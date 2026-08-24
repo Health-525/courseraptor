@@ -1,0 +1,25 @@
+{
+  "name": "courseraptor",
+  "version": "0.1.0",
+  "description": "NJTECH 教务对话式 agent：抢课/课表/成绩/考试，一句话搞定",
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@ai-sdk/deepseek": "^3.0.31",
+    "@ai-sdk/tui": "^1.0.78",
+    "ai": "^7.0.77",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}
