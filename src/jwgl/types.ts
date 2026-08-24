@@ -36,3 +36,10 @@ export interface GradeCourse {
   type: string;
   semester: string;
 }
+
+export interface NewsItem {
+  title: string;
+  url: string;
+  date: string;
+  category?: string;
+}

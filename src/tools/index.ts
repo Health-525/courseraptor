@@ -1,6 +1,6 @@
 /**
  * CourseRaptor agent 工具集
- * 7 个工具：选课状态 / 搜课 / 盯课 / 抢课 / 课表 / 成绩 / 考试
+ * 8 个工具：选课状态 / 搜课 / 盯课 / 抢课 / 课表 / 成绩 / 考试 / 教务通知
  */
 
 import { tool } from "ai";
@@ -9,6 +9,7 @@ import { z } from "zod";
 import { config } from "../config";
 import { fetchSchedule, fetchExams } from "../jwgl/academics";
 import { fetchAllGrades } from "../jwgl/grades";
+import { fetchJwcNews } from "../jwgl/news";
 import {
   inspectXk,
   searchCourses,
@@ -315,6 +316,44 @@ export const raptorTools = {
           seatNumber: e.seatNumber || undefined,
         })),
         note: exams.length === 0 ? "暂无考试安排" : undefined,
+      };
+    },
+  }),
+
+  /** 8. 教务处官网通知 */
+  get_jwc_news: tool({
+    description:
+      "抓取南京工业大学教务处官网（jwc.njtech.edu.cn）的最新通知，涵盖三个板块：公告通知（含选课/考试/学籍等重要安排）、教学动态、考试排课。公开页面无需登录。用户问「最近有什么教务通知」「选课什么时候开始」「有没有关于××的通知」时调用。",
+    inputSchema: z.object({
+      category: z
+        .enum(["公告通知", "教学动态", "考试排课"])
+        .optional()
+        .describe("只看某个板块（可选，默认全部）"),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(30)
+        .default(10)
+        .describe("返回条数（默认 10）"),
+    }),
+    execute: async ({ category, limit }) => {
+      const items = await fetchJwcNews([], 30);
+      const filtered = category
+        ? items.filter((i) => i.category === category)
+        : items;
+      return {
+        total: filtered.length,
+        items: filtered.slice(0, limit).map((i) => ({
+          title: i.title,
+          date: i.date,
+          category: i.category,
+          url: i.url,
+        })),
+        note:
+          filtered.length === 0
+            ? "未抓到通知（官网结构可能变化或网络异常）"
+            : undefined,
       };
     },
   }),
