@@ -7,6 +7,9 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit"
   },
+  "bin": {
+    "raptor": "bin/raptor.cjs"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
@@ -15,11 +18,11 @@
     "@ai-sdk/deepseek": "^3.0.31",
     "@ai-sdk/tui": "^1.0.78",
     "ai": "^7.0.77",
+    "tsx": "^4.23.12",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
-    "tsx": "^4.23.12",
     "typescript": "^7.0.2"
   }
 }

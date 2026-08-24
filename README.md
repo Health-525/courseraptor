@@ -27,8 +27,12 @@ agent（DeepSeek）自动调用工具完成登录、查询、监控、提交。
 # 1. 配置凭证（教务账号已预填的话只需补 DeepSeek Key）
 cp .env.example .env   # 或直接编辑 .env
 
-# 2. 启动
-npm run dev
+# 2. 注册全局命令（只需一次，任意目录可用 raptor）
+npm link
+
+# 3. 启动（二选一）
+raptor          # 全局命令，任意目录
+npm run dev     # 项目内开发模式
 ```
 
 `.env` 需要的字段：
@@ -61,20 +65,21 @@ npm run dev
 ## 项目结构
 
 ```
-src/
-├── index.ts        # 入口：终端对话 UI
-├── agent.ts        # agent 定义（系统提示词 + 装配）
-├── config.ts       # .env 配置加载
-├── jwgl/           # 教务协议层（移植自 ScholarFlow 并实战校准）
-│   ├── auth.ts     #   登录（RSA + CSRF）
-│   ├── http.ts     #   带 Cookie 管理的 HTTP 客户端
-│   ├── crypto.ts   #   正方 RSA 密码加密
-│   ├── academics.ts#   课表 / 考试抓取
-│   ├── grades.ts   #   成绩 + GPA 计算
-│   ├── news.ts     #   教务处官网通知爬取（公开页面）
-│   ├── xk.ts       #   选课（搜索/余量/提交，官方 JS 逆向校准）
-│   └── types.ts
-└── tools/          # agent 工具（8 个）+ 会话缓存管理
+├── bin/raptor.cjs  # 全局命令入口（npm link 后任意目录敲 raptor）
+└── src/
+    ├── index.ts    #   入口：终端对话 UI
+    ├── agent.ts    #   agent 定义（系统提示词 + 装配）
+    ├── config.ts   #   .env 配置加载（按项目根解析，任意目录启动均可）
+    ├── jwgl/       #   教务协议层（移植自 ScholarFlow 并实战校准）
+    │   ├── auth.ts     #   登录（RSA + CSRF）
+    │   ├── http.ts     #   带 Cookie 管理的 HTTP 客户端
+    │   ├── crypto.ts   #   正方 RSA 密码加密
+    │   ├── academics.ts#   课表 / 考试抓取
+    │   ├── grades.ts   #   成绩 + GPA 计算
+    │   ├── news.ts     #   教务处官网通知爬取（公开页面）
+    │   ├── xk.ts       #   选课（搜索/余量/提交，官方 JS 逆向校准）
+    │   └── types.ts
+    └── tools/      #   agent 工具（8 个）+ 会话缓存管理
 ```
 
 ## 安全提示

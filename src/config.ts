@@ -3,6 +3,9 @@
  * Node 24 原生 process.loadEnvFile()，无 dotenv 依赖
  */
 
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 export interface RaptorConfig {
   deepseekApiKey: string;
   deepseekBaseUrl?: string;
@@ -11,11 +14,18 @@ export interface RaptorConfig {
   jwglPassword: string;
 }
 
-// 加载项目根目录 .env（不存在时静默跳过）
+// .env 跟随包位置解析：全局命令 raptor 可在任意目录启动
+const PROJECT_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  ".."
+);
+const ENV_FILE = path.join(PROJECT_ROOT, ".env");
+
+// 不存在时静默跳过，依赖真实环境变量
 try {
-  process.loadEnvFile();
+  process.loadEnvFile(ENV_FILE);
 } catch {
-  /* .env 不存在，依赖真实环境变量 */
+  /* .env 不存在 */
 }
 
 function env(key: string): string | undefined {
@@ -39,7 +49,7 @@ export function loadConfig(): RaptorConfig {
 
   if (missing.length > 0) {
     throw new Error(
-      `缺少必要配置：${missing.join("、")}。请在项目根目录 .env 中填写（参考 .env.example）`
+      `缺少必要配置：${missing.join("、")}。请在 ${ENV_FILE} 中填写（参考 .env.example）`
     );
   }
 
