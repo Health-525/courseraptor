@@ -84,6 +84,47 @@ export function parseSemesterString(
   return null;
 }
 
+// ── 周次计算（移植自 ScholarFlow njtechAdapter.getCurrentSemester）──
+// 正方不提供开学日期接口；已知学期记录实际值，未来学期按
+// 「秋季 9 月第一个周一 / 春季 3 月第一个周一」估算，校历发布后校准。
+
+const WEEK1_MONDAY: Record<string, string> = {
+  "2025-1": "2025-09-01",
+  "2025-2": "2026-03-02",
+  "2026-1": "2026-09-07", // 估算：2026 年 9 月第一个周一
+};
+
+function firstMondayOfMonth(year: number, month: number): string {
+  const d = new Date(year, month - 1, 1);
+  const offset = (8 - d.getDay()) % 7; // 到下一个周一的天数
+  return `${year}-${String(month).padStart(2, "0")}-${String(1 + offset).padStart(2, "0")}`;
+}
+
+/** 学期开学日期（第 1 周的周一） */
+export function week1MondayFor(
+  year: number,
+  semester: number
+): { date: string; estimated: boolean } {
+  const key = `${year}-${semester === 3 ? 1 : 2}`;
+  if (WEEK1_MONDAY[key]) return { date: WEEK1_MONDAY[key], estimated: false };
+  return {
+    date: semester === 3 ? firstMondayOfMonth(year, 9) : firstMondayOfMonth(year + 1, 3),
+    estimated: true,
+  };
+}
+
+/** 当前教学周；未开学或超出 30 周时返回 null */
+export function currentWeekOf(
+  year: number,
+  semester: number
+): { week: number; week1Monday: string; estimated: boolean } | null {
+  const { date, estimated } = week1MondayFor(year, semester);
+  const start = new Date(`${date}T00:00:00`).getTime();
+  const week = Math.floor((Date.now() - start) / (7 * 86400000)) + 1;
+  if (week < 1 || week > 30) return null;
+  return { week, week1Monday: date, estimated };
+}
+
 // ── 课表抓取 ────────────────────────────────────────────────
 
 export async function fetchSchedule(

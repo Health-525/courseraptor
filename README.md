@@ -49,6 +49,7 @@ npm run dev     # 项目内开发模式
 |---|---|---|
 | `get_xk_status` | 选课模块状态（是否开放 / 接口是否被拦截） | ~3s |
 | `search_courses` | 按关键词搜课程、查各教学班余量 | ~3s |
+| `search_jxb` | 查某门课所有教学班明细（各班教师/时间/地点/余量对比） | ~5s |
 | `watch_courses` | 限时盯课监控（只观察不提交），返回余量事件流 | 指定时长 |
 | `grab_course` | 抢课：余量出现即自动提交选课，成功即停 | 指定时长 |
 | `get_schedule` | 课表（自动探测最新学期，交界期不查错；可指定如 2026-2027-1） | ~3-5s |
@@ -74,12 +75,12 @@ npm run dev     # 项目内开发模式
     │   ├── auth.ts     #   登录（RSA + CSRF）
     │   ├── http.ts     #   带 Cookie 管理的 HTTP 客户端
     │   ├── crypto.ts   #   正方 RSA 密码加密
-    │   ├── academics.ts#   课表 / 考试抓取
+    │   ├── academics.ts#   课表 / 考试抓取（学期探测 + 周次计算 + 节次时间）
     │   ├── grades.ts   #   成绩 + GPA 计算
     │   ├── news.ts     #   教务处官网通知爬取（公开页面）
     │   ├── xk.ts       #   选课（搜索/余量/提交，官方 JS 逆向校准）
     │   └── types.ts
-    └── tools/      #   agent 工具（8 个）+ 会话缓存管理
+    └── tools/      #   agent 工具（9 个）+ 会话缓存管理
 ```
 
 ## 安全提示

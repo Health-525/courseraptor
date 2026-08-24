@@ -1,6 +1,6 @@
 /**
  * CourseRaptor agent 工具集
- * 8 个工具：选课状态 / 搜课 / 盯课 / 抢课 / 课表 / 成绩 / 考试 / 教务通知
+ * 9 个工具：选课状态 / 搜课 / 查教学班 / 盯课 / 抢课 / 课表 / 成绩 / 考试 / 教务通知
  */
 
 import { tool } from "ai";
@@ -11,12 +11,15 @@ import {
   fetchScheduleSmart,
   fetchExamsSmart,
   parseSemesterString,
+  currentWeekOf,
+  NJTECH_PERIOD_TIMES,
 } from "../jwgl/academics";
 import { fetchAllGrades } from "../jwgl/grades";
 import { fetchJwcNews } from "../jwgl/news";
 import {
   inspectXk,
   searchCourses,
+  fetchJxbList,
   submitCourse,
   matchTargets,
   type XkCourse,
@@ -35,7 +38,17 @@ function now(): string {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
 }
 
+/** 节次号 -> 上课时间段，如 [7,8] -> "16:00-17:40" */
+function periodTimeRange(periods: number[]): string | undefined {
+  if (!periods.length) return undefined;
+  const first = NJTECH_PERIOD_TIMES[String(periods[0])];
+  const last = NJTECH_PERIOD_TIMES[String(periods[periods.length - 1])];
+  if (!first || !last) return undefined;
+  return `${first.split("-")[0]}-${last.split("-")[1]}`;
+}
+
 function courseBrief(c: XkCourse) {
+  const raw = (c.raw ?? {}) as Record<string, unknown>;
   return {
     courseName: c.courseName,
     courseCode: c.courseCode,
@@ -45,6 +58,8 @@ function courseBrief(c: XkCourse) {
     selected: c.selected,
     remain: c.remain,
     jxbId: c.jxbId,
+    ...(raw.sksj ? { schedule: String(raw.sksj) } : {}),
+    ...(raw.jxdd ? { venue: String(raw.jxdd) } : {}),
   };
 }
 
@@ -197,7 +212,73 @@ export const raptorTools = {
     },
   }),
 
-  /** 3. 盯课监控（有限时长，不提交选课） */
+  /** 3. 查教学班列表（同门课各班对比） */
+  search_jxb: tool({
+    description:
+      "查某门课程下所有教学班的明细：每个班的教师、上课时间、地点、容量、已选人数、剩余名额。适合「这门课哪个老师还有名额」「周几的班还开着」这类对比问题。输入课程名关键词，自动匹配课程号后展开教学班。",
+    inputSchema: z.object({
+      courseName: z.string().describe("课程名关键词（模糊匹配），如「操作系统原理」"),
+    }),
+    execute: async ({ courseName }) => {
+      let session = await getXkSession();
+
+      const searchOnce = async () => {
+        try {
+          return await searchCourses(session, courseName);
+        } catch (e) {
+          if ((e as Error).message === "SESSION_EXPIRED") {
+            invalidateXkSession();
+            session = await getXkSession(true);
+            return await searchCourses(session, courseName);
+          }
+          throw e;
+        }
+      };
+      const courses = await searchOnce();
+
+      const codes = [
+        ...new Set(courses.map((c) => c.courseCode).filter(Boolean)),
+      ].slice(0, 3);
+      if (codes.length === 0) {
+        return {
+          error:
+            "未查到该课程。选课未开放（isXkOpen=false）时课程/教学班接口均不可查，可先调 get_xk_status 确认。",
+        };
+      }
+
+      const result = [];
+      for (const code of codes) {
+        let list: XkCourse[];
+        try {
+          list = await fetchJxbList(session, { courseCode: code });
+        } catch (e) {
+          if ((e as Error).message === "SESSION_EXPIRED") {
+            invalidateXkSession();
+            session = await getXkSession(true);
+            list = await fetchJxbList(session, { courseCode: code });
+          } else throw e;
+        }
+        result.push({
+          courseCode: code,
+          courseName:
+            courses.find((c) => c.courseCode === code)?.courseName || code,
+          jxbCount: list.length,
+          classes: list.map(courseBrief),
+        });
+      }
+      return {
+        isXkOpen: session.isXkOpen,
+        matchedCourses: codes.length,
+        courses: result,
+        note:
+          session.isXkOpen === false
+            ? "当前选课未开放，接口可能被拦截，数据为空属正常"
+            : undefined,
+      };
+    },
+  }),
+
+  /** 4. 盯课监控（有限时长，不提交选课） */
   watch_courses: tool({
     description:
       "在指定时长内轮询监控目标课程的余量变化（默认 60 秒，每轮间隔约 3 秒含随机抖动）。只观察不提交选课。返回期间的全部事件（何时出现余量）与结束时的余量快照。",
@@ -230,7 +311,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 4. 自动抢课（真实提交选课操作！） */
+  /** 5. 自动抢课（真实提交选课操作！） */
   grab_course: tool({
     description:
       "抢课模式：轮询监控目标课程，一出现余量立即自动提交选课请求，成功后停止。注意：此工具会真实提交选课操作，调用前务必先与用户确认目标课程。默认跑 120 秒。",
@@ -258,7 +339,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 5. 课表查询 */
+  /** 6. 课表查询 */
   get_schedule: tool({
     description:
       "查询课表，返回每门课的上课时间、地点、教师、周次。默认自动探测最新有课表的学期（学期交界期也不会查错）；也可指定学期，如「2026-2027-1」。",
@@ -274,28 +355,31 @@ export const raptorTools = {
         return { error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
       }
       const cookie = await getCookie();
-      const { label, courses } = await fetchScheduleSmart(
-        cookie,
-        parsed?.year,
-        parsed?.semester
-      );
+      const r = await fetchScheduleSmart(cookie, parsed?.year, parsed?.semester);
+      const week = currentWeekOf(r.year, r.semester);
       return {
-        term: label,
-        total: courses.length,
-        courses: courses.map((c) => ({
+        term: r.label,
+        currentWeek: week ? `第 ${week.week} 周` : "未开学或不在教学周内",
+        week1Monday: week?.week1Monday,
+        weekNote: week?.estimated
+          ? "开学日期为估算值（校历发布后校准）"
+          : undefined,
+        total: r.courses.length,
+        courses: r.courses.map((c) => ({
           title: c.title,
           weekday: WEEKDAY_NAMES[c.weekday] ?? `周${c.weekday}`,
           periods: c.periods.join(","),
+          time: periodTimeRange(c.periods),
           weeks: c.weeks,
           location: c.location,
           teacher: c.teacher,
         })),
-        note: courses.length === 0 ? "课表为空（假期或学期未排课属正常）" : undefined,
+        note: r.courses.length === 0 ? "课表为空（假期或学期未排课属正常）" : undefined,
       };
     },
   }),
 
-  /** 6. 成绩查询 */
+  /** 7. 成绩查询 */
   get_grades: tool({
     description: "查询全部学期的成绩与 GPA（按 NJTECH 绩点规则计算，重复课程取最高分）。",
     inputSchema: z.object({}),
@@ -318,7 +402,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 7. 考试安排 */
+  /** 8. 考试安排 */
   get_exams: tool({
     description:
       "查询考试安排：科目、日期、时间、考场、座位号。默认自动探测最新学期（也可指定，如「2026-2027-1」）。",
@@ -354,7 +438,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 8. 教务处官网通知 */
+  /** 9. 教务处官网通知 */
   get_jwc_news: tool({
     description:
       "抓取南京工业大学教务处官网（jwc.njtech.edu.cn）的最新通知，涵盖三个板块：公告通知（含选课/考试/学籍等重要安排）、教学动态、考试排课。公开页面无需登录。用户问「最近有什么教务通知」「选课什么时候开始」「有没有关于××的通知」时调用。",
