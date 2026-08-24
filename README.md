@@ -42,6 +42,7 @@ npm run dev     # 项目内开发模式
 | `DEEPSEEK_API_KEY` | DeepSeek API Key（必填） |
 | `JWGL_USERNAME` / `JWGL_PASSWORD` | 教务系统学号/密码（必填） |
 | `RAPTOR_MODEL` | 模型，默认 `deepseek-v4-flash`（可选） |
+| `FIRECRAWL_API_KEY` | Firecrawl 云解析通知附件为文本（可选，未配置则附件下载到本地） |
 
 ## 工具清单（模型可调用）
 
@@ -57,6 +58,7 @@ npm run dev     # 项目内开发模式
 | `get_exams` | 考试安排（自动探测最新学期，可指定学期） | ~3-5s |
 | `get_jwc_news` | 教务处官网最新通知（公告通知 / 教学动态 / 考试排课，无需登录） | ~5s |
 | `read_jwc_notice` | 读某篇通知的正文全文 + 附件链接（时间安排都在正文里） | ~3s |
+| `fetch_attachment` | 通知附件获取：配 `FIRECRAWL_API_KEY` 时解析为文本，否则下载到本地 `downloads/` | ~5s |
 
 ## 已知状态（2026-08）
 
@@ -81,7 +83,7 @@ npm run dev     # 项目内开发模式
     │   ├── news.ts     #   教务处官网通知爬取（公开页面）
     │   ├── xk.ts       #   选课（搜索/余量/提交，官方 JS 逆向校准）
     │   └── types.ts
-    └── tools/      #   agent 工具（10 个）+ 会话缓存管理
+    └── tools/      #   agent 工具（11 个）+ 会话缓存管理
 ```
 
 ## 安全提示

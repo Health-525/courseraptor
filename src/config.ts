@@ -12,10 +12,12 @@ export interface RaptorConfig {
   model: string;
   jwglUsername: string;
   jwglPassword: string;
+  /** Firecrawl 云解析（通知附件转 markdown），可选 */
+  firecrawlApiKey?: string;
 }
 
 // .env 跟随包位置解析：全局命令 raptor 可在任意目录启动
-const PROJECT_ROOT = path.resolve(
+export const PROJECT_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   ".."
 );
@@ -40,6 +42,7 @@ export function loadConfig(): RaptorConfig {
     model: env("RAPTOR_MODEL") ?? "deepseek-v4-flash",
     jwglUsername: env("JWGL_USERNAME") ?? "",
     jwglPassword: env("JWGL_PASSWORD") ?? "",
+    firecrawlApiKey: env("FIRECRAWL_API_KEY"),
   };
 
   const missing: string[] = [];

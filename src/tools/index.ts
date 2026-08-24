@@ -1,12 +1,13 @@
 /**
  * CourseRaptor agent 工具集
- * 10 个工具：选课状态 / 搜课 / 查教学班 / 盯课 / 抢课 / 课表 / 成绩 / 考试 / 教务通知列表 / 通知正文
+ * 11 个工具：选课状态 / 搜课 / 查教学班 / 盯课 / 抢课 / 课表 / 成绩 / 考试 / 通知列表 / 通知正文 / 附件
  */
 
 import { tool } from "ai";
 import { z } from "zod";
 
 import { config } from "../config";
+import { fetchAttachment } from "../attachments";
 import {
   fetchScheduleSmart,
   fetchExamsSmart,
@@ -501,12 +502,31 @@ export const raptorTools = {
             : undefined,
           note:
             article.text.length === 0
-              ? "正文为空（可能需要附件查看，或页面结构变化）"
+              ? "正文为空（可能内容在附件里，见 attachments；或页面结构变化）"
               : undefined,
         };
       } catch (e) {
         return { error: `通知抓取失败：${(e as Error).message.slice(0, 100)}` };
       }
+    },
+  }),
+
+  /** 11. 附件获取（Firecrawl 云解析 / 本地下载） */
+  fetch_attachment: tool({
+    description:
+      "获取通知的文件附件（.pdf/.doc/.xls 等，URL 来自 read_jwc_notice 返回的 attachments）。配置了 FIRECRAWL_API_KEY 时通过 Firecrawl 把附件解析成 markdown 文本直接返回；未配置时下载到本地 downloads 目录并返回文件路径。问「附件里怎么说的」「把附件内容读出来」时调用。",
+    inputSchema: z.object({
+      url: z.string().describe("附件下载 URL（来自 read_jwc_notice 的 attachments[].url）"),
+    }),
+    execute: async ({ url }) => {
+      const isNjtech = /^https?:\/\/[a-z0-9.-]*\.njtech\.edu\.cn\//.test(url);
+      if (!isNjtech && !config.firecrawlApiKey) {
+        return {
+          error:
+            "未配置 FIRECRAWL_API_KEY 时，仅支持 njtech.edu.cn 域名的附件下载",
+        };
+      }
+      return await fetchAttachment(url);
     },
   }),
 };

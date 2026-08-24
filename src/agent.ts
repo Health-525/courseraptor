@@ -30,6 +30,7 @@ const SYSTEM_PROMPT = `你是「迅猛龙」（CourseRaptor），南京工业大
 - get_exams：考试安排
 - get_jwc_news：教务处官网最新通知列表（公告通知/教学动态/考试排课；选课时间安排类通知从这里查）
 - read_jwc_notice：读通知正文全文（时间安排/截止日期/开学时间都在正文里；先 get_jwc_news 拿 URL 再读）
+- fetch_attachment：读通知的文件附件（配 FIRECRAWL_API_KEY 时解析成文本，否则下载到本地给路径）
 
 ## 背景知识（重要）
 
