@@ -7,7 +7,11 @@ import { tool } from "ai";
 import { z } from "zod";
 
 import { config } from "../config";
-import { fetchSchedule, fetchExams } from "../jwgl/academics";
+import {
+  fetchScheduleSmart,
+  fetchExamsSmart,
+  parseSemesterString,
+} from "../jwgl/academics";
 import { fetchAllGrades } from "../jwgl/grades";
 import { fetchJwcNews } from "../jwgl/news";
 import {
@@ -256,12 +260,27 @@ export const raptorTools = {
 
   /** 5. 课表查询 */
   get_schedule: tool({
-    description: "查询本学期课表（自动推断当前学年学期），返回每门课的上课时间、地点、教师、周次。",
-    inputSchema: z.object({}),
-    execute: async () => {
+    description:
+      "查询课表，返回每门课的上课时间、地点、教师、周次。默认自动探测最新有课表的学期（学期交界期也不会查错）；也可指定学期，如「2026-2027-1」。",
+    inputSchema: z.object({
+      semester: z
+        .string()
+        .optional()
+        .describe('指定学期，格式如「2026-2027-1」或「2025-2026-2」；不填则自动探测最新学期'),
+    }),
+    execute: async ({ semester }) => {
+      const parsed = semester ? parseSemesterString(semester) : null;
+      if (semester && !parsed) {
+        return { error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
+      }
       const cookie = await getCookie();
-      const courses = await fetchSchedule(cookie);
+      const { label, courses } = await fetchScheduleSmart(
+        cookie,
+        parsed?.year,
+        parsed?.semester
+      );
       return {
+        term: label,
         total: courses.length,
         courses: courses.map((c) => ({
           title: c.title,
@@ -271,7 +290,7 @@ export const raptorTools = {
           location: c.location,
           teacher: c.teacher,
         })),
-        note: courses.length === 0 ? "课表为空（假期或学期末属正常）" : undefined,
+        note: courses.length === 0 ? "课表为空（假期或学期未排课属正常）" : undefined,
       };
     },
   }),
@@ -301,12 +320,27 @@ export const raptorTools = {
 
   /** 7. 考试安排 */
   get_exams: tool({
-    description: "查询本学期考试安排：科目、日期、时间、考场、座位号。",
-    inputSchema: z.object({}),
-    execute: async () => {
+    description:
+      "查询考试安排：科目、日期、时间、考场、座位号。默认自动探测最新学期（也可指定，如「2026-2027-1」）。",
+    inputSchema: z.object({
+      semester: z
+        .string()
+        .optional()
+        .describe('指定学期，格式如「2026-2027-1」；不填则自动探测最新学期'),
+    }),
+    execute: async ({ semester }) => {
+      const parsed = semester ? parseSemesterString(semester) : null;
+      if (semester && !parsed) {
+        return { error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
+      }
       const cookie = await getCookie();
-      const exams = await fetchExams(cookie);
+      const { label, exams } = await fetchExamsSmart(
+        cookie,
+        parsed?.year,
+        parsed?.semester
+      );
       return {
+        term: label,
         total: exams.length,
         exams: exams.map((e) => ({
           subject: e.subject,
@@ -315,7 +349,7 @@ export const raptorTools = {
           location: e.location,
           seatNumber: e.seatNumber || undefined,
         })),
-        note: exams.length === 0 ? "暂无考试安排" : undefined,
+        note: exams.length === 0 ? "该学期暂无考试安排" : undefined,
       };
     },
   }),

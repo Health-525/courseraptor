@@ -23,25 +23,65 @@ export const NJTECH_PERIOD_TIMES: Record<string, string> = {
 };
 
 /**
- * 学年/学期参数推断
+ * 学期参数与「当前学期」探测
+ *
+ * 正方不提供当前学期查询接口（无参数请求返回 0 条，页面接口无 HTML），
+ * 按日历日期推断在学期交界期（如 8 月下旬新学期课表已生成）必然出错，
+ * 因此改为候选学期探测：从最新可能学期开始逐个查询，取第一个有数据的。
+ *
  * xnm = 学年起始年；第一学期(秋季) xqm=3，第二学期(春季) xqm=12
  */
-export function currentXnxq(
-  xnm?: number,
-  xqm?: number
-): { year: number; semester: number } {
+
+export interface TermRef {
+  year: number;
+  semester: number; // 3=第一学期 12=第二学期
+  label: string;
+}
+
+export function termLabel(year: number, semester: number): string {
+  return `${year}-${year + 1}学年${semester === 3 ? "第一" : "第二"}学期`;
+}
+
+/** 候选学期列表（新到旧）。交界月（7-8 月）优先探测即将开始的秋学期 */
+export function candidateXnxqList(): Array<{ year: number; semester: number }> {
   const now = new Date();
-  const month = now.getMonth(); // 0-based: Jan=0, Jun=5, Sep=8
-  const isFirstSemester = month >= 8 || month <= 1; // Sep-Jan
-  const year =
-    xnm ??
-    (isFirstSemester
-      ? month >= 8
-        ? now.getFullYear()
-        : now.getFullYear() - 1
-      : now.getFullYear() - 1);
-  const semester = xqm ?? (isFirstSemester ? 3 : 12);
-  return { year, semester };
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
+  if (m >= 9) {
+    // 秋学期进行中
+    return [
+      { year: y, semester: 3 },
+      { year: y - 1, semester: 12 },
+    ];
+  }
+  if (m >= 7) {
+    // 暑假：新学期课表通常已生成，先探秋学期
+    return [
+      { year: y, semester: 3 },
+      { year: y - 1, semester: 12 },
+      { year: y - 1, semester: 3 },
+    ];
+  }
+  // 1-6 月：春学期（学年始于上一年）
+  return [
+    { year: y - 1, semester: 12 },
+    { year: y - 1, semester: 3 },
+  ];
+}
+
+/** 解析用户/模型给定的学期串，如「2026-2027-1」「2025-2026第2学期」「2026-1」 */
+export function parseSemesterString(
+  s: string
+): { year: number; semester: number } | null {
+  let m = s.match(/(\d{4})\D+(\d{4})\D*(1|2|一|二)(?!\d)/);
+  if (m) {
+    return { year: parseInt(m[1], 10), semester: m[3] === "1" || m[3] === "一" ? 3 : 12 };
+  }
+  m = s.match(/(\d{4})\D(1|2|一|二)(?!\d)/);
+  if (m) {
+    return { year: parseInt(m[1], 10), semester: m[2] === "1" || m[2] === "一" ? 3 : 12 };
+  }
+  return null;
 }
 
 // ── 课表抓取 ────────────────────────────────────────────────
@@ -51,8 +91,40 @@ export async function fetchSchedule(
   xnm?: number,
   xqm?: number
 ): Promise<CourseData[]> {
+  return (await fetchScheduleSmart(cookie, xnm, xqm)).courses;
+}
+
+/**
+ * 智能课表抓取：未指定学期时按候选列表探测，返回第一个有数据的学期
+ * （同时带上年份与学期标签，解决交界期「年+学期」双双推断错误的问题）
+ */
+export async function fetchScheduleSmart(
+  cookie: string,
+  xnm?: number,
+  xqm?: number
+): Promise<TermRef & { courses: CourseData[] }> {
+  const candidates =
+    xnm && xqm ? [{ year: xnm, semester: xqm }] : candidateXnxqList();
+
+  for (const c of candidates) {
+    const courses = await fetchScheduleFor(cookie, c.year, c.semester);
+    if (courses.length > 0) {
+      return { ...c, label: termLabel(c.year, c.semester), courses };
+    }
+  }
+
+  // 全部候选都为空：返回首选学期（保持「假期空课表」语义）
+  const first = candidates[0];
+  return { ...first, label: termLabel(first.year, first.semester), courses: [] };
+}
+
+/** 抓取指定单个学期的课表（kbList 为空时回退用考试数据反推） */
+async function fetchScheduleFor(
+  cookie: string,
+  year: number,
+  semester: number
+): Promise<CourseData[]> {
   const client = createClientWithCookie(BASE, cookie);
-  const { year, semester } = currentXnxq(xnm, xqm);
 
   const resp = await client.req("/kbcx/xskbcx_cxXsKb.html?gnmkdm=N253508", {
     method: "POST",
@@ -179,8 +251,36 @@ export async function fetchExams(
   xnm?: number,
   xqm?: number
 ): Promise<ExamData[]> {
+  return (await fetchExamsSmart(cookie, xnm, xqm)).exams;
+}
+
+/** 智能考试安排抓取：未指定学期时按候选列表探测（与课表同一套学期策略） */
+export async function fetchExamsSmart(
+  cookie: string,
+  xnm?: number,
+  xqm?: number
+): Promise<TermRef & { exams: ExamData[] }> {
+  const candidates =
+    xnm && xqm ? [{ year: xnm, semester: xqm }] : candidateXnxqList();
+
+  for (const c of candidates) {
+    const exams = await fetchExamsFor(cookie, c.year, c.semester);
+    if (exams.length > 0) {
+      return { ...c, label: termLabel(c.year, c.semester), exams };
+    }
+  }
+
+  const first = candidates[0];
+  return { ...first, label: termLabel(first.year, first.semester), exams: [] };
+}
+
+/** 抓取指定单个学期的考试安排 */
+async function fetchExamsFor(
+  cookie: string,
+  year: number,
+  semester: number
+): Promise<ExamData[]> {
   const client = createClientWithCookie(BASE, cookie);
-  const { year, semester } = currentXnxq(xnm, xqm);
 
   const resp = await client.req(
     "/kwgl/kscx_cxXsksxxIndex.html?doType=query&gnmkdm=N358105",
