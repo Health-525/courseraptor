@@ -91,7 +91,10 @@ export function parseSemesterString(
 const WEEK1_MONDAY: Record<string, string> = {
   "2025-1": "2025-09-01",
   "2025-2": "2026-03-02",
-  "2026-1": "2026-09-07", // 估算：2026 年 9 月第一个周一
+  // 2026 秋：尚未见校历原文（正式校历发布在 OA 系统，需 WebVPN 登录），
+  // 按 9 月第一个周一估算，与 2026 选课通知日期交叉吻合：
+  // 9/2 公布停开、9/10-13 第 1 周补退选、9/21-24 第 3 周课程补退选
+  "2026-1": "2026-09-07",
 };
 
 function firstMondayOfMonth(year: number, month: number): string {

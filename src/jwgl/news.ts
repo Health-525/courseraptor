@@ -154,3 +154,76 @@ export async function fetchJwcNews(
   // No new items - return existing
   return existingItems;
 }
+
+// ── 通知正文抓取 ────────────────────────────────────────────
+
+export interface JwcArticle {
+  title: string;
+  text: string;
+  attachments: Array<{ name: string; url: string }>;
+}
+
+/**
+ * 抓取一篇教务处通知的正文（webplus CMS 文章页）
+ * 时间安排、开学/考试/选课日期都在正文里，列表页只有标题
+ */
+export async function fetchJwcArticle(url: string): Promise<JwcArticle> {
+  const html = await fetchHtml(url);
+  const title =
+    html.match(/<title>([^<]*)<\/title>/i)?.[1]?.trim().replace(/-南京工业大学教务处.*$/, "") ?? "";
+
+  // 正文在 v_news_content / vsb_content 容器内；容器有嵌套 div，
+  // 必须做配对计数提取（正则非贪婪会在第一个 </div> 截断）
+  let bodyHtml =
+    extractDivBlock(html, /<div[^>]*class="[^"]*v_news_content[^"]*"[^>]*>/i) ??
+    extractDivBlock(html, /<div[^>]*class="[^"]*vsb_content[^"]*"[^>]*>/i);
+  if (!bodyHtml || htmlToText(bodyHtml).length < 200) {
+    bodyHtml = html; // 容器缺失/过短时退化为整页剥离
+  }
+
+  // 附件（教务处通知常带 .xls/.pdf/.doc，含选课安排表/校历等）
+  const attachments: JwcArticle["attachments"] = [];
+  for (const m of bodyHtml.matchAll(
+    /<a[^>]*href="([^"]+\.(?:xls|xlsx|pdf|doc|docx|zip|rar))"[^>]*>([\s\S]*?)<\/a>/gi
+  )) {
+    const name =
+      m[2].replace(/<[^>]+>/g, "").trim() || m[1].split("/").pop() || "";
+    try {
+      const full = new URL(m[1], url).href;
+      if (!attachments.some((a) => a.url === full)) {
+        attachments.push({ name, url: full });
+      }
+    } catch {
+      /* 非法链接跳过 */
+    }
+  }
+
+  return { title, text: htmlToText(bodyHtml), attachments };
+}
+
+/** 提取指定开标签 div 的完整内容（<div 配对计数，正确处理嵌套） */
+function extractDivBlock(html: string, openRe: RegExp): string | null {
+  const m = openRe.exec(html);
+  if (!m) return null;
+  const start = m.index + m[0].length;
+  const tokenRe = /<div\b|<\/div\s*>/gi;
+  tokenRe.lastIndex = start;
+  let depth = 1;
+  let t: RegExpExecArray | null;
+  while ((t = tokenRe.exec(html)) !== null) {
+    depth += t[0].toLowerCase().startsWith("</") ? -1 : 1;
+    if (depth === 0) return html.slice(start, t.index);
+  }
+  return null;
+}
+
+function htmlToText(html: string): string {
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}

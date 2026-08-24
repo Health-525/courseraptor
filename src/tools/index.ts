@@ -1,6 +1,6 @@
 /**
  * CourseRaptor agent 工具集
- * 9 个工具：选课状态 / 搜课 / 查教学班 / 盯课 / 抢课 / 课表 / 成绩 / 考试 / 教务通知
+ * 10 个工具：选课状态 / 搜课 / 查教学班 / 盯课 / 抢课 / 课表 / 成绩 / 考试 / 教务通知列表 / 通知正文
  */
 
 import { tool } from "ai";
@@ -15,7 +15,7 @@ import {
   NJTECH_PERIOD_TIMES,
 } from "../jwgl/academics";
 import { fetchAllGrades } from "../jwgl/grades";
-import { fetchJwcNews } from "../jwgl/news";
+import { fetchJwcNews, fetchJwcArticle } from "../jwgl/news";
 import {
   inspectXk,
   searchCourses,
@@ -473,6 +473,40 @@ export const raptorTools = {
             ? "未抓到通知（官网结构可能变化或网络异常）"
             : undefined,
       };
+    },
+  }),
+
+  /** 10. 通知正文阅读 */
+  read_jwc_notice: tool({
+    description:
+      "读取一篇教务处通知的正文全文（get_jwc_news 只返回标题列表，具体时间安排都在正文里）。输入通知 URL（来自 get_jwc_news 结果的 items[].url），返回正文文本与附件下载链接。用户问「选课几点开始」「补选什么时候截止」「通知里怎么说的」时：先 get_jwc_news 找到相关通知，再用本工具读正文。",
+    inputSchema: z.object({
+      url: z
+        .string()
+        .describe("通知文章 URL（来自 get_jwc_news 返回的 items[].url）"),
+    }),
+    execute: async ({ url }) => {
+      if (!/^https?:\/\/jwc\.njtech\.edu\.cn\//.test(url)) {
+        return { error: "仅支持 jwc.njtech.edu.cn 域名下的通知 URL" };
+      }
+      try {
+        const article = await fetchJwcArticle(url);
+        const MAX = 6000;
+        return {
+          title: article.title,
+          text: article.text.slice(0, MAX),
+          truncated: article.text.length > MAX || undefined,
+          attachments: article.attachments.length
+            ? article.attachments
+            : undefined,
+          note:
+            article.text.length === 0
+              ? "正文为空（可能需要附件查看，或页面结构变化）"
+              : undefined,
+        };
+      } catch (e) {
+        return { error: `通知抓取失败：${(e as Error).message.slice(0, 100)}` };
+      }
     },
   }),
 };
