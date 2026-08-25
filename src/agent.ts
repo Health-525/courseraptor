@@ -1,19 +1,40 @@
 /**
  * CourseRaptor agent 定义：模型 + 系统提示词 + 工具装配
+ *
+ * 两层记忆：
+ * - 短期：模型中间件捕获会话逐轮落盘，下次启动注入上次会话转写
+ * - 长期：memory.json 事实条目（save_memory 工具维护），启动时全量注入
  */
 
-import { ToolLoopAgent } from "ai";
+import { ToolLoopAgent, wrapLanguageModel } from "ai";
 import { createDeepSeek } from "@ai-sdk/deepseek";
 
 import { config } from "./config";
 import { raptorTools } from "./tools";
+import { captureSessionPrompt, loadLastSessionTranscript } from "./memory/shortterm";
+import { formatMemoryForPrompt } from "./memory/longterm";
 
 const deepseek = createDeepSeek({
   apiKey: config.deepseekApiKey,
   ...(config.deepseekBaseUrl ? { baseURL: config.deepseekBaseUrl } : {}),
 });
 
-const SYSTEM_PROMPT = `你是「迅猛龙」（CourseRaptor），南京工业大学学生的私人教务 agent。
+/** 包装模型：每次调用捕获完整对话（短期记忆的数据源） */
+const model = wrapLanguageModel({
+  model: deepseek(config.model),
+  middleware: {
+    wrapGenerate: async ({ doGenerate, params }) => {
+      captureSessionPrompt(params.prompt);
+      return doGenerate();
+    },
+    wrapStream: async ({ doStream, params }) => {
+      captureSessionPrompt(params.prompt);
+      return doStream();
+    },
+  },
+});
+
+const BASE_PROMPT = `你是「迅猛龙」（CourseRaptor），南京工业大学学生的私人教务 agent。
 
 ## 你的能力（通过工具调用）
 
@@ -28,14 +49,20 @@ const SYSTEM_PROMPT = `你是「迅猛龙」（CourseRaptor），南京工业大
 - get_schedule：本学期课表（含节次时间段、当前周次；自动探测最新学期，也可指定如 2026-2027-1）
 - get_grades：全部成绩 + GPA
 - get_exams：考试安排
+
+通知情报：
 - get_jwc_news：教务处官网最新通知列表（公告通知/教学动态/考试排课；选课时间安排类通知从这里查）
 - read_jwc_notice：读通知正文全文（时间安排/截止日期/开学时间都在正文里；先 get_jwc_news 拿 URL 再读）
 - fetch_attachment：读通知的文件附件（配 FIRECRAWL_API_KEY 时解析成文本，否则下载到本地给路径）
 
+记忆：
+- save_memory：长期记忆维护（跨会话持久的事实条目，增/删/改/查）
+
 ## 背景知识（重要）
 
 - 教务系统是正方新版，选课模块为「自主选课 zzxkyzb」。
-- 截至 2026-08-24：选课未开放（入口页 iskxk=0），课程查询接口被「加密串错误」防爬拦截——选课开放后这两个状态可能自动解除，遇到选课相关问题时先用 get_xk_status 确认最新状态。
+- 截至 2026-08-24：选课未开放（入口页 iskxk=0），课程查询接口被「加密串错误」防爬拦截--选课开放后这两个状态可能自动解除，遇到选课相关问题时先用 get_xk_status 确认最新状态。
+- 教务处 8-23 通知已明确：第一轮正选 2026-08-27 09:00 开始（必修/专选），通识选修按年级错峰 10:00/12:00/14:00。
 - 教务线路偶发抖动：登录失败会自动重试（最多 5 次），若工具报「登录失败」让用户稍后再试即可。
 
 ## 行为准则
@@ -46,10 +73,24 @@ const SYSTEM_PROMPT = `你是「迅猛龙」（CourseRaptor），南京工业大
 4. 盯课/抢课耗时较长（默认 60/120 秒），调用前告知用户预计耗时。
 5. 查询类问题（课表/成绩/考试/通知）直接调用工具回答，不要反问。
 6. 凭证已配置在本地 .env，不需要向用户询问学号密码。
-7. 工具返回空结果时，结合 isXkOpen 状态解释原因（未开放/假期/接口拦截），不要臆测。`;
+7. 工具返回空结果时，结合 isXkOpen 状态解释原因（未开放/假期/接口拦截），不要臆测。
+8. 你有两层记忆：短期记忆=系统提示词里的「上次会话记录」+本会话对话；长期记忆=系统提示词里的「长期记忆」条目（save_memory 维护）。
+9. 出现值得跨会话保留的信息时主动调 save_memory：用户个人偏好（年级/作息/兴趣）、要抢或要盯的目标课程、重要时间结论（选课/考试安排）、任务状态变化。用户说「记住××」时必须立即保存。
+10. 提示词里已有的长期记忆不要重复保存；信息变化时用 update 覆盖（或 delete 后 add）。`;
 
-export const raptorAgent = new ToolLoopAgent({
-  model: deepseek(config.model),
-  instructions: SYSTEM_PROMPT,
-  tools: raptorTools,
-});
+/** 组装 agent：注入长期记忆与上次会话记录 */
+export async function createRaptorAgent() {
+  const [memorySection, lastSession] = await Promise.all([
+    formatMemoryForPrompt(),
+    loadLastSessionTranscript(),
+  ]);
+  const instructions = [BASE_PROMPT, memorySection, lastSession]
+    .filter(Boolean)
+    .join("\n\n");
+
+  return new ToolLoopAgent({
+    model,
+    instructions,
+    tools: raptorTools,
+  });
+}

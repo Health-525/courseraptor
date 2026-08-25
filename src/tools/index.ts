@@ -1,6 +1,6 @@
 /**
  * CourseRaptor agent 工具集
- * 11 个工具：选课状态 / 搜课 / 查教学班 / 盯课 / 抢课 / 课表 / 成绩 / 考试 / 通知列表 / 通知正文 / 附件
+ * 12 个工具：选课 5 + 查询 3 + 通知 3 + 记忆 1
  */
 
 import { tool } from "ai";
@@ -8,6 +8,12 @@ import { z } from "zod";
 
 import { config } from "../config";
 import { fetchAttachment } from "../attachments";
+import {
+  addMemory,
+  updateMemory,
+  deleteMemory,
+  loadMemory,
+} from "../memory/longterm";
 import {
   fetchScheduleSmart,
   fetchExamsSmart,
@@ -527,6 +533,45 @@ export const raptorTools = {
         };
       }
       return await fetchAttachment(url);
+    },
+  }),
+
+  /** 12. 长期记忆维护 */
+  save_memory: tool({
+    description:
+      "长期记忆维护（跨会话持久，存于本地 memory.json，启动时自动注入新会话）。值得跨会话记住的信息出现时主动调用：用户偏好（年级/作息）、要抢/盯的目标课程、重要时间结论（选课考试安排）、任务状态。用户说「记住××」必须立即调用。",
+    inputSchema: z.object({
+      action: z
+        .enum(["add", "update", "delete", "list"])
+        .describe("add=新增条目，update=按 id 改内容，delete=按 id 删除，list=列出全部"),
+      content: z
+        .string()
+        .optional()
+        .describe("条目内容（add 必填；update 时为新内容）"),
+      category: z
+        .string()
+        .optional()
+        .describe('分类，如「用户偏好」「选课」「任务」（add 可选，默认「事实」）'),
+      id: z.string().optional().describe("目标条目 id（update/delete 必填，来自 list 或提示词里的 [id]）"),
+    }),
+    execute: async ({ action, content, category, id }) => {
+      if (action === "add") {
+        if (!content?.trim()) return { error: "add 需要 content" };
+        const { entry, total } = await addMemory(content.trim(), category?.trim() || undefined);
+        return { ok: true, saved: entry, totalEntries: total };
+      }
+      if (action === "update") {
+        if (!id || !content?.trim()) return { error: "update 需要 id 和 content（新内容）" };
+        const entry = await updateMemory(id, content.trim());
+        return entry ? { ok: true, updated: entry } : { error: `未找到条目 ${id}` };
+      }
+      if (action === "delete") {
+        if (!id) return { error: "delete 需要 id" };
+        const ok = await deleteMemory(id);
+        return ok ? { ok: true, deletedId: id } : { error: `未找到条目 ${id}` };
+      }
+      const entries = await loadMemory();
+      return { total: entries.length, entries };
     },
   }),
 };
