@@ -1,6 +1,6 @@
 /**
  * CourseRaptor agent 工具集
- * 12 个工具：选课 5 + 查询 3 + 通知 3 + 记忆 1
+ * 16 个工具：选课 5 + 查询 7 + 通知 3 + 记忆 1
  */
 
 import { tool } from "ai";
@@ -8,6 +8,12 @@ import { z } from "zod";
 
 import { config } from "../config";
 import { fetchAttachment } from "../attachments";
+import {
+  fetchProfile,
+  fetchRetakeCourses,
+  fetchEnrolledClasses,
+  fetchLabGradesSmart,
+} from "../jwgl/portal";
 import {
   addMemory,
   updateMemory,
@@ -445,7 +451,111 @@ export const raptorTools = {
     },
   }),
 
-  /** 9. 教务处官网通知 */
+  /** 9. 学籍个人信息 */
+  get_profile: tool({
+    description:
+      "查询学籍个人信息：姓名、学号、性别、学院、专业、班级、年级、学制、入学/毕业日期等（从教务系统个人信息页解析）。需要确认用户身份信息、或查询班级/专业信息时调用。",
+    inputSchema: z.object({}),
+    execute: async () => {
+      const cookie = await getCookie();
+      const profile = await fetchProfile(cookie);
+      // 敏感字段打码（只留前4后4），避免完整证件/卡号进入模型上下文
+      const SENSITIVE = /证件号码|银行卡|考生号/;
+      const masked: Record<string, string> = {};
+      let maskedCount = 0;
+      for (const [k, v] of Object.entries(profile)) {
+        if (SENSITIVE.test(k) && v.length > 8) {
+          masked[k] = `${v.slice(0, 4)}****${v.slice(-4)}`;
+          maskedCount++;
+        } else {
+          masked[k] = v;
+        }
+      }
+      const keys = Object.keys(masked);
+      return {
+        total: keys.length,
+        info: masked,
+        maskedNote: maskedCount > 0 ? `${maskedCount} 个敏感字段已打码` : undefined,
+        note: keys.length === 0 ? "个人信息页解析失败（页面结构可能变化）" : undefined,
+      };
+    },
+  }),
+
+  /** 10. 已选课程教学班 */
+  get_enrolled_courses: tool({
+    description:
+      "查询本学期已选的课程教学班列表：课程名、教学班、教师、上课时间、地点、学分、课程性质（必修/选修）。注意：与课表（get_schedule）互补，这里按教学班维度、含选课属性。",
+    inputSchema: z.object({}),
+    execute: async () => {
+      const cookie = await getCookie();
+      const classes = await fetchEnrolledClasses(cookie);
+      return {
+        total: classes.length,
+        courses: classes,
+        note: classes.length === 0 ? "暂无已选课程（学期初未选课属正常）" : undefined,
+      };
+    },
+  }),
+
+  /** 11. 可重修课程 */
+  get_retake_courses: tool({
+    description:
+      "查询可重修的课程列表（历年开课记录，含课程号/开课学院/学分）。用户问「××能不能重修」「重修有哪些课」或计划重修时调用；可用 keyword 过滤课程名。",
+    inputSchema: z.object({
+      keyword: z.string().optional().describe("课程名关键词过滤（可选）"),
+    }),
+    execute: async ({ keyword }) => {
+      const cookie = await getCookie();
+      const all = await fetchRetakeCourses(cookie);
+      const filtered = keyword
+        ? all.filter((c) => c.courseName.includes(keyword))
+        : all;
+      return {
+        total: filtered.length,
+        totalAll: all.length,
+        courses: filtered.slice(0, 40).map((c) => ({
+          ...c,
+          semester: c.semester || undefined,
+        })),
+        note:
+          filtered.length > 40
+            ? `仅显示前 40 条（共 ${filtered.length} 条，可加 keyword 过滤）`
+            : undefined,
+      };
+    },
+  }),
+
+  /** 12. 实验成绩 */
+  get_lab_grades: tool({
+    description:
+      "查询实验课程成绩（按学期，默认自动探测最新学期，也可指定如「2026-2027-1」）。没有实验课的学期返回空属正常。",
+    inputSchema: z.object({
+      semester: z
+        .string()
+        .optional()
+        .describe('指定学期，格式如「2026-2027-1」；不填则自动探测最新学期'),
+    }),
+    execute: async ({ semester }) => {
+      const parsed = semester ? parseSemesterString(semester) : null;
+      if (semester && !parsed) {
+        return { error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
+      }
+      const cookie = await getCookie();
+      const { label, items } = await fetchLabGradesSmart(
+        cookie,
+        parsed?.year,
+        parsed?.semester
+      );
+      return {
+        term: label,
+        total: items.length,
+        items: items.slice(0, 30),
+        note: items.length === 0 ? "该学期暂无实验成绩（无实验课属正常）" : undefined,
+      };
+    },
+  }),
+
+  /** 13. 教务处官网通知 */
   get_jwc_news: tool({
     description:
       "抓取南京工业大学教务处官网（jwc.njtech.edu.cn）的最新通知，涵盖三个板块：公告通知（含选课/考试/学籍等重要安排）、教学动态、考试排课。公开页面无需登录。用户问「最近有什么教务通知」「选课什么时候开始」「有没有关于××的通知」时调用。",
@@ -483,7 +593,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 10. 通知正文阅读 */
+  /** 14. 通知正文阅读 */
   read_jwc_notice: tool({
     description:
       "读取一篇教务处通知的正文全文（get_jwc_news 只返回标题列表，具体时间安排都在正文里）。输入通知 URL（来自 get_jwc_news 结果的 items[].url），返回正文文本与附件下载链接。用户问「选课几点开始」「补选什么时候截止」「通知里怎么说的」时：先 get_jwc_news 找到相关通知，再用本工具读正文。",
@@ -517,7 +627,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 11. 附件获取（Firecrawl 云解析 / 本地下载） */
+  /** 15. 附件获取（Firecrawl 云解析 / 本地下载） */
   fetch_attachment: tool({
     description:
       "获取通知的文件附件（.pdf/.doc/.xls 等，URL 来自 read_jwc_notice 返回的 attachments）。配置了 FIRECRAWL_API_KEY 时通过 Firecrawl 把附件解析成 markdown 文本直接返回；未配置时下载到本地 downloads 目录并返回文件路径。问「附件里怎么说的」「把附件内容读出来」时调用。",
@@ -536,7 +646,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 12. 长期记忆维护 */
+  /** 16. 长期记忆维护 */
   save_memory: tool({
     description:
       "长期记忆维护（跨会话持久，存于本地 memory.json，启动时自动注入新会话）。值得跨会话记住的信息出现时主动调用：用户偏好（年级/作息）、要抢/盯的目标课程、重要时间结论（选课考试安排）、任务状态。用户说「记住××」必须立即调用。",
