@@ -178,7 +178,7 @@ async function watchLoop(
 
 export const raptorTools = {
   /** 1. 查询选课模块状态 */
-  get_xk_status: tool({
+  check_selection_status: tool({
     description:
       "查询南京工业大学教务系统「自主选课」模块的当前状态：选课是否开放（iskxk）、选课控制 ID（xkkzId）、以及课程查询接口是否仍返回「加密串错误」（防爬拦截）。回答任何选课相关问题前建议先调用此工具确认状态。",
     inputSchema: z.object({}),
@@ -217,7 +217,7 @@ export const raptorTools = {
         courses: courses.slice(0, 30).map(courseBrief),
         note:
           courses.length === 0
-            ? "未查询到课程。若选课未开放（isXkOpen=false）属正常；若已开放仍为空，可能是接口被「加密串」拦截，建议调用 get_xk_status 检查。"
+            ? "未查询到课程。若选课未开放（isXkOpen=false）属正常；若已开放仍为空，可能是接口被「加密串」拦截，建议调用 check_selection_status 检查。"
             : courses.length > 30
               ? `仅显示前 30 条（共 ${courses.length} 条）`
               : undefined,
@@ -226,7 +226,7 @@ export const raptorTools = {
   }),
 
   /** 3. 查教学班列表（同门课各班对比） */
-  search_jxb: tool({
+  search_classes: tool({
     description:
       "查某门课程下所有教学班的明细：每个班的教师、上课时间、地点、容量、已选人数、剩余名额。适合「这门课哪个老师还有名额」「周几的班还开着」这类对比问题。输入课程名关键词，自动匹配课程号后展开教学班。",
     inputSchema: z.object({
@@ -255,7 +255,7 @@ export const raptorTools = {
       if (codes.length === 0) {
         return {
           error:
-            "未查到该课程。选课未开放（isXkOpen=false）时课程/教学班接口均不可查，可先调 get_xk_status 确认。",
+            "未查到该课程。选课未开放（isXkOpen=false）时课程/教学班接口均不可查，可先调 check_selection_status 确认。",
         };
       }
 
@@ -452,7 +452,7 @@ export const raptorTools = {
   }),
 
   /** 9. 学籍个人信息 */
-  get_profile: tool({
+  get_student_info: tool({
     description:
       "查询学籍个人信息：姓名、学号、性别、学院、专业、班级、年级、学制、入学/毕业日期等（从教务系统个人信息页解析）。需要确认用户身份信息、或查询班级/专业信息时调用。",
     inputSchema: z.object({}),
@@ -556,7 +556,7 @@ export const raptorTools = {
   }),
 
   /** 13. 教务处官网通知 */
-  get_jwc_news: tool({
+  get_news: tool({
     description:
       "抓取南京工业大学教务处官网（jwc.njtech.edu.cn）的最新通知，涵盖三个板块：公告通知（含选课/考试/学籍等重要安排）、教学动态、考试排课。公开页面无需登录。用户问「最近有什么教务通知」「选课什么时候开始」「有没有关于××的通知」时调用。",
     inputSchema: z.object({
@@ -594,9 +594,9 @@ export const raptorTools = {
   }),
 
   /** 14. 通知正文阅读 */
-  read_jwc_notice: tool({
+  read_notice: tool({
     description:
-      "读取学校官网任意文章页面的正文全文（webplus CMS 结构解析）。两种用法：① 读 get_jwc_news 列表里的通知（用 items[].url）；② 直接读用户贴出来的链接（如 https://jwc.njtech.edu.cn/info/1158/6876.htm，用户发来 jwc/学校官网链接时就用本工具读）。返回标题、正文全文与附件下载链接。",
+      "读取学校官网任意文章页面的正文全文（webplus CMS 结构解析）。两种用法：① 读 get_news 列表里的通知（用 items[].url）；② 直接读用户贴出来的链接（如 https://jwc.njtech.edu.cn/info/1158/6876.htm，用户发来 jwc/学校官网链接时就用本工具读）。返回标题、正文全文与附件下载链接。",
     inputSchema: z.object({
       url: z
         .string()
@@ -630,9 +630,9 @@ export const raptorTools = {
   /** 15. 附件获取（Firecrawl 云解析 / 本地下载） */
   fetch_attachment: tool({
     description:
-      "获取通知的文件附件（.pdf/.doc/.xls 等，URL 来自 read_jwc_notice 返回的 attachments）。配置了 FIRECRAWL_API_KEY 时通过 Firecrawl 把附件解析成 markdown 文本直接返回；未配置时下载到本地 downloads 目录并返回文件路径。问「附件里怎么说的」「把附件内容读出来」时调用。",
+      "获取通知的文件附件（.pdf/.doc/.xls 等，URL 来自 read_notice 返回的 attachments）。配置了 FIRECRAWL_API_KEY 时通过 Firecrawl 把附件解析成 markdown 文本直接返回；未配置时下载到本地 downloads 目录并返回文件路径。问「附件里怎么说的」「把附件内容读出来」时调用。",
     inputSchema: z.object({
-      url: z.string().describe("附件下载 URL（来自 read_jwc_notice 的 attachments[].url）"),
+      url: z.string().describe("附件下载 URL（来自 read_notice 的 attachments[].url）"),
     }),
     execute: async ({ url }) => {
       const isNjtech = /^https?:\/\/[a-z0-9.-]*\.njtech\.edu\.cn\//.test(url);
