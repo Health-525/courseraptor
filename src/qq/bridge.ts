@@ -20,7 +20,6 @@ import {
   messageFilter,
   contentSanitizer,
   mentionGate,
-  accessPolicy,
   concurrencyGuard,
 } from "@tencent-connect/qqbot-nodejs";
 
@@ -80,15 +79,12 @@ async function main(): Promise<void> {
   bot.use(messageFilter({ skipSelfEcho: true, dedup: { windowMs: 5000 } }));
   bot.use(contentSanitizer({ stripBotMention: true }));
   bot.use(mentionGate({ requireMentionInGroup: true }));
-  bot.use(
-    accessPolicy({
-      c2c: { mode: "allowlist", allow: [(ctx) => allowedOpenids.has(ctx.message.senderId)] },
-      group: { mode: "allowlist", allow: [(ctx) => allowedOpenids.has(ctx.message.senderId)] },
-      onBlock: (ctx) =>
-        console.log(`[access] 拦截未授权消息 sender=${ctx.message.senderId}`),
-    })
-  );
   bot.use(concurrencyGuard());
+  // 白名单不用 accessPolicy 中间件：它会拦截未授权消息，导致
+  // 「首条消息发暗号激活」永远走不到；处理器内自带校验 + 激活流程
+
+  // 拒绝回复防刷：每个陌生人只提示一次，避免被刷消息消耗被动回复额度
+  const rejectedNotified = new Set<string>();
 
   bot.on("message", async (ctx, msg) => {
     const senderId = msg.senderId;
@@ -103,7 +99,8 @@ async function main(): Promise<void> {
           msg.replyTarget,
           "✅ 已授权，迅猛龙上线！直接说需求即可：查课表 / 盯课 / 抢课 / 读教务通知。"
         );
-      } else {
+      } else if (!rejectedNotified.has(senderId)) {
+        rejectedNotified.add(senderId);
         await bot.sendText(
           msg.replyTarget,
           "⛔ 未授权。首次使用请发送激活暗号（管理员在 .env 的 QQBOT_PASSCODE 中设置）。"

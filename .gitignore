@@ -5,4 +5,5 @@ downloads/
 memory.json
 session.json
 qq-allowlist.json
+qq-bridge.log
 *.log
