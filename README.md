@@ -77,9 +77,10 @@ Agent 可调用 **11 个工具**，覆盖选课作战、教务查询、通知情
 ```bash
 # 1. 在 https://q.qq.com 用主号实名注册 -> 创建机器人 -> 拿到 AppID / AppSecret
 # 2. .env 填入 QQBOT_APP_ID / QQBOT_APP_SECRET / QQBOT_PASSCODE（自定激活暗号）
-# 3. 手动启动（前台运行，Ctrl+C 退出）
-raptor-qq        # 全局命令，任意目录
-npm run qq       # 或项目目录内
+# 3. 启动：一条 raptor 全包（终端对话 + QQ 机器人同时在线，前台运行，Ctrl+C 退出）
+raptor
+#    只跑 QQ 桥（不开终端对话）：
+npm run qq
 # 4. QQ 里给机器人发第一条消息 = 激活暗号，完成授权
 ```
 
