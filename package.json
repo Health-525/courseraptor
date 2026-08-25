@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit"
   },
   "bin": {
-    "raptor": "bin/raptor.cjs"
+    "raptor": "bin/raptor.cjs",
+    "raptor-qq": "bin/raptor-qq.cjs"
   },
   "keywords": [],
   "author": "",

@@ -75,10 +75,11 @@ Agent 可调用 **11 个工具**，覆盖选课作战、教务查询、通知情
 除终端外，agent 还能挂到 QQ 上（腾讯官方开放平台路线，零封号风险）：
 
 ```bash
-# 1. 在 https://q.qq.com 用主号实名注册 → 创建机器人 → 拿到 AppID / AppSecret
+# 1. 在 https://q.qq.com 用主号实名注册 -> 创建机器人 -> 拿到 AppID / AppSecret
 # 2. .env 填入 QQBOT_APP_ID / QQBOT_APP_SECRET / QQBOT_PASSCODE（自定激活暗号）
-# 3. 启动桥接
-npm run qq
+# 3. 手动启动（前台运行，Ctrl+C 退出）
+raptor-qq        # 全局命令，任意目录
+npm run qq       # 或项目目录内
 # 4. QQ 里给机器人发第一条消息 = 激活暗号，完成授权
 ```
 
