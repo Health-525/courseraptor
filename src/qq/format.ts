@@ -5,28 +5,38 @@
 export function mdToPlain(md: string): string {
   const lines = md.split("\n");
   const out: string[] = [];
-  let tableHeaderEmitted = false; // 表格首行（表头）是否已输出
+  let inTable = false;
   for (const line of lines) {
     if (/^\s*\|/.test(line)) {
       if (/^\s*\|[\s:|-]+\|\s*$/.test(line)) continue; // 表格分隔行
-      const cells = line.split("|").slice(1, -1).map((c) => c.trim());
-      out.push(
-        tableHeaderEmitted
-          ? "  " + cells.join("｜")
-          : "【" + cells.join("｜") + "】"
-      );
-      tableHeaderEmitted = true;
+      const cells = line
+        .split("|")
+        .slice(1, -1)
+        .map((c) => c.trim())
+        .filter(Boolean);
+      // 兜底格式：表头行【】，数据行用 · 连接（模型已按 QQ 规则输出，
+      // 这里只处理漏网的 Markdown 表格）
+      if (!inTable && cells.length > 1) {
+        out.push("");
+        out.push(`【${cells.join(" · ")}】`);
+      } else {
+        out.push(cells.join(" · "));
+      }
+      inTable = true;
       continue;
     }
-    tableHeaderEmitted = false;
-    out.push(
-      line
-        .replace(/^#{1,4}\s*(.+)$/, "【$1】")
-        .replace(/\*\*(.+?)\*\*/g, "$1")
-        .replace(/`([^`]+)`/g, "$1")
-        .replace(/^[-*]\s+/, "• ")
-        .replace(/^>\s?/, "")
-    );
+    inTable = false;
+    const converted = line
+      .replace(/^#{1,4}\s*(.+)$/, "【$1】")
+      .replace(/\*\*(.+?)\*\*/g, "$1")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/^[-*]\s+/, "• ")
+      .replace(/^>\s?/, "");
+    // 【小标题】前补空行，段落感
+    if (/^【.+】$/.test(converted.trim()) && out.length && out[out.length - 1].trim()) {
+      out.push("");
+    }
+    out.push(converted);
   }
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }

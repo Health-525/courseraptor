@@ -83,13 +83,29 @@ const BASE_PROMPT = `你是「迅猛龙」（CourseRaptor），南京工业大�
 9. 出现值得跨会话保留的信息时主动调 save_memory：用户个人偏好（年级/作息/兴趣）、要抢或要盯的目标课程、重要时间结论（选课/考试安排）、任务状态变化。用户说「记住××」时必须立即保存。
 10. 提示词里已有的长期记忆不要重复保存；信息变化时用 update 覆盖（或 delete 后 add）。`;
 
-/** 组装 agent：注入长期记忆与上次会话记录 */
-export async function createRaptorAgent() {
+/** QQ 渠道排版规则：让模型原生输出 QQ 友好文本，而非事后转换 Markdown */
+const QQ_CHANNEL_PROMPT = `## 输出格式（QQ 渠道，必须遵守）
+
+你的回复将直接发送到 QQ 聊天，纯文本环境：
+- 禁用一切 Markdown 语法：不要表格、不要 **加粗**、不要代码块、不要 # 标题
+- 数据列表：一个条目一行，字段间用「 · 」分隔。例：周一 · 7-8节 · 最优化方法 · 仁智楼518
+- 小标题独立成行，用【】包裹，如【本周要点】；标题与上文空一行
+- 关键时间/状态可用 emoji 前缀点缀：⏰ 时间 ✅ 成功 ⚠️ 注意 📅 日期
+- 单次回复控制在 30 行内：先结论、再要点，细节等用户追问
+- 用户闲聊时自然简短，不要强行套格式`;
+
+/** 组装 agent：注入长期记忆与上次会话记录；channel 指定输出渠道风格 */
+export async function createRaptorAgent(channel?: "qq") {
   const [memorySection, lastSession] = await Promise.all([
     formatMemoryForPrompt(),
     loadLastSessionTranscript(),
   ]);
-  const instructions = [BASE_PROMPT, memorySection, lastSession]
+  const instructions = [
+    BASE_PROMPT,
+    memorySection,
+    lastSession,
+    channel === "qq" ? QQ_CHANNEL_PROMPT : undefined,
+  ]
     .filter(Boolean)
     .join("\n\n");
 

@@ -25,9 +25,7 @@ import {
 
 import { config, PROJECT_ROOT } from "../config";
 import { createRaptorAgent } from "../agent";
-import { mdToPlain, splitMessage } from "./format";
-
-// ── 授权：白名单 + 暗号激活 ────────────────────────────────────
+import { mdToPlain, splitMessage } from "./format";// ── 授权：白名单 + 暗号激活 ────────────────────────────────────
 
 const ALLOWLIST_FILE = path.join(PROJECT_ROOT, "qq-allowlist.json");
 const allowedOpenids = new Set<string>();
@@ -67,7 +65,8 @@ async function main(): Promise<void> {
     );
   }
   await loadAllowlist();
-  const agent = await createRaptorAgent();
+  // qq 渠道：注入 QQ 排版规则，让模型原生输出纯文本列表
+  const agent = await createRaptorAgent("qq");
 
   const bot = new QQBot({
     appId: config.qqBotAppId,
