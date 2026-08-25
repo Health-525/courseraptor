@@ -70,7 +70,25 @@ Agent 可调用 **11 个工具**，覆盖选课作战、教务查询、通知情
 
 说一次「记住我想抢羽毛球周三班」，之后每次新会话它都记得。记忆文件在本地且已被 `.gitignore` 排除。
 
-### 📰 通知情报
+### 💬 QQ 接入（官方机器人）
+
+除终端外，agent 还能挂到 QQ 上（腾讯官方开放平台路线，零封号风险）：
+
+```bash
+# 1. 在 https://q.qq.com 用主号实名注册 → 创建机器人 → 拿到 AppID / AppSecret
+# 2. .env 填入 QQBOT_APP_ID / QQBOT_APP_SECRET / QQBOT_PASSCODE（自定激活暗号）
+# 3. 启动桥接
+npm run qq
+# 4. QQ 里给机器人发第一条消息 = 激活暗号，完成授权
+```
+
+- **单聊**：直接和机器人对话；**群聊**：@机器人 触发
+- **安全**：白名单制，未授权用户一律拒绝（agent 能抢课、持有教务凭证）；授权 openid 落盘 `qq-allowlist.json`（gitignored）
+- 官方平台给的是 openid 而非 QQ 号，所以用暗号激活代替加白名单
+- 每用户独立会话历史（滑动窗口）；回复自动 Markdown 转纯文本 + 长消息分段
+- 限制：官方机器人为被动回复（约 5 分钟窗口），盯课/抢课（60-120 秒）在窗口内可正常回
+
+## 📰 通知情报
 
 | 工具 | 说明 | 耗时 |
 |---|---|---|
@@ -106,6 +124,8 @@ npm run dev            # 或项目内开发模式
 | `JWGL_USERNAME` / `JWGL_PASSWORD` | 教务系统学号 / 密码（必填） |
 | `RAPTOR_MODEL` | 模型，默认 `deepseek-v4-flash`，可选 `deepseek-v4-pro`（可选） |
 | `FIRECRAWL_API_KEY` | Firecrawl 云解析通知附件为文本（可选；未配置则附件下载到本地） |
+| `QQBOT_APP_ID` / `QQBOT_APP_SECRET` | QQ 官方机器人凭证（可选，`npm run qq` 用） |
+| `QQBOT_PASSCODE` | QQ 授权暗号：首次给机器人发此暗号完成授权 |
 | `DEEPSEEK_BASE_URL` | 自定义 API 地址（可选） |
 
 </details>
@@ -142,6 +162,7 @@ npm run dev            # 或项目内开发模式
     ├── agent.ts        #   agent 定义（系统提示词 + 装配）
     ├── config.ts       #   .env 配置加载（按项目根解析，任意目录启动均可）
     ├── attachments.ts  #   附件获取（Firecrawl 云解析 / 本地下载）
+    ├── qq/             #   QQ 官方机器人桥（bridge + 消息格式化）
     ├── jwgl/           #   教务协议层（登录 / 课表 / 成绩 / 选课 / 通知爬取）
     │   ├── auth.ts     #     登录（RSA + CSRF）
     │   ├── http.ts     #     带 Cookie 管理的 HTTP 客户端

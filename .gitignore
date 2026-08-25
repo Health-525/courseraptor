@@ -4,4 +4,5 @@ dist/
 downloads/
 memory.json
 session.json
+qq-allowlist.json
 *.log

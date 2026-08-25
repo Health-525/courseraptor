@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "start": "tsx src/index.ts",
+    "qq": "tsx src/qq/bridge.ts",
     "typecheck": "tsc --noEmit"
   },
   "bin": {
@@ -17,6 +18,7 @@
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.31",
     "@ai-sdk/tui": "^1.0.78",
+    "@tencent-connect/qqbot-nodejs": "^1.0.4",
     "ai": "^7.0.77",
     "tsx": "^4.23.12",
     "zod": "^4.4.3"

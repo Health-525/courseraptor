@@ -14,6 +14,10 @@ export interface RaptorConfig {
   jwglPassword: string;
   /** Firecrawl 云解析（通知附件转 markdown），可选 */
   firecrawlApiKey?: string;
+  /** QQ 官方机器人（开放平台 q.qq.com，可选，npm run qq 启动桥接） */
+  qqBotAppId?: string;
+  qqBotAppSecret?: string;
+  qqBotPasscode?: string;
 }
 
 // .env 跟随包位置解析：全局命令 raptor 可在任意目录启动
@@ -43,6 +47,10 @@ export function loadConfig(): RaptorConfig {
     jwglUsername: env("JWGL_USERNAME") ?? "",
     jwglPassword: env("JWGL_PASSWORD") ?? "",
     firecrawlApiKey: env("FIRECRAWL_API_KEY"),
+    /** QQ 官方机器人（开放平台 q.qq.com，可选，npm run qq 启动桥接） */
+    qqBotAppId: env("QQBOT_APP_ID"),
+    qqBotAppSecret: env("QQBOT_APP_SECRET"),
+    qqBotPasscode: env("QQBOT_PASSCODE"),
   };
 
   const missing: string[] = [];
