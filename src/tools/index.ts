@@ -596,15 +596,15 @@ export const raptorTools = {
   /** 14. 通知正文阅读 */
   read_jwc_notice: tool({
     description:
-      "读取一篇教务处通知的正文全文（get_jwc_news 只返回标题列表，具体时间安排都在正文里）。输入通知 URL（来自 get_jwc_news 结果的 items[].url），返回正文文本与附件下载链接。用户问「选课几点开始」「补选什么时候截止」「通知里怎么说的」时：先 get_jwc_news 找到相关通知，再用本工具读正文。",
+      "读取学校官网任意文章页面的正文全文（webplus CMS 结构解析）。两种用法：① 读 get_jwc_news 列表里的通知（用 items[].url）；② 直接读用户贴出来的链接（如 https://jwc.njtech.edu.cn/info/1158/6876.htm，用户发来 jwc/学校官网链接时就用本工具读）。返回标题、正文全文与附件下载链接。",
     inputSchema: z.object({
       url: z
         .string()
-        .describe("通知文章 URL（来自 get_jwc_news 返回的 items[].url）"),
+        .describe("文章页 URL（jwc.njtech.edu.cn 或其他 njtech.edu.cn 子域）"),
     }),
     execute: async ({ url }) => {
-      if (!/^https?:\/\/jwc\.njtech\.edu\.cn\//.test(url)) {
-        return { error: "仅支持 jwc.njtech.edu.cn 域名下的通知 URL" };
+      if (!/^https?:\/\/[a-z0-9.-]*\.njtech\.edu\.cn\//.test(url)) {
+        return { error: "仅支持 njtech.edu.cn 域名下的文章 URL" };
       }
       try {
         const article = await fetchJwcArticle(url);
