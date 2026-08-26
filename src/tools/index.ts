@@ -1,6 +1,6 @@
 /**
  * CourseRaptor agent 工具集
- * 16 个工具：选课 5 + 查询 7 + 通知 3 + 记忆 1
+ * 17 个工具：选课 6 + 查询 7 + 通知 3 + 记忆 1
  */
 
 import { tool } from "ai";
@@ -208,6 +208,156 @@ async function watchLoop(
   };
 }
 
+// ── 分类抢课计划循环（每类抢到一门即停，类间互不影响）─────────
+
+interface PlanGroup {
+  category: string;
+  courseNames: string[];
+}
+
+async function grabPlanLoop(
+  groups: PlanGroup[],
+  durationSec: number
+): Promise<{
+  durationSec: number;
+  rounds: number;
+  results: Array<{
+    category: string;
+    grabbed: string | null;
+    tried: string[];
+    note?: string;
+  }>;
+  events: Array<{ time: string; message: string }>;
+  submitAttempts: number;
+}> {
+  const deadline = Date.now() + durationSec * 1000;
+  let session = await getXkSession();
+  let rounds = 0;
+  let submitAttempts = 0;
+  const events: Array<{ time: string; message: string }> = [];
+  const state = groups.map((g) => ({
+    category: g.category,
+    courseNames: g.courseNames,
+    idx: 0,
+    grabbed: "",
+    tried: [] as string[],
+    fullRounds: 0,
+    missRounds: 0,
+    done: false,
+  }));
+  let consecutiveErrors = 0;
+  let lastSessionRefresh = 0;
+
+  while (Date.now() < deadline) {
+    if (state.every((s) => s.done)) break;
+    rounds++;
+
+    for (const s of state) {
+      if (s.done || s.idx >= s.courseNames.length) continue;
+      const name = s.courseNames[s.idx];
+
+      let courses: XkCourse[] = [];
+      try {
+        // 按候选课程名做服务端过滤（课程列表分页只拉第一页）
+        courses = await searchCourses(session, name);
+        consecutiveErrors = 0;
+      } catch (e) {
+        if ((e as Error).message === "SESSION_EXPIRED") {
+          invalidateXkSession();
+          session = await getXkSession(true);
+          continue;
+        }
+        consecutiveErrors++;
+        if (consecutiveErrors >= 5) throw e;
+        events.push({
+          time: now(),
+          message: `[${s.category}] 查询异常（${consecutiveErrors}/5）：${(e as Error).message.slice(0, 50)}`,
+        });
+        continue;
+      }
+
+      // 监控期间选课开放：缓存的会话无 xkkzId，提交必败 -> 刷新（限频 30s）
+      if (
+        courses.length > 0 &&
+        !session.xkkzId &&
+        Date.now() - lastSessionRefresh > 30000
+      ) {
+        lastSessionRefresh = Date.now();
+        invalidateXkSession();
+        session = await getXkSession(true);
+        events.push({
+          time: now(),
+          message: `检测到选课开放，已刷新会话（xkkzId=${session.xkkzId ? session.xkkzId.slice(0, 10) + "…" : "仍未下发"}）`,
+        });
+      }
+
+      const matched = courses.filter(
+        (c) => c.courseName.includes(name) || name.includes(c.courseName)
+      );
+      const available = matched.filter((c) => c.remain > 0);
+
+      if (available.length > 0) {
+        submitAttempts++;
+        const course = available[0];
+        if (!s.tried.includes(course.courseName)) s.tried.push(course.courseName);
+        const result = await submitCourse(session, course);
+        if (result.ok) {
+          s.grabbed = course.courseName;
+          s.done = true; // 该类抢到一门即停，绝不重复抢同类学分
+          events.push({
+            time: now(),
+            message: `🎉 [${s.category}] 抢到：${course.courseName}（${course.teacher || "网课"}）-${result.message}，该类收手`,
+          });
+        } else if (result.message === "SESSION_EXPIRED") {
+          invalidateXkSession();
+          session = await getXkSession(true);
+        } else {
+          events.push({
+            time: now(),
+            message: `[${s.category}] 提交失败：${result.message}`,
+          });
+        }
+      } else if (matched.length > 0) {
+        // 候选存在但满员：连续 3 轮满员换下一个备选
+        s.fullRounds++;
+        if (s.fullRounds >= 3) {
+          events.push({
+            time: now(),
+            message: `[${s.category}] ${name} 持续满员，切换备选：${s.courseNames[s.idx + 1] ?? "（无更多备选）"}`,
+          });
+          s.idx++;
+          s.fullRounds = 0;
+        }
+      } else {
+        // 候选未出现在可选列表：连续 5 轮未出现换下一个
+        s.missRounds++;
+        if (s.missRounds >= 5) {
+          events.push({
+            time: now(),
+            message: `[${s.category}] ${name} 未出现在列表，切换备选：${s.courseNames[s.idx + 1] ?? "（无更多备选）"}`,
+          });
+          s.idx++;
+          s.missRounds = 0;
+        }
+      }
+    }
+    await pollDelay(2500);
+  }
+
+  return {
+    durationSec,
+    rounds,
+    results: state.map((s) => ({
+      category: s.category,
+      grabbed: s.grabbed || null,
+      tried: s.tried,
+      note: s.idx >= s.courseNames.length && !s.done ? "备选已用尽" : undefined,
+    })),
+    events,
+    submitAttempts,
+  };
+}
+
 // ── 工具定义 ─────────────────────────────────────────────────
 
 export const raptorTools = {
@@ -386,7 +536,45 @@ export const raptorTools = {
     },
   }),
 
-  /** 6. 课表查询 */
+  /** 6. 分类抢课计划（每类一门即停） */
+  grab_plan: tool({
+    description:
+      "分类抢课计划（真实提交选课！）：按类别分组抢课，每个类别抢到一门立即停止该类、绝不重复抢同类学分，类别之间互不影响。组内候选按优先级排列，当前候选满员（连续 3 轮）或未出现（连续 5 轮）自动切换下一个备选。适合通识选修按类补学分（如创新创业类和人文类各抢一门网课）。调用前与用户确认分组计划。",
+    inputSchema: z.object({
+      groups: z
+        .array(
+          z.object({
+            category: z.string().describe("类别名，如「创新创业类」「人文类」"),
+            courseNames: z
+              .array(z.string())
+              .min(1)
+              .describe("该类候选课程名（按优先级排序，第一个为主目标）"),
+          })
+        )
+        .min(1)
+        .describe("分类抢课计划（每类抢到一门即停）"),
+      durationSec: z
+        .number()
+        .int()
+        .min(10)
+        .max(600)
+        .default(600)
+        .describe("总时长上限（秒），默认 600"),
+    }),
+    execute: async ({ groups, durationSec }) => {
+      const result = await grabPlanLoop(groups, durationSec);
+      const okCount = result.results.filter((r) => r.grabbed).length;
+      return {
+        ...result,
+        successCount: okCount,
+        summary:
+          `抢到 ${okCount}/${groups.length} 类：` +
+          result.results.map((r) => `${r.category}=${r.grabbed ?? "未抢到"}`).join("；"),
+      };
+    },
+  }),
+
+  /** 7. 课表查询 */
   get_schedule: tool({
     description:
       "查询课表，返回每门课的上课时间、地点、教师、周次。默认自动探测最新有课表的学期（学期交界期也不会查错）；也可指定学期，如「2026-2027-1」。",
@@ -426,7 +614,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 7. 成绩查询 */
+  /** 8. 成绩查询 */
   get_grades: tool({
     description: "查询全部学期的成绩与 GPA（按 NJTECH 绩点规则计算，重复课程取最高分）。",
     inputSchema: z.object({}),
@@ -473,7 +661,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 8. 考试安排 */
+  /** 9. 考试安排 */
   get_exams: tool({
     description:
       "查询考试安排：科目、日期、时间、考场、座位号。默认自动探测最新学期（也可指定，如「2026-2027-1」）。",
@@ -509,7 +697,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 9. 学籍个人信息 */
+  /** 10. 学籍个人信息 */
   get_student_info: tool({
     description:
       "查询学籍个人信息：姓名、学号、性别、学院、专业、班级、年级、学制、入学/毕业日期等（从教务系统个人信息页解析）。需要确认用户身份信息、或查询班级/专业信息时调用。",
@@ -539,7 +727,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 10. 已选课程教学班 */
+  /** 11. 已选课程教学班 */
   get_enrolled_courses: tool({
     description:
       "查询本学期已选的课程教学班列表：课程名、教学班、教师、上课时间、地点、学分、课程性质（必修/选修）。注意：与课表（get_schedule）互补，这里按教学班维度、含选课属性。",
@@ -555,7 +743,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 11. 可重修课程 */
+  /** 12. 可重修课程 */
   get_retake_courses: tool({
     description:
       "查询可重修的课程列表（历年开课记录，含课程号/开课学院/学分）。用户问「××能不能重修」「重修有哪些课」或计划重修时调用；可用 keyword 过滤课程名。",
@@ -583,7 +771,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 12. 实验成绩 */
+  /** 13. 实验成绩 */
   get_lab_grades: tool({
     description:
       "查询实验课程成绩（按学期，默认自动探测最新学期，也可指定如「2026-2027-1」）。没有实验课的学期返回空属正常。",
@@ -613,7 +801,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 13. 教务处官网通知 */
+  /** 14. 教务处官网通知 */
   get_news: tool({
     description:
       "抓取南京工业大学教务处官网（jwc.njtech.edu.cn）的最新通知，涵盖三个板块：公告通知（含选课/考试/学籍等重要安排）、教学动态、考试排课。公开页面无需登录。用户问「最近有什么教务通知」「选课什么时候开始」「有没有关于××的通知」时调用。",
@@ -651,7 +839,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 14. 通知正文阅读 */
+  /** 15. 通知正文阅读 */
   read_notice: tool({
     description:
       "读取学校官网任意文章页面的正文全文（webplus CMS 结构解析）。两种用法：① 读 get_news 列表里的通知（用 items[].url）；② 直接读用户贴出来的链接（如 https://jwc.njtech.edu.cn/info/1158/6876.htm，用户发来 jwc/学校官网链接时就用本工具读）。返回标题、正文全文与附件下载链接。",
@@ -712,7 +900,7 @@ export const raptorTools = {
     },
   }),
 
-  /** 16. 长期记忆维护 */
+  /** 17. 长期记忆维护 */
   save_memory: tool({
     description:
       "长期记忆维护（跨会话持久，存于本地 memory.json，启动时自动注入新会话）。值得跨会话记住的信息出现时主动调用：用户偏好（年级/作息）、要抢/盯的目标课程、重要时间结论（选课考试安排）、任务状态。用户说「记住××」必须立即调用。",
