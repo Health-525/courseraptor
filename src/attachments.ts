@@ -203,8 +203,10 @@ function sanitizeFilename(name: string): string {
  */
 export async function fetchAttachment(
   url: string,
-  name?: string
+  name?: string,
+  opts: { limit?: number } = {}
 ): Promise<AttachmentResult> {
+  const textLimit = opts.limit ?? TEXT_LIMIT;
   // jwc 的 download.jsp 带验证码，走专门链路；其余直链
   const isJwcDownload =
     /jwc\.njtech\.edu\.cn\/system\/_content\/download\.jsp/.test(url);
@@ -231,9 +233,9 @@ export async function fetchAttachment(
     return {
       mode: "parsed",
       format: parsed.format,
-      text: parsed.text.slice(0, TEXT_LIMIT),
+      text: parsed.text.slice(0, textLimit),
       charCount: parsed.text.length,
-      truncated: parsed.text.length > TEXT_LIMIT || undefined,
+      truncated: parsed.text.length > textLimit || undefined,
     };
   }
 

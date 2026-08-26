@@ -433,11 +433,35 @@ export const raptorTools = {
     execute: async () => {
       const cookie = await getCookie();
       const result = await fetchAllGrades(cookie, config.jwglUsername);
+
+      // 通识选修六类统计（选修性质 + 通识教育课，成绩接口自带课程归属 kcgsmc）
+      const geByCat = new Map<string, { credits: number; courses: string[] }>();
+      for (const g of result.allCourses) {
+        if (g.type !== "选修" || !g.courseClass?.includes("通识") || !g.category) continue;
+        const e = geByCat.get(g.category) ?? { credits: 0, courses: [] };
+        e.credits += parseFloat(g.credit) || 0;
+        e.courses.push(`${g.course}(${g.credit}分)`);
+        geByCat.set(g.category, e);
+      }
+      const GE_REQUIRED = ["创新创业类", "公共艺术类", "人文类", "社会类", "自然类", "AI前沿技术类"];
+      const covered = (c: string) =>
+        [...geByCat.keys()].some((k) => k === c || k.includes(c) || c.includes(k));
+      const generalElectives = {
+        byCategory: [...geByCat.entries()].map(([category, e]) => ({
+          category,
+          credits: e.credits,
+          courses: e.courses,
+        })),
+        missingCategories: GE_REQUIRED.filter((c) => !covered(c)),
+        note: "六类要求：创新创业/公共艺术(美育)/人文/社会/自然/AI前沿；「大学英语拓展课程」是否计入人文以培养方案为准",
+      };
+
       return {
         gpa: result.gpa,
         totalCredits: result.totalCredits,
         requiredCourses: result.requiredCourses,
         courseCount: result.allCourses.length,
+        generalElectives,
         courses: result.allCourses.map((g) => ({
           course: g.course,
           score: g.score,

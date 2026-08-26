@@ -61,33 +61,41 @@ export async function fetchAllGrades(
   const all: GradeCourse[] = [];
   const endYear = new Date().getFullYear();
 
+  // 单学期查询带重试（线路抖动会导致整个学期数据静默丢失）
+  const fetchTerm = async (y: number, q: number): Promise<GradeCourse[]> => {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const resp = await client.req(
+          "/cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005",
+          {
+            method: "POST",
+            body: `xnm=${y}&xqm=${q}&_search=false&nd=${Date.now()}&queryModel.showCount=200&queryModel.currentPage=1`,
+          }
+        );
+        const data = JSON.parse(resp.body);
+        return (data.items ?? []).map(
+          (g: Record<string, unknown>): GradeCourse => ({
+            course: String(g.kcmc || g.kch || ""),
+            score: String(g.cj || g.bfzcj || ""),
+            credit: String(g.xf || ""),
+            type: String(g.kcxzmc || ""),
+            semester: String(g.xnmmc ?? "") + String(g.xqmmc ?? ""),
+            category: String(g.kcgsmc || ""),
+            courseClass: String(g.kclbmc || ""),
+          })
+        );
+      } catch {
+        if (attempt === 3) return []; // 彻底失败才放弃该学期
+        await new Promise((r) => setTimeout(r, attempt * 1500));
+      }
+    }
+    return [];
+  };
+
   // 遍历所有学年学期
   for (let y = 2023; y <= endYear; y++) {
     for (const q of [3, 12]) {
-      const resp = await client.req(
-        "/cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005",
-        {
-          method: "POST",
-          body: `xnm=${y}&xqm=${q}&_search=false&nd=${Date.now()}&queryModel.showCount=200&queryModel.currentPage=1`,
-        }
-      );
-
-      try {
-        const data = JSON.parse(resp.body);
-        if (data.items) {
-          for (const g of data.items) {
-            all.push({
-              course: g.kcmc || g.kch || "",
-              score: g.cj || g.bfzcj || "",
-              credit: g.xf || "",
-              type: g.kcxzmc || "",
-              semester: (g.xnmmc || "") + (g.xqmmc || ""),
-            });
-          }
-        }
-      } catch {
-        // Skip failed semester
-      }
+      all.push(...(await fetchTerm(y, q)));
     }
   }
 
