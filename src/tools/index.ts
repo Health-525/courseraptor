@@ -100,19 +100,53 @@ async function watchLoop(
   let grabbed: LoopResult["grabbed"] = null;
   const events: LoopResult["events"] = [];
   let lastSnapshot: LoopResult["lastSnapshot"] = [];
+  let consecutiveErrors = 0;
+  let lastSessionRefresh = 0;
+
+  // 单目标时按关键词缩小服务端查询范围：课程列表分页只拉第一页（100 条），
+  // 通识选修课程数百门，不带关键词目标可能不在第一页
+  const keyword = targets.length === 1 ? targets[0].courseName : undefined;
 
   while (Date.now() < deadline) {
     rounds++;
     let courses: XkCourse[] = [];
     try {
-      courses = await searchCourses(session);
+      courses = await searchCourses(session, keyword);
+      consecutiveErrors = 0;
     } catch (e) {
       if ((e as Error).message === "SESSION_EXPIRED") {
         invalidateXkSession();
         session = await getXkSession(true);
         continue;
       }
-      throw e;
+      // 教务线路抖动容错：连续 5 次异常才放弃，单次异常记录后继续
+      consecutiveErrors++;
+      if (consecutiveErrors >= 5) throw e;
+      events.push({
+        time: now(),
+        message: `查询异常（连续 ${consecutiveErrors}/5）：${(e as Error).message.slice(0, 60)}`,
+      });
+      await pollDelay(2000);
+      continue;
+    }
+
+    // 抢课模式下课程出现但会话里没有 xkkzId：说明选课是在监控期间开放的
+    // （缓存的会话建于开放前），提交会带空 xkkz_id 必败 -> 刷新会话（限频 30s）
+    if (
+      grab &&
+      courses.length > 0 &&
+      !session.xkkzId &&
+      Date.now() - lastSessionRefresh > 30000
+    ) {
+      lastSessionRefresh = Date.now();
+      invalidateXkSession();
+      session = await getXkSession(true);
+      events.push({
+        time: now(),
+        message: session.xkkzId
+          ? `检测到选课开放，已刷新会话（xkkzId=${session.xkkzId.slice(0, 10)}…）`
+          : "课程已出现但 xkkzId 仍未下发，30 秒后重试刷新",
+      });
     }
 
     const matched = courses.filter((c) => matchTargets(c, targets));
