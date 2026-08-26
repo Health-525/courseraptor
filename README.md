@@ -96,7 +96,7 @@ npm run qq
 |---|---|---|
 | `get_news` | 教务处官网（jwc.njtech.edu.cn）最新通知列表：公告通知 / 教学动态 / 考试排课 | ~5s |
 | `read_notice` | 读通知**正文全文**（选课时间表、截止日期都在正文里） | ~3s |
-| `fetch_attachment` | 通知附件（PDF/DOC/XLS）：配 `FIRECRAWL_API_KEY` 时解析成文本，否则下载到本地 `downloads/` | ~5s |
+| `fetch_attachment` | 通知附件解析：xlsx/docx/pdf 本地离线解析成文本（自动过图片验证码），其他格式下载到本地 | ~10-20s |
 | `save_memory` | 长期记忆维护（跨会话事实条目：偏好/目标/结论，增删改查） | 即时 |
 
 ## 🚀 快速开始
