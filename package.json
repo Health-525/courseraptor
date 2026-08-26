@@ -20,7 +20,11 @@
     "@ai-sdk/tui": "^1.0.78",
     "@tencent-connect/qqbot-nodejs": "^1.0.4",
     "ai": "^7.0.77",
+    "mammoth": "^1.12.1",
+    "pdf-parse": "^2.4.5",
+    "tesseract.js": "^7.0.0",
     "tsx": "^4.23.12",
+    "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {

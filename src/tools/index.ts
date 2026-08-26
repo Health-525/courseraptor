@@ -664,19 +664,27 @@ export const raptorTools = {
   /** 15. 附件获取（Firecrawl 云解析 / 本地下载） */
   fetch_attachment: tool({
     description:
-      "获取通知的文件附件（.pdf/.doc/.xls 等，URL 来自 read_notice 返回的 attachments）。配置了 FIRECRAWL_API_KEY 时通过 Firecrawl 把附件解析成 markdown 文本直接返回；未配置时下载到本地 downloads 目录并返回文件路径。问「附件里怎么说的」「把附件内容读出来」时调用。",
+      "获取并解析通知的文件附件（URL 与文件名来自 read_notice 返回的 attachments）。docx/xlsx/pdf 自动本地解析成文本直接返回（离线零费用，网课目录、课程清单都能读）；其他格式下载到本地 downloads 目录返回路径。问「附件里有哪些课」「网课目录读一下」时调用。",
     inputSchema: z.object({
-      url: z.string().describe("附件下载 URL（来自 read_notice 的 attachments[].url）"),
+      url: z.string().describe("附件下载 URL（read_notice 返回的 attachments[].url）"),
+      name: z
+        .string()
+        .optional()
+        .describe("附件文件名（read_notice 返回的 attachments[].name，含扩展名）"),
     }),
-    execute: async ({ url }) => {
+    execute: async ({ url, name }) => {
       const isNjtech = /^https?:\/\/[a-z0-9.-]*\.njtech\.edu\.cn\//.test(url);
       if (!isNjtech && !config.firecrawlApiKey) {
         return {
           error:
-            "未配置 FIRECRAWL_API_KEY 时，仅支持 njtech.edu.cn 域名的附件下载",
+            "仅支持 njtech.edu.cn 域名的附件（未配置 FIRECRAWL_API_KEY 时）",
         };
       }
-      return await fetchAttachment(url);
+      try {
+        return await fetchAttachment(url, name);
+      } catch (e) {
+        return { error: `附件获取失败：${(e as Error).message.slice(0, 120)}` };
+      }
     },
   }),
 

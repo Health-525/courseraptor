@@ -181,17 +181,24 @@ export async function fetchJwcArticle(url: string): Promise<JwcArticle> {
     bodyHtml = html; // 容器缺失/过短时退化为整页剥离
   }
 
-  // 附件（教务处通知常带 .xls/.pdf/.doc，含选课安排表/校历等）
+  // 附件扫描必须覆盖整页：webplus 的附件块在正文容器之外（页面尾部
+  // <li>附件【<a href="/system/_content/download.jsp?...">名称.xlsx</a>】），
+  // 且下载 URL 无文件后缀（文件名在链接文本里）
   const attachments: JwcArticle["attachments"] = [];
-  for (const m of bodyHtml.matchAll(
-    /<a[^>]*href="([^"]+\.(?:xls|xlsx|pdf|doc|docx|zip|rar))"[^>]*>([\s\S]*?)<\/a>/gi
+  for (const m of html.matchAll(
+    /<a[^>]*href="([^"]+)"[^>]*>([\s\S]{0,150}?)<\/a>/gi
   )) {
-    const name =
-      m[2].replace(/<[^>]+>/g, "").trim() || m[1].split("/").pop() || "";
+    const href = m[1];
+    const text = m[2].replace(/<[^>]+>/g, "").trim();
+    const isDownload =
+      href.includes("download.jsp") || href.includes("DownloadAttachUrl");
+    const hasExt = /\.(xls|xlsx|pdf|doc|docx|zip|rar|wps)(?:[?#]|$)/i.test(href);
+    if (!isDownload && !hasExt) continue;
+    if (!text || text.length < 3) continue;
     try {
-      const full = new URL(m[1], url).href;
+      const full = new URL(href, url).href;
       if (!attachments.some((a) => a.url === full)) {
-        attachments.push({ name, url: full });
+        attachments.push({ name: text, url: full });
       }
     } catch {
       /* 非法链接跳过 */
