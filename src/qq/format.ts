@@ -28,8 +28,13 @@ export function mdToPlain(md: string): string {
     inTable = false;
     const converted = line
       .replace(/^#{1,4}\s*(.+)$/, "【$1】")
-      .replace(/\*\*(.+?)\*\*/g, "$1")
+      // 粗斜体（***x*** / ___x___）先转，避免被下面的粗体/斜体规则各吃掉一半星号
+      .replace(/(\*\*\*|___)(.+?)\1/g, "$2")
+      .replace(/(\*\*|__)(.+?)\1/g, "$2")
+      .replace(/(\*|_)(.+?)\1/g, "$2")
       .replace(/`([^`]+)`/g, "$1")
+      // [文字](链接) -> 文字：链接（QQ 纯文本环境，链接单独换行更易点开）
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, "$1：$2")
       .replace(/^[-*]\s+/, "• ")
       .replace(/^>\s?/, "");
     // 【小标题】前补空行，段落感

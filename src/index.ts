@@ -24,6 +24,11 @@ const agent = await createRaptorAgent();
 await runAgentTUI({
   title: "🦖 CourseRaptor · NJTECH 教务 Agent",
   agent,
+  // tools: "full" -- 默认 "auto-collapsed" 会在工具卡后出现文字总结时
+  // 自动折叠成只剩标题的空壳，agent 几乎每轮都这样，等于工具调用永远看不见。
+  // reasoning: "hidden" -- 不展示推理过程，对话界面只保留结论。
+  tools: "full",
+  reasoning: "hidden",
 });
 
 // 会话历史在每轮已逐轮落盘，这里兜底刷写
