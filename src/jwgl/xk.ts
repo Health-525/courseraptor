@@ -48,6 +48,10 @@ export interface XkCourse {
   kklxdm?: string;
   xkkzId?: string;
   xkkzXh?: string;
+  /** 课程归属（kzmc，如创新创业类/自然类） */
+  category?: string;
+  /** 不限容量（网课/通识课无容量字段时 true，始终视为有余量） */
+  unlimited?: boolean;
 }
 
 /** 选课轮次（入口页每个 tab 一个：主修课程/通识选修/其他课程…） */
@@ -61,6 +65,12 @@ export interface XkRound {
   zyh: string;
   /** 该轮次的加密串（与 xkkzId 配对，查询/提交必须同源） */
   xh: string;
+  /**
+   * Display 页（queryCourse 后 load 出来的）返回的隐藏字段。
+   * PartDisplay 查询必须携带这些（rwlx/xklc/kklxpx/sfkxk/isinxksj 等
+   * 几十个开关），缺失会导致服务端过滤返回空列表（flag=1 但 tmpList 空）。
+   */
+  displayParams?: Record<string, string>;
 }
 
 export interface XkSession {
@@ -75,6 +85,8 @@ export interface XkSession {
   xkkzXh: string;
   /** 入口页解析出的全部轮次 tab（通识选修轮可能选课时段才出现） */
   rounds: XkRound[];
+  /** 入口页学生维度字段（xqh_id/jg_id/xz/ccdm 等，PartDisplay 查询携带） */
+  studentParams: Record<string, string>;
   /** 是否处于选课时间（入口页 iskxk，1=开放） */
   isXkOpen: boolean;
   /** 入口页 csrftoken（正方 V9 部分接口需要） */
@@ -176,6 +188,15 @@ export function parseCourseList(json: unknown): XkCourse[] {
       "kxrs",
       "remain",
     ]);
+    // 通识课/网课无容量字段（PartDisplay 平铺结构只有 jxb_id/kcmc/kch/jxbxf/kzmc），
+    // 此时 capacity=selected=0，判定为不限容量
+    const unlimited =
+      !("jxbrl" in merged) &&
+      !("yxzrs" in merged) &&
+      !("jxbrs" in merged) &&
+      !("yxjxrs" in merged) &&
+      capacity === 0 &&
+      selected === 0;
 
     return {
       jxbId: pickString(merged, [
@@ -184,14 +205,20 @@ export function parseCourseList(json: unknown): XkCourse[] {
         "do_jxb_id",
         "do_jxbid",
       ]),
-      courseCode: pickString(merged, ["kch_id", "kch", "courseCode"]),
+      courseCode: pickString(merged, ["kch", "kch_id", "courseCode"]),
       courseName: pickString(merged, ["kcmc", "kcm", "courseName"]),
       teacher: pickString(merged, ["jsxx", "jgxm", "teacher"]),
-      credit: pickString(merged, ["xf", "credit"]),
+      credit: pickString(merged, ["jxbxf", "xf", "credit"]),
+      category: pickString(merged, ["kzmc", "kcgsmc"]),
       capacity,
       selected,
-      // 部分学校不返回 remain 字段，用容量-已选兜底
-      remain: remain > 0 ? remain : Math.max(0, capacity - selected),
+      // 部分学校不返回 remain 字段，用容量-已选兜底；不限容量课恒为正
+      remain: unlimited
+        ? 9999
+        : remain > 0
+          ? remain
+          : Math.max(0, capacity - selected),
+      unlimited,
       raw: obj,
     };
   });
@@ -286,13 +313,41 @@ export async function openXkSession(
     });
   }
 
-  // 4. Display 预热（建立服务端选课上下文，浏览器时序）
-  await client.req(`${XK_DISPLAY}?gnmkdm=N253512`, {
-    method: "POST",
-    body: `csrftoken=${encodeURIComponent(csrftoken)}&xkkz_id=${encodeURIComponent(
-      status.xkkzId || ""
-    )}&xkkz_xh=${encodeURIComponent(xkkzXh)}&kklxdm=&xszxzt=&njdm_id=&zyh_id=&kspage=0&jspage=0`,
-  });
+  // 3.7 提取入口页学生维度字段（PartDisplay 查询必须携带）
+  const studentParams: Record<string, string> = {};
+  for (const [id, key] of [
+    ["xqh_id", "xqh_id"], ["jg_id_1", "jg_id"], ["xz", "xz"], ["ccdm", "ccdm"],
+    ["xslbdm", "xslbdm"], ["bh_id", "bh_id"], ["xbm", "xbm"], ["mzm", "mzm"],
+    ["xsbj", "xsbj"], ["njdm_id_1", "njdm_id_1"], ["zyh_id_1", "zyh_id_1"],
+    ["zyfx_id", "zyfx_id"], ["xkxnm", "xkxnm"], ["xkxqm", "xkxqm"],
+  ] as const) {
+    const m = entry.body.match(new RegExp(`id="${id}"[^>]*value="([^"]*)"`));
+    if (m) studentParams[key] = m[1];
+  }
+
+  // 4. 每个轮次 load Display，提取其隐藏字段（PartDisplay 查询必须携带，
+  // 否则服务端过滤返回空列表——这是「flag=1 但 tmpList 空」的根因）
+  for (const round of rounds) {
+    const dispBody =
+      `csrftoken=${encodeURIComponent(csrftoken)}&xkkz_id=${encodeURIComponent(round.xkkzId)}` +
+      `&xkkz_xh=${encodeURIComponent(round.xh)}&kklxdm=${round.kklxdm}` +
+      `&xszxzt=&njdm_id=${round.njdm}&zyh_id=${round.zyh}&kspage=0&jspage=0`;
+    try {
+      const disp = await client.req(`${XK_DISPLAY}?gnmkdm=N253512`, {
+        method: "POST",
+        body: dispBody,
+      });
+      const params: Record<string, string> = {};
+      for (const m of (disp.body ?? "").matchAll(/<input[^>]*type="hidden"[^>]*>/gi)) {
+        const id = m[0].match(/id="([^"]*)"/)?.[1] ?? "";
+        const val = m[0].match(/value="([^"]*)"/)?.[1] ?? "";
+        if (id) params[id] = val;
+      }
+      round.displayParams = params;
+    } catch {
+      round.displayParams = undefined;
+    }
+  }
 
   return {
     client,
@@ -300,6 +355,7 @@ export async function openXkSession(
     xkkzId: status.xkkzId || "",
     xkkzXh,
     rounds,
+    studentParams,
     isXkOpen: status.isXkOpen,
     csrftoken,
     username,
@@ -333,14 +389,17 @@ export async function searchCourses(
       kklxdm: r.kklxdm,
       njdm_id: r.njdm,
       zyh_id: r.zyh,
+      // Display 页隐藏字段 + 入口页学生维度字段（缺则服务端过滤返回空）
+      ...(r.displayParams ?? {}),
+      ...session.studentParams,
       // searchBox 筛选条件（getConditions）
       kch: "",
       kcmc: keyword || "",
       skls: "",
       skxq: "",
       skjc: "",
-      // 分页（loadCoursesByPaged）
-      kspage: "0",
+      // 分页（loadCoursesByPaged）：行号范围 1 起，首屏取前 100 行
+      kspage: "1",
       jspage: "100",
       _: String(Date.now()),
     };
