@@ -11,6 +11,10 @@
 [![Vercel AI SDK](https://img.shields.io/badge/Vercel%20AI%20SDK-v7-black.svg)](https://ai-sdk.dev)
 [![LLM](https://img.shields.io/badge/LLM-DeepSeek-4D6BFE.svg)](https://www.deepseek.com)
 [![教务系统](https://img.shields.io/badge/%E6%95%99%E5%8A%A1-%E6%AD%A3%E6%96%B9%E6%96%B0%E7%89%88-success.svg)](#已知状态-2026-08)
+[![Last Commit](https://img.shields.io/github/last-commit/Health-525/courseraptor?color=orange)](https://github.com/Health-525/courseraptor/commits/master)
+[![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social)](https://github.com/Health-525/courseraptor)
+
+**[✨ 能力总览](#-能力总览) · [🚀 快速开始](#-快速开始) · [📡 已知状态](#已知状态-2026-08) · [🏗️ 技术栈](#-技术栈) · [📁 项目结构](#-项目结构)**
 
 </div>
 
@@ -38,6 +42,10 @@ $ raptor
 ## ✨ 能力总览
 
 Agent 可调用 **11 个工具**，覆盖选课作战、教务查询、通知情报三条线。
+
+| 🎯 选课作战 | 📚 教务查询 | 🧠 两层记忆 | 💬 QQ 接入 |
+|---|---|---|---|
+| 盯课不眨眼，余量一出手就抢 | 课表 / 成绩 / 考试一句话查 | 记住你想抢的课，跨会话不丢 | 官方机器人零封号，群里 @ 就能用 |
 
 ### 🎯 选课作战
 
@@ -189,5 +197,7 @@ npm run dev            # 或项目内开发模式
 <div align="center">
 
 **🦖 CourseRaptor** · 让迅猛龙替你守教务
+
+[⬆ 回到顶部](#-courseraptor)
 
 </div>
