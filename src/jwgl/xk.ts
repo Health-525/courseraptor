@@ -44,13 +44,37 @@ export interface XkCourse {
   remain: number;
   /** 原始数据（字段校准用） */
   raw: Record<string, unknown>;
+  /** 课程所在轮次的参数（提交必须同源，由 searchCourses 回填） */
+  kklxdm?: string;
+  xkkzId?: string;
+  xkkzXh?: string;
+}
+
+/** 选课轮次（入口页每个 tab 一个：主修课程/通识选修/其他课程…） */
+export interface XkRound {
+  /** 开课类型代码（tab 维度 key） */
+  kklxdm: string;
+  /** tab 显示名（如「主修课程」） */
+  tabName: string;
+  xkkzId: string;
+  njdm: string;
+  zyh: string;
+  /** 该轮次的加密串（与 xkkzId 配对，查询/提交必须同源） */
+  xh: string;
 }
 
 export interface XkSession {
   client: HttpClient;
   cookie: string;
-  /** 选课控制 ID（选课轮次 key，未开放时为空） */
+  /** 选课控制 ID（第一个轮次，兼容旧逻辑） */
   xkkzId: string;
+  /**
+   * 选课轮次校验串（入口页 firstXkkzXh，256 位 hex）。
+   * 正方 V9 的「加密串错误」即缺此参数：查询/提交都必须携带 xkkz_xh。
+   */
+  xkkzXh: string;
+  /** 入口页解析出的全部轮次 tab（通识选修轮可能选课时段才出现） */
+  rounds: XkRound[];
   /** 是否处于选课时间（入口页 iskxk，1=开放） */
   isXkOpen: boolean;
   /** 入口页 csrftoken（正方 V9 部分接口需要） */
@@ -238,18 +262,44 @@ export async function openXkSession(
   const csrfMatch = entry.body.match(/id="csrftoken"[^>]*value="([^"]+)"/);
   const csrftoken = csrfMatch ? csrfMatch[1].split(",")[0] : "";
 
+  // 3.5 提取加密串（firstXkkzXh）——「加密串错误」拦截的关键参数
+  const xhMatch =
+    entry.body.match(/id="firstXkkzXh"[^>]*value="([^"]+)"/) ??
+    entry.body.match(/value="([^"]+)"[^>]*id="firstXkkzXh"/);
+  const xkkzXh = xhMatch ? xhMatch[1] : "";
+
+  // 3.6 解析全部轮次 tab：queryCourse(this,'kklxdm','xkkz_id','njdm','zyh','xh')
+  // 每个轮次参数独立（通识选修轮 ≠ 首轮），提交必须用课程所在轮次的参数
+  const rounds: XkRound[] = [];
+  for (const t of entry.body.matchAll(
+    /queryCourse\(this,'(\w+)','(\w+)','(\w*)','(\w*)','(\w+)'\)/g
+  )) {
+    const tabName =
+      entry.body.match(new RegExp(`id="tab_kklx_${t[1]}_[^"]*"[^>]*>([^<]*)<`))?.[1]?.trim() ?? "";
+    rounds.push({
+      kklxdm: t[1],
+      tabName,
+      xkkzId: t[2],
+      njdm: t[3],
+      zyh: t[4],
+      xh: t[5],
+    });
+  }
+
   // 4. Display 预热（建立服务端选课上下文，浏览器时序）
   await client.req(`${XK_DISPLAY}?gnmkdm=N253512`, {
     method: "POST",
     body: `csrftoken=${encodeURIComponent(csrftoken)}&xkkz_id=${encodeURIComponent(
       status.xkkzId || ""
-    )}&kklxdm=&xszxzt=&njdm_id=&zyh_id=&kspage=0&jspage=0`,
+    )}&xkkz_xh=${encodeURIComponent(xkkzXh)}&kklxdm=&xszxzt=&njdm_id=&zyh_id=&kspage=0&jspage=0`,
   });
 
   return {
     client,
     cookie,
     xkkzId: status.xkkzId || "",
+    xkkzXh,
+    rounds,
     isXkOpen: status.isXkOpen,
     csrftoken,
     username,
@@ -258,49 +308,72 @@ export async function openXkSession(
 
 /**
  * 查询课程分页列表（zzxkyzb_cxZzxkYzbPartDisplay，官方 JS 确认的参数）
- * 响应为分页课程列表；教学班明细（含余量）需再调 jxb 接口
+ * 遍历入口页解析到的全部轮次 tab（每个轮次独立 xkkz_id/加密串），
+ * 合并结果；每门课回填其所在轮次的参数供提交使用。
  * @param keyword - 课程名关键词（可选）
+ * @param round   - 指定轮次（可选，默认全部轮次）
  */
 export async function searchCourses(
   session: XkSession,
-  keyword?: string
+  keyword?: string,
+  round?: XkRound
 ): Promise<XkCourse[]> {
-  const form: Record<string, string> = {
-    csrftoken: session.csrftoken,
-    xkkz_id: session.xkkzId,
-    kklxdm: "",
-    njdm_id: "",
-    zyh_id: "",
-    // searchBox 筛选条件（getConditions）
-    kch: "",
-    kcmc: keyword || "",
-    skls: "",
-    skxq: "",
-    skjc: "",
-    // 分页（loadCoursesByPaged）
-    kspage: "0",
-    jspage: "100",
-    _: String(Date.now()),
-  };
+  const targets: XkRound[] = round
+    ? [round]
+    : session.rounds.length
+      ? session.rounds
+      : [{ kklxdm: "", tabName: "", xkkzId: session.xkkzId, njdm: "", zyh: "", xh: session.xkkzXh }];
 
-  const resp = await session.client.req(`${XK_COURSE_LIST}?gnmkdm=N253512`, {
-    method: "POST",
-    body: Object.entries(form)
-      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-      .join("&"),
-  });
+  const all: XkCourse[] = [];
+  for (const r of targets) {
+    const form: Record<string, string> = {
+      csrftoken: session.csrftoken,
+      xkkz_id: r.xkkzId,
+      xkkz_xh: r.xh, // 加密串：缺此参数服务端报「加密串错误」
+      kklxdm: r.kklxdm,
+      njdm_id: r.njdm,
+      zyh_id: r.zyh,
+      // searchBox 筛选条件（getConditions）
+      kch: "",
+      kcmc: keyword || "",
+      skls: "",
+      skxq: "",
+      skjc: "",
+      // 分页（loadCoursesByPaged）
+      kspage: "0",
+      jspage: "100",
+      _: String(Date.now()),
+    };
 
-  if (isSessionExpired(resp.body)) {
-    throw new Error("SESSION_EXPIRED");
+    const resp = await session.client.req(`${XK_COURSE_LIST}?gnmkdm=N253512`, {
+      method: "POST",
+      body: Object.entries(form)
+        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+        .join("&"),
+    });
+
+    if (isSessionExpired(resp.body)) {
+      throw new Error("SESSION_EXPIRED");
+    }
+
+    // PartDisplay 返回 HTML 分页结构，其中嵌有课程数据；
+    // 尝试 JSON 解析失败时提取 HTML 中的课程行
+    let courses: XkCourse[];
+    try {
+      courses = parseCourseList(JSON.parse(resp.body));
+    } catch {
+      courses = parseCourseRowsFromHtml(resp.body);
+    }
+    // 回填轮次参数（提交选课必须与查询同源）
+    for (const c of courses) {
+      c.kklxdm = r.kklxdm;
+      c.xkkzId = r.xkkzId;
+      c.xkkzXh = r.xh;
+      c.raw = { ...c.raw, _roundTab: r.tabName };
+    }
+    all.push(...courses);
   }
-
-  // PartDisplay 返回 HTML 分页结构，其中嵌有课程数据；
-  // 尝试 JSON 解析失败时提取 HTML 中的课程行
-  try {
-    return parseCourseList(JSON.parse(resp.body));
-  } catch {
-    return parseCourseRowsFromHtml(resp.body);
-  }
+  return all;
 }
 
 /**
@@ -351,11 +424,14 @@ export function parseCourseRowsFromHtml(html: string): XkCourse[] {
  */
 export async function fetchJxbList(
   session: XkSession,
-  course: Pick<XkCourse, "courseCode">
+  course: Pick<XkCourse, "courseCode" | "kklxdm" | "xkkzId" | "xkkzXh">
 ): Promise<XkCourse[]> {
   const form: Record<string, string> = {
     csrftoken: session.csrftoken,
-    xkkz_id: session.xkkzId,
+    // 优先用课程自带轮次参数（与查询同源）
+    xkkz_id: course.xkkzId || session.xkkzId,
+    xkkz_xh: course.xkkzXh || session.xkkzXh, // 加密串
+    kklxdm: course.kklxdm || "",
     kch_id: course.courseCode,
     cxbj: "0",
     _: String(Date.now()),
@@ -394,7 +470,10 @@ export async function submitCourse(
 ): Promise<XkSubmitResult> {
   const form: Record<string, string> = {
     csrftoken: session.csrftoken,
-    xkkz_id: session.xkkzId,
+    // 优先用课程自带轮次参数（与查询同源，跨轮次提交会失败）
+    xkkz_id: course.xkkzId || session.xkkzId,
+    xkkz_xh: course.xkkzXh || session.xkkzXh, // 加密串
+    kklxdm: course.kklxdm || "",
     jxb_id: course.jxbId,
     kch_id: course.courseCode,
     do_jxb_id: course.jxbId,

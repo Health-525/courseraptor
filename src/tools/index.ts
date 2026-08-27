@@ -130,22 +130,20 @@ async function watchLoop(
       continue;
     }
 
-    // 抢课模式下课程出现但会话里没有 xkkzId：说明选课是在监控期间开放的
-    // （缓存的会话建于开放前），提交会带空 xkkz_id 必败 -> 刷新会话（限频 30s）
+    // 抢课模式：①会话建于开放前（xkkzId 空）或 ②全部轮次查询为空
+    // （新一轮次可能在监控期间才出现，如 12:00 通识选修轮上线新 tab）
+    // -> 限频刷新会话，重新解析轮次列表
     if (
       grab &&
-      courses.length > 0 &&
-      !session.xkkzId &&
-      Date.now() - lastSessionRefresh > 30000
+      Date.now() - lastSessionRefresh > 45000 &&
+      (courses.length === 0 || !session.xkkzId)
     ) {
       lastSessionRefresh = Date.now();
       invalidateXkSession();
       session = await getXkSession(true);
       events.push({
         time: now(),
-        message: session.xkkzId
-          ? `检测到选课开放，已刷新会话（xkkzId=${session.xkkzId.slice(0, 10)}…）`
-          : "课程已出现但 xkkzId 仍未下发，30 秒后重试刷新",
+        message: `刷新选课会话：轮次=[${session.rounds.map((r) => r.tabName || r.kklxdm).join("、")}]`,
       });
     }
 
@@ -276,18 +274,19 @@ async function grabPlanLoop(
         continue;
       }
 
-      // 监控期间选课开放：缓存的会话无 xkkzId，提交必败 -> 刷新（限频 30s）
+      // 抢课期间刷新会话（限频 45s）：①建于开放前（xkkzId 空）或
+      // ②当前候选查无结果（新一轮次可能在监控期间才出现，如 12:00
+      // 通识选修轮上线新 tab），刷新后重新解析轮次列表
       if (
-        courses.length > 0 &&
-        !session.xkkzId &&
-        Date.now() - lastSessionRefresh > 30000
+        Date.now() - lastSessionRefresh > 45000 &&
+        (courses.length === 0 || !session.xkkzId)
       ) {
         lastSessionRefresh = Date.now();
         invalidateXkSession();
         session = await getXkSession(true);
         events.push({
           time: now(),
-          message: `检测到选课开放，已刷新会话（xkkzId=${session.xkkzId ? session.xkkzId.slice(0, 10) + "…" : "仍未下发"}）`,
+          message: `刷新选课会话：轮次=[${session.rounds.map((r) => r.tabName || r.kklxdm).join("、")}]`,
         });
       }
 
