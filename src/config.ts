@@ -18,6 +18,8 @@ export interface RaptorConfig {
   qqBotAppId?: string;
   qqBotAppSecret?: string;
   qqBotPasscode?: string;
+  /** 抢课功能开关（选课季设为 1 才暴露抢课/盯课工具，平时关闭回到日常对话） */
+  enableGrab: boolean;
 }
 
 // .env 跟随包位置解析：全局命令 raptor 可在任意目录启动
@@ -51,6 +53,7 @@ export function loadConfig(): RaptorConfig {
     qqBotAppId: env("QQBOT_APP_ID"),
     qqBotAppSecret: env("QQBOT_APP_SECRET"),
     qqBotPasscode: env("QQBOT_PASSCODE"),
+    enableGrab: env("RAPTOR_ENABLE_GRAB") === "1",
   };
 
   const missing: string[] = [];

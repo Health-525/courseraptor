@@ -938,3 +938,12 @@ export const raptorTools = {
     },
   }),
 };
+
+// 抢课季开关：默认关闭（RAPTOR_ENABLE_GRAB=1 才暴露），平时对话回到日常
+// 抢课/盯课是真实选课操作，只在选课季启用
+if (!config.enableGrab) {
+  delete (raptorTools as Record<string, unknown>).watch_courses;
+  delete (raptorTools as Record<string, unknown>).grab_course;
+  delete (raptorTools as Record<string, unknown>).grab_plan;
+}
+
