@@ -14,13 +14,13 @@ export function mdToPlain(md: string): string {
         .slice(1, -1)
         .map((c) => c.trim())
         .filter(Boolean);
-      // 兜底格式：表头行【】，数据行用 · 连接（模型已按 QQ 规则输出，
-      // 这里只处理漏网的 Markdown 表格）
+      // 兜底格式：表头行压成【标题】，数据行用 • 开头 + · 连接（模型已按
+      // QQ 规则输出，这里只处理漏网的 Markdown 表格）
       if (!inTable && cells.length > 1) {
         out.push("");
-        out.push(`【${cells.join(" · ")}】`);
+        out.push(`【${cells.join(" ")}】`);
       } else {
-        out.push(cells.join(" · "));
+        out.push(`• ${cells.join(" · ")}`);
       }
       inTable = true;
       continue;
