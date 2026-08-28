@@ -3,9 +3,9 @@
  * 配置了 QQ 机器人（QQBOT_APP_ID/SECRET）时，QQ 渠道随本入口一并启动
  * 运行: raptor / npm run dev
  *
- * 默认使用行内渲染器（src/tui/inline.ts）：工具调用即时可见、
- * 滚动走终端原生缓冲区（滚轮/滚动条/选中复制都可用）。
- * RAPTOR_TUI_CLASSIC=1 回到 @ai-sdk/tui 全屏卡片 UI。
+ * 默认使用 @ai-sdk/tui 全屏卡片 UI（用户指定偏好：不要顺着命令行往下滚）。
+ * RAPTOR_TUI_INLINE=1 时改用行内渲染器（src/tui/inline.ts）：
+ * 输出顺着终端缓冲区往下走、滚轮/选中复制可用，供需要时选用。
  */
 
 import { config } from "./config";
@@ -23,7 +23,13 @@ if (config.qqBotAppId && config.qqBotAppSecret) {
 
 const agent = await createRaptorAgent();
 
-if (process.env.RAPTOR_TUI_CLASSIC === "1") {
+if (process.env.RAPTOR_TUI_INLINE === "1") {
+  const { runInlineTUI } = await import("./tui/inline");
+  await runInlineTUI({
+    title: "🦖 CourseRaptor · NJTECH 教务 Agent（试试：这周课表 · 最近通知 · 我的成绩）",
+    agent,
+  });
+} else {
   const { runAgentTUI } = await import("@ai-sdk/tui");
   await runAgentTUI({
     // TUI 每帧都会 clearScreen 重绘，启动前打印的引导横幅活不下来；title 是
@@ -35,12 +41,6 @@ if (process.env.RAPTOR_TUI_CLASSIC === "1") {
     // reasoning: "hidden" -- 不展示推理过程，对话界面只保留结论。
     tools: "full",
     reasoning: "hidden",
-  });
-} else {
-  const { runInlineTUI } = await import("./tui/inline");
-  await runInlineTUI({
-    title: "🦖 CourseRaptor · NJTECH 教务 Agent（试试：这周课表 · 最近通知 · 我的成绩）",
-    agent,
   });
 }
 
