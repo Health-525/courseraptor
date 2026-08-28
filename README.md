@@ -14,7 +14,7 @@
 [![Last Commit](https://img.shields.io/github/last-commit/Health-525/courseraptor?color=orange)](https://github.com/Health-525/courseraptor/commits/master)
 [![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social)](https://github.com/Health-525/courseraptor)
 
-**[✨ 能力总览](#-能力总览) · [🚀 快速开始](#-快速开始) · [📡 已知状态](#-已知状态-2026-09) · [🏗️ 技术栈](#-技术栈) · [📁 项目结构](#-项目结构)**
+**[✨ 能力总览](#-能力总览) · [🚀 快速开始](#-快速开始) · [📡 已知状态](#-已知状态-2026-09) · [🏗️ 技术栈](#-技术栈) · [⚠️ 免责声明](#️-免责声明)**
 
 </div>
 
@@ -193,6 +193,13 @@ npm run dev            # 或项目内开发模式
     │   └── types.ts
     └── tools/          #   agent 工具（默认 14 个，抢课季 +3）+ 会话缓存管理
 ```
+
+## ⚠️ 免责声明
+
+- 本项目**仅供个人学习与研究用途**（正方教务系统协议分析、LLM Agent 工程实践），与南京工业大学官方无关，也未获其授权或认可。
+- 使用者需**自行承担全部风险**：请遵守学校相关规定及教务系统使用条款，因使用本工具产生的任何后果（包括但不限于账号受限、选课异常、成绩处理）由使用者本人负责。
+- 选课功能（`RAPTOR_ENABLE_GRAB=1`）尤其注意：部分学校明确禁止使用第三方工具进行选课操作，违规可能影响成绩或学籍，**请自行评估并谨慎使用**。
+- 请勿将本项目用于商业用途或大规模请求（内置的请求间隔与重试限制请勿移除）。
 
 ## 🔐 安全提示
 
