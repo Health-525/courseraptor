@@ -6,7 +6,7 @@
  * （返回「系统维护页面」），任何客户端均不可用。
  */
 
-import { createClientWithCookie } from "./http";
+import { createClient } from "./http";
 import { BASE } from "./auth";
 import { candidateXnxqList, termLabel } from "./academics";
 
@@ -33,7 +33,7 @@ const PROFILE_URL = "/xsxxxggl/xsgrxxwh_cxXsgrxx.html";
 export async function fetchProfile(
   cookie: string
 ): Promise<Record<string, string>> {
-  const client = createClientWithCookie(BASE, cookie);
+  const client = createClient(BASE, cookie);
   const r = await client.req(PROFILE_URL, { method: "GET" });
   const html = r.body ?? "";
   const out: Record<string, string> = {};
@@ -65,7 +65,7 @@ export interface RetakeCourse {
 export async function fetchRetakeCourses(
   cookie: string
 ): Promise<RetakeCourse[]> {
-  const client = createClientWithCookie(BASE, cookie);
+  const client = createClient(BASE, cookie);
   const r = await client.req("/cxkccx/cxkccx_cxCxkccxIndex.html?doType=query", {
     method: "POST",
     body: queryBody(),
@@ -108,7 +108,7 @@ export interface EnrolledClass {
 export async function fetchEnrolledClasses(
   cookie: string
 ): Promise<EnrolledClass[]> {
-  const client = createClientWithCookie(BASE, cookie);
+  const client = createClient(BASE, cookie);
   const r = await client.req("/xkcx/xkmdcx_cxXkmdcxIndex.html?doType=query", {
     method: "POST",
     body: queryBody(),
@@ -147,7 +147,7 @@ export async function fetchLabGradesSmart(
   xnm?: number,
   xqm?: number
 ): Promise<{ year: number; semester: number; label: string; items: Array<Record<string, unknown>> }> {
-  const client = createClientWithCookie(BASE, cookie);
+  const client = createClient(BASE, cookie);
   const candidates =
     xnm && xqm ? [{ year: xnm, semester: xqm }] : candidateXnxqList();
 

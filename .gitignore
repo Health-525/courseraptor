@@ -8,3 +8,5 @@ qq-allowlist.json
 qq-bridge.log
 *.log
 eng.traineddata
+data/
+.workbuddy/

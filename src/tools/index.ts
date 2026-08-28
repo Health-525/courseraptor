@@ -25,7 +25,9 @@ import {
   fetchExamsSmart,
   parseSemesterString,
   currentWeekOf,
-  NJTECH_PERIOD_TIMES,
+  buildWeekIndex,
+  periodTimeRange,
+  WEEKDAY_NAMES,
 } from "../jwgl/academics";
 import { fetchAllGrades } from "../jwgl/grades";
 import { fetchJwcNews, fetchJwcArticle } from "../jwgl/news";
@@ -35,6 +37,7 @@ import {
   fetchJxbList,
   submitCourse,
   matchTargets,
+  roundRefOf,
   type XkCourse,
   type XkTarget,
 } from "../jwgl/xk";
@@ -45,19 +48,8 @@ import {
   pollDelay,
 } from "./session";
 
-const WEEKDAY_NAMES = ["", "周一", "周二", "周三", "周四", "周五", "周六", "周日"];
-
 function now(): string {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
-}
-
-/** 节次号 -> 上课时间段，如 [7,8] -> "16:00-17:40" */
-function periodTimeRange(periods: number[]): string | undefined {
-  if (!periods.length) return undefined;
-  const first = NJTECH_PERIOD_TIMES[String(periods[0])];
-  const last = NJTECH_PERIOD_TIMES[String(periods[periods.length - 1])];
-  if (!first || !last) return undefined;
-  return `${first.split("-")[0]}-${last.split("-")[1]}`;
 }
 
 function courseBrief(c: XkCourse) {
@@ -359,7 +351,7 @@ async function grabPlanLoop(
 
 // ── 工具定义 ─────────────────────────────────────────────────
 
-export const raptorTools = {
+const raptorToolsAll = {
   /** 1. 查询选课模块状态 */
   check_selection_status: tool({
     description:
@@ -370,16 +362,27 @@ export const raptorTools = {
         config.jwglUsername,
         config.jwglPassword
       );
-      const encryptedError = result.courseListRaw.includes("加密串");
+      const okRounds = result.rounds.filter((r) => r.status === "ok");
       return {
         isXkOpen: result.isXkOpen,
         isXkOpenLabel: result.isXkOpen ? "选课开放中" : "当前不属于选课阶段",
         xkkzId: result.xkkzId ?? "未下发（选课未开放时不发放）",
-        courseQueryBlocked: encryptedError,
-        courseQueryNote: encryptedError
-          ? "课程查询接口仍被防爬拦截（加密串错误），选课开放后需复测"
-          : "课程查询接口无加密串错误",
-        courseQueryRawHead: result.courseListRaw.slice(0, 200),
+        hasXkkzXh: result.hasXkkzXh,
+        courseQueryBlocked: result.courseQueryBlocked,
+        /** 自检结论必须可直接引用：blocked 才说被拦截，empty 要说清楚是没数据 */
+        courseQueryNote: result.courseQueryBlocked
+          ? "课程查询接口被加密串拦截，需复测"
+          : result.isXkOpen
+            ? `课程查询接口正常（${okRounds.length}/${result.rounds.length} 个轮次返回数据）`
+            : "课程查询接口无加密串错误；当前非选课阶段，返回空属正常",
+        rounds: result.rounds.map((r) => ({
+          tab: r.tabName,
+          status: r.status,
+          sentXkkzXh: r.sentXkkzXh,
+          parsedVia: r.parsedVia,
+          courseCount: r.courseCount,
+          message: r.message,
+        })),
       };
     },
   }),
@@ -432,10 +435,15 @@ export const raptorTools = {
       };
       const courses = await searchOnce();
 
-      const codes = [
-        ...new Set(courses.map((c) => c.courseCode).filter(Boolean)),
-      ].slice(0, 3);
-      if (codes.length === 0) {
+      // 按课程号去重，但必须留住课程对象本身——它带着所在轮次的凭证。
+      // 只取 courseCode 会丢掉 kklxdm/xkkzId/xkkzXh，于是通识选修轮的课
+      // 会拿主修轮的凭证去问教学班明细，查不到或查错。
+      const byCode = new Map<string, XkCourse>();
+      for (const c of courses) {
+        if (c.courseCode && !byCode.has(c.courseCode)) byCode.set(c.courseCode, c);
+      }
+      const picked = [...byCode.values()].slice(0, 3);
+      if (picked.length === 0) {
         return {
           error:
             "未查到该课程。选课未开放（isXkOpen=false）时课程/教学班接口均不可查，可先调 check_selection_status 确认。",
@@ -443,28 +451,30 @@ export const raptorTools = {
       }
 
       const result = [];
-      for (const code of codes) {
+      for (const course of picked) {
+        // 轮次凭证必填：跨轮次查询会失败，类型层面已强制
+        const ref = roundRefOf(course, session);
         let list: XkCourse[];
         try {
-          list = await fetchJxbList(session, { courseCode: code });
+          list = await fetchJxbList(session, { ...ref, courseCode: course.courseCode });
         } catch (e) {
           if ((e as Error).message === "SESSION_EXPIRED") {
             invalidateXkSession();
             session = await getXkSession(true);
-            list = await fetchJxbList(session, { courseCode: code });
+            list = await fetchJxbList(session, { ...ref, courseCode: course.courseCode });
           } else throw e;
         }
         result.push({
-          courseCode: code,
-          courseName:
-            courses.find((c) => c.courseCode === code)?.courseName || code,
+          courseCode: course.courseCode,
+          courseName: course.courseName || course.courseCode,
+          roundTab: String(course.raw?._roundTab ?? "") || undefined,
           jxbCount: list.length,
           classes: list.map(courseBrief),
         });
       }
       return {
         isXkOpen: session.isXkOpen,
-        matchedCourses: codes.length,
+        matchedCourses: picked.length,
         courses: result,
         note:
           session.isXkOpen === false
@@ -576,7 +586,7 @@ export const raptorTools = {
   /** 7. 课表查询 */
   get_schedule: tool({
     description:
-      "查询课表，返回每门课的上课时间、地点、教师、周次。默认自动探测最新有课表的学期（学期交界期也不会查错）；也可指定学期，如「2026-2027-1」。",
+      "查询课表，返回每门课的上课时间、地点、教师、周次。默认自动探测最新有课表的学期（学期交界期也不会查错）；也可指定学期，如「2026-2027-1」。返回的 byWeek 是按周预分组好的索引（week -> 该周的课，已格式化可直接引用）：用户问「第一周的课」「第 5 周有什么」「这周哪几天有课」时，直接查 byWeek 对应 week 即可，不要自己解析 courses[].weeks 里的周次表达式。byWeek 里没有的周次即该周无课。",
     inputSchema: z.object({
       semester: z
         .string()
@@ -590,16 +600,27 @@ export const raptorTools = {
       }
       const cookie = await getCookie();
       const r = await fetchScheduleSmart(cookie, parsed?.year, parsed?.semester);
-      const week = currentWeekOf(r.year, r.semester);
+      // 拿不到 ≠ 没有：断网/会话失效必须如实说，不能让用户以为这学期没课
+      if (!r.ok) {
+        return {
+          error: `课表查询失败：${r.error}。这与「课表为空」不是一回事，请检查网络或稍后重试。`,
+        };
+      }
+      const term = r.data;
+      const week = currentWeekOf(term.year, term.semester);
       return {
-        term: r.label,
+        term: term.label,
         currentWeek: week ? `第 ${week.week} 周` : "未开学或不在教学周内",
         week1Monday: week?.week1Monday,
-        weekNote: week?.estimated
-          ? "开学日期为估算值（校历发布后校准）"
-          : undefined,
-        total: r.courses.length,
-        courses: r.courses.map((c) => ({
+        /** recorded=通知实测 / known=人工校准 / estimated=按月份估算 */
+        weekSource: week?.source,
+        weekNote: !week
+          ? undefined
+          : week.source === "estimated"
+            ? `⚠️ 开学日期是估算值（${week.evidence ?? "未见校历原文"}），把报到注册通知链接发我可校准`
+            : week.evidence,
+        total: term.courses.length,
+        courses: term.courses.map((c) => ({
           title: c.title,
           weekday: WEEKDAY_NAMES[c.weekday] ?? `周${c.weekday}`,
           periods: c.periods.join(","),
@@ -608,7 +629,17 @@ export const raptorTools = {
           location: c.location,
           teacher: c.teacher,
         })),
-        note: r.courses.length === 0 ? "课表为空（假期或学期未排课属正常）" : undefined,
+        /**
+         * 按周预分组索引：week -> 该周要上的课（已格式化，可直接引用）。
+         * 用户问「第一周的课」「第 5 周有什么」时直接查表，不要再自己解析
+         * weeks 字段里的 "2-6,8-12" 这类表达式——那部分已由工具层算好。
+         * 只含有课的周；缺失的周次即该周无课。
+         */
+        byWeek: buildWeekIndex(term.courses),
+        note:
+          term.courses.length === 0
+            ? "课表已查通但无排课（假期或学期未排课属正常）"
+            : undefined,
       };
     },
   }),
@@ -645,12 +676,17 @@ export const raptorTools = {
 
       return {
         gpa: result.gpa,
-        totalCredits: result.totalCredits,
+        gpaBasis: result.gpaBasis,
+        // 语义：这是计入 GPA 的必修课学分和，不是总修学分。转述时别说成「总学分」。
+        requiredCredits: result.requiredCredits,
+        passFailCredits: result.passFailCredits || 0,
         requiredCourses: result.requiredCourses,
         courseCount: result.allCourses.length,
+        failedTerms: result.failedTerms?.length ? result.failedTerms : undefined,
         generalElectives,
         courses: result.allCourses.map((g) => ({
           course: g.course,
+          courseCode: g.courseCode || undefined,
           score: g.score,
           credit: g.credit,
           type: g.type,
@@ -676,11 +712,11 @@ export const raptorTools = {
         return { error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
       }
       const cookie = await getCookie();
-      const { label, exams } = await fetchExamsSmart(
-        cookie,
-        parsed?.year,
-        parsed?.semester
-      );
+      const r = await fetchExamsSmart(cookie, parsed?.year, parsed?.semester);
+      if (!r.ok) {
+        return { error: `考试查询失败：${r.error}（不是「暂无考试」，是没查到）` };
+      }
+      const { label, exams } = r.data;
       return {
         term: label,
         total: exams.length,
@@ -939,11 +975,13 @@ export const raptorTools = {
   }),
 };
 
-// 抢课季开关：默认关闭（RAPTOR_ENABLE_GRAB=1 才暴露），平时对话回到日常
-// 抢课/盯课是真实选课操作，只在选课季启用
-if (!config.enableGrab) {
-  delete (raptorTools as Record<string, unknown>).watch_courses;
-  delete (raptorTools as Record<string, unknown>).grab_course;
-  delete (raptorTools as Record<string, unknown>).grab_plan;
-}
+// 抢课相关工具按开关条件构建，而不是全建好再 delete——
+// 之前 raptorTools 的类型内容和运行时内容不一致，TS 完全帮不上忙。
+const GRAB_TOOLS = ["watch_courses", "grab_course", "grab_plan"] as const;
+
+export const raptorTools: typeof raptorToolsAll = config.enableGrab
+  ? raptorToolsAll
+  : Object.fromEntries(
+      Object.entries(raptorToolsAll).filter(([name]) => !(GRAB_TOOLS as readonly string[]).includes(name))
+    ) as typeof raptorToolsAll;
 

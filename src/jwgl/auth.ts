@@ -69,13 +69,3 @@ export async function loginJwgl(
     username,
   };
 }
-
-// 会话失效检测（响应含登录页特征）
-export function isSessionExpired(body: string): boolean {
-  if (!body) return false;
-  return (
-    body.includes("login_slogin") ||
-    body.includes('id="csrftoken"') ||
-    body.includes("用户登录")
-  );
-}

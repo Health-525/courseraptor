@@ -103,7 +103,37 @@ async function firecrawlScrape(url: string): Promise<string> {
   return data.data.markdown;
 }
 
-// ── 下载（含 jwc 验证码自动识别）──────────────────────────────
+// ── 下载（含 jwc 验证码自动识别，可整体停用）──────────────────
+
+// 验证码是网站明确表达的「此处不欢迎自动化」。这个能力默认开启是为了
+// 自己下载本人有权访问的通知附件，但它不该被当成卖点——所以留了总开关。
+const CAPTCHA_OCR_ENABLED = process.env.RAPTOR_DISABLE_CAPTCHA_OCR !== "1";
+/** 重试上限。之前是 6 次且每次重建 tesseract worker（重复加载 4MB 模型），收敛为 3 次 + worker 常驻 */
+const CAPTCHA_MAX_TRIES = 3;
+
+const CAPTCHA_DISABLED_MSG =
+  "附件下载被图形验证码拦截，且验证码自动识别已关闭（RAPTOR_DISABLE_CAPTCHA_OCR=1）。" +
+  "请在浏览器登录后手动下载该附件，或提供直链地址。";
+
+/** tesseract worker 常驻复用：首次调用时加载一次模型，之后所有识别共享 */
+let ocrWorkerPromise: Promise<Awaited<ReturnType<typeof createTesseractWorker>>> | null = null;
+
+function createTesseractWorker() {
+  const { createWorker } = require("tesseract.js") as typeof import("tesseract.js");
+  return createWorker("eng");
+}
+
+async function getOcrWorker() {
+  if (!ocrWorkerPromise) {
+    ocrWorkerPromise = createTesseractWorker().then(async (worker) => {
+      await worker.setParameters({
+        tessedit_char_whitelist: "0123456789abcdefghijklmnopqrstuvwxyz",
+      } as Parameters<typeof worker.setParameters>[0]);
+      return worker;
+    });
+  }
+  return ocrWorkerPromise;
+}
 
 /**
  * jwc 附件下载带图片验证码（webplus createimage.jsp）：
@@ -113,6 +143,9 @@ async function firecrawlScrape(url: string): Promise<string> {
 async function downloadWithCaptcha(
   url: string
 ): Promise<{ buf: Buffer; contentType: string }> {
+  if (!CAPTCHA_OCR_ENABLED) {
+    throw new Error(CAPTCHA_DISABLED_MSG);
+  }
   let cookie = "";
 
   const get = async (u: string): Promise<{ buf: Buffer; type: string }> => {
@@ -139,8 +172,7 @@ async function downloadWithCaptcha(
     };
   };
 
-  const MAX_TRIES = 6;
-  for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
+  for (let attempt = 1; attempt <= CAPTCHA_MAX_TRIES; attempt++) {
     const page = await get(url);
     if (!page.type.includes("html")) {
       return { buf: page.buf, contentType: page.type }; // 直链文件
@@ -150,7 +182,7 @@ async function downloadWithCaptcha(
       return { buf: page.buf, contentType: page.type }; // 非验证码页，走后续逻辑
     }
 
-    // 验证码页：拉图 + OCR
+    // 验证码页：拉图 + OCR（worker 常驻，不重复加载模型）
     const imgUrl = new URL(
       "/system/resource/js/filedownload/createimage.jsp?randnum=" + Date.now(),
       url
@@ -167,23 +199,18 @@ async function downloadWithCaptcha(
     }
     // 识别错误 -> 下一轮换新验证码
   }
-  throw new Error(`验证码识别失败（已重试 ${MAX_TRIES} 次）`);
+  throw new Error(
+    `验证码识别失败（已重试 ${CAPTCHA_MAX_TRIES} 次）。可在浏览器中下载后手动提供文件；` +
+      `或确认该附件确属本人有权获取的内容后重试。`
+  );
 }
 
-/** tesseract OCR 验证码（数字+小写字母） */
+/** tesseract OCR 验证码（数字+小写字母），worker 由 getOcrWorker 常驻复用 */
 async function ocrCaptcha(buf: Buffer): Promise<string> {
   try {
-    const { createWorker } = require("tesseract.js") as typeof import("tesseract.js");
-    const worker = await createWorker("eng");
-    try {
-      await worker.setParameters({
-        tessedit_char_whitelist: "0123456789abcdefghijklmnopqrstuvwxyz",
-      } as Parameters<typeof worker.setParameters>[0]);
-      const { data } = await worker.recognize(buf);
-      return data.text.replace(/[^0-9a-zA-Z]/g, "").toLowerCase();
-    } finally {
-      await worker.terminate();
-    }
+    const worker = await getOcrWorker();
+    const { data } = await worker.recognize(buf);
+    return data.text.replace(/[^0-9a-zA-Z]/g, "").toLowerCase();
   } catch {
     return "";
   }
