@@ -18,7 +18,9 @@ import {
   addMemory,
   updateMemory,
   deleteMemory,
+  archiveMemory,
   loadMemory,
+  loadUserGrade,
 } from "../memory/longterm";
 import {
   fetchScheduleSmart,
@@ -50,6 +52,43 @@ import {
 
 function now(): string {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
+}
+
+// ── 通知相关性 ────────────────────────────────────────────────
+// 教务处一次发十几条，其中大半跟具体某个学生无关。过去全靠模型逐条判断，
+// 判断质量时好时坏；这里按「是否点名本年级 / 是否需本人行动」固化成规则。
+
+type RelevanceLevel = "high" | "medium" | "low";
+
+/** 视情况才看：只在本人有对应需求时才相关，判定要早于 MUST_DO */
+const SITUATIONAL = ["补修", "重修", "转专业", "辅修", "免修", "缓考", "交流", "学籍", "毕业", "学位", "先修"];
+/** 全校性需要本人动手的事 */
+const MUST_DO = ["报到", "注册", "教材", "开学", "选课", "考试", "补考", "停开", "补退选", "放假", "缴费"];
+/** 与学生日常无关的行政类 */
+const IRRELEVANT = ["公示", "课题", "申报", "增设", "评审", "立项", "结题", "获奖", "专项", "教研", "教改"];
+
+function relevanceOf(
+  title: string,
+  grade: string | null
+): { level: RelevanceLevel; reason?: string } {
+  // 归一化：去掉括号与空白，否则「补（缓）考」这种写法匹配不到「缓考」
+  const flat = title.replace(/[（）()【】\[\]\s]/g, "");
+  const gradeInTitle = flat.match(/(\d{4})\s*级/);
+  if (grade && gradeInTitle) {
+    return gradeInTitle[1] === grade
+      ? { level: "high", reason: `点名 ${grade} 级` }
+      : { level: "low", reason: `面向 ${gradeInTitle[1]} 级，非你所在年级` };
+  }
+  if (SITUATIONAL.some((w) => flat.includes(w))) {
+    return { level: "medium", reason: "视个人情况" };
+  }
+  if (MUST_DO.some((w) => flat.includes(w))) {
+    return { level: "high", reason: "需本人办理" };
+  }
+  if (IRRELEVANT.some((w) => flat.includes(w))) {
+    return { level: "low", reason: "行政公示类" };
+  }
+  return { level: "low" };
 }
 
 function courseBrief(c: XkCourse) {
@@ -839,7 +878,7 @@ const raptorToolsAll = {
   /** 14. 教务处官网通知 */
   get_news: tool({
     description:
-      "抓取南京工业大学教务处官网（jwc.njtech.edu.cn）的最新通知，涵盖三个板块：公告通知（含选课/考试/学籍等重要安排）、教学动态、考试排课。公开页面无需登录。用户问「最近有什么教务通知」「选课什么时候开始」「有没有关于××的通知」时调用。",
+      "抓取南京工业大学教务处官网（jwc.njtech.edu.cn）的最新通知，涵盖三个板块：公告通知（含选课/考试/学籍等重要安排）、教学动态、考试排课。公开页面无需登录。用户问「最近有什么教务通知」「选课什么时候开始」「有没有关于××的通知」时调用。每条带 relevance：high=需本人行动（点名本年级或全校性必办）、medium=视个人情况（补修/重修/转专业等）、low=基本无关（其他年级或行政公示）。回答时优先讲 high 的，low 的一句带过，不要平铺全部。",
     inputSchema: z.object({
       category: z
         .enum(["公告通知", "教学动态", "考试排课"])
@@ -858,18 +897,32 @@ const raptorToolsAll = {
       const filtered = category
         ? items.filter((i) => i.category === category)
         : items;
-      return {
-        total: filtered.length,
-        items: filtered.slice(0, limit).map((i) => ({
+      const grade = await loadUserGrade();
+      const scored = filtered.slice(0, limit).map((i) => {
+        const { level, reason } = relevanceOf(i.title, grade);
+        return {
           title: i.title,
           date: i.date,
           category: i.category,
+          /** high=需本人行动 / medium=视情况 / low=基本无关 */
+          relevance: level,
+          relevanceReason: reason,
           url: i.url,
-        })),
+        };
+      });
+      const mustSee = scored.filter((i) => i.relevance === "high").length;
+      return {
+        total: filtered.length,
+        /** 年级依据；取不到就退化成纯关键词判断 */
+        gradeBasis: grade ?? undefined,
+        mustSeeCount: mustSee,
+        items: scored,
         note:
           filtered.length === 0
             ? "未抓到通知（官网结构可能变化或网络异常）"
-            : undefined,
+            : grade
+              ? `已按你所在「${grade} 级」标记相关性：high ${mustSee} 条需要你行动。回答时先给 high 的，low 的一条带过即可。`
+              : "未识别到你的年级，相关性按关键词粗判。",
       };
     },
   }),
@@ -941,8 +994,10 @@ const raptorToolsAll = {
       "长期记忆维护（跨会话持久，存于本地 memory.json，启动时自动注入新会话）。值得跨会话记住的信息出现时主动调用：用户偏好（年级/作息）、要抢/盯的目标课程、重要时间结论（选课考试安排）、任务状态。用户说「记住××」必须立即调用。",
     inputSchema: z.object({
       action: z
-        .enum(["add", "update", "delete", "list"])
-        .describe("add=新增条目，update=按 id 改内容，delete=按 id 删除，list=列出全部"),
+        .enum(["add", "update", "delete", "list", "archive"])
+        .describe(
+          "add=新增条目，update=按 id 改内容，delete=按 id 删除，list=列出全部，archive=按 id 归档（事情办完但想留档时用，归档后不再进入提示词）"
+        ),
       content: z
         .string()
         .optional()
@@ -951,13 +1006,34 @@ const raptorToolsAll = {
         .string()
         .optional()
         .describe('分类，如「用户偏好」「选课」「任务」（add 可选，默认「事实」）'),
-      id: z.string().optional().describe("目标条目 id（update/delete 必填，来自 list 或提示词里的 [id]）"),
+      id: z.string().optional().describe("目标条目 id（update/delete/archive 必填，来自 list 或提示词里的 [id]）"),
+      expiresAt: z
+        .string()
+        .optional()
+        .describe("过期时间（ISO 日期，如 2026-09-15）。到点后自动不再进入提示词，适合一次性安排/任务类记忆"),
     }),
-    execute: async ({ action, content, category, id }) => {
+    execute: async ({ action, content, category, id, expiresAt }) => {
       if (action === "add") {
         if (!content?.trim()) return { error: "add 需要 content" };
-        const { entry, total } = await addMemory(content.trim(), category?.trim() || undefined);
-        return { ok: true, saved: entry, totalEntries: total };
+        const { entry, total, merged } = await addMemory(
+          content.trim(),
+          category?.trim() || undefined,
+          expiresAt
+        );
+        return {
+          ok: true,
+          saved: entry,
+          totalEntries: total,
+          merged,
+          note: merged ? "与已有条目重复，已合并为较新的表述" : undefined,
+        };
+      }
+      if (action === "archive") {
+        if (!id) return { error: "archive 需要 id" };
+        const entry = await archiveMemory(id);
+        return entry
+          ? { ok: true, archived: entry, note: "已归档，后续会话不再注入" }
+          : { error: `未找到条目 ${id}` };
       }
       if (action === "update") {
         if (!id || !content?.trim()) return { error: "update 需要 id 和 content（新内容）" };

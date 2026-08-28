@@ -61,6 +61,51 @@ async function saveAllowlist(): Promise<void> {
 const MAX_HISTORY_TURNS = 20;
 const histories = new Map<string, ModelMessage[]>();
 
+/**
+ * QQ 官方机器人是被动回复，窗口约 5 分钟。而抢课类工具默认要跑 600 秒——
+ * 同步等任务跑完再回，用户发出的那条早就过了窗口，结果永远收不到。
+ * 所以：先应答、再心跳，保证窗口内始终有消息；任务跑完再推真实结果。
+ */
+const ACK_DELAY_MS = 4000;
+const HEARTBEAT_MS = 100_000;
+
+/** 等待期间的心跳提示；返回停止函数 */
+function startWaitingNotices(send: (text: string) => Promise<unknown>): () => void {
+  const startedAt = Date.now();
+  let beat = 0;
+  let timer: ReturnType<typeof setTimeout>;
+
+  const tick = () => {
+    beat++;
+    const sec = Math.round((Date.now() - startedAt) / 1000);
+    const text =
+      beat === 1 ? "🦖 收到，正在查…" : `…还在查（已 ${sec} 秒），马上回你`;
+    void send(text).catch(() => {});
+    timer = setTimeout(tick, HEARTBEAT_MS);
+  };
+  timer = setTimeout(tick, ACK_DELAY_MS);
+
+  return () => clearTimeout(timer);
+}
+
+/**
+ * 把技术错误转译成人话，并给出下一步动作。
+ * 用户不需要知道 SESSION_EXPIRED 是什么，只需要知道「重试就好」还是「这功能坏了」。
+ */
+function humanizeError(e: unknown): string {
+  const raw = (e as Error)?.message ?? String(e);
+  if (/SESSION_EXPIRED|登录|login|未授权/i.test(raw)) {
+    return "教务登录态掉了，我正在重新登录。稍等几秒再问一次就好。";
+  }
+  if (/ETIMEDOUT|ECONN|ENOTFOUND|fetch failed|network|timeout|socket|EOF/i.test(raw)) {
+    return "教务系统这会儿连不上，多半是线路抖动。稍等一两分钟再试一次。";
+  }
+  if (/JSON|parse|解析|Unexpected|结构/i.test(raw)) {
+    return "教务页面结构可能变了，这个查询暂时用不了。其他功能不受影响。";
+  }
+  return "这件事没办成。稍后再试一次，或者换个说法告诉我。";
+}
+
 // ── 主流程 ────────────────────────────────────────────────────
 
 export async function startQQBridge(
@@ -122,10 +167,14 @@ export async function startQQBridge(
 
     const history = histories.get(senderId) ?? [];
     const userMsg: ModelMessage = { role: "user", content: text };
+    const stopNotices = startWaitingNotices((t) =>
+      bot.sendText(msg.replyTarget, t)
+    );
     try {
       const result = await agent.generate({
         messages: [...history, userMsg],
       });
+      stopNotices();
       const reply = mdToPlain(result.text || "（无输出）");
       for (const seg of splitMessage(reply)) {
         await bot.sendText(msg.replyTarget, seg);
@@ -139,10 +188,9 @@ export async function startQQBridge(
         [...history, userMsg, assistantMsg].slice(-MAX_HISTORY_TURNS)
       );
     } catch (e) {
-      await bot.sendText(
-        msg.replyTarget,
-        `❌ 处理失败：${(e as Error).message.slice(0, 120)}`
-      );
+      stopNotices();
+      log.error(`[qq] 处理失败（openid=${senderId}）：${(e as Error)?.message ?? e}`);
+      await bot.sendText(msg.replyTarget, `❌ ${humanizeError(e)}`);
     }
   });
 

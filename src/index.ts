@@ -2,15 +2,17 @@
  * CourseRaptor 入口：终端对话 UI
  * 配置了 QQ 机器人（QQBOT_APP_ID/SECRET）时，QQ 渠道随本入口一并启动
  * 运行: raptor / npm run dev
+ *
+ * 默认使用行内渲染器（src/tui/inline.ts）：工具调用即时可见、
+ * 滚动走终端原生缓冲区（滚轮/滚动条/选中复制都可用）。
+ * RAPTOR_TUI_CLASSIC=1 回到 @ai-sdk/tui 全屏卡片 UI。
  */
-
-import { runAgentTUI } from "@ai-sdk/tui";
 
 import { config } from "./config";
 import { createRaptorAgent } from "./agent";
 import { flushCapturedSession } from "./memory/shortterm";
 
-// QQ 渠道：日志写 qq-bridge.log，不干扰 TUI 渲染
+// QQ 渠道：日志写 qq-bridge.log，不干扰终端渲染
 if (config.qqBotAppId && config.qqBotAppSecret) {
   const { startQQBridge } = await import("./qq/bridge");
   const { createQQFileLogger } = await import("./qq/logger");
@@ -21,15 +23,26 @@ if (config.qqBotAppId && config.qqBotAppSecret) {
 
 const agent = await createRaptorAgent();
 
-await runAgentTUI({
-  title: "🦖 CourseRaptor · NJTECH 教务 Agent",
-  agent,
-  // tools: "full" -- 默认 "auto-collapsed" 会在工具卡后出现文字总结时
-  // 自动折叠成只剩标题的空壳，agent 几乎每轮都这样，等于工具调用永远看不见。
-  // reasoning: "hidden" -- 不展示推理过程，对话界面只保留结论。
-  tools: "full",
-  reasoning: "hidden",
-});
+if (process.env.RAPTOR_TUI_CLASSIC === "1") {
+  const { runAgentTUI } = await import("@ai-sdk/tui");
+  await runAgentTUI({
+    // TUI 每帧都会 clearScreen 重绘，启动前打印的引导横幅活不下来；title 是
+    // 唯一常驻的引导位，超宽时会被 sliceVisible 自动截断，不会破坏布局。
+    title: "🦖 CourseRaptor · 试试：这周课表 · 最近通知 · 我的成绩 · 通识还差哪几类",
+    agent,
+    // tools: "full" -- 默认 "auto-collapsed" 会在工具卡后出现文字总结时
+    // 自动折叠成只剩标题的空壳，agent 几乎每轮都这样，等于工具调用永远看不见。
+    // reasoning: "hidden" -- 不展示推理过程，对话界面只保留结论。
+    tools: "full",
+    reasoning: "hidden",
+  });
+} else {
+  const { runInlineTUI } = await import("./tui/inline");
+  await runInlineTUI({
+    title: "🦖 CourseRaptor · NJTECH 教务 Agent（试试：这周课表 · 最近通知 · 我的成绩）",
+    agent,
+  });
+}
 
 // 会话历史在每轮已逐轮落盘，这里兜底刷写
 await flushCapturedSession();

@@ -15,6 +15,11 @@ import { PROJECT_ROOT } from "../config";
 const SESSION_FILE = path.join(PROJECT_ROOT, "session.json");
 const MAX_PERSIST_MESSAGES = 200;
 const MAX_TRANSCRIPT_CHARS = 3000;
+/**
+ * 注入时只取最后若干条。上次会话里早期那些已经聊完的事没有延续价值，
+ * 全量塞进来只会挤占上下文、稀释注意力——保留尾部即可延续语境。
+ */
+const MAX_TRANSCRIPT_MESSAGES = 8;
 
 interface CapturedMessage {
   role: string;
@@ -89,7 +94,8 @@ export async function loadLastSessionTranscript(): Promise<string> {
   if (messages.length === 0) return "";
 
   const lines: string[] = [];
-  for (const m of messages) {
+  const recent = messages.slice(-MAX_TRANSCRIPT_MESSAGES);
+  for (const m of recent) {
     if (m.role !== "user" && m.role !== "assistant") continue;
     const text = extractText(m.content);
     if (!text) continue;
@@ -104,5 +110,7 @@ export async function loadLastSessionTranscript(): Promise<string> {
       transcript.slice(transcript.length - MAX_TRANSCRIPT_CHARS);
   }
   const savedAt = data.savedAt ? new Date(data.savedAt).toLocaleString("zh-CN") : "未知时间";
-  return `## 上次会话记录（${savedAt}，短期记忆自动恢复）\n\n${transcript}`;
+  const head = `## 上次会话记录（${savedAt}，短期记忆自动恢复）`;
+  // 只保留尾部，且按字符预算再截一次，避免单轮超长回复撑爆提示词
+  return `${head}\n\n${transcript}`;
 }

@@ -17,6 +17,56 @@ export interface MemoryEntry {
   category: string;
   createdAt: string;
   updatedAt: string;
+  /** active=生效中（默认）；archived=已归档，不再注入提示词 */
+  status?: "active" | "archived";
+  /** ISO 日期；到点后不再注入，适合一次性安排 / 任务类记忆 */
+  expiresAt?: string;
+}
+
+/** 归一化：去掉空白与标点，便于比较语义是否重复 */
+function normalize(s: string): string {
+  return s.replace(/[\s\p{P}\p{S}]/gu, "");
+}
+
+/**
+ * 相似度 = 归一化最长公共子序列 / 较短方长度。
+ *
+ * 为什么不用更常见的 bigram Jaccard：Jaccard 对长度差异惩罚过重。以 memory.json
+ * 里的真实数据实测——两条真重复条目（同一条偏好换个措辞说了两遍）Jaccard 仅
+ * 0.41，而两条必须区分的条目（网课备选 vs 抢课计划）也有 0.23，分离度很差；
+ * 换 LCS 归一化后真重复 0.81、需区分的 0.54，中间是明显空档。
+ *
+ * 误合并会丢信息，漏合并只是上下文略胖，两者代价不对称，故取保守阈值。
+ */
+function similarity(a: string, b: string): number {
+  const A = normalize(a);
+  const B = normalize(b);
+  if (!A || !B) return 0;
+  if (A === B) return 1;
+
+  // 滚动数组求 LCS 长度；记忆条目量级下开销可忽略
+  let prev = new Array<number>(B.length + 1).fill(0);
+  for (let i = 1; i <= A.length; i++) {
+    const cur = new Array<number>(B.length + 1).fill(0);
+    for (let j = 1; j <= B.length; j++) {
+      cur[j] =
+        A[i - 1] === B[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+    }
+    prev = cur;
+  }
+  return prev[B.length] / Math.min(A.length, B.length);
+}
+
+/** 超过该阈值视为同一条记忆的重复表述（实测：真重复 0.81，需区分的 0.54） */
+const DEDUPE_THRESHOLD = 0.7;
+
+export function isExpired(e: MemoryEntry): boolean {
+  return !!e.expiresAt && Date.parse(e.expiresAt) < Date.now();
+}
+
+/** 是否还需要注入提示词：归档的、过期的都剔除 */
+function isActive(e: MemoryEntry): boolean {
+  return e.status !== "archived" && !isExpired(e);
 }
 
 const MEMORY_FILE = path.join(PROJECT_ROOT, "memory.json");
@@ -46,10 +96,38 @@ function newId(): string {
 
 export async function addMemory(
   content: string,
-  category = "事实"
-): Promise<{ entry: MemoryEntry; total: number }> {
+  category = "事实",
+  expiresAt?: string
+): Promise<{ entry: MemoryEntry; total: number; merged: boolean }> {
   const entries = await loadMemory();
   const now = new Date().toISOString();
+
+  // 完全相同的直接刷新时间
+  const exact = entries.find(
+    (e) => e.content === content && e.category === category && isActive(e)
+  );
+  if (exact) {
+    exact.updatedAt = now;
+    await persist(entries);
+    return { entry: exact, total: entries.length, merged: true };
+  }
+
+  // 近似重复：同一件事换个说法再说一遍（memory.json 里曾因此堆了两条几乎
+  // 一样的「不要提及抢课」）。以较新的表述为准覆盖，避免条目无限膨胀。
+  const near = entries.find(
+    (e) =>
+      e.category === category &&
+      isActive(e) &&
+      similarity(e.content, content) >= DEDUPE_THRESHOLD
+  );
+  if (near) {
+    near.content = content;
+    near.updatedAt = now;
+    if (expiresAt) near.expiresAt = expiresAt;
+    await persist(entries);
+    return { entry: near, total: entries.length, merged: true };
+  }
+
   const entry: MemoryEntry = {
     id: newId(),
     content,
@@ -57,19 +135,11 @@ export async function addMemory(
     createdAt: now,
     updatedAt: now,
   };
-  // 同类目同内容去重：更新时间即可
-  const dup = entries.find(
-    (e) => e.content === content && e.category === category
-  );
-  if (dup) {
-    dup.updatedAt = now;
-    await persist(entries);
-    return { entry: dup, total: entries.length };
-  }
+  if (expiresAt) entry.expiresAt = expiresAt;
   entries.unshift(entry);
   const capped = entries.slice(0, MAX_ENTRIES);
   await persist(capped);
-  return { entry, total: capped.length };
+  return { entry, total: capped.length, merged: false };
 }
 
 export async function updateMemory(
@@ -93,9 +163,48 @@ export async function deleteMemory(id: string): Promise<boolean> {
   return true;
 }
 
+/**
+ * 归档：条目留在文件里可追溯，但不再注入提示词。
+ * 用于「事情办完了但还想留档」的场景（如已执行完的抢课计划）。
+ */
+export async function archiveMemory(id: string): Promise<MemoryEntry | null> {
+  const entries = await loadMemory();
+  const entry = entries.find((e) => e.id === id);
+  if (!entry) return null;
+  entry.status = "archived";
+  entry.updatedAt = new Date().toISOString();
+  await persist(entries);
+  return entry;
+}
+
+/**
+ * 提取用户年级（四位年，如 "2024"），供通知相关性判断使用。
+ * 用户档案已存在记忆里，数据是现成的——过去通知靠模型逐条自己判断跟用户
+ * 有没有关系，现在把这一步固化下来，模型的临场发挥变成产品能力。
+ */
+export async function loadUserGrade(): Promise<string | null> {
+  const entries = await loadMemory();
+  const pool = entries
+    .filter((e) => /档案|用户/.test(e.category))
+    .map((e) => e.content)
+    .join(" ");
+  if (!pool) return null;
+
+  const direct = pool.match(/(\d{4})\s*级/);
+  if (direct) return direct[1];
+
+  // 班号如「大数据2401班」-> 前两位即入学年
+  const bj = pool.match(/(\d{2})\d{2}\s*班/);
+  if (bj) return `20${bj[1]}`;
+
+  return null;
+}
+
 /** 格式化为注入系统提示词的区块（超出字符预算时从旧到新截断） */
 export async function formatMemoryForPrompt(): Promise<string> {
-  const entries = await loadMemory();
+  const all = await loadMemory();
+  // 只注入生效中的条目：已归档与过期的不再占用上下文
+  const entries = all.filter(isActive);
   if (entries.length === 0) return "";
 
   const byCategory = new Map<string, MemoryEntry[]>();

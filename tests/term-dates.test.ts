@@ -69,13 +69,11 @@ test("recordWeek1Monday: recorded 可覆盖 known，estimated 不能覆盖实测
   assert.equal(r.source, "recorded");
 });
 
-test("落盘持久化：写进 RAPTOR_DATA_DIR 而非真实 data/", () => {
+test("落盘持久化：写进 RAPTOR_DATA_DIR 指向的目录", () => {
   const store = loadStore();
   assert.ok(fs.existsSync(path.join(tmpData, "term-dates.json")));
   assert.ok(store[termKey(2026, 3)].week1Monday === "2026-08-31");
-  // 确认没写进项目目录
-  const projectStore = path.resolve(import.meta.dirname, "../data/term-dates.json");
-  assert.equal(fs.existsSync(projectStore), false);
+  // 注意：不检查项目真实 data/ ——生产环境首次运行后那里就合法存在真值文件了
 });
 
 // ── 从通知正文解析开学日期 ────────────────────────────────────
