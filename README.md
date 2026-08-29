@@ -121,8 +121,9 @@ npm run qq
 git clone https://github.com/Health-525/courseraptor.git
 cd courseraptor && npm install
 
-# 2. 配置凭证（教务账号 + DeepSeek Key）
-cp .env.example .env   # 编辑 .env 填入
+# 2. 配置凭证
+#    DeepSeek Key：cp .env.example .env 后编辑填入
+#    教务账号：留空即可，首次启动 raptor 引导录入并加密保存本机
 
 # 3. 注册全局命令（一次即可，任意目录可用）
 npm link
@@ -138,7 +139,7 @@ npm run dev            # 或项目内开发模式
 | 变量 | 说明 |
 |---|---|
 | `DEEPSEEK_API_KEY` | DeepSeek API Key（必填） |
-| `JWGL_USERNAME` / `JWGL_PASSWORD` | 教务系统学号 / 密码（必填） |
+| `JWGL_USERNAME` / `JWGL_PASSWORD` | 教务系统学号 / 密码（可选；留空则首次启动引导录入并 AES-256-GCM 加密保存） |
 | `RAPTOR_MODEL` | 模型，默认 `deepseek-v4-flash`，可选 `deepseek-v4-pro`（可选） |
 | `RAPTOR_ENABLE_GRAB` | 抢课模式开关：选课季设 `1` 启用抢课/盯课工具，平时留空（默认） |
 | `FIRECRAWL_API_KEY` | Firecrawl 云解析通知附件（可选；本地已支持 xlsx/docx/pdf，仅作兜底） |
