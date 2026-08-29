@@ -15,7 +15,9 @@ import { captureSessionPrompt, loadLastSessionTranscript } from "./memory/shortt
 import { formatMemoryForPrompt } from "./memory/longterm";
 
 const deepseek = createDeepSeek({
-  apiKey: config.deepseekApiKey,
+  // 不传 apiKey：AI SDK 会每次请求实时读 DEEPSEEK_API_KEY 环境变量，
+  // /key 斜杠命令更新 env 即热生效，无需重建 provider
+
   ...(config.deepseekBaseUrl ? { baseURL: config.deepseekBaseUrl } : {}),
 });
 

@@ -47,8 +47,9 @@ export interface KeyProxy {
 }
 
 export interface KeyProxyOptions {
-  /** 提示符下输入 key 回车 → 不提交给 TUI，改为请求切换到对应模式 */
-  commands?: Record<string, string>;
+  /** 提示符下输入命令回车 → 不提交给 TUI。值为模式名 = 请求切换；
+   *  值为 handler = 带参命令（如 /key sk-xxx），注入退格清行后调用 */
+  commands?: Record<string, string | { handler: (arg: string) => void }>;
 }
 
 export function createKeyProxy(
@@ -127,13 +128,23 @@ export function createKeyProxy(
     for (const key of synth) proxy.write(key);
     if (!text) return;
 
-    // 斜杠命令镜像：整行以 / 开头才跟踪，回车命中则触发切换、不提交命令
+    // 斜杠命令镜像：整行以 / 开头才跟踪，回车命中则处理、不提交命令
     if (Object.keys(commands).length) {
       if (text === "\r" || text === "\n") {
         const cmd = cmdBuffer.trim();
         cmdBuffer = "";
-        if (cmd in commands) {
-          triggerSwitch(commands[cmd]);
+        const spaceIdx = cmd.indexOf(" ");
+        const cmdName = spaceIdx > 0 ? cmd.slice(0, spaceIdx) : cmd;
+        if (cmdName in commands) {
+          const entry = commands[cmdName];
+          if (typeof entry === "string") {
+            triggerSwitch(entry);
+          } else {
+            // 带参命令（如 /key sk-xxx）：注入退格清空输入行（逐条 write，
+            // 库的 parseKey 对 chunk 精确匹配），参数交给 handler，不提交
+            for (let i = 0; i < cmd.length; i++) proxy.write("\x7f");
+            entry.handler(spaceIdx > 0 ? cmd.slice(spaceIdx + 1).trim() : "");
+          }
           return;
         }
       } else if (text === "\x7f" || text === "\b") {

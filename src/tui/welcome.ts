@@ -14,8 +14,6 @@ import {
   WEEKDAY_NAMES,
 } from "../jwgl/academics";
 import { currentWeekOf } from "../jwgl/term-dates";
-import { fetchAllGrades } from "../jwgl/grades";
-import { config } from "../config";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -39,7 +37,6 @@ const panel = {
   week: undefined as number | undefined,
   scheduleLines: [dim("  正在登录教务系统…")],
   newsLines: [dim("  正在获取…")],
-  gpaLine: "" as string,
 };
 
 function render() {
@@ -54,7 +51,6 @@ function render() {
     "",
     header("最新通知"),
     ...panel.newsLines,
-    ...(panel.gpaLine ? ["", panel.gpaLine] : []),
   );
   lines.push("", dim("快捷键：滚轮/↑↓ 滚动 · ESC 打断回复 · Ctrl+C 退出 · /inline 切行内模式"));
   globalThis.__raptorWelcome = lines;
@@ -116,18 +112,6 @@ async function refreshSchedule() {
     }
   } catch {
     panel.scheduleLines = [dim("  教务登录失败，直接提问可看详细报错")];
-  }
-  render();
-}
-
-async function refreshGpa() {
-  try {
-    const cookie = await getCookie();
-    const r = await fetchAllGrades(cookie, config.jwglUsername);
-    panel.gpaLine = `${header("概览")} GPA ${r.gpa} · 计入 GPA 必修 ${r.totalCredits} 学分 / ${r.requiredCourses} 门`;
-  } catch {
-    // 概览是锦上添花，失败就不显示这一段
-    return;
   }
   render();
 }

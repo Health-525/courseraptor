@@ -4,7 +4,7 @@
  */
 
 import path from "node:path";
-import { loadStoredCredentials } from "./credentials";
+import { loadCredentialsStore } from "./credentials";
 
 // 项目根目录解析独立成 paths.ts，避免与 credentials.ts 循环依赖
 import { PROJECT_ROOT as ROOT } from "./paths";
@@ -58,18 +58,25 @@ function loadConfig(): RaptorConfig {
     enableGrab: env("RAPTOR_ENABLE_GRAB") === "1",
   };
 
-  if (!config.deepseekApiKey) {
-    throw new Error("缺少必要配置：DEEPSEEK_API_KEY。请在 .env 中填写");
-  }
+  // DEEPSEEK_API_KEY 允许缺失：/key 斜杠命令运行时配置（热生效）
 
-  // 教务凭证：.env 优先；否则尝试解密本地加密凭证（都没有则由入口引导录入）
-  if (!config.jwglUsername || !config.jwglPassword) {
-    const stored = loadStoredCredentials();
-    if (stored?.username && stored?.password) {
-      config.jwglUsername = stored.username;
-      config.jwglPassword = stored.password;
-      config.credentialsSource = "encrypted";
-    } else {
+  // 凭证解析：.env 优先；否则解密本地加密存储（都没有则由入口引导）
+  if (!config.jwglUsername || !config.jwglPassword || !config.deepseekApiKey) {
+    const stored = loadCredentialsStore();
+    if (stored) {
+      if ((!config.jwglUsername || !config.jwglPassword) && stored.username && stored.password) {
+        config.jwglUsername = stored.username;
+        config.jwglPassword = stored.password;
+        config.credentialsSource = "encrypted";
+      } else if (!config.jwglUsername || !config.jwglPassword) {
+        config.credentialsSource = "unset";
+      }
+      if (!config.deepseekApiKey && stored.deepseekApiKey) {
+        // provider 每次请求实时读该环境变量 -> 重启后同样生效
+        config.deepseekApiKey = stored.deepseekApiKey;
+        process.env.DEEPSEEK_API_KEY = stored.deepseekApiKey;
+      }
+    } else if (!config.jwglUsername || !config.jwglPassword) {
       config.credentialsSource = "unset";
     }
   }

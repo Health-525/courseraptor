@@ -49,14 +49,24 @@ while (running) {
     const { createKeyProxy } = await import("./tui/keys");
     const { withSoftInterrupt } = await import("./tui/soft-interrupt");
     const { startWelcomeBootstrap } = await import("./tui/welcome");
-    const keys = createKeyProxy(process.stdin, { commands: { "/inline": "inline" } });
+    const { setDeepSeekApiKey } = await import("./onboarding");
+    const keys = createKeyProxy(process.stdin, {
+      commands: {
+        "/inline": "inline",
+        // /key sk-xxx：配置 DeepSeek API Key（校验 -> 热生效 -> 加密持久化）
+        "/key": { handler: (arg) => console.log(setDeepSeekApiKey(arg).message) },
+      },
+    });
     // 空屏欢迎面板：后台拉今日课表/最新通知/GPA，逐段填进 TUI 空状态
     startWelcomeBootstrap();
     try {
       await runAgentTUI({
         // TUI 每帧都会 clearScreen 重绘，启动前打印的引导横幅活不下来；title 是
         // 唯一常驻的引导位，超宽时会被 sliceVisible 自动截断，不会破坏布局。
-        title: "🦖 CourseRaptor · NJTECH 教务 Agent（/inline 切行内模式）",
+        // 未配置 API Key 时借 title 常驻提示 /key 配置命令。
+        title: config.deepseekApiKey
+          ? "🦖 CourseRaptor · NJTECH 教务 Agent（/inline 切行内模式）"
+          : "🦖 CourseRaptor · 输入 /key sk-你的Key 配置后即可对话",
         // 键位约定（对齐 Claude Code 等主流 CLI）：ESC=打断当前回复并回到输入框
         // （库默认 ESC/Ctrl+C 都会终结会话，键位代理拦 ESC 转软打断信号，包装层
         // 消费：src/tui/soft-interrupt.ts）；Ctrl+C=退出程序（透传，库自己走优雅退出）

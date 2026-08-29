@@ -7,7 +7,7 @@ import readline from "node:readline/promises";
 import { Writable } from "node:stream";
 
 import { config } from "./config";
-import { saveStoredCredentials } from "./credentials";
+import { saveCredentialsStore, saveStoredCredentials } from "./credentials";
 import { loginJwgl } from "./jwgl/auth";
 
 /** 密码输入静音（回车后换行），避免明文密码留在终端回显里 */
@@ -69,4 +69,23 @@ export async function ensureCredentials(): Promise<void> {
   } finally {
     rl.close();
   }
+}
+
+/**
+ * /key 斜杠命令：配置 DeepSeek API Key（校验 -> 热生效 -> 加密持久化）
+ * 热生效原理：provider 构建时不绑定 key，每次请求实时读
+ * process.env.DEEPSEEK_API_KEY（AI SDK loadApiKey 惰性求值）
+ */
+export function setDeepSeekApiKey(key: string): { ok: boolean; message: string } {
+  const trimmed = key.trim();
+  if (!/^sk-[A-Za-z0-9]{16,}$/.test(trimmed)) {
+    return {
+      ok: false,
+      message: "❌ 格式不对：应为 sk- 开头的完整 Key（如 /key sk-xxxxxxxx…）",
+    };
+  }
+  process.env.DEEPSEEK_API_KEY = trimmed; // 热生效
+  config.deepseekApiKey = trimmed;
+  saveCredentialsStore({ deepseekApiKey: trimmed }); // 加密持久化（保留教务凭证字段）
+  return { ok: true, message: "✅ API Key 已加密保存并立即生效，直接提问即可" };
 }

@@ -306,6 +306,12 @@ export async function runInlineTUI(options: {
       result = "switch-card";
       break;
     }
+    if (prompt.startsWith("/key")) {
+      const { setDeepSeekApiKey } = await import("../onboarding");
+      const res = setDeepSeekApiKey(prompt.slice(4).trim());
+      write(`  ${res.ok ? "" : ""}${res.message}${RESET}\n\n`);
+      continue;
+    }
     if (["exit", "quit", "/exit", "退出"].includes(prompt.toLowerCase())) break;
     await runOnce(prompt);
   }
