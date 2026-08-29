@@ -30,8 +30,16 @@ function machineKey(salt: string): Buffer {
   return crypto.scryptSync(fingerprint, salt, 32);
 }
 
+/** 加密存储的凭证（通用 KV：教务账号 + API Key 等） */
+export interface CredentialsStore {
+  username?: string;
+  password?: string;
+  deepseekApiKey?: string;
+  savedAt: string;
+}
+
 /** 读取并解密本地凭证；文件不存在或跨机器无法解密时返回 null */
-export function loadStoredCredentials(): StoredCredentials | null {
+export function loadCredentialsStore(): CredentialsStore | null {
   try {
     const raw = JSON.parse(fs.readFileSync(CRED_FILE, "utf8")) as {
       salt: string;
@@ -49,22 +57,23 @@ export function loadStoredCredentials(): StoredCredentials | null {
       decipher.update(Buffer.from(raw.data, "base64")),
       decipher.final(),
     ]).toString("utf8");
-    return JSON.parse(plain) as StoredCredentials;
+    return JSON.parse(plain) as CredentialsStore;
   } catch {
     return null;
   }
 }
 
-/** 加密保存凭证（AES-256-GCM，随机 salt/iv） */
-export function saveStoredCredentials(username: string, password: string): void {
+/** 合并加密保存（patch 部分字段，保留未提及字段） */
+export function saveCredentialsStore(patch: Partial<CredentialsStore>): void {
+  const existing = loadCredentialsStore();
+  const payload: CredentialsStore = {
+    ...existing,
+    ...patch,
+    savedAt: new Date().toISOString(),
+  };
   const salt = crypto.randomBytes(16).toString("base64");
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv("aes-256-gcm", machineKey(salt), iv);
-  const payload: StoredCredentials = {
-    username,
-    password,
-    savedAt: new Date().toISOString(),
-  };
   const data = Buffer.concat([
     cipher.update(JSON.stringify(payload), "utf8"),
     cipher.final(),
@@ -83,6 +92,15 @@ export function saveStoredCredentials(username: string, password: string): void 
       2
     )
   );
+}
+
+/** 旧接口兼容（onboarding 使用） */
+export function loadStoredCredentials(): CredentialsStore | null {
+  return loadCredentialsStore();
+}
+
+export function saveStoredCredentials(username: string, password: string): void {
+  saveCredentialsStore({ username, password });
 }
 
 export function clearStoredCredentials(): void {
