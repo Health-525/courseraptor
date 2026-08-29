@@ -36,6 +36,12 @@ export interface CredentialsStore {
   username?: string;
   password?: string;
   deepseekApiKey?: string;
+  /** 经 /key 明确确认的本机覆盖值；启动时优先于 .env。 */
+  deepseekApiKeyOverride?: boolean;
+  /** 独立激活密钥；与教务凭证一样仅加密保存在本机。 */
+  licenseKey?: string;
+  /** 本机随机安装 ID，不采集硬件序列号或个人信息。 */
+  licenseDeviceId?: string;
   savedAt: string;
 }
 

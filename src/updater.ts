@@ -14,7 +14,8 @@ import { exec as execCb } from "node:child_process";
 import { promisify } from "node:util";
 import path from "node:path";
 import { PROJECT_ROOT } from "./paths";
-import { checkForUpdate, getUpdateServerUrl } from "./update-check";
+import { getLicenseDownloadHeaders } from "./license";
+import { checkForUpdate, requireSecureUpdateServerUrl } from "./update-check";
 
 const exec = promisify(execCb);
 
@@ -60,7 +61,7 @@ const NPM_INSTALL_TIMEOUT_MS = 10 * 60_000;
  * @returns 给用户看的最终结果文案
  */
 export async function applyUpdate(log: (msg: string) => void = () => {}): Promise<string> {
-  const server = getUpdateServerUrl();
+  const server = requireSecureUpdateServerUrl();
   if (!server) {
     return "未配置更新后台地址（RAPTOR_UPDATE_SERVER），请找维护者要安装包手动覆盖。";
   }
@@ -91,6 +92,7 @@ export async function applyUpdate(log: (msg: string) => void = () => {}): Promis
 
 async function downloadPackage(server: string): Promise<string> {
   const res = await fetch(`${server}/download`, {
+    headers: getLicenseDownloadHeaders(),
     signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`下载失败：HTTP ${res.status}（后台可能还没发过版）`);

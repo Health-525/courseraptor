@@ -35,6 +35,12 @@ if (!SERVER || !TOKEN) {
   console.error("缺配置：请在 .env 里加 UPDATE_SERVER_URL 和 UPDATE_ADMIN_TOKEN。");
   process.exit(1);
 }
+try {
+  if (new URL(SERVER).protocol !== "https:") throw new Error("not https");
+} catch {
+  console.error("UPDATE_SERVER_URL 必须是可公开访问的 HTTPS 地址。");
+  process.exit(1);
+}
 
 // ── 参数 ──
 const rest = process.argv.slice(2);
@@ -87,6 +93,18 @@ cpSync(ROOT, stage, {
     return !EXCLUDE_DIRS.has(top) && !top.endsWith(".log") && !isExcluded(rel);
   },
 });
+
+// 仅在待发布副本写入服务地址：源码本地开发不要求激活，发给同学的 zip 则必定校验。
+const stagedUpdateCheck = path.join(stage, "src", "update-check.ts");
+const updateCheckSource = readFileSync(stagedUpdateCheck, "utf8");
+const placeholderLine = 'const DEFAULT_UPDATE_SERVER = "__RAPTOR_RELEASE_SERVER__";';
+if (!updateCheckSource.includes(placeholderLine)) {
+  throw new Error("未找到客户端授权服务器占位符，已中止打包");
+}
+writeFileSync(
+  stagedUpdateCheck,
+  updateCheckSource.replace(placeholderLine, `const DEFAULT_UPDATE_SERVER = ${JSON.stringify(SERVER)};`),
+);
 
 function compress(dir, out) {
   if (process.platform === "win32") {

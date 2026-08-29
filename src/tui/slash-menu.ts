@@ -14,21 +14,25 @@
 export interface SlashCommand {
   name: string;
   desc: string;
+  /** 从菜单确认后先补全并等待用户输入参数，不能立刻以空参数执行。 */
+  requiresArgument?: boolean;
 }
 
+export type SlashCommandDefinition = Omit<SlashCommand, "name">;
+
 /**
- * 全部内置斜杠命令的说明文案 —— 全项目唯一数据源。
+ * 全部内置斜杠命令的交互定义 —— 全项目唯一数据源。
  *
- * 卡片模式的菜单候选池来自它分发用的 commands 表（keys.ts），行内模式来自
- * commandsForMode()。两边都从这里取 desc，避免菜单里写的说明和回车后真正
- * 执行的行为对不上（曾经两张表各写一份，改一处漏一处）。
+ * 卡片模式的候选池来自它分发用的 commands 表（keys.ts），行内模式来自
+ * commandsForMode()。两边都取同一份说明和参数行为，避免菜单里写的说明、
+ * 补全规则和回车后的真实执行逻辑漂移。
  */
-export const SLASH_COMMANDS: Readonly<Record<string, string>> = {
-  "/inline": "切换到行内模式（滚轮/复制可用）",
-  "/card": "切换到全屏卡片模式",
-  "/key": "配置 DeepSeek API Key：/key sk-xxx",
-  "/update": "检查并一键更新到最新版（更新后需重启）",
-  "/exit": "退出程序",
+export const SLASH_COMMANDS: Readonly<Record<string, SlashCommandDefinition>> = {
+  "/inline": { desc: "切换到行内模式（滚轮/复制可用）" },
+  "/card": { desc: "切换到全屏卡片模式" },
+  "/key": { desc: "管理 DeepSeek API Key（查看或覆盖）" },
+  "/update": { desc: "检查并一键更新到最新版（更新后需重启）" },
+  "/exit": { desc: "退出程序" },
 };
 
 export function commandsForMode(mode: "card" | "inline"): SlashCommand[] {
@@ -36,7 +40,26 @@ export function commandsForMode(mode: "card" | "inline"): SlashCommand[] {
     mode === "card"
       ? ["/inline", "/key", "/update", "/exit"]
       : ["/card", "/key", "/update", "/exit"];
-  return names.map((name) => ({ name, desc: SLASH_COMMANDS[name] }));
+  return names.map((name) => ({ name, ...SLASH_COMMANDS[name] }));
+}
+
+/**
+ * 只能由运行程序的本机终端处理的命令。严格匹配命令边界，避免误伤 /keyfoo
+ * 或普通对话文字；QQ 等远程渠道在写 history/调用 Agent 前据此拦截。
+ */
+/** 仅本机处理的 /key 命令；安全边界忽略大小写，菜单补全仍保持大小写敏感。 */
+export function isLocalOnlyKeyCommand(input: string): boolean {
+  return /^\/key(?:\s|$)/i.test(input.trim());
+}
+
+/** 原始按键层用：一出现空白即视为旧式带参数写法，后续字符不得进入输入组件。 */
+export function isLocalKeyCommandWithArgumentPrefix(input: string): boolean {
+  return /^\/key\s/i.test(input);
+}
+
+export function localOnlyCommandMessage(input: string): string | undefined {
+  if (!isLocalOnlyKeyCommand(input)) return undefined;
+  return "🔐 API Key 只能在运行 CourseRaptor 的本机终端设置：请输入无参数 /key。";
 }
 
 /**

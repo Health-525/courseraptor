@@ -19,6 +19,9 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "type": "module",
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.31",

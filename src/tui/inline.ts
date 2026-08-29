@@ -34,6 +34,9 @@ import {
   filterSlashCommands,
   renderSlashMenu,
   coalesceText,
+  isLocalKeyCommandWithArgumentPrefix,
+  isLocalOnlyKeyCommand,
+  isPrintableKey,
   splitKeys,
   type SlashCommand,
 } from "./slash-menu";
@@ -156,7 +159,7 @@ function fmtTokens(n: number | undefined): string {
 
 // ── 主循环 ────────────────────────────────────────────────────
 
-export type InlineTUIResult = "exit" | "switch-card";
+export type InlineTUIResult = "exit" | "switch-card" | "setup-key";
 
 /**
  * 行内渲染器会话循环。返回值供 index.ts 的 UI 切换外层循环消费：
@@ -219,6 +222,10 @@ export async function runInlineTUI(options: {
   let suppressMenu = false;
   /** ESC 收起后本行内不再自动弹出（对齐主流 CLI）；行清空或提交后解除 */
   let menuDismissed = false;
+  /** 原始输入镜像仅用于秘密边界；普通文本保持 readline 现有行为。 */
+  let rawLine = "";
+  /** 旧式 /key <secret> 从首个空白开始吞掉，防止进入 readline/history/屏幕。 */
+  let blockingKeyArgument = false;
 
   const resetMenuState = (): void => {
     menuItems = [];
@@ -260,12 +267,16 @@ export async function runInlineTUI(options: {
   };
 
   /** Tab/回车补全：把选中命令的剩余字符写进 readline（走与打字相同的
-   * 按键路径，readline 自己刷新输入行） */
-  const completeInline = (): void => {
+   * 按键路径，readline 自己刷新输入行）。带参数命令额外补一个空格并等待输入。
+   * @returns 是否已进入等待参数状态；此时回车不应提交整行。 */
+  const completeInline = (): boolean => {
     const sel = menuItems[Math.min(menuIndex, menuItems.length - 1)];
-    if (!sel || !sel.name.startsWith(rl.line)) return;
-    const suffix = sel.name.slice(rl.line.length);
-    if (suffix) proxy.write(suffix);
+    const line = rl.line ?? "";
+    if (!sel || !sel.name.startsWith(line)) return false;
+    const suffix = sel.name.slice(line.length);
+    const awaitingArgument = Boolean(sel.requiresArgument && !line.includes(" "));
+    if (suffix || awaitingArgument) proxy.write(`${suffix}${awaitingArgument ? " " : ""}`);
+    return awaitingArgument;
   };
 
   const handleRawKey = (text: string): void => {
@@ -286,16 +297,22 @@ export async function runInlineTUI(options: {
         return;
       }
       if (text === "\t") {
-        completeInline(); // 菜单保持打开，keypress 会按新行文本重绘
+        if (completeInline()) {
+          eraseMenu();
+          resetMenuState();
+        }
         return;
       }
       if (text === "\r" || text === "\n") {
-        // 先擦菜单再补全 + 提交：补全字符触发的 keypress 不会把菜单画回来；
-        // readline 的 line 事件照常走下方既有命令分发
+        // 先擦菜单再补全。/key 这类带参命令仅补全并留在输入框，等待用户继续输入。
         eraseMenu();
-        resetMenuState();
         suppressMenu = true;
-        completeInline();
+        const awaitingArgument = completeInline();
+        resetMenuState();
+        if (awaitingArgument) {
+          suppressMenu = false;
+          return;
+        }
         proxy.write(text);
         return;
       }
@@ -314,6 +331,49 @@ export async function runInlineTUI(options: {
     proxy.write(text);
   };
 
+  const rejectVisibleKeyArgument = (): void => {
+    eraseMenu();
+    resetMenuState();
+    for (let i = 0; i < (rl.line ?? "").length; i++) proxy.write("\x7f");
+    rawLine = "";
+    blockingKeyArgument = true;
+  };
+
+  /** 在 readline 前处理秘密命令参数，保证它们不会被回显或写入 history。 */
+  const handleProtectedRawKey = (text: string): void => {
+    if (blockingKeyArgument) {
+      if (text === "\r" || text === "\n") {
+        blockingKeyArgument = false;
+        rawLine = "";
+        write(`\r\n  ${YELLOW}请直接输入无参数 /key，再按提示安全设置 API Key。${RESET}\n`);
+        rl.prompt();
+      } else if (text === "\x1b") {
+        blockingKeyArgument = false;
+        rawLine = "";
+        rl.prompt();
+      }
+      return;
+    }
+
+    if (isPrintableKey(text)) {
+      const candidate = rawLine === ""
+        ? text
+        : rawLine === "\u0000"
+          ? rawLine
+          : `${rawLine}${text}`;
+      if (isLocalKeyCommandWithArgumentPrefix(candidate)) {
+        rejectVisibleKeyArgument();
+        return;
+      }
+      rawLine = candidate.startsWith("/") ? candidate : "\u0000";
+    } else if (text === "\x7f" || text === "\b") {
+      rawLine = rawLine === "\u0000" ? rawLine : rawLine.slice(0, -1);
+    } else if (text === "\r" || text === "\n") {
+      rawLine = "";
+    }
+    handleRawKey(text);
+  };
+
   const onRawData = (chunk: Buffer): void => {
     // 流式期间 readline 已 pause，不做菜单交互，按键原样进代理缓冲
     //（恢复后回放，与 pause 前的输入行为一致）
@@ -326,7 +386,7 @@ export async function runInlineTUI(options: {
     // readline，被当成历史翻阅把上一轮内容翻进输入行。
     // 切完再把连续文本合并回一块（见 coalesceText），避免逐字符喂 readline
     const keys = coalesceText(splitKeys(chunk.toString("utf8")));
-    for (const key of keys) handleRawKey(key);
+    for (const key of keys) handleProtectedRawKey(key);
   };
 
   // readline 处理完按键（行文本已更新、光标已归位）后刷新菜单过滤。
@@ -501,10 +561,13 @@ export async function runInlineTUI(options: {
       result = "switch-card";
       break;
     }
-    if (prompt.startsWith("/key")) {
-      const { setDeepSeekApiKey } = await import("../onboarding");
-      const res = setDeepSeekApiKey(prompt.slice(4).trim());
-      write(`  ${res.ok ? "" : ""}${res.message}${RESET}\n\n`);
+    if (isLocalOnlyKeyCommand(prompt)) {
+      if (prompt.toLowerCase() === "/key") {
+        result = "setup-key";
+        break;
+      }
+      // 原始按键层已阻断参数；此处作为粘贴/非 TTY 路径的最后一道边界。
+      write(`  ${YELLOW}请直接输入无参数 /key，再按提示安全设置 API Key。${RESET}\n\n`);
       continue;
     }
     if (prompt === "/update") {

@@ -147,3 +147,14 @@ describe("行内模式斜杠菜单", { concurrency: 1 }, () => {
     });
   });
 });
+
+
+  test("选择 /key 请求安全设置流程，不补全可见参数或提交给 agent", async () => {
+    await withInline(async (rig) => {
+      await rig.press("/");
+      await rig.press("\x1b[B"); // 第二项 /key
+      const frame = await rig.press("\r");
+      assert.ok(!frame.includes("key "), "不应补全可见 API Key 参数输入");
+      assert.ok(!frame.includes("── 完成"), "/key 不应提交给 agent");
+    });
+  });

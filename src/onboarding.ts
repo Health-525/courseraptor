@@ -4,34 +4,17 @@
  */
 
 import readline from "node:readline/promises";
-import { Writable } from "node:stream";
 
-import { config } from "./config";
+import { config, maskDeepSeekApiKey, type DeepSeekApiKeySource } from "./config";
 import { saveCredentialsStore, saveStoredCredentials } from "./credentials";
 import { loginJwgl } from "./jwgl/auth";
-
-/** 密码输入静音（回车后换行），避免明文密码留在终端回显里 */
-function createMutedOutput() {
-  let muted = false;
-  const stream = new Writable({
-    write(chunk, _enc, cb) {
-      if (!muted) process.stdout.write(chunk);
-      cb();
-    },
-  });
-  return {
-    stream,
-    setMuted: (v: boolean) => {
-      muted = v;
-    },
-  };
-}
+import { createMutedTerminalOutput } from "./secret-input";
 
 export async function ensureCredentials(): Promise<void> {
   if (config.jwglUsername && config.jwglPassword) return;
 
   console.log("🦖 首次使用：先配置教务系统账号（将 AES-256-GCM 加密保存在本机，不明文落盘）");
-  const out = createMutedOutput();
+  const out = createMutedTerminalOutput();
   // terminal: true 不能省：output 是自定义 Writable（没有 isTTY），省了它
   // readline 就判定为非终端、不给 stdin 开 raw mode，终端自身的回显会把密码
   // 直接打在屏幕上——「输入不回显」就成了空话。开了之后提示符与回显都走
@@ -79,8 +62,100 @@ export async function ensureCredentials(): Promise<void> {
   }
 }
 
+export interface DeepSeekKeyStatus {
+  configured: boolean;
+  masked?: string;
+  source: DeepSeekApiKeySource;
+}
+
+/** 给 UI 的状态不包含任何完整 Key，防止调用方误回显或误传给 Agent。 */
+export function getDeepSeekKeyStatus(): DeepSeekKeyStatus {
+  if (!config.deepseekApiKey) return { configured: false, source: "unset" };
+  return {
+    configured: true,
+    masked: maskDeepSeekApiKey(config.deepseekApiKey),
+    source: config.deepseekApiKeySource,
+  };
+}
+
+/** 本地 /key 设置流程唯一需要的终端能力；测试可注入内存实现，不读真实 stdin。 */
+export interface KeySetupIO {
+  write(message: string): void;
+  confirm(prompt: string): Promise<boolean>;
+  readSecret(prompt: string): Promise<string>;
+  close?(): void;
+}
+
+export type KeySetupResult = "saved" | "kept" | "cancelled" | "invalid";
+
+interface KeySetupServices {
+  getStatus(): DeepSeekKeyStatus;
+  setKey(key: string): { ok: boolean; message: string };
+}
+
+function createTerminalKeySetupIO(): KeySetupIO {
+  const out = createMutedTerminalOutput();
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: out.stream,
+    terminal: true,
+  });
+  return {
+    write: (message) => console.log(message),
+    confirm: async (prompt) => /^(y|yes)$/i.test((await rl.question(`${prompt} [y/N] `)).trim()),
+    readSecret: async (prompt) => {
+      // 提示必须在开启静音前直接写出；否则用户只看到空白行，不知道该填什么。
+      process.stdout.write(`${prompt}（输入不回显）: `);
+      out.setMuted(true);
+      try {
+        return await rl.question("");
+      } finally {
+        out.setMuted(false);
+        process.stdout.write("\n");
+      }
+    },
+    close: () => rl.close(),
+  };
+}
+
 /**
- * /key 斜杠命令：配置 DeepSeek API Key（校验 -> 热生效 -> 加密持久化）
+ * 无参 /key 的本地安全流程：已有值仅展示脱敏摘要，明确确认后才静音读取新值。
+ * 完整 Key 只从 readSecret 传到 setKey；不写入 TUI、Agent、会话或日志。
+ */
+export async function runDeepSeekKeySetup(
+  io: KeySetupIO = createTerminalKeySetupIO(),
+  services: KeySetupServices = {
+    getStatus: getDeepSeekKeyStatus,
+    setKey: setDeepSeekApiKey,
+  },
+): Promise<KeySetupResult> {
+  try {
+    const status = services.getStatus();
+    if (status.configured) {
+      io.write(`当前 API Key：${status.masked ?? "已配置"}`);
+      if (!(await io.confirm("是否覆盖当前 Key？"))) {
+        io.write("已保留当前 API Key。");
+        return "kept";
+      }
+    }
+
+    io.write("请粘贴或输入新的 DeepSeek API Key（输入内容不会显示）。");
+    const key = await io.readSecret("API Key");
+    if (!key.trim()) {
+      io.write("已取消，未修改 API Key。");
+      return "cancelled";
+    }
+
+    const result = services.setKey(key);
+    io.write(result.message);
+    return result.ok ? "saved" : "invalid";
+  } finally {
+    io.close?.();
+  }
+}
+
+/**
+ * 配置 DeepSeek API Key（校验 -> 热生效 -> 加密持久化）
  * 热生效原理：provider 构建时不绑定 key，每次请求实时读
  * process.env.DEEPSEEK_API_KEY（AI SDK loadApiKey 惰性求值）
  */
@@ -89,11 +164,13 @@ export function setDeepSeekApiKey(key: string): { ok: boolean; message: string }
   if (!/^sk-[A-Za-z0-9]{16,}$/.test(trimmed)) {
     return {
       ok: false,
-      message: "❌ 格式不对：应为 sk- 开头的完整 Key（如 /key sk-xxxxxxxx…）",
+      message: "❌ 格式不对：请输入 sk- 开头的完整 API Key。",
     };
   }
   process.env.DEEPSEEK_API_KEY = trimmed; // 热生效
   config.deepseekApiKey = trimmed;
-  saveCredentialsStore({ deepseekApiKey: trimmed }); // 加密持久化（保留教务凭证字段）
-  return { ok: true, message: "✅ API Key 已加密保存并立即生效，直接提问即可" };
+  config.deepseekApiKeySource = "encrypted";
+  // 明确覆盖标记让重启后优先使用加密新值，但绝不改写 .env 的明文旧值。
+  saveCredentialsStore({ deepseekApiKey: trimmed, deepseekApiKeyOverride: true });
+  return { ok: true, message: "✅ API Key 已加密保存并立即生效，重启后仍使用新 Key。" };
 }

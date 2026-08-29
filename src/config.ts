@@ -10,8 +10,12 @@ import { loadCredentialsStore } from "./credentials";
 import { PROJECT_ROOT as ROOT } from "./paths";
 export const PROJECT_ROOT = ROOT;
 
+export type DeepSeekApiKeySource = "env" | "encrypted" | "unset";
+
 export interface RaptorConfig {
   deepseekApiKey: string;
+  /** 仅供状态展示，UI 不得读取 deepseekApiKey 明文。 */
+  deepseekApiKeySource: DeepSeekApiKeySource;
   deepseekBaseUrl?: string;
   model: string;
   jwglUsername: string;
@@ -26,6 +30,35 @@ export interface RaptorConfig {
   qqBotPasscode?: string;
   /** 抢课功能开关（选课季设为 1 才暴露抢课/盯课工具，平时关闭回到日常对话） */
   enableGrab: boolean;
+}
+
+export interface ResolvedDeepSeekApiKey {
+  key: string;
+  source: DeepSeekApiKeySource;
+}
+
+/**
+ * 交互式 /key 明确确认的覆盖值优先于 .env：否则成功提示后重启又回到旧值，
+ * 用户无法可靠地更换密钥。未标记覆盖的历史加密值仍保持 .env 优先。
+ */
+export function resolveDeepSeekApiKey(input: {
+  environmentKey?: string;
+  storedKey?: string;
+  storedOverride?: boolean;
+}): ResolvedDeepSeekApiKey {
+  if (input.storedOverride && input.storedKey) {
+    return { key: input.storedKey, source: "encrypted" };
+  }
+  if (input.environmentKey) return { key: input.environmentKey, source: "env" };
+  if (input.storedKey) return { key: input.storedKey, source: "encrypted" };
+  return { key: "", source: "unset" };
+}
+
+/** 脱敏展示：永远不完整回显；过短或不规范值只表明已配置。 */
+export function maskDeepSeekApiKey(key: string): string {
+  const trimmed = key.trim();
+  if (!/^sk-[A-Za-z0-9]{8,}$/.test(trimmed)) return "已配置";
+  return `${trimmed.slice(0, 3)}••••••••••••${trimmed.slice(-4)}`;
 }
 
 // .env 跟随包位置解析：全局命令 raptor 可在任意目录启动
@@ -44,8 +77,17 @@ function env(key: string): string | undefined {
 }
 
 function loadConfig(): RaptorConfig {
+  const stored = loadCredentialsStore();
+  const resolvedKey = resolveDeepSeekApiKey({
+    environmentKey: env("DEEPSEEK_API_KEY"),
+    storedKey: stored?.deepseekApiKey,
+    storedOverride: stored?.deepseekApiKeyOverride,
+  });
+  if (resolvedKey.key) process.env.DEEPSEEK_API_KEY = resolvedKey.key;
+
   const config: RaptorConfig = {
-    deepseekApiKey: env("DEEPSEEK_API_KEY") ?? "",
+    deepseekApiKey: resolvedKey.key,
+    deepseekApiKeySource: resolvedKey.source,
     deepseekBaseUrl: env("DEEPSEEK_BASE_URL"),
     model: env("RAPTOR_MODEL") ?? "deepseek-v4-flash",
     jwglUsername: env("JWGL_USERNAME") ?? "",
@@ -58,25 +100,13 @@ function loadConfig(): RaptorConfig {
     enableGrab: env("RAPTOR_ENABLE_GRAB") === "1",
   };
 
-  // DEEPSEEK_API_KEY 允许缺失：/key 斜杠命令运行时配置（热生效）
-
-  // 凭证解析：.env 优先；否则解密本地加密存储（都没有则由入口引导）
-  if (!config.jwglUsername || !config.jwglPassword || !config.deepseekApiKey) {
-    const stored = loadCredentialsStore();
-    if (stored) {
-      if ((!config.jwglUsername || !config.jwglPassword) && stored.username && stored.password) {
-        config.jwglUsername = stored.username;
-        config.jwglPassword = stored.password;
-        config.credentialsSource = "encrypted";
-      } else if (!config.jwglUsername || !config.jwglPassword) {
-        config.credentialsSource = "unset";
-      }
-      if (!config.deepseekApiKey && stored.deepseekApiKey) {
-        // provider 每次请求实时读该环境变量 -> 重启后同样生效
-        config.deepseekApiKey = stored.deepseekApiKey;
-        process.env.DEEPSEEK_API_KEY = stored.deepseekApiKey;
-      }
-    } else if (!config.jwglUsername || !config.jwglPassword) {
+  // 凭证解析：教务账号保持 .env 优先，缺失时再解密本地存储。
+  if (!config.jwglUsername || !config.jwglPassword) {
+    if (stored?.username && stored.password) {
+      config.jwglUsername = stored.username;
+      config.jwglPassword = stored.password;
+      config.credentialsSource = "encrypted";
+    } else {
       config.credentialsSource = "unset";
     }
   }

@@ -24,6 +24,7 @@ const { createKeyProxy } = await import("../src/tui/keys");
 interface Harness {
   stdin: PassThrough;
   out: string[];
+  readonly switchRequest: string | null;
   restore(): void;
 }
 
@@ -49,6 +50,9 @@ function makeProxy(
   return {
     stdin,
     out,
+    get switchRequest() {
+      return proxy.switchRequest;
+    },
     restore: () => {
       proxy.restore();
       proxy.stream.destroy();
@@ -345,9 +349,50 @@ test("命令文案单一来源：菜单候选的 desc 全部取自 SLASH_COMMAND
     for (const c of commandsForMode(mode)) {
       assert.equal(
         c.desc,
-        SLASH_COMMANDS[c.name],
+        SLASH_COMMANDS[c.name].desc,
         `${c.name} 的 desc 应来自 SLASH_COMMANDS，不能各自硬编码一份`,
       );
     }
   }
+});
+
+
+test("共享 /key 命令不要求在普通输入框填写参数", () => {
+  const command = commandsForMode("card").find((item) => item.name === "/key");
+  assert.ok(command, "/key 必须出现在卡片模式菜单");
+  assert.equal(command.requiresArgument, undefined);
+});
+
+
+test("/key 携带旧式可见参数时本地拒绝，不切换也不透传回车", async () => {
+  let rejected = 0;
+  const h = makeProxy({
+    "/key": {
+      desc: "配置 Key",
+      switchTo: "key-setup",
+      // 当前版本尚未实现该命令约束；此测试先固定期望行为。
+      rejectsArgument: true,
+      onArgumentRejected: () => rejected++,
+    } as unknown as SlashCommandSpec,
+  });
+  write(h, "/key sk-OldKey1234567890ABCDE\r");
+  await flush();
+
+  assert.equal(rejected, 1, "带参数的旧写法应被本地拒绝");
+  assert.equal(h.switchRequest, null, "拒绝时不能请求进入设置流程");
+  assert.ok(!h.out.includes("\r"), "回车不得透传给 Agent");
+  h.restore();
+});
+
+
+test("/Key 大小写变体同样请求本地设置，不透传给 Agent", async () => {
+  const h = makeProxy({
+    "/key": { desc: "管理 API Key", switchTo: "setup-key" },
+  });
+  write(h, "/Key\r");
+  await flush();
+
+  assert.equal(h.switchRequest, "setup-key");
+  assert.ok(!h.out.includes("\r"), "回车不得透传给 Agent");
+  h.restore();
 });

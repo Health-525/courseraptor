@@ -124,7 +124,7 @@ npm run qq
 
 ### 方式一：下载安装包（推荐给同学）
 
-到更新后台落地页下载最新版 zip（维护者部署后把地址发给同学），然后：
+维护者会把安装包和**个人激活密钥**一同私发给同学，然后：
 
 1. 装 [Node.js](https://nodejs.org/zh-cn) LTS（装过可跳过）
 2. 解压 zip，双击里面的 **`start.bat`**（首次自动装依赖并引导配置）
@@ -150,7 +150,7 @@ npm run dev            # 或项目内开发模式
 
 ### 🔄 更新（给同学）
 
-raptor **启动时会自动检查新版本**（默认每 24 小时联网查一次，检查失败不影响启动）。有新版时标题栏会出现 `🔄 新版 vX.Y.Z，/update 可更新` 徽标，对话里直接输入：
+raptor **启动时会校验激活状态，并每 24 小时检查一次新版本**。有新版时标题栏会出现 `🔄 新版 vX.Y.Z，/update 可更新` 徽标，对话里直接输入：
 
 ```text
 /update
@@ -158,24 +158,27 @@ raptor **启动时会自动检查新版本**（默认每 24 小时联网查一�
 
 即一键完成：下载新版 → 覆盖安装（你的凭证 / 记忆 / 会话 / QQ 授权名单不受影响）→ 自动装依赖，然后重启 raptor 即可。嫌下载进度看不清可以先 `/inline` 切行内模式再执行。
 
-也可以随时去落地页重新下载 zip 解压覆盖（本机数据文件不会被覆盖）。
+密钥和设备绑定会在每次启动时校验；如需换电脑，请联系维护者在 `/admin` 重置设备绑定后再启动。
 
 不想要提醒：`.env` 里加 `RAPTOR_NO_UPDATE_CHECK=1`。
 
 ### 🛠️ 部署更新后台 + 发版（给维护者）
 
-分发链路三件套：**更新后台**（同学端查版本/下载包）、**发版命令**（打 zip 并发布）、**客户端自更新**（`/update`）。后台是零依赖单文件，任何能跑 Node 的机器（云服务器/宿舍旧电脑）都能部署：
+分发链路四件套：**授权后台**（个人密钥与设备绑定）、**更新后台**（同学端查版本/下载包）、**发版命令**（打 zip 并发布）、**客户端自更新**（`/update`）。后台使用 Node.js 24+ 的内置 SQLite，不需要额外数据库或 npm 依赖；任何能跑 Node 的机器（云服务器/宿舍旧电脑）都能部署：
 
 ```bash
-# 1. 部署后台（建议 pm2 常驻；UPDATE_ADMIN_TOKEN 自拟为发布密钥）
-UPDATE_ADMIN_TOKEN=你的密钥 PORT=8787 pm2 start server/update-server.mjs --name raptor-update
-#    落地页 http://你的服务器:8787/ 发给同学即可
+# 0. 先把 server/nginx.conf.example 复制到服务器并替换 license.example.com；
+#    用 Nginx + Let's Encrypt 对外提供 HTTPS。Node 服务默认只监听 127.0.0.1。
 
-# 2. 本机 .env 配置后台地址与密钥
-#    UPDATE_SERVER_URL=http://你的服务器:8787
-#    UPDATE_ADMIN_TOKEN=你的密钥
+# 1. 部署后台（建议 pm2 常驻；两个密钥都必须是高强度随机值）
+UPDATE_ADMIN_TOKEN=你的管理员密钥 LICENSE_SECRET=你的授权哈希密钥 HOST=127.0.0.1 PORT=8787 pm2 start server/update-server.mjs --name raptor-update
+#    管理后台 https://license.你的域名.com/admin（生成/禁用/重置同学的激活密钥）
 
-# 3. 改完代码、提交后，一条命令发版（bump 版本 -> 打 zip -> 发布到后台）
+# 2. 本机 .env 配置 HTTPS 后台地址与发布密钥
+#    UPDATE_SERVER_URL=https://license.你的域名.com
+#    UPDATE_ADMIN_TOKEN=你的管理员密钥
+
+# 3. 改完代码、提交后，一条命令发版（打包时会把 HTTPS 地址写入同学安装包）
 npm run publish -- "本次更新说明"            # patch：0.1.0 -> 0.1.1（默认）
 npm run publish -- minor "更新说明"          # 0.1.0 -> 0.2.0
 npm run publish -- major "更新说明"          # 0.1.0 -> 1.0.0
@@ -185,9 +188,9 @@ npm run publish -- major "更新说明"          # 0.1.0 -> 1.0.0
 
 其他配置：
 
-- 客户端后台地址默认写在 `src/update-check.ts` 的 `DEFAULT_UPDATE_SERVER`（部署后台后改这里），`.env` 的 `RAPTOR_UPDATE_SERVER` 可覆盖
-- 未配置后台时自动兜底：读 GitHub 的 `vX.Y.Z` tag（`npm run release` 发 tag 走这条链路）或 raw package.json
-- 后台数据在 `update-data/`（版本 zip + meta），部署时记得备份、别删
+- 客户端后台地址由 `npm run publish` 在打包时写入安装包；仅维护者本地可用 `.env` 的 `RAPTOR_UPDATE_SERVER` 覆盖
+- 未配置后台仅视为源码开发模式；正式 zip 没有 HTTPS 授权地址将无法发版
+- 后台数据在 `update-data/`（版本 zip、meta 与 `licenses.sqlite`），部署时记得备份、别删
 
 <details>
 <summary><b>⚙️ 环境变量</b></summary>
@@ -202,8 +205,8 @@ npm run publish -- major "更新说明"          # 0.1.0 -> 1.0.0
 | `QQBOT_APP_ID` / `QQBOT_APP_SECRET` | QQ 官方机器人凭证（可选） |
 | `QQBOT_PASSCODE` | QQ 授权暗号：首次给机器人发此暗号完成授权 |
 | `RAPTOR_NO_UPDATE_CHECK` | 设 `1` 关闭启动时的版本更新检查（默认开启） |
-| `RAPTOR_UPDATE_SERVER` | 更新后台地址（客户端；不填用代码内默认值） |
-| `UPDATE_SERVER_URL` / `UPDATE_ADMIN_TOKEN` | 维护者发版用：后台地址 + 发布密钥（`npm run publish`） |
+| `RAPTOR_UPDATE_SERVER` | 仅维护者本地测试时覆盖授权后台地址；必须为 HTTPS，正式安装包由发版命令内置地址 |
+| `UPDATE_SERVER_URL` / `UPDATE_ADMIN_TOKEN` / `LICENSE_SECRET` | 维护者配置：后台地址、管理员密钥、授权密钥哈希专用密钥；`LICENSE_SECRET` 上线后不得随意更换 |
 | `DEEPSEEK_BASE_URL` | 自定义 API 地址（可选） |
 
 </details>

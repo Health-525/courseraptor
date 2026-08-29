@@ -22,10 +22,11 @@ import { writeFileAtomic } from "./atomic-write";
 const exec = promisify(execCb);
 
 /**
- * 部署更新后台后，把地址填到这里（形如 http://1.2.3.4:8787，结尾不带 /），
- * 同学端无需任何配置；.env 里配 RAPTOR_UPDATE_SERVER 可覆盖此默认值。
+ * 发版脚本会把占位符替换为 HTTPS 授权后台地址并随 zip 一起分发；
+ * 源码开发时占位符会解析为空，避免没有后台的本地开发被阻断。
+ * .env 的 RAPTOR_UPDATE_SERVER 只用于维护者/本地测试覆盖。
  */
-const DEFAULT_UPDATE_SERVER = "";
+const DEFAULT_UPDATE_SERVER = "__RAPTOR_RELEASE_SERVER__";
 
 const RAW_URL = "https://raw.githubusercontent.com/Health-525/courseraptor/master/package.json";
 const CACHE_FILE = path.join(PROJECT_ROOT, "data", "update-check.json");
@@ -33,9 +34,26 @@ const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 4000;
 const GIT_TIMEOUT_MS = 6000;
 
-/** 更新后台地址：环境变量优先，其次代码内默认值（见 DEFAULT_UPDATE_SERVER） */
+/** 更新后台地址：环境变量优先，其次是发版时写入安装包的 HTTPS 地址。 */
 export function getUpdateServerUrl(): string {
-  return (process.env.RAPTOR_UPDATE_SERVER || DEFAULT_UPDATE_SERVER).replace(/\/+$/, "");
+  const bundledServer = DEFAULT_UPDATE_SERVER.startsWith("__RAPTOR_") ? "" : DEFAULT_UPDATE_SERVER;
+  return (process.env.RAPTOR_UPDATE_SERVER || bundledServer).replace(/\/+$/, "");
+}
+
+/** 授权与更新包都含敏感凭据，公开服务只能走 HTTPS。 */
+function isSecureUpdateServer(server: string): boolean {
+  try {
+    return new URL(server).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+export function requireSecureUpdateServerUrl(): string {
+  const server = getUpdateServerUrl();
+  if (!server) throw new Error("未配置更新与授权后台地址");
+  if (!isSecureUpdateServer(server)) throw new Error("更新与授权后台必须使用 HTTPS 地址");
+  return server;
 }
 
 export interface UpdateInfo {
@@ -81,6 +99,7 @@ const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 async function fetchLatestFromServer(
   server: string,
 ): Promise<{ version: string; notes?: string } | null> {
+  if (!isSecureUpdateServer(server)) return null;
   try {
     const res = await fetch(`${server}/latest`, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
     if (!res.ok) return null;

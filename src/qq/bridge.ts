@@ -27,9 +27,12 @@ import {
 } from "@tencent-connect/qqbot-nodejs";
 
 import { config, PROJECT_ROOT } from "../config";
+import { ensureLicense } from "../license";
+import { ensureCredentials } from "../onboarding";
 import { createRaptorAgent } from "../agent";
 import { quarantineCorruptFile, writeFileAtomic } from "../atomic-write";
 import { mdToPlain, splitMessage } from "./format";
+import { localOnlyCommandMessage } from "../tui/slash-menu";
 
 type BridgeLogger = Pick<Console, "log" | "info" | "warn" | "error" | "debug">;
 
@@ -166,6 +169,12 @@ export async function startQQBridge(
     const text = msg.content.trim();
     if (!text) return;
 
+    const localOnlyMessage = localOnlyCommandMessage(text);
+    if (localOnlyMessage) {
+      await bot.sendText(msg.replyTarget, localOnlyMessage);
+      return;
+    }
+
     const history = histories.get(senderId) ?? [];
     const userMsg: ModelMessage = { role: "user", content: text };
     const stopNotices = startWaitingNotices((t) =>
@@ -212,9 +221,25 @@ const isEntry = (() => {
   }
 })();
 
+export interface StandaloneQQDependencies {
+  ensureLicense(): Promise<void>;
+  ensureCredentials(): Promise<void>;
+  startBridge(): Promise<void>;
+}
+
+/** 独立 QQ 入口与主程序共用相同的授权前置条件。 */
+export async function startStandaloneQQ(
+  dependencies: StandaloneQQDependencies = {
+    ensureLicense,
+    ensureCredentials,
+    startBridge: () => startQQBridge(),
+  },
+): Promise<void> {
+  await dependencies.ensureLicense();
+  await dependencies.ensureCredentials();
+  await dependencies.startBridge();
+}
+
 if (isEntry) {
-  // 独立跑桥（npm run qq）也需要教务凭证：缺失时引导录入
-  const { ensureCredentials } = await import("../onboarding");
-  await ensureCredentials();
-  await startQQBridge();
+  await startStandaloneQQ();
 }

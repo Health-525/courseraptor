@@ -8,13 +8,14 @@
  *   - 卡片模式输入 /inline → 行内（输出顺着终端缓冲区走、滚轮/选中复制可用）
  *   - 行内模式输入 /card   → 卡片
  * RAPTOR_TUI_INLINE=1 只决定初始模式。滚轮/滚动步长/斜杠命令见 src/tui/keys.ts。
- * 两种模式输入 / 都会唤出斜杠命令候选菜单（↑↓ 选择、Tab/Enter 补全），
+ * 两种 UI 输入 / 都会唤出斜杠命令候选菜单（↑↓ 选择、Tab/Enter 补全），
  * 注册表与渲染共用 src/tui/slash-menu.ts。
  */
 
 import { config } from "./config";
 import { createRaptorAgent } from "./agent";
-import { ensureCredentials } from "./onboarding";
+import { ensureCredentials, runDeepSeekKeySetup } from "./onboarding";
+import { ensureLicense } from "./license";
 import { flushCapturedSession } from "./memory/shortterm";
 import { runUpdateCommand } from "./updater";
 import {
@@ -27,6 +28,9 @@ import { SLASH_COMMANDS } from "./tui/slash-menu";
 
 // 更新检查先发出，与凭证加载/agent 构建并行跑，后面收结果
 const updatePromise = checkForUpdate();
+
+// 激活密钥在服务端仅绑定本机随机安装 ID，不接触教务账号或对话内容。
+await ensureLicense();
 
 // 教务凭证缺失时引导录入（.env > credentials.enc 加密文件 > 首次引导）
 await ensureCredentials();
@@ -53,11 +57,8 @@ const agent = await createRaptorAgent();
 
 /**
  * UI 切换外层循环：全屏卡片（@ai-sdk/tui）和行内渲染器可运行时互切。
- * - 卡片模式下输入 /inline：键位代理（keys.ts）镜像输入框识别命令，
- *   注入 Ctrl+C 让 runAgentTUI 优雅返回，switchRequest 带出切换意图；
- * - 行内模式下输入 /card：runInlineTUI 返回 "switch-card"。
- * RAPTOR_TUI_INLINE=1 只决定初始模式。会话历史由 agent/shortterm 持有，
- * 切换只换渲染层，上下文不丢（卡片 UI 自身的可视历史除外）。
+ * /key 与 /inline 同样先退出当前 UI；外层独占 stdin 执行静音本地设置后，
+ * 回到原 UI，避免 API Key 出现在 TUI 帧、会话或 Agent 中。
  */
 type UIMode = "card" | "inline";
 let mode: UIMode = process.env.RAPTOR_TUI_INLINE === "1" ? "inline" : "card";
@@ -68,27 +69,32 @@ while (running) {
     const { createKeyProxy } = await import("./tui/keys");
     const { withSoftInterrupt } = await import("./tui/soft-interrupt");
     const { startWelcomeBootstrap } = await import("./tui/welcome");
-    const { setDeepSeekApiKey } = await import("./onboarding");
     const keys = createKeyProxy(process.stdin, {
       commands: {
         // desc 同时是斜杠菜单（输入 / 唤出，↑↓ 选择）里的说明文案，统一取自
         // SLASH_COMMANDS——菜单里写的说明必须和回车后真正执行的是一回事
-        "/inline": { desc: SLASH_COMMANDS["/inline"], switchTo: "inline" },
-        // /key sk-xxx：配置 DeepSeek API Key（校验 -> 热生效 -> 加密持久化）
+        "/inline": {
+          desc: SLASH_COMMANDS["/inline"].desc,
+          switchTo: "inline",
+        },
+        // /key 始终无参：TUI 退出后由外层独占 stdin 显示脱敏值、确认并静音读取。
         "/key": {
-          desc: SLASH_COMMANDS["/key"],
-          handler: (arg) => console.log(setDeepSeekApiKey(arg).message),
+          desc: SLASH_COMMANDS["/key"].desc,
+          switchTo: "setup-key",
+          rejectsArgument: true,
+          onArgumentRejected: () =>
+            console.log("请直接输入无参数 /key，再按提示安全设置 API Key。"),
         },
         // /update：从更新后台拉新版覆盖安装（进度在行内模式看得更清楚）
         "/update": {
-          desc: SLASH_COMMANDS["/update"],
+          desc: SLASH_COMMANDS["/update"].desc,
           handler: () => {
             console.log("🔄 /update：开始检查更新…");
             runUpdateCommand();
           },
         },
         // 非目标模式名（"exit"）的 switchRequest 让外层循环走正常退出
-        "/exit": { desc: SLASH_COMMANDS["/exit"], switchTo: "exit" },
+        "/exit": { desc: SLASH_COMMANDS["/exit"].desc, switchTo: "exit" },
       },
     });
     // 空屏欢迎面板：后台拉今日课表/最新通知/GPA，逐段填进 TUI 空状态
@@ -104,7 +110,7 @@ while (running) {
           updateInfo ? formatUpdateBadge(updateInfo) : null,
           config.deepseekApiKey
             ? "NJTECH 教务 Agent（/inline 切行内模式）"
-            : "输入 /key sk-你的Key 配置后即可对话",
+            : "输入无参数 /key 安全配置后即可对话",
         ]
           .filter(Boolean)
           .join(" · "),
@@ -126,7 +132,9 @@ while (running) {
       // 不然退出 TUI 后按键还在流向已退出的 UI
       keys.restore();
     }
-    if (keys.switchRequest === "inline") {
+    if (keys.switchRequest === "setup-key") {
+      await runDeepSeekKeySetup();
+    } else if (keys.switchRequest === "inline") {
       mode = "inline";
     } else {
       running = false; // Ctrl+C / 正常退出
@@ -143,7 +151,9 @@ while (running) {
         .join(" · "),
       agent,
     });
-    if (result === "switch-card") {
+    if (result === "setup-key") {
+      await runDeepSeekKeySetup();
+    } else if (result === "switch-card") {
       mode = "card";
     } else {
       running = false;

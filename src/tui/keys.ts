@@ -54,7 +54,9 @@ import {
   repaintCardFrame,
   coalesceText,
   isPrintableKey,
+  isLocalKeyCommandWithArgumentPrefix,
   splitKeys,
+  type SlashCommand,
 } from "./slash-menu";
 
 /** 一次滚轮滚格 / 一次 ↑/↓ 对应的滚动行数（库原生是 1，太慢） */
@@ -62,6 +64,12 @@ const SCROLL_LINES = 3;
 
 export interface SlashCommandSpec {
   desc: string;
+  /** 从候选菜单确认后先等待参数，而不是以空参数立即执行。 */
+  requiresArgument?: boolean;
+  /** 带参数命令（如旧式 /key sk-xxx）是否只允许无参调用。 */
+  rejectsArgument?: boolean;
+  /** 参数被拒绝时的本地提示；绝不能把命令继续交给 Agent。 */
+  onArgumentRejected?: () => void;
   /** 提示符下回车 → 请求切换的 UI 模式（index.ts 消费 switchRequest） */
   switchTo?: string;
   /** 带参命令（如 /key sk-xxx）：注入退格清行后调用 */
@@ -101,13 +109,17 @@ export function createKeyProxy(
   /** 镜像输入框文本，识别斜杠命令；\u0000 标记本行已不是命令 */
   let cmdBuffer = "";
   let retryTimer: NodeJS.Timeout | undefined;
+  /** 旧式 /key <secret> 的参数段：从首个空白开始吞掉，绝不写入 TUI。 */
+  let blockingKeyArgument = false;
 
   // ── 斜杠菜单状态。候选池直接来自 commands 表——菜单展示 ⇔ 回车分发
   // 永远一致，不会出现菜单里有、分发却不认识的命令 ──
-  const menuPool: { name: string; desc: string }[] = Object.entries(
-    commands,
-  ).map(([name, spec]) => ({ name, desc: spec.desc }));
-  let menuItems: { name: string; desc: string }[] = [];
+  const menuPool: SlashCommand[] = Object.entries(commands).map(([name, spec]) => ({
+    name,
+    desc: spec.desc,
+    requiresArgument: spec.requiresArgument,
+  }));
+  let menuItems: SlashCommand[] = [];
   let menuIndex = 0;
   /** 上次生成菜单的查询串；变了才重建菜单（打字伴随库重绘，无需手动） */
   let menuQuery = "";
@@ -141,13 +153,17 @@ export function createKeyProxy(
   };
 
   /** Tab/回车的补全：把选中命令的剩余字符逐条写入库的输入行（parseKey
-   * 对 chunk 精确匹配，必须逐条），镜像同步成完整命令 */
-  const completeSelection = (): void => {
+   * 对 chunk 精确匹配，必须逐条），镜像同步成完整命令。
+   * @returns 是否已补全为等待参数的命令；此时回车不能继续分发。 */
+  const completeSelection = (): boolean => {
     const sel = menuItems[menuIndex] ?? menuItems[0];
-    if (!sel) return;
+    if (!sel) return false;
     const suffix = sel.name.slice(cmdBuffer.length);
     for (const ch of suffix) proxy.write(ch);
-    cmdBuffer = sel.name;
+    const awaitingArgument = Boolean(sel.requiresArgument && !cmdBuffer.includes(" "));
+    if (awaitingArgument) proxy.write(" ");
+    cmdBuffer = `${sel.name}${awaitingArgument ? " " : ""}`;
+    return awaitingArgument;
   };
 
   const restore = (): void => {
@@ -186,6 +202,21 @@ export function createKeyProxy(
    * 不保证一次 data 事件只给一个按键，整块喂给按单按键写的判断必然误判。
    */
   const handleKey = (text: string): void => {
+    // 旧式 /key <secret>：从第一个空白开始就不让后续字符进入 TUI 输入框。
+    if (blockingKeyArgument) {
+      if (text === "\r" || text === "\n") {
+        blockingKeyArgument = false;
+        resetLine();
+        commands["/key"]?.onArgumentRejected?.();
+        hideMenu();
+      } else if (text === "\x1b") {
+        blockingKeyArgument = false;
+        resetLine();
+        hideMenu();
+      }
+      return;
+    }
+
     // ── 菜单打开时，按键语义被选择逻辑接管 ──
     if (menuItems.length) {
       if (text === "\x1b[A" || text === "\x1b[B") {
@@ -197,7 +228,7 @@ export function createKeyProxy(
         return;
       }
       if (text === "\t") {
-        completeSelection();
+        if (completeSelection()) hideMenu();
         return;
       }
       if (text === "\x1b") {
@@ -225,14 +256,26 @@ export function createKeyProxy(
     // 斜杠命令镜像：整行以 / 开头才跟踪，回车命中则处理、不提交命令
     if (Object.keys(commands).length) {
       if (text === "\r" || text === "\n") {
-        // 菜单打开时回车 = 选中项补全后分发（镜像同步成完整命令）
-        if (menuItems.length) completeSelection();
+        // 菜单打开时回车 = 补全后分发；需要参数的命令只补全并留在输入框。
+        if (menuItems.length && completeSelection()) {
+          hideMenu();
+          return;
+        }
         const cmd = cmdBuffer.trim();
         resetLine();
         const spaceIdx = cmd.indexOf(" ");
         const cmdName = spaceIdx > 0 ? cmd.slice(0, spaceIdx) : cmd;
-        if (cmdName in commands) {
-          const entry = commands[cmdName];
+        // 菜单补全仍保持大小写敏感；但 /key 是秘密边界，任何大小写变体都必须本地处理。
+        const commandName = cmdName.toLowerCase() === "/key" ? "/key" : cmdName;
+        if (commandName in commands) {
+          const entry = commands[commandName];
+          if (entry.rejectsArgument && spaceIdx > 0) {
+            // 旧式 /key sk-xxx 已在输入框可见；立刻擦除并只显示无秘密的本地提示。
+            for (let i = 0; i < cmd.length; i++) proxy.write("\x7f");
+            entry.onArgumentRejected?.();
+            hideMenu();
+            return;
+          }
           if (entry.switchTo !== undefined) {
             triggerSwitch(entry.switchTo);
           } else {
@@ -250,11 +293,20 @@ export function createKeyProxy(
         if (!cmdBuffer) resetLine(); // 删空 = 本行结束，解除菜单抑制
         refreshMenu();
       } else if (isPrintable(text)) {
-        if (cmdBuffer.startsWith("/")) {
-          cmdBuffer += text;
-        } else if (cmdBuffer === "") {
-          cmdBuffer = text.startsWith("/") ? text : "\u0000";
+        const candidate = cmdBuffer === ""
+          ? (text.startsWith("/") ? text : "\u0000")
+          : cmdBuffer.startsWith("/")
+            ? `${cmdBuffer}${text}`
+            : cmdBuffer;
+        if (isLocalKeyCommandWithArgumentPrefix(candidate)) {
+          // 已显示的命令名前缀也立即擦掉；参数段从未写入 TUI。
+          for (let i = 0; i < cmdBuffer.length; i++) proxy.write("\x7f");
+          resetLine();
+          hideMenu();
+          blockingKeyArgument = true;
+          return;
         }
+        cmdBuffer = candidate;
         refreshMenu();
       }
     }
