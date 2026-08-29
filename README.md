@@ -165,7 +165,7 @@ npm run dev            # 或项目内开发模式
 
 ## 🏗️ 技术栈
 
-- **Agent**：[Vercel AI SDK v7](https://ai-sdk.dev)（`ToolLoopAgent` + `runAgentTUI` 终端对话 UI）
+- **Agent**：[Vercel AI SDK v7](https://ai-sdk.dev)（`ToolLoopAgent` + `runAgentTUI` 终端对话 UI；`scripts/patch-tui.mjs` 给库的空屏打欢迎面板补丁，启动后自动展示今日课表/最新通知/GPA，`npm install` 时经 postinstall 自动生效）
 - **LLM**：DeepSeek（默认 `deepseek-v4-flash`，可切换）
 - **教务协议**：NJTECH 正方新版适配层（账号密码自动登录 RSA + CSRF；选课接口按官方前端 zzxkyzb.js 逆向 + 抢课实战校准）
 

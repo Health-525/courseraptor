@@ -212,5 +212,8 @@ const isEntry = (() => {
 })();
 
 if (isEntry) {
+  // 独立跑桥（npm run qq）也需要教务凭证：缺失时引导录入
+  const { ensureCredentials } = await import("../onboarding");
+  await ensureCredentials();
   await startQQBridge();
 }

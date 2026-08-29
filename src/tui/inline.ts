@@ -10,6 +10,9 @@
  * 行内渲染反过来：所有输出直接写进终端原生缓冲区，滚动交给 Windows
  * Terminal / iTerm 自己（滚轮、PageUp、搜索、复制全都能用）；工具在
  * 发起瞬间打一行 ⟳、结束时打一行 ✓ 摘要 + 耗时，过程全程可见。
+ *
+ * 与全屏卡片 UI 可运行时互切：/card 请求切回卡片模式（index.ts 外层循环
+ * 消费返回值），全屏卡片模式下输入 /inline 切回本渲染器。
  */
 
 import readline from "node:readline";
@@ -40,6 +43,10 @@ export interface TUIStreamableAgent {
     abortSignal?: AbortSignal;
   }): PromiseLike<{ fullStream: AsyncIterable<unknown> }>;
 }
+
+/** 进程级 SIGINT 监听（流式中断用）。运行时切换 UI 会多次进入本模块， */
+/** 用模块级引用去重，避免监听器累积 */
+let sigintHandler: (() => void) | null = null;
 
 // ── ANSI 辅助 ─────────────────────────────────────────────────
 
@@ -132,15 +139,22 @@ function fmtTokens(n: number | undefined): string {
 
 // ── 主循环 ────────────────────────────────────────────────────
 
+export type InlineTUIResult = "exit" | "switch-card";
+
+/**
+ * 行内渲染器会话循环。返回值供 index.ts 的 UI 切换外层循环消费：
+ * - "exit"：用户退出（exit/quit/退出/Ctrl+D/Ctrl+C）
+ * - "switch-card"：用户输入 /card，请求切回全屏卡片 UI
+ */
 export async function runInlineTUI(options: {
   title: string;
   agent: TUIStreamableAgent;
-}): Promise<void> {
+}): Promise<InlineTUIResult> {
   const { agent } = options;
 
   write(
     `${CYAN}${options.title}${RESET}\n` +
-      `${DIM}  Enter 发送 · ↑ 输入历史 · 滚轮/PageUp 翻历史（终端原生） · Ctrl+C 退出${RESET}\n\n`
+      `${DIM}  Enter 发送 · 滚轮/PageUp 翻历史（终端原生） · /card 切回全屏卡片 · Ctrl+C 退出${RESET}\n\n`
   );
 
   const rl = readline.createInterface({
@@ -161,15 +175,20 @@ export async function runInlineTUI(options: {
   rl.on("SIGINT", () => {
     if (!activeAbort) exit();
   });
-  // 流式期间 stdin 已 pause 且关闭 raw mode，^C 走进程信号 -> 中断本轮
-  process.on("SIGINT", () => {
+  // 流式期间 stdin 已 pause 且关闭 raw mode，^C 走进程信号 -> 中断本轮。
+  // 运行时可在两种 UI 间来回切换，本函数会被多次调用——先摘掉上一次的
+  // 监听再挂新的，避免监听器累积和重复处理
+  if (sigintHandler) process.removeListener("SIGINT", sigintHandler);
+  const onSigint = (): void => {
     if (activeAbort) {
       activeAbort.abort();
       write(`${DIM}\n  （已中断本轮）${RESET}\n`);
     } else {
       exit();
     }
-  });
+  };
+  process.on("SIGINT", onSigint);
+  sigintHandler = onSigint;
 
   const ask = (): Promise<string | null> =>
     new Promise((resolve) => {
@@ -277,14 +296,24 @@ export async function runInlineTUI(options: {
   };
 
   // ── 会话循环 ────────────────────────────────────────────────
+  let result: InlineTUIResult = "exit";
   while (true) {
     const line = await ask();
     if (line === null) break; // Ctrl+D / close
     const prompt = line.trim();
     if (!prompt) continue;
-    if (["exit", "quit", "退出"].includes(prompt.toLowerCase())) break;
+    if (prompt === "/card") {
+      result = "switch-card";
+      break;
+    }
+    if (["exit", "quit", "/exit", "退出"].includes(prompt.toLowerCase())) break;
     await runOnce(prompt);
   }
 
+  if (sigintHandler === onSigint) {
+    process.removeListener("SIGINT", onSigint);
+    sigintHandler = null;
+  }
   rl.close();
+  return result;
 }
