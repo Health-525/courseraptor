@@ -13,9 +13,30 @@
  *
  * 与全屏卡片 UI 可运行时互切：/card 请求切回卡片模式（index.ts 外层循环
  * 消费返回值），全屏卡片模式下输入 /inline 切回本渲染器。
+ *
+ * 斜杠命令菜单：readline 不留插手渲染/按键的口子，所以 stdin 先过一层
+ * 原始按键代理——提示符下输入 "/" 时在输入行下方自绘候选菜单：
+ *   - ↑/↓ = 移动选中项（消费掉，不进 readline，否则变成历史翻阅）
+ *   - Tab / 回车 = 补全选中命令再继续（回车补全后直接提交）
+ *   - ESC = 收起菜单，且本行内不再自动弹出（删空或提交后解除）
+ * 其余按键原样透传，菜单随行文本自动开关/过滤。
+ * 菜单绘制全部用光标相对移动（下移不滚屏、\n 在屏底自然滚屏、画完按行数
+ * 上移 + 绝对列归位），不查询光标绝对位置，readline 对这一切无感。
+ * 菜单刷新挂在 keypress 事件上：事件触发时 readline 已处理完按键，
+ * rl.line 是最新行文本。见 src/tui/slash-menu.ts（共用注册表与渲染）。
  */
 
 import readline from "node:readline";
+import { PassThrough } from "node:stream";
+import {
+  commandsForMode,
+  displayWidth,
+  filterSlashCommands,
+  renderSlashMenu,
+  coalesceText,
+  splitKeys,
+  type SlashCommand,
+} from "./slash-menu";
 
 // ── 流事件（对 ai 包 fullStream 的宽松视图，字段按需取用）────────
 
@@ -56,10 +77,6 @@ const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
 const RED = "\x1b[31m";
 const RESET = "\x1b[0m";
-
-const write = (s: string): void => {
-  process.stdout.write(s);
-};
 
 // ── 摘要工具 ──────────────────────────────────────────────────
 
@@ -149,23 +166,188 @@ export type InlineTUIResult = "exit" | "switch-card";
 export async function runInlineTUI(options: {
   title: string;
   agent: TUIStreamableAgent;
+  /**
+   * 输出目标，默认 process.stdout。渲染器与 readline 的重绘全部走它——
+   * 测试注入一个内存流就能捕获整帧 ANSI 做断言，不必劫持全局 stdout
+   * （劫持会把 test runner 自己的报告一起吞掉）。
+   */
+  output?: NodeJS.WriteStream;
+  /** 输入源，默认 process.stdin。同上，测试注入即可驱动按键 */
+  input?: NodeJS.ReadStream;
 }): Promise<InlineTUIResult> {
   const { agent } = options;
+  const out = options.output ?? process.stdout;
+  const input = options.input ?? process.stdin;
+  const write = (s: string): void => {
+    out.write(s);
+  };
 
   write(
     `${CYAN}${options.title}${RESET}\n` +
-      `${DIM}  Enter 发送 · 滚轮/PageUp 翻历史（终端原生） · /card 切回全屏卡片 · Ctrl+C 退出${RESET}\n\n`
+      `${DIM}  Enter 发送 · 输入 / 唤出命令菜单（↑↓ 选择） · /card 切回全屏卡片 · Ctrl+C 退出${RESET}\n\n`
   );
 
+  // ── 输入代理：原始按键先过菜单拦截，再喂给 readline ─────────
+  // readline 需要 isTTY 才进交互模式、会对 input 调 setRawMode，
+  // 前者伪造为 true，后者转发给真实 stdin
+  const proxy = new PassThrough();
+  Object.defineProperty(proxy, "isTTY", { value: true });
+  Object.defineProperty(proxy, "setRawMode", {
+    value: (flag: boolean) =>
+      input.setRawMode?.(flag),
+  });
+
   const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
+    input: proxy,
+    output: out,
     prompt: `${CYAN}›${RESET} `,
     historySize: 50,
   });
 
   /** 非空的一轮流式处理期间置为非 null，Ctrl+C 走中断而非退出 */
   let activeAbort: AbortController | null = null;
+
+  // ── 斜杠命令候选菜单 ─────────────────────────────────────────
+  const menuPool = commandsForMode("inline");
+  let menuItems: SlashCommand[] = [];
+  let menuIndex = 0;
+  /** 当前画在屏上的菜单行数（0 = 收起）。擦除靠它做相对下移 */
+  let menuRows = 0;
+  /** 上次生成菜单的查询串（= 输入行），变了才重画 */
+  let menuQuery = "";
+  /** 回车补全 → line 事件之间的过渡期：补全字符的 keypress 不再唤出菜单 */
+  let suppressMenu = false;
+  /** ESC 收起后本行内不再自动弹出（对齐主流 CLI）；行清空或提交后解除 */
+  let menuDismissed = false;
+
+  const resetMenuState = (): void => {
+    menuItems = [];
+    menuIndex = 0;
+    menuQuery = "";
+    menuDismissed = false;
+  };
+
+  /** 提示符可见宽度："› " 两列（光标列 = 提示符 + 光标前文本显示宽度） */
+  const PROMPT_COLS = 2;
+  const cursorCol = (): number => {
+    const line = rl.line ?? "";
+    const idx = Math.min(rl.cursor ?? line.length, line.length);
+    return PROMPT_COLS + displayWidth(line.slice(0, idx));
+  };
+
+  /** 擦除菜单：从光标行向下逐行清除再上移回光标行。\x1b[B 在屏底只会
+   * 钳住不滚屏，而菜单恰好画满到屏底，全程相对移动、永不产生滚动 */
+  const eraseMenu = (): void => {
+    if (!menuRows) return;
+    for (let i = 0; i < menuRows; i++) write("\x1b[B\x1b[2K");
+    write(`\x1b[${menuRows}A`);
+    menuRows = 0;
+  };
+
+  /** 画菜单：光标行下方。行首 \n 在屏底让终端自然滚屏（屏上内容整体
+   * 上移、光标留在原行），画完按菜单行数上移 + 绝对列归位——无论滚了
+   * 几行，落点都是光标原位置，readline 对这次「出走再回来」无感 */
+  const drawMenu = (): void => {
+    const lines = renderSlashMenu(menuItems, menuIndex);
+    if (!lines.length) {
+      eraseMenu();
+      return;
+    }
+    eraseMenu();
+    write(`\r\n${lines.map((l) => `\x1b[2K${l}`).join("\r\n")}`);
+    menuRows = lines.length;
+    write(`\x1b[${menuRows}A\r\x1b[${cursorCol() + 1}G`);
+  };
+
+  /** Tab/回车补全：把选中命令的剩余字符写进 readline（走与打字相同的
+   * 按键路径，readline 自己刷新输入行） */
+  const completeInline = (): void => {
+    const sel = menuItems[Math.min(menuIndex, menuItems.length - 1)];
+    if (!sel || !sel.name.startsWith(rl.line)) return;
+    const suffix = sel.name.slice(rl.line.length);
+    if (suffix) proxy.write(suffix);
+  };
+
+  const handleRawKey = (text: string): void => {
+    // 防御：吞掉终端的光标位置报告（实现不依赖 CPR，混进输入行会成乱码）
+    if (/^\x1b\[\d+;\d+R$/.test(text)) return;
+    if (suppressMenu) {
+      proxy.write(text);
+      return;
+    }
+    if (menuRows > 0) {
+      if (text === "\x1b[A" || text === "\x1b[B") {
+        const n = menuItems.length;
+        if (n) {
+          menuIndex =
+            text === "\x1b[A" ? (menuIndex - 1 + n) % n : (menuIndex + 1) % n;
+          drawMenu();
+        }
+        return;
+      }
+      if (text === "\t") {
+        completeInline(); // 菜单保持打开，keypress 会按新行文本重绘
+        return;
+      }
+      if (text === "\r" || text === "\n") {
+        // 先擦菜单再补全 + 提交：补全字符触发的 keypress 不会把菜单画回来；
+        // readline 的 line 事件照常走下方既有命令分发
+        eraseMenu();
+        resetMenuState();
+        suppressMenu = true;
+        completeInline();
+        proxy.write(text);
+        return;
+      }
+      if (text === "\x1b") {
+        // ESC 只收起菜单、不进输入行，且本行内不再自动弹出
+        eraseMenu();
+        resetMenuState();
+        menuDismissed = true;
+        return;
+      }
+      if (text === "\x03" || text === "\x04") {
+        eraseMenu(); // Ctrl+C / Ctrl+D：菜单区先擦掉再走 readline 的退出路径
+        resetMenuState();
+      }
+    }
+    proxy.write(text);
+  };
+
+  const onRawData = (chunk: Buffer): void => {
+    // 流式期间 readline 已 pause，不做菜单交互，按键原样进代理缓冲
+    //（恢复后回放，与 pause 前的输入行为一致）
+    if (activeAbort) {
+      proxy.write(chunk);
+      return;
+    }
+    // 一次 data 事件可能含多个按键（连按退格 / 粘贴 / 输入法整段上屏），
+    // 必须切成单个按键序列再逐个处理——否则菜单打开时连按 ↑↓ 会整块漏给
+    // readline，被当成历史翻阅把上一轮内容翻进输入行。
+    // 切完再把连续文本合并回一块（见 coalesceText），避免逐字符喂 readline
+    const keys = coalesceText(splitKeys(chunk.toString("utf8")));
+    for (const key of keys) handleRawKey(key);
+  };
+
+  // readline 处理完按键（行文本已更新、光标已归位）后刷新菜单过滤。
+  // keypress 发在输入流（= 下面的 proxy）上而不是接口对象上
+  // （emitKeypressEvents(input, this)），接口自身的 onkeypress 先挂先跑，
+  // 这里后挂、拿到的是已处理完的行文本
+  proxy.on("keypress", () => {
+    if (suppressMenu || activeAbort) return;
+    const line = rl.line ?? "";
+    // 删空 = 新的一行，解除 ESC 的菜单抑制（下一行是新的意图）
+    if (!line) menuDismissed = false;
+    if (menuDismissed) return;
+    const query = line.startsWith("/") ? line : "";
+    if (query === menuQuery) return;
+    menuQuery = query;
+    menuItems = query ? filterSlashCommands(query, menuPool) : [];
+    menuIndex = 0;
+    drawMenu();
+  });
+
+  /** 非空的一轮流式处理期间置为非 null，Ctrl+C 走中断而非退出 */
 
   const exit = (): void => {
     rl.close();
@@ -192,7 +374,17 @@ export async function runInlineTUI(options: {
 
   const ask = (): Promise<string | null> =>
     new Promise((resolve) => {
-      rl.once("line", (line) => resolve(line));
+      rl.once("line", (line) => {
+        suppressMenu = false;
+        // 粘贴等绕过菜单回车拦截的路径可能残留菜单：光标此时落在菜单
+        // 第一行，\r\x1b[J 恰好把它整块擦掉
+        if (menuRows) {
+          write("\r\x1b[J");
+          menuRows = 0;
+          resetMenuState();
+        }
+        resolve(line);
+      });
       rl.once("close", () => resolve(null));
       rl.prompt();
     });
@@ -296,6 +488,9 @@ export async function runInlineTUI(options: {
   };
 
   // ── 会话循环 ────────────────────────────────────────────────
+  input.resume();
+  input.on("data", onRawData);
+
   let result: InlineTUIResult = "exit";
   while (true) {
     const line = await ask();
@@ -312,14 +507,26 @@ export async function runInlineTUI(options: {
       write(`  ${res.ok ? "" : ""}${res.message}${RESET}\n\n`);
       continue;
     }
+    if (prompt === "/update") {
+      const { applyUpdate } = await import("../updater");
+      try {
+        const res = await applyUpdate((m) => write(`  ${m}\n`));
+        write(`  ${res}\n\n`);
+      } catch (e) {
+        write(`  ${RED}❌ 更新失败：${e instanceof Error ? e.message : String(e)}${RESET}\n\n`);
+      }
+      continue;
+    }
     if (["exit", "quit", "/exit", "退出"].includes(prompt.toLowerCase())) break;
     await runOnce(prompt);
   }
 
+  input.removeListener("data", onRawData);
   if (sigintHandler === onSigint) {
     process.removeListener("SIGINT", onSigint);
     sigintHandler = null;
   }
+  input.pause();
   rl.close();
   return result;
 }

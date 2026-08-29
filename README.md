@@ -114,7 +114,22 @@ npm run qq
 
 选课协议已实战校准（2026-08-27 首轮正选实测）：加密串（`xkkz_xh`）、多轮次 tab、Display 页隐藏字段、平铺数据结构均已攻克。
 
+### ⌨️ 终端交互
+
+- **斜杠命令菜单**：输入框敲 `/` 即弹出候选命令（`/card` `/inline` `/key` `/update` `/exit`），↑/↓ 或滚轮选择、Tab 或回车补全，继续输入按前缀过滤；ESC 收起（收起后本行不再自动弹出，删空重来即可）
+- **双 UI 运行时互切**：默认全屏卡片模式，`/inline` 切行内模式（输出进终端缓冲区，滚轮/选中复制可用），`/card` 切回
+- 滚轮/↑↓ 滚动 · ESC 打断正在进行的回复（菜单弹出时 ESC 只收菜单）· Ctrl+C 退出
+
 ## 🚀 快速开始
+
+### 方式一：下载安装包（推荐给同学）
+
+到更新后台落地页下载最新版 zip（维护者部署后把地址发给同学），然后：
+
+1. 装 [Node.js](https://nodejs.org/zh-cn) LTS（装过可跳过）
+2. 解压 zip，双击里面的 **`start.bat`**（首次自动装依赖并引导配置）
+
+### 方式二：git 克隆（开发者）
 
 ```bash
 # 1. 克隆 & 安装
@@ -133,6 +148,47 @@ raptor                 # 全局命令
 npm run dev            # 或项目内开发模式
 ```
 
+### 🔄 更新（给同学）
+
+raptor **启动时会自动检查新版本**（默认每 24 小时联网查一次，检查失败不影响启动）。有新版时标题栏会出现 `🔄 新版 vX.Y.Z，/update 可更新` 徽标，对话里直接输入：
+
+```text
+/update
+```
+
+即一键完成：下载新版 → 覆盖安装（你的凭证 / 记忆 / 会话 / QQ 授权名单不受影响）→ 自动装依赖，然后重启 raptor 即可。嫌下载进度看不清可以先 `/inline` 切行内模式再执行。
+
+也可以随时去落地页重新下载 zip 解压覆盖（本机数据文件不会被覆盖）。
+
+不想要提醒：`.env` 里加 `RAPTOR_NO_UPDATE_CHECK=1`。
+
+### 🛠️ 部署更新后台 + 发版（给维护者）
+
+分发链路三件套：**更新后台**（同学端查版本/下载包）、**发版命令**（打 zip 并发布）、**客户端自更新**（`/update`）。后台是零依赖单文件，任何能跑 Node 的机器（云服务器/宿舍旧电脑）都能部署：
+
+```bash
+# 1. 部署后台（建议 pm2 常驻；UPDATE_ADMIN_TOKEN 自拟为发布密钥）
+UPDATE_ADMIN_TOKEN=你的密钥 PORT=8787 pm2 start server/update-server.mjs --name raptor-update
+#    落地页 http://你的服务器:8787/ 发给同学即可
+
+# 2. 本机 .env 配置后台地址与密钥
+#    UPDATE_SERVER_URL=http://你的服务器:8787
+#    UPDATE_ADMIN_TOKEN=你的密钥
+
+# 3. 改完代码、提交后，一条命令发版（bump 版本 -> 打 zip -> 发布到后台）
+npm run publish -- "本次更新说明"            # patch：0.1.0 -> 0.1.1（默认）
+npm run publish -- minor "更新说明"          # 0.1.0 -> 0.2.0
+npm run publish -- major "更新说明"          # 0.1.0 -> 1.0.0
+```
+
+发布成功后，同学端 raptor 下次启动即提示，`/update` 一键升级。打包自动排除 `.env` / `credentials.enc` / 会话记忆等本机隐私文件，`eng.traineddata`（验证码 OCR）随包分发。
+
+其他配置：
+
+- 客户端后台地址默认写在 `src/update-check.ts` 的 `DEFAULT_UPDATE_SERVER`（部署后台后改这里），`.env` 的 `RAPTOR_UPDATE_SERVER` 可覆盖
+- 未配置后台时自动兜底：读 GitHub 的 `vX.Y.Z` tag（`npm run release` 发 tag 走这条链路）或 raw package.json
+- 后台数据在 `update-data/`（版本 zip + meta），部署时记得备份、别删
+
 <details>
 <summary><b>⚙️ 环境变量</b></summary>
 
@@ -145,6 +201,9 @@ npm run dev            # 或项目内开发模式
 | `FIRECRAWL_API_KEY` | Firecrawl 云解析通知附件（可选；本地已支持 xlsx/docx/pdf，仅作兜底） |
 | `QQBOT_APP_ID` / `QQBOT_APP_SECRET` | QQ 官方机器人凭证（可选） |
 | `QQBOT_PASSCODE` | QQ 授权暗号：首次给机器人发此暗号完成授权 |
+| `RAPTOR_NO_UPDATE_CHECK` | 设 `1` 关闭启动时的版本更新检查（默认开启） |
+| `RAPTOR_UPDATE_SERVER` | 更新后台地址（客户端；不填用代码内默认值） |
+| `UPDATE_SERVER_URL` / `UPDATE_ADMIN_TOKEN` | 维护者发版用：后台地址 + 发布密钥（`npm run publish`） |
 | `DEEPSEEK_BASE_URL` | 自定义 API 地址（可选） |
 
 </details>

@@ -8,6 +8,9 @@
     "qq": "tsx src/qq/bridge.ts",
     "typecheck": "tsc --noEmit",
     "postinstall": "node scripts/patch-tui.mjs",
+    "release": "node scripts/release.mjs",
+    "publish": "node scripts/publish-release.mjs",
+    "server": "node server/update-server.mjs",
     "test": "node --import tsx --test tests/*.test.ts"
   },
   "bin": {

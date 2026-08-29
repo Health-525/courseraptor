@@ -17,6 +17,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { quarantineCorruptFileSync, writeFileAtomicSync } from "../atomic-write";
 
 /** 来源可信度：recorded > known > estimated，只有前两者能当真值用 */
 export type TermDateSource = "recorded" | "known" | "estimated";
@@ -78,7 +79,10 @@ export function loadStore(): Record<string, TermStartDate> {
       TermStartDate
     >;
   } catch {
-    // 首次运行：用存量值播种并落盘，之后就以文件为准
+    // 首次运行：用存量值播种并落盘，之后就以文件为准。
+    // 但如果是文件写坏了（半截 JSON），静默用种子覆盖会把已经实测记录过的学期
+    // 一并冲掉——先把坏文件留个副本，别让真值无声消失。
+    quarantineCorruptFileSync(storePath());
     cache = structuredClone(LEGACY_SEED);
     persist(cache);
   }
@@ -87,8 +91,8 @@ export function loadStore(): Record<string, TermStartDate> {
 
 function persist(store: Record<string, TermStartDate>): void {
   try {
-    fs.mkdirSync(dataDir(), { recursive: true });
-    fs.writeFileSync(storePath(), JSON.stringify(store, null, 2), "utf8");
+    // 原子写：这是「开学日期」的唯一真值源，写坏了整个学期的周次都会系统性算错
+    writeFileAtomicSync(storePath(), JSON.stringify(store, null, 2));
   } catch {
     // 只读环境（如打包后）下退化为内存存储，不影响主流程
   }

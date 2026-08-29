@@ -52,7 +52,7 @@ function render() {
     header("最新通知"),
     ...panel.newsLines,
   );
-  lines.push("", dim("快捷键：滚轮/↑↓ 滚动 · ESC 打断回复 · Ctrl+C 退出 · /inline 切行内模式"));
+  lines.push("", dim("快捷键：滚轮/↑↓ 滚动 · ESC 打断回复 · 输入 / 唤出命令菜单 · Ctrl+C 退出"));
   globalThis.__raptorWelcome = lines;
 }
 

@@ -11,6 +11,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { PROJECT_ROOT } from "../config";
+import { writeFileAtomic } from "../atomic-write";
 
 const SESSION_FILE = path.join(PROJECT_ROOT, "session.json");
 const MAX_PERSIST_MESSAGES = 200;
@@ -43,14 +44,9 @@ export function captureSessionPrompt(prompt: unknown): void {
   // 串行化写入，避免并发覆盖
   writeChain = writeChain
     .then(() =>
-      fs.writeFile(
+      writeFileAtomic(
         SESSION_FILE,
-        JSON.stringify(
-          { savedAt: new Date().toISOString(), messages },
-          null,
-          2
-        ),
-        "utf8"
+        JSON.stringify({ savedAt: new Date().toISOString(), messages }, null, 2)
       )
     )
     .catch(() => {

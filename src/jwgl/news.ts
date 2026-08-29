@@ -21,7 +21,14 @@ const TARGETS = [
 
 // ── HTML 抓取 ────────────────────────────────────────────────
 
-function fetchHtml(url: string, timeout = 15000): Promise<string> {
+/** 跟随重定向的上限：A↔B 互跳时没有上限就是无限请求 */
+const MAX_REDIRECTS = 5;
+
+function fetchHtml(
+  url: string,
+  timeout = 15000,
+  hops = 0
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const lib = url.startsWith("https") ? https : http;
     const req = lib.get(
@@ -46,7 +53,13 @@ function fetchHtml(url: string, timeout = 15000): Promise<string> {
           const redirectUrl = res.headers.location.startsWith("http")
             ? res.headers.location
             : new URL(res.headers.location, url).href;
-          return fetchHtml(redirectUrl, timeout).then(resolve).catch(reject);
+          // 必须把这次响应的数据读完（或销毁），否则 keep-alive 下 socket
+          // 一直挂在半途，重定向链一长就把连接池耗光
+          res.resume();
+          if (hops >= MAX_REDIRECTS) {
+            return reject(new Error(`重定向次数超过上限（${MAX_REDIRECTS}）：${url}`));
+          }
+          return fetchHtml(redirectUrl, timeout, hops + 1).then(resolve).catch(reject);
         }
         if ((res.statusCode ?? 0) < 200 || (res.statusCode ?? 0) >= 400) {
           return reject(new Error(`HTTP ${res.statusCode ?? 0} for ${url}`));

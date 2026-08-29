@@ -10,6 +10,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 
 import { PROJECT_ROOT } from "../config";
+import { quarantineCorruptFile, writeFileAtomic } from "../atomic-write";
 
 export interface MemoryEntry {
   id: string;
@@ -78,15 +79,21 @@ export async function loadMemory(): Promise<MemoryEntry[]> {
     const data = JSON.parse(await fs.readFile(MEMORY_FILE, "utf8"));
     return Array.isArray(data?.entries) ? (data.entries as MemoryEntry[]) : [];
   } catch {
+    // 文件在却读不出来 = 写坏了。直接返回 [] 的话，下一次 save_memory 会以空
+    // 数组为基回写，全部记忆无声消失——先把坏文件留个副本，至少还有得救。
+    await quarantineCorruptFile(MEMORY_FILE);
     return [];
   }
 }
 
+/**
+ * 落盘。注意是 read-modify-write：调用方先把条目读出来改、再整个写回，
+ * 所以必须原子替换——否则崩溃留下的半截 JSON 会被 loadMemory 当成「空」。
+ */
 async function persist(entries: MemoryEntry[]): Promise<void> {
-  await fs.writeFile(
+  await writeFileAtomic(
     MEMORY_FILE,
-    JSON.stringify({ updatedAt: new Date().toISOString(), entries }, null, 2),
-    "utf8"
+    JSON.stringify({ updatedAt: new Date().toISOString(), entries }, null, 2)
   );
 }
 

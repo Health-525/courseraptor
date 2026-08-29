@@ -149,12 +149,14 @@ export function createClient(baseURL: string, initialCookie = ""): HttpClient {
         (r) => {
           absorbCookies(r.headers["set-cookie"] as string[] | undefined, cookieMap);
 
-          let b = "";
-          r.on("data", (c: Buffer) => (b += c.toString()));
+          // 逐块 toString 会把跨 chunk 边界的 UTF-8 中文切成两半、变成 U+FFFD
+          //（课名/教师名/通知正文全是中文），必须先攒 Buffer 再一次性解码
+          const chunks: Buffer[] = [];
+          r.on("data", (c: Buffer) => chunks.push(c));
           r.on("end", () =>
             finish({
               status: r.statusCode ?? 0,
-              body: b,
+              body: Buffer.concat(chunks).toString("utf8"),
               headers: r.headers as Record<string, string | string[] | undefined>,
             })
           );

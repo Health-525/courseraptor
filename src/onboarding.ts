@@ -32,7 +32,15 @@ export async function ensureCredentials(): Promise<void> {
 
   console.log("🦖 首次使用：先配置教务系统账号（将 AES-256-GCM 加密保存在本机，不明文落盘）");
   const out = createMutedOutput();
-  const rl = readline.createInterface({ input: process.stdin, output: out.stream });
+  // terminal: true 不能省：output 是自定义 Writable（没有 isTTY），省了它
+  // readline 就判定为非终端、不给 stdin 开 raw mode，终端自身的回显会把密码
+  // 直接打在屏幕上——「输入不回显」就成了空话。开了之后提示符与回显都走
+  // out.stream，由 setMuted 统一开关。
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: out.stream,
+    terminal: true,
+  });
 
   try {
     for (let attempt = 1; ; attempt++) {

@@ -133,6 +133,8 @@ async function watchLoop(
   let lastSnapshot: LoopResult["lastSnapshot"] = [];
   let consecutiveErrors = 0;
   let lastSessionRefresh = 0;
+  /** 连续「会话失效」次数：重登本身就要打好几个请求，必须退避 */
+  let sessionExpireStreak = 0;
 
   // 单目标时按关键词缩小服务端查询范围：课程列表分页只拉第一页（100 条），
   // 通识选修课程数百门，不带关键词目标可能不在第一页
@@ -144,8 +146,14 @@ async function watchLoop(
     try {
       courses = await searchCourses(session, keyword);
       consecutiveErrors = 0;
+      sessionExpireStreak = 0;
     } catch (e) {
       if ((e as Error).message === "SESSION_EXPIRED") {
+        // 重登 = 登录 + 入口页 + 每个轮次 Display，本身就有好几个请求；
+        // 这里不延迟的话，会话持续失效会变成无退避热循环，几分钟内把教务系统
+        // 打爆（全局令牌桶只限速不限量）。按连续次数线性退避，上限 10s。
+        sessionExpireStreak++;
+        await pollDelay(Math.min(2000 * sessionExpireStreak, 10_000));
         invalidateXkSession();
         session = await getXkSession(true);
         continue;
@@ -273,16 +281,30 @@ async function grabPlanLoop(
     fullRounds: 0,
     missRounds: 0,
     done: false,
+    /** 备选已用尽（区别于 done：不是抢到了，是没得抢了） */
+    exhausted: false,
   }));
   let consecutiveErrors = 0;
   let lastSessionRefresh = 0;
+  /** 连续「会话失效」次数：重登本身就要打好几个请求，必须退避 */
+  let sessionExpireStreak = 0;
 
   while (Date.now() < deadline) {
     if (state.every((s) => s.done)) break;
     rounds++;
 
     for (const s of state) {
-      if (s.done || s.idx >= s.courseNames.length) continue;
+      if (s.done) continue;
+      // 备选已用尽：不标记的话主循环只认 done，会白转到 deadline（最长 600s）
+      if (s.idx >= s.courseNames.length) {
+        s.exhausted = true;
+        s.done = true;
+        events.push({
+          time: now(),
+          message: `[${s.category}] 备选已用尽，停止该类`,
+        });
+        continue;
+      }
       const name = s.courseNames[s.idx];
 
       let courses: XkCourse[] = [];
@@ -290,8 +312,12 @@ async function grabPlanLoop(
         // 按候选课程名做服务端过滤（课程列表分页只拉第一页）
         courses = await searchCourses(session, name);
         consecutiveErrors = 0;
+        sessionExpireStreak = 0;
       } catch (e) {
         if ((e as Error).message === "SESSION_EXPIRED") {
+          // 同 watchLoop：重登要好几个请求，不延迟会在会话持续失效时热循环
+          sessionExpireStreak++;
+          await pollDelay(Math.min(2000 * sessionExpireStreak, 10_000));
           invalidateXkSession();
           session = await getXkSession(true);
           continue;
@@ -381,7 +407,7 @@ async function grabPlanLoop(
       category: s.category,
       grabbed: s.grabbed || null,
       tried: s.tried,
-      note: s.idx >= s.courseNames.length && !s.done ? "备选已用尽" : undefined,
+      note: s.exhausted ? "备选已用尽" : undefined,
     })),
     events,
     submitAttempts,

@@ -15,6 +15,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { PROJECT_ROOT } from "./paths";
+import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
 
 const CRED_FILE = path.join(PROJECT_ROOT, "credentials.enc");
 
@@ -66,6 +67,15 @@ export function loadCredentialsStore(): CredentialsStore | null {
 /** 合并加密保存（patch 部分字段，保留未提及字段） */
 export function saveCredentialsStore(patch: Partial<CredentialsStore>): void {
   const existing = loadCredentialsStore();
+  // 文件在却解不出来（换过机器 / 文件损坏）：这时 existing 是 null，直接合并
+  // 写出等于用 patch 覆盖掉里面所有其它字段（比如已存的 DeepSeek Key）。
+  // 先隔离留档再写，并且说一声——静默丢凭证比报错糟得多。
+  if (!existing && hasStoredCredentials()) {
+    quarantineCorruptFileSync(CRED_FILE);
+    console.warn(
+      "⚠️ 本机凭证文件无法解密（换过机器或文件已损坏），已另存备份后重建；教务账号可能需要重新配置。"
+    );
+  }
   const payload: CredentialsStore = {
     ...existing,
     ...patch,
@@ -78,7 +88,7 @@ export function saveCredentialsStore(patch: Partial<CredentialsStore>): void {
     cipher.update(JSON.stringify(payload), "utf8"),
     cipher.final(),
   ]);
-  fs.writeFileSync(
+  writeFileAtomicSync(
     CRED_FILE,
     JSON.stringify(
       {

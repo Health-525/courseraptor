@@ -125,12 +125,19 @@ function createTesseractWorker() {
 
 async function getOcrWorker() {
   if (!ocrWorkerPromise) {
-    ocrWorkerPromise = createTesseractWorker().then(async (worker) => {
-      await worker.setParameters({
-        tessedit_char_whitelist: "0123456789abcdefghijklmnopqrstuvwxyz",
-      } as Parameters<typeof worker.setParameters>[0]);
-      return worker;
-    });
+    ocrWorkerPromise = createTesseractWorker()
+      .then(async (worker) => {
+        await worker.setParameters({
+          tessedit_char_whitelist: "0123456789abcdefghijklmnopqrstuvwxyz",
+        } as Parameters<typeof worker.setParameters>[0]);
+        return worker;
+      })
+      .catch((e) => {
+        // 创建失败必须把缓存清掉：留着 rejected Promise 会让后续每一次
+        // OCR 都直接 reject，附件下载从此静默失败且毫无提示
+        ocrWorkerPromise = null;
+        throw e;
+      });
   }
   return ocrWorkerPromise;
 }

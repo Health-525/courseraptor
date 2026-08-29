@@ -28,6 +28,7 @@ import {
 
 import { config, PROJECT_ROOT } from "../config";
 import { createRaptorAgent } from "../agent";
+import { quarantineCorruptFile, writeFileAtomic } from "../atomic-write";
 import { mdToPlain, splitMessage } from "./format";
 
 type BridgeLogger = Pick<Console, "log" | "info" | "warn" | "error" | "debug">;
@@ -44,15 +45,15 @@ async function loadAllowlist(): Promise<void> {
       allowedOpenids.add(String(id));
     }
   } catch {
-    /* 首次运行为空 */
+    // 白名单坏了却静默当空，下次有人激活就会以空集合回写，把已授权的人全清掉
+    await quarantineCorruptFile(ALLOWLIST_FILE);
   }
 }
 
 async function saveAllowlist(): Promise<void> {
-  await fs.writeFile(
+  await writeFileAtomic(
     ALLOWLIST_FILE,
-    JSON.stringify({ openids: [...allowedOpenids] }, null, 2),
-    "utf8"
+    JSON.stringify({ openids: [...allowedOpenids] }, null, 2)
   );
 }
 
