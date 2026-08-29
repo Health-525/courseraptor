@@ -1,11 +1,10 @@
 /**
  * 启动欢迎面板：往 @ai-sdk/tui 的空状态（scripts/patch-tui.mjs 打的补丁）
  * 注入实时教务数据。补丁每次重绘都读 globalThis.__raptorWelcome，所以这里
- * 分阶段拉、逐段刷新：最新通知（无需登录）→ 今日课表（登录）→ GPA 概览。
+ * 分阶段拉、逐段刷新：最新通知（无需登录）→ 今日课表（登录）。
  * 任何一段失败只降级那一段的文案，不影响其他段和正常对话。
  */
 
-import { config } from "../config";
 import { getCookie } from "../tools/session";
 import { fetchJwcNews } from "../jwgl/news";
 import {
@@ -14,8 +13,9 @@ import {
   periodTimeRange,
   WEEKDAY_NAMES,
 } from "../jwgl/academics";
-import { fetchAllGrades } from "../jwgl/grades";
 import { currentWeekOf } from "../jwgl/term-dates";
+import { fetchAllGrades } from "../jwgl/grades";
+import { config } from "../config";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -39,7 +39,7 @@ const panel = {
   week: undefined as number | undefined,
   scheduleLines: [dim("  正在登录教务系统…")],
   newsLines: [dim("  正在获取…")],
-  gpaLine: undefined as string | undefined,
+  gpaLine: "" as string,
 };
 
 function render() {
@@ -54,11 +54,9 @@ function render() {
     "",
     header("最新通知"),
     ...panel.newsLines,
+    ...(panel.gpaLine ? ["", panel.gpaLine] : []),
   );
-  if (panel.gpaLine) {
-    lines.push("", panel.gpaLine);
-  }
-  lines.push("", dim("快捷键：ESC 打断回复 · Ctrl+C 退出 · ↑/↓ 滚动"));
+  lines.push("", dim("快捷键：滚轮/↑↓ 滚动 · ESC 打断回复 · Ctrl+C 退出 · /inline 切行内模式"));
   globalThis.__raptorWelcome = lines;
 }
 
@@ -70,8 +68,7 @@ export function startWelcomeBootstrap(): void {
 async function bootstrap() {
   render();
   void refreshNews(); // 通知不依赖教务登录，并行先刷
-  await refreshSchedule(); // 课表和 GPA 都要登录，串行复用同一次 getCookie
-  await refreshGpa();
+  await refreshSchedule();
 }
 
 async function refreshNews() {
@@ -127,7 +124,7 @@ async function refreshGpa() {
   try {
     const cookie = await getCookie();
     const r = await fetchAllGrades(cookie, config.jwglUsername);
-    panel.gpaLine = `${header("概览")} GPA ${r.gpa} · 计入 GPA 必修 ${r.requiredCredits} 学分 / ${r.requiredCourses} 门`;
+    panel.gpaLine = `${header("概览")} GPA ${r.gpa} · 计入 GPA 必修 ${r.totalCredits} 学分 / ${r.requiredCourses} 门`;
   } catch {
     // 概览是锦上添花，失败就不显示这一段
     return;
