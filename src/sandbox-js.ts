@@ -42,8 +42,19 @@ function show(v: unknown): string {
 }
 
 /** 明显越界的写法先静态拦一道（挡不住有心逃逸，但能挡住顺手一写） */
-const BANNED =
-  /\b(require|import\s*[\({]|process|child_process|eval\s*\(|Function\s*\(|globalThis|fetch|XMLHttpRequest|WebSocket|Atomics|SharedArrayBuffer)\b/;
+const BANNED: Array<[RegExp, string]> = [
+  [/\brequire\b/, "require"],
+  [/\bprocess\b/, "process"],
+  [/\bchild_process\b/, "child_process"],
+  [/\bglobalThis\b/, "globalThis"],
+  [/\bimport\s*\(/, "import()"],
+  [/\beval\s*\(/, "eval()"],
+  [/\bFunction\s*\(/, "Function()"],
+  [/\bfetch\s*\(/, "fetch"],
+  [/\bXMLHttpRequest\b/, "XMLHttpRequest"],
+  [/\bWebSocket\b/, "WebSocket"],
+  [/\bSharedArrayBuffer\b|\bAtomics\b/, "共享内存原语"],
+];
 
 export function runSandboxedJs(code: string): SandboxResult {
   const src = code.trim();
@@ -51,11 +62,11 @@ export function runSandboxedJs(code: string): SandboxResult {
   if (src.length > MAX_CODE) {
     return { ok: false, error: `代码超过 ${MAX_CODE} 字符（本工具做小计算，大数据处理请交给 query_table 筛选）` };
   }
-  const banned = src.match(BANNED)?.[1];
-  if (banned) {
+  const hit = BANNED.find(([re]) => re.test(src));
+  if (hit) {
     return {
       ok: false,
-      error: `沙箱禁用「${banned}」：这里只能做纯计算与文本处理（数组/字符串/JSON/正则/数学）。数据先用 query_table 筛好再以 JSON 字符串传进来。`,
+      error: `沙箱禁用「${hit[1]}」：这里只能做纯计算与文本处理（数组/字符串/JSON/正则/数学）。数据先用 query_table 筛好再以 JSON 字符串传进来。`,
     };
   }
 

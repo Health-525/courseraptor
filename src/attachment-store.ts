@@ -168,7 +168,9 @@ export function touchAttachment(id: string): void {
     const idx = loadIndexSync();
     if (idx[id]) {
       idx[id].hits++;
-      void saveIndex(idx);
+      // 必须 catch：游离 Promise 在进程退出前 reject 会把整个测试文件
+      // 拖成进程级失败（node --test 报 file-level fail 而非用例失败）
+      saveIndex(idx).catch(() => {});
     }
   } catch {
     /* 统计而已 */

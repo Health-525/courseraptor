@@ -37,7 +37,24 @@ export function loadWorkbook(buf: Buffer, filename: string): TableSheet[] | null
   if (!isTableFilename(filename)) return null;
   try {
     const XLSX = require2("xlsx") as typeof import("xlsx");
-    const wb = XLSX.read(buf, { type: "buffer" });
+    // csv/tsv 是纯文本：SheetJS 对 buffer 默认按 latin1 解码，中文必挂，
+    // 先自己按 utf8 解开再喂给 string 模式
+    const isText = /\.(csv|tsv)$/i.test(filename);
+    if (!isText) {
+      // SheetJS 对垃圾字节会宽容解析成单格表（测试实测），先验格式魔数：
+      // xlsx = zip（PK），xls = OLE2（D0 CF 11 E0）
+      const zip = buf[0] === 0x50 && buf[1] === 0x4b;
+      const ole =
+        buf.length > 4 &&
+        buf[0] === 0xd0 &&
+        buf[1] === 0xcf &&
+        buf[2] === 0x11 &&
+        buf[3] === 0xe0;
+      if (!zip && !ole) return null;
+    }
+    const wb = isText
+      ? XLSX.read(buf.toString("utf8").replace(/^\uFEFF/, ""), { type: "string" })
+      : XLSX.read(buf, { type: "buffer" });
     const sheets: TableSheet[] = [];
     for (const name of wb.SheetNames) {
       const ws = wb.Sheets[name];
@@ -49,7 +66,11 @@ export function loadWorkbook(buf: Buffer, filename: string): TableSheet[] | null
         defval: "",
       });
       const grid = aoa.map((r) => r.map(cellText));
-      const firstData = grid.findIndex((r) => r.some((c) => c !== ""));
+      // 表头识别：教务处导出常见「首行大标题（合并单元格）+ 空行 + 真表头」，
+      // 所以取第一个「≥2 个非空单元格」的行为表头；纯单列表退回首行非空
+      const nonEmpty = (r: string[]) => r.filter((c) => c !== "").length;
+      let firstData = grid.findIndex((r) => nonEmpty(r) >= 2);
+      if (firstData === -1) firstData = grid.findIndex((r) => nonEmpty(r) >= 1);
       if (firstData === -1) {
         sheets.push({ name, headers: [], rows: [] });
         continue;

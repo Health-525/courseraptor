@@ -211,12 +211,19 @@ async function analyzeBuffer(
       ? attachmentIdForSource("url", source.url)
       : attachmentIdForSource("local", source.path);
 
+  // 已按同 id/同体积缓存过 = 内容没变：复用索引条目，不重写文件、不清零 hits
+  const existing = getMeta(id);
+  const reused = existing && existing.size === buf.length ? existing : null;
+  const register = (
+    input: Omit<Parameters<typeof putAttachment>[0], "id">
+  ): Promise<AttachmentMeta> =>
+    reused ? Promise.resolve(reused) : putAttachment({ id, ...input });
+
   // 1) 表格：结构化概览（默认只给每 sheet 表头 + 前 15 行，读不完是设计而非事故）
   if (isTableFilename(filename)) {
     const sheets = loadWorkbook(buf, filename);
     if (sheets) {
-      const meta = await putAttachment({
-        id,
+      const meta = await register({
         filename,
         kind: "table",
         format: (filename.toLowerCase().match(/\.([a-z0-9]+)$/) ?? [, "bin"])[1],
@@ -232,8 +239,7 @@ async function analyzeBuffer(
   // 2) 文本类：全文缓存 + 分页/检索视图
   const parsed = await extractText(buf, filename);
   if (parsed && parsed.text.trim()) {
-    const meta = await putAttachment({
-      id,
+    const meta = await register({
       filename,
       kind: "text",
       format: parsed.format,
@@ -246,8 +252,7 @@ async function analyzeBuffer(
   }
 
   // 3) 不支持的格式：先落盘缓存，再 Firecrawl 云兜底
-  const meta = await putAttachment({
-    id,
+  const meta = await register({
     filename,
     kind: "other",
     format: (filename.toLowerCase().match(/\.([a-z0-9]+)$/) ?? [, "bin"])[1],
