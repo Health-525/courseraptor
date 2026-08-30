@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/courseraptor-mascot.png" width="260" alt="CourseRaptor mascot" />
+<img src="docs/courseraptor-logo.png" width="200" alt="CourseRaptor logo" />
 
 # 🦖 CourseRaptor
 
@@ -114,7 +114,10 @@ npm run qq
 - **单聊**：直接和机器人对话；**群聊**：@机器人 触发
 - **安全**：白名单制，未授权用户一律拒绝；授权 openid 落盘 `qq-allowlist.json`（gitignored）
 - 官方平台给的是 openid 而非 QQ 号，所以用暗号激活代替加白名单
-- 每用户独立会话历史（滑动窗口）；回复自动 Markdown 转纯文本 + 长消息分段
+- 每用户独立上下文（内存滑动窗口 20 条，只用于喂模型）；回复自动 Markdown 转纯文本 + 长消息分段
+- **QQ 对话同时进网页历史记录**：每轮问答另外归档到 `data/chat-sessions.json`，私聊每人一档、群聊每群一档，
+  标题带「QQ｜」/「QQ群｜」前缀，网页侧栏点开即可回看（答砸的那轮只留提问）。这条线**只写不读**——
+  在网页里删除或改名这些档案，不影响 QQ 那边正在进行的对话
 - 限制：官方机器人为被动回复（约 5 分钟窗口）
 
 ### 🎯 选课作战（默认关闭）
@@ -257,7 +260,10 @@ npm run publish -- major "更新说明"          # 0.1.0 -> 1.0.0
     ├── index.ts        #   入口：终端对话 UI（QQ 已配置时一并拉起）
     ├── agent.ts        #   agent 定义（系统提示词 + 装配，抢课能力按开关注入）
     ├── config.ts       #   .env 配置加载（按项目根解析，任意目录启动均可）
-    ├── attachments.ts  #   附件获取与解析（本地 xlsx/docx/pdf + 验证码 OCR + Firecrawl 兜底）
+    ├── attachments.ts  #   附件/本地文件流水线（缓存 + 表格概览 + 长文分页/关键词定位 + 验证码 OCR + Firecrawl 兜底）
+    ├── attachment-store.ts # 附件缓存库（data/attachments 落盘索引，免重下；删除锁死缓存目录）
+    ├── spreadsheet.ts  #   表格引擎（xlsx/xls/csv 结构化：筛选/排序/去重统计/分页）
+    ├── sandbox-js.ts   #   run_js 沙箱（node:vm 裸上下文，限时限量，无网络磁盘）
     ├── weather.ts      #   天气（Open-Meteo 免密钥：地名两轮解析 + WMO 码中文化 + 带伞穿衣建议）
     ├── memory/         #   两层记忆（长期事实条目 + 短期会话捕获恢复）
     ├── qq/             #   QQ 官方机器人桥（bridge + 消息格式化 + 文件日志）
@@ -271,7 +277,7 @@ npm run publish -- major "更新说明"          # 0.1.0 -> 1.0.0
     │   ├── news.ts     #     教务处官网通知（列表 / 正文 / 附件提取）
     │   ├── xk.ts       #     选课协议（加密串 / 多轮次 / 教学班 / 提交）
     │   └── types.ts
-    └── tools/          #   agent 工具（默认 15 个，抢课季 +3）+ 会话缓存管理
+    └── tools/          #   agent 工具（默认 20 个，抢课季 +3）+ 会话缓存管理
 ```
 
 ## ⚠️ 免责声明
@@ -285,7 +291,7 @@ npm run publish -- major "更新说明"          # 0.1.0 -> 1.0.0
 ## 🔐 安全提示
 
 - `.env` 含教务密码与 API Key，已被 `.gitignore` 排除，**切勿提交或分享**（.env 明文保存教务密码，仅建议在个人设备使用；如需更高安全性可将密码留空、运行时交互输入）。
-- 记忆/会话/授权文件（`memory.json` / `session.json` / `qq-allowlist.json`）均为本地数据，不入库。`session.json` 落盘完整对话（含学号、学籍、成绩），**请勿分享该文件**；QQ 桥为单用户设计，白名单只是准入控制，**不要把凭证共享给他人使用**。
+- 记忆/会话/授权文件（`memory.json` / `session.json` / `qq-allowlist.json`）均为本地数据，不入库。`session.json` 落盘完整对话（含学号、学籍、成绩），**请勿分享该文件**；`data/chat-sessions.json` 同时存着网页与 QQ 两个渠道的完整对话，同样是本地敏感数据，**请勿分享该文件**。QQ 桥为单用户设计，白名单只是准入控制，**不要把凭证共享给他人使用**。
 - 学籍信息中的证件号/银行卡号/考生号在返回时自动打码，避免完整 PII 进入模型上下文。
 - 抢课工具（`RAPTOR_ENABLE_GRAB=1` 时）会真实提交选课操作，agent 调用前会与你确认。
 - 附件云解析（Firecrawl）仅用于公开网站内容；需要登录态的教务数据一律本地直连，不经第三方。

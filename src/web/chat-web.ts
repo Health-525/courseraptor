@@ -8,8 +8,9 @@
  * 界面是「红头档案」编辑部风：暖纸底 + 墨色字 + 单一朱砂红，楷体报头、
  * 等宽小字数据行、圆形印章徽章。设计令牌全部在 chatPage() 的 CSS :root。
  *
- * 协议：POST /api/chat 用 SSE 流式回传（text=文本增量 / tool=工具卡片 /
- * err=错误 / end=结束并携带 sid），与行内 TUI 消费的是同一个 agent.fullStream。
+ * 协议：POST /api/chat 用 SSE 流式回传（text=文本增量 / think=思考过程增量
+ * 与段末标记 / tool=工具卡片 / err=错误 / end=结束并携带 sid），与行内 TUI
+ * 消费的是同一个 agent.fullStream。
  * 多会话历史由 chat-sessions.ts 落盘（data/chat-sessions.json），重启不丢；
  * 每轮把该会话最后 40 条转成 ModelMessage 传给 agent，多轮上下文完整。
  */
@@ -41,6 +42,15 @@ const MARKED_UMD = path.resolve(
   "marked",
   "lib",
   "marked.umd.js",
+);
+
+/** 项目 logo（随仓库放在 docs/）：浏览器标签页图标与首屏那枚印章共用同一张 */
+const LOGO_PNG = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "docs",
+  "courseraptor-logo.png",
 );
 
 /** 与 agent.ts 的 ToolLoopAgent 对齐的最小接口：网页端每轮都带全量历史，
@@ -244,6 +254,20 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       }
       return;
     }
+    if (url === "/logo.png" || url === "/favicon.ico") {
+      try {
+        res.writeHead(200, {
+          "content-type": "image/png",
+          "cache-control": "public, max-age=86400",
+        });
+        res.end(fs.readFileSync(LOGO_PNG));
+      } catch {
+        // 图没了也只是没图标，不能连累页面
+        res.writeHead(404);
+        res.end();
+      }
+      return;
+    }
     if (url === "/api/sessions") {
       json(res, { sessions: listSessions() });
       return;
@@ -375,6 +399,7 @@ async function runTurn(
   const startedAt = Date.now();
   const toolStart = new Map<string, { name: string; at: number }>();
   let text = "";
+  let think = "";
   let failure: string | null = null;
 
   try {
@@ -387,6 +412,21 @@ async function runTurn(
             text += t;
             send({ t: "text", v: t });
           }
+          break;
+        }
+        // 思考过程走独立的 think 通道，前端渲染成草稿卡片：和正文分开累积，
+        // 绝不混进 text（混进去会既当正文渲染、又被当成回答写回下一轮上下文）
+        case "reasoning-delta": {
+          const t = deltaOf(p);
+          if (t) {
+            think += t;
+            send({ t: "think", v: t });
+          }
+          break;
+        }
+        case "reasoning-end": {
+          // 只发段末标记（全文已经逐字发过）：前端据此把这一段定格折叠
+          send({ t: "think", phase: "end" });
           break;
         }
         case "tool-call": {
@@ -440,8 +480,11 @@ async function runTurn(
   send({ t: "end", dur: Date.now() - startedAt, sid: sessionId });
 
   // 完整跑完的一轮才进历史（中断的半截回复会污染下一轮上下文）；
-  // 落盘在 chat-sessions 里做，重启后历史仍在
-  if (!signal.aborted) appendRound(sessionId, message, text.trim() ? text : null);
+  // 落盘在 chat-sessions 里做，重启后历史仍在。思考跟着同一轮的助手消息
+  // 存成 think 字段，只给界面回看，不会再被喂回模型
+  if (!signal.aborted) {
+    appendRound(sessionId, message, text.trim() ? text : null, think.trim() || null);
+  }
 }
 
 // ── 前端单页 ─────────────────────────────────────────────────
@@ -458,6 +501,7 @@ function chatPage(): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/png" href="/logo.png">
 <title>CourseRaptor</title>
 <script src="/vendor/marked.min.js"></script>
 <style>
@@ -577,15 +621,19 @@ function chatPage(): string {
                   color: var(--ink-2); }
   .tool summary::-webkit-details-marker { display: none; }
   .tool summary:hover .tname { color: var(--accent); }
-  .tool .tw { flex: none; width: 12px; color: var(--ink-3); }
+  /* 行首恒为一枚描线齿轮（不随状态换字形），状态交给行尾等宽小字说明 */
+  .tool .tw { flex: none; width: 12px; display: flex; align-items: center;
+              color: var(--ink-3); }
+  .tool .tw svg { display: block; }
   .tool .tname { flex: none; }
   .tool .tsum { flex: 1; min-width: 0; overflow: hidden;
                 text-overflow: ellipsis; white-space: nowrap;
                 color: var(--ink-3); }
+  .tool .tstat { flex: none; color: var(--ink-3); }
+  .tool.ok .tstat { color: var(--ink-2); }
   .tool .tdur { flex: none; color: var(--ink-3); }
-  .tool.ok .tw { color: var(--accent); }
   .tool.bad { border-color: var(--accent); }
-  .tool.bad .tw, .tool.bad .tname { color: var(--accent-deep); }
+  .tool.bad .tname, .tool.bad .tstat { color: var(--accent-deep); }
   .tool .tbody { border-top: 1px dashed var(--rule); padding: 2px 10px 8px; }
   .tool .tbody:empty { display: none; }
   .tool .psec { margin-top: 6px; }
@@ -597,6 +645,27 @@ function chatPage(): string {
               overflow: auto; font-family: var(--mono); font-size: 10.5px;
               line-height: 1.6; color: var(--ink-2);
               white-space: pre-wrap; word-break: break-all; }
+
+  /* 思考过程：独立建模成草稿卡片。与工具卡片同族但更轻（虚线框、无底色），
+     内容用楷体灰字小一号——正文是系统黑体 15px，这里是 --kai 13px，两级层次
+     一眼可分；长思考限高内部滚，不把屏幕撑满。 */
+  .think { border: 1px dashed var(--rule-2); background: none; }
+  .think summary { display: flex; align-items: center; gap: 9px;
+                   padding: 4px 10px; cursor: pointer; list-style: none;
+                   font-family: var(--mono); font-size: 9.5px;
+                   letter-spacing: .18em; color: var(--ink-3); }
+  .think summary::-webkit-details-marker { display: none; }
+  .think summary:hover .tstat { color: var(--ink-2); }
+  .think .tk { flex: none; color: var(--ink-3); }
+  .think .tstat { flex: 1; min-width: 0; overflow: hidden;
+                  text-overflow: ellipsis; white-space: nowrap;
+                  letter-spacing: .04em; }
+  .think .tdur { flex: none; letter-spacing: .04em; }
+  .think .thbody { border-top: 1px dashed var(--rule); padding: 8px 12px 10px;
+                   font-family: var(--kai); font-size: 13px; line-height: 1.95;
+                   color: var(--ink-2); letter-spacing: .01em;
+                   white-space: pre-wrap; word-break: break-word;
+                   max-height: 300px; overflow: auto; }
 
   /* 兜底错误行（网络错误 / 中断这类非工具事件仍是等宽一行） */
   .tline { display: flex; gap: 8px; font-family: var(--mono); font-size: 11px;
@@ -618,8 +687,9 @@ function chatPage(): string {
   .hero .seal::after { content: ""; position: absolute; inset: 6px;
                        border: 1px solid var(--accent); border-radius: 50%;
                        opacity: .45; }
-  .hero .seal b { position: absolute; inset: 0; display: grid;
-                  place-items: center; font-size: 34px; font-weight: 400; }
+  .hero .seal img { position: absolute; top: 11px; left: 11px;
+                    width: 70px; height: 70px; border-radius: 50%;
+                    object-fit: cover; }
   .hero h2 { margin: 0 0 10px; font-family: var(--kai); font-weight: 400;
              font-size: 30px; letter-spacing: 1px; }
   .hero p { margin: 0 auto; max-width: 430px; font-size: 13px;
@@ -676,8 +746,7 @@ function chatPage(): string {
            background: var(--card); border: 1px solid var(--rule-2);
            border-radius: 3px; padding: 6px 7px 6px 16px;
            transition: border-color 0.15s ease, box-shadow 0.15s ease; }
-  .cwrap:focus-within { border-color: var(--accent);
-                        box-shadow: 0 0 0 3px var(--accent-soft); }
+  .cwrap:focus-within { border-color: var(--ink-3); }
   .clabel { flex: none; font-family: var(--kai); font-size: 16px;
             letter-spacing: 2px; color: var(--ink-3);
             border-right: 1px solid var(--rule); padding-right: 12px;
@@ -687,6 +756,7 @@ function chatPage(): string {
   textarea { flex: 1; background: none; border: 0; outline: none; resize: none;
              color: var(--ink); font-size: 14.5px; line-height: 1.6;
              padding: 6px 0; max-height: 180px; align-self: center; }
+  textarea:focus-visible { outline: none; }  /* 聚焦态交给 .cwrap 描边表达，不叠红圈 */
   textarea::placeholder { color: var(--ink-3); }
   #b { flex: none; align-self: center; display: inline-flex;
        align-items: center; gap: 7px;
@@ -809,7 +879,7 @@ function chatPage(): string {
   </div>
   <div id="log"><div class="inner" id="inner">
     <div class="hero" id="hero">
-      <div class="seal" aria-hidden="true"><b>🦖</b></div>
+      <div class="seal" aria-hidden="true"><img src="/logo.png" alt=""></div>
       <h2>同学，你好。</h2>
       <p>课表、成绩、考试、通知——直接用一句话问。<br>
       <span class="hint">对话只在本机流转（127.0.0.1）；会话自动存档，重启不丢。</span></p>
@@ -888,6 +958,24 @@ function el(cls) {
 function el2(cls, text) {
   const n = el(cls);
   n.textContent = text;
+  return n;
+}
+/* 工具卡片行首的描线齿轮：状态不再换字形，靠行尾文字表达，所以图标是常量。
+   内容是这里写死的字符串（不掺模型输出），innerHTML 赋值不构成注入面 */
+const GEAR = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" '
+  + 'stroke="currentColor" stroke-width="1.8" stroke-linecap="round" '
+  + 'stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0'
+  + 'l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51'
+  + 'a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08'
+  + 'a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18'
+  + 'a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39'
+  + 'a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09'
+  + 'a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25'
+  + 'a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>';
+function iconSpan(cls, svg) {
+  const n = el(cls);
+  n.innerHTML = svg;
   return n;
 }
 function pad(x) { return (x < 10 ? "0" : "") + x; }
@@ -984,7 +1072,7 @@ function addUser(text, ts) {
   scroll(true);
 }
 
-/** 助手一轮：题注 + 工具卡片区 + 回答正文 + 操作行 */
+/** 助手一轮：题注 + 时间线区（思考卡片 + 工具卡片）+ 回答正文 + 操作行 */
 function addBotShell() {
   const { sec, tm, dur } = addTurn("bot");
   const tl = el("tl");
@@ -995,8 +1083,8 @@ function addBotShell() {
   sec.appendChild(acts);
   inner.appendChild(sec);
   scroll(true);
-  /* 工具卡片索引：id 精确配对为主，同名排队兜底 */
-  return { sec, tm, dur, tl, msg, acts, tools: new Map(), queue: {} };
+  /* 工具卡片索引：id 精确配对为主，同名排队兜底；think 是当前展开中的思考卡片 */
+  return { sec, tm, dur, tl, msg, acts, tools: new Map(), queue: {}, think: null };
 }
 
 function addCopyButton(acts, raw) {
@@ -1015,10 +1103,17 @@ function addCopyButton(acts, raw) {
   acts.appendChild(b);
 }
 
-/** 定格一条完整助手消息（openSession 重绘历史用） */
-function addBotMessage(raw, ts) {
+/** 定格一条完整助手消息（openSession 重绘历史用）；thinkText 是历史里的思考 */
+function addBotMessage(raw, ts, thinkText) {
   const shell = addBotShell();
   shell.tm.textContent = clock(ts);
+  if (thinkText) {
+    /* 历史里的思考不计时（重开时算出的耗时是假的），建卡即定格为折叠态 */
+    const item = thinkNew(shell.tl);
+    item.body.textContent = thinkText;
+    item.st.textContent = "已完成";
+    item.det.open = false;
+  }
   const html = renderMd(raw);
   if (html != null) shell.msg.innerHTML = html;
   else shell.msg.textContent = raw;
@@ -1027,7 +1122,46 @@ function addBotMessage(raw, ts) {
   return shell;
 }
 
-/* ── 工具卡片：▸ 执行中 / ✓ 完成 / ✗ 失败，点开看参数与结果预览 ── */
+/* ── 思考卡片：一段 reasoning 一张卡，流式期间展开、段落收尾自动折叠 ── */
+function thinkNew(tl) {
+  const det = document.createElement("details");
+  det.className = "think";
+  det.open = true;
+  const sum = document.createElement("summary");
+  sum.appendChild(el2("tk", "思考"));
+  const st = el2("tstat", "进行中");
+  const dur = el2("tdur", "");
+  sum.appendChild(st);
+  sum.appendChild(dur);
+  det.appendChild(sum);
+  const body = el("thbody");
+  det.appendChild(body);
+  const item = { det, st, dur, body, buf: "", at: Date.now(), manual: false };
+  /* 监听器挂在 open=true 之后：程序化的首次展开不算用户手动开合 */
+  det.addEventListener("toggle", () => { item.manual = true; });
+  tl.appendChild(det);
+  return item;
+}
+
+function thinkDelta(shell, text) {
+  if (!shell.think) shell.think = thinkNew(shell.tl);
+  const item = shell.think;
+  item.buf += text;
+  item.body.textContent = item.buf;
+  scroll(false);
+}
+
+/** 本段思考结束：定格状态字与耗时，用户没手动开过就折叠起来 */
+function thinkClose(shell, stat) {
+  const item = shell.think;
+  if (!item) return;
+  shell.think = null;
+  item.st.textContent = stat || "已完成";
+  item.dur.textContent = ((Date.now() - item.at) / 1000).toFixed(1) + "s";
+  if (!item.manual) item.det.open = false;
+}
+
+/* ── 工具卡片：行首齿轮恒定，状态用等宽小字写「执行中 / 完成 / 失败」 ── */
 function appendPre(body, label, text) {
   const w = el("psec");
   w.appendChild(el2("plabel", label));
@@ -1041,9 +1175,10 @@ function toolCard(shell, ev) {
   const det = document.createElement("details");
   det.className = "tool run";
   const sum = document.createElement("summary");
-  sum.appendChild(el2("tw", "▸"));
+  sum.appendChild(iconSpan("tw", GEAR));
   sum.appendChild(el2("tname", ev.name || "tool"));
-  sum.appendChild(el2("tsum", "执行中…"));
+  sum.appendChild(el2("tsum", ""));
+  sum.appendChild(el2("tstat", "执行中"));
   sum.appendChild(el2("tdur", ""));
   det.appendChild(sum);
   const body = el("tbody");
@@ -1073,8 +1208,8 @@ function toolTake(shell, ev) {
 function toolDone(shell, ev, ok) {
   const item = toolTake(shell, ev);
   item.det.className = "tool " + (ok ? "ok" : "bad");
-  item.det.querySelector(".tw").textContent = ok ? "✓" : "✗";
-  item.det.querySelector(".tsum").textContent = String(ev.brief || (ok ? "完成" : "失败"));
+  item.det.querySelector(".tstat").textContent = ok ? "完成" : "失败";
+  item.det.querySelector(".tsum").textContent = String(ev.brief || "");
   item.det.querySelector(".tdur").textContent =
     ev.dur != null ? (ev.dur / 1000).toFixed(1) + "s" : "";
   if (ev.out) appendPre(item.body, "结果", ev.out);
@@ -1140,7 +1275,7 @@ function openSession(id) {
       /* 重绘历史：渲染函数不写 msgs（它已是服务端数据的镜像） */
       msgs.forEach((m) => {
         if (m.role === "user") addUser(m.text, m.ts);
-        else addBotMessage(m.text, m.ts);
+        else addBotMessage(m.text, m.ts, m.think);
       });
       scroll(true);
       renderSessList();
@@ -1263,6 +1398,12 @@ refreshSessions().then(() => {
   renderSessList();
 });
 
+/* QQ 那边的对话也写进同一份档案，光靠启动拉一次要重开页面才看得见。
+   定时补一次列表：正在回复（busy）不打断，标签页在后台（hidden）不刷 */
+setInterval(() => {
+  if (!busy && !document.hidden) refreshSessions();
+}, 20000);
+
 async function send(text) {
   if (!text || busy) return;
   busy = true;
@@ -1276,6 +1417,7 @@ async function send(text) {
   btn.classList.add("stop");
   btn.innerHTML = '停止<span class="kbd">⏎</span>';
   let raw = "";
+  let thinkRaw = "";
   controller = new AbortController();
   try {
     const res = await fetch("/api/chat", {
@@ -1300,16 +1442,24 @@ async function send(text) {
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
         const ev = JSON.parse(line.slice(6));
-        if (ev.t === "text") {
+        if (ev.t === "think") {
+          /* 一段思考一张卡：段末标记或后续任何别的事件都把它定格折叠 */
+          if (ev.phase === "end") thinkClose(shell);
+          else { thinkRaw += ev.v || ""; thinkDelta(shell, ev.v || ""); }
+        } else if (ev.t === "text") {
+          thinkClose(shell);
           if (!raw) shell.tm.textContent = clock(Date.now());
           raw += ev.v;
           renderStreaming(shell.msg, raw);
         } else if (ev.t === "tool") {
+          thinkClose(shell);
           if (ev.phase === "start") toolCard(shell, ev);
           else toolDone(shell, ev, ev.phase === "end");
         } else if (ev.t === "err") {
+          thinkClose(shell);
           lineBad(shell.tl, ev.v);
         } else if (ev.t === "end") {
+          thinkClose(shell);
           if (ev.dur != null) shell.dur.textContent = "· " + (ev.dur / 1000).toFixed(1) + "s";
           /* 服务端可能把无名新会话建档成 default 档：认领回来的 id */
           if (ev.sid) { activeId = String(ev.sid); lsSet(ACTIVE_KEY, activeId); }
@@ -1323,7 +1473,7 @@ async function send(text) {
       if (html != null) shell.msg.innerHTML = html;
       else shell.msg.textContent = raw;
       addCopyButton(shell.acts, raw);
-      msgs.push({ role: "bot", text: raw, ts: Date.now() });
+      msgs.push({ role: "bot", text: raw, think: thinkRaw.trim() || undefined, ts: Date.now() });
     } else {
       shell.msg.textContent = "这轮没有输出，再问一次试试";
     }
@@ -1335,8 +1485,10 @@ async function send(text) {
         const html = renderMd(raw);
         if (html != null) shell.msg.innerHTML = html;
         else shell.msg.textContent = raw;
+        thinkClose(shell, "已中断");
         lineBad(shell.tl, "已中断", "⏸");
       } else {
+        thinkClose(shell, "已中断");
         shell.msg.textContent = "已中断";
       }
     } else {
@@ -1351,6 +1503,7 @@ async function send(text) {
       shell.acts.appendChild(retry);
     }
   } finally {
+    thinkClose(shell);
     shell.msg.classList.remove("cursor");
     busy = false; controller = null;
     btn.classList.remove("stop");

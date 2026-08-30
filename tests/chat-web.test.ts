@@ -7,6 +7,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -66,6 +67,22 @@ test("GET /vendor/marked.min.js 返回 marked 脚本本体", async () => {
   assert.match(res.headers.get("content-type") ?? "", /javascript/);
   const body = await res.text();
   assert.ok(body.length > 10000, "marked UMD 构建应有实际体积");
+});
+
+test("GET /logo.png 返回项目 logo，favicon 与首屏印章都指向它", async () => {
+  const url = (await startChatWeb())!;
+  const res = await fetch(`${url}/logo.png`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get("content-type") ?? "", /image\/png/);
+  const buf = await res.arrayBuffer();
+  assert.ok(buf.byteLength > 10_000, "logo 应是真实图片而非占位");
+  // 浏览器还会自行请求 /favicon.ico，同一张图兜住，别让它 404
+  assert.equal((await fetch(`${url}/favicon.ico`)).status, 200);
+
+  const html = await (await fetch(url)).text();
+  assert.match(html, /<link rel="icon"[^>]*href="\/logo\.png"/, "标签页应有 favicon");
+  assert.match(html, /class="seal"[^>]*><img src="\/logo\.png"/, "首屏印章应是 logo");
+  assert.ok(!html.includes("🦖"), "印章已换成 logo，页面不再用 emoji 占位");
 });
 
 test("agent 未就绪时返回 503 与明确错误", async () => {
@@ -267,4 +284,83 @@ test("POST /api/settings：坏格式 Key 与半套教务凭证都被拒且不落
   // 空提交视为无修改（200），同样不应产生任何写入
   const r3 = await call({});
   assert.equal(r3.status, 200);
+});
+
+/** 桩 agent 收到的 messages，供「思考不进上下文」那条测试回看 */
+const thinkCalls: unknown[][] = [];
+
+test("reasoning 走独立 think 通道，绝不混进正文 text", async () => {
+  setChatAgent({
+    stream({ messages }: { messages?: unknown[] }) {
+      thinkCalls.push(messages ?? []);
+      async function* gen() {
+        yield { type: "reasoning-start", id: "r1" };
+        yield { type: "reasoning-delta", delta: "先" };
+        yield { type: "reasoning-delta", text: "想想" };
+        yield { type: "reasoning-end", id: "r1" };
+        yield { type: "tool-call", toolCallId: "z1", toolName: "get_schedule" };
+        yield { type: "tool-result", toolCallId: "z1", toolName: "get_schedule", output: { term: "1" } };
+        // 第二段思考没有 reasoning-end（各家实现不保证）：靠后续事件收尾
+        yield { type: "reasoning-delta", delta: "再核对周次" };
+        yield { type: "text-delta", text: "答案在此" };
+        yield { type: "finish" };
+      }
+      return Promise.resolve({ fullStream: gen() });
+    },
+  });
+  const url = (await startChatWeb())!;
+  const r = await post(url, { message: "这周有什么课", sessionId: "think1" });
+
+  const thinkEvs = r.events.filter((e) => e.t === "think");
+  assert.equal(
+    thinkEvs.filter((e) => e.v).map((e) => e.v).join(""),
+    "先想想再核对周次",
+    "两段思考都完整下发",
+  );
+  assert.ok(thinkEvs.some((e) => e.phase === "end"), "段末有 end 标记供前端折叠卡片");
+  assert.equal(
+    r.events.filter((e) => e.t === "text").map((e) => e.v).join(""),
+    "答案在此",
+    "正文通道只有正文，思考没漏进去",
+  );
+});
+
+test("思考随本轮落盘成 think，但不回流进模型上下文", async () => {
+  const url = (await startChatWeb())!;
+  await post(url, { message: "再来一轮", sessionId: "think2" });
+  await post(url, { message: "追一句", sessionId: "think2" });
+
+  const detail = await (await fetch(`${url}/api/sessions/think2`)).json();
+  const bot = detail.messages.find((m: { role: string }) => m.role === "assistant");
+  assert.equal(bot.text, "答案在此");
+  assert.equal(bot.think, "先想想再核对周次", "重开会话还能回看思考");
+
+  const lastCall = JSON.stringify(thinkCalls.at(-1));
+  assert.ok(lastCall.includes("答案在此"), "正文照常进上下文");
+  assert.ok(!lastCall.includes("先想想"), "思考不喂回模型（省 token 也防自我复读）");
+});
+
+test("渲染产物语法自检 + 思考卡片与齿轮图标锚点", async () => {
+  const url = (await startChatWeb())!;
+  const html = await (await fetch(url)).text();
+
+  // chatPage 是外层模板串：必须对「求值后的页面」做语法检查，源码切片会漏判
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  assert.ok(blocks.length >= 1, "页面应有内联脚本");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-page-"));
+  blocks.forEach((code, i) => {
+    const f = path.join(dir, `chunk-${i}.js`);
+    fs.writeFileSync(f, code, "utf8");
+    execFileSync(process.execPath, ["--check", f], { stdio: "pipe" });
+  });
+
+  // 思考独立建模：有自己的样式块（楷体草稿区，与黑体正文分层）与绘图函数
+  assert.match(html, /\.think \{/, "缺少 .think 卡片样式");
+  assert.match(html, /\.think \.thbody[\s\S]{0,200}var\(--kai\)/, "思考区应为楷体");
+  assert.match(html, /function thinkNew/, "缺少思考卡片渲染函数");
+  assert.match(html, /"思考"/, "思考卡片要有常驻文字标记");
+  // 工具卡片行首是内联 SVG 齿轮，不再用勾叉字形表达状态
+  assert.match(html, /<svg viewBox="0 0 24 24"/, "工具行首应为内联 SVG 图标");
+  assert.match(html, /function toolDone[\s\S]{0,400}"完成"/, "完成状态用文字表达");
+  assert.ok(!html.includes('"✓"') && !html.includes("'✓'"), "工具状态不再用勾号");
 });
