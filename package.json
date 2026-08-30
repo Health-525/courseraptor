@@ -29,6 +29,7 @@
     "@tencent-connect/qqbot-nodejs": "^1.0.4",
     "ai": "^7.0.83",
     "mammoth": "^1.12.1",
+    "marked": "^18.0.11",
     "pdf-parse": "^2.4.5",
     "tesseract.js": "^7.0.0",
     "tsx": "^4.23.12",

@@ -31,6 +31,7 @@ import {
   periodTimeRange,
   WEEKDAY_NAMES,
 } from "../jwgl/academics";
+import { saveScheduleCache } from "../schedule-cache";
 import { fetchAllGrades } from "../jwgl/grades";
 import { fetchJwcNews, fetchJwcArticle } from "../jwgl/news";
 import {
@@ -672,6 +673,9 @@ const raptorToolsAll = {
         };
       }
       const term = r.data;
+      // 未指定学期（即自动探测的最新学期）时顺带刷新本地缓存，
+      // TUI 启动面板读缓存就够，不必每次登录都请求教务系统
+      if (!semester) saveScheduleCache(term);
       const week = currentWeekOf(term.year, term.semester);
       return {
         term: term.label,

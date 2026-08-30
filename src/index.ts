@@ -55,6 +55,11 @@ if (config.qqBotAppId && config.qqBotAppSecret) {
 
 const agent = await createRaptorAgent();
 
+// 网页对话窗口：浏览器打开即聊（地址显示在欢迎卡片下方），起不来不影响终端
+const { setChatAgent, startChatWeb } = await import("./web/chat-web");
+setChatAgent(agent);
+startChatWeb().catch(() => {});
+
 /**
  * UI 切换外层循环：全屏卡片（@ai-sdk/tui）和行内渲染器可运行时互切。
  * /key 与 /inline 同样先退出当前 UI；外层独占 stdin 执行静音本地设置后，
