@@ -162,12 +162,7 @@ export function contextMessages(id: string): ModelMessage[] {
   );
 }
 
-/** 最近一个有内容的会话的消息数 —— /api/brief 的 historyLen */
-export function latestCount(): number {
-  const s = readSessions().sort(byRecent).find((x) => x.messages.length > 0);
-  return s ? s.messages.length : 0;
-}
-
+/** 清空全部会话档案（/api/reset 背后，UI 不挂按钮，留给自救与测试） */
 export function resetAll(): void {
   writeSessions([]);
 }

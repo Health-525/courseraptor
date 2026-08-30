@@ -64,5 +64,4 @@ test("删除与清空", () => {
   assert.ok(!S.getSession("bbbb2222"));
   S.resetAll();
   assert.equal(S.listSessions().length, 0);
-  assert.equal(S.latestCount(), 0);
 });

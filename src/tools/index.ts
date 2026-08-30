@@ -1,13 +1,23 @@
 /**
  * CourseRaptor agent 工具集
- * 17 个工具：选课 6 + 查询 7 + 通知 3 + 记忆 1
+ * 23 个工具：选课 6 + 查询 7 + 通知 3 + 文件数据 4 + 天气 1 + 记忆 1 + 校历 1
  */
 
 import { tool } from "ai";
 import { z } from "zod";
 
 import { config } from "../config";
-import { fetchAttachment } from "../attachments";
+import { fetchAttachment, openLocalFile } from "../attachments";
+import {
+  getMeta,
+  readStoredBuffer,
+  listAttachments,
+  deleteAttachment,
+  clearAttachments,
+  attachmentStats,
+} from "../attachment-store";
+import { loadWorkbook, querySheet, distinctValues, sheetOverview } from "../spreadsheet";
+import { runSandboxedJs } from "../sandbox-js";
 import {
   fetchProfile,
   fetchRetakeCourses,
@@ -27,10 +37,20 @@ import {
   fetchExamsSmart,
   parseSemesterString,
   currentWeekOf,
+  resolveWeek1Monday,
   buildWeekIndex,
   periodTimeRange,
   WEEKDAY_NAMES,
 } from "../jwgl/academics";
+import {
+  annotateWeekGroups,
+  listSpecialDays,
+  specialOnDate,
+  recordSpecialDays,
+  removeSpecialDays,
+  loadHolidayStore,
+  type SpecialDayRecord,
+} from "../jwgl/term-holidays";
 import { saveScheduleCache } from "../schedule-cache";
 import { fetchAllGrades } from "../jwgl/grades";
 import { fetchJwcNews, fetchJwcArticle } from "../jwgl/news";
@@ -50,6 +70,7 @@ import {
   invalidateXkSession,
   pollDelay,
 } from "./session";
+import { fetchWeather, defaultWeatherCity } from "../weather";
 
 function now(): string {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
@@ -652,7 +673,7 @@ const raptorToolsAll = {
   /** 7. 课表查询 */
   get_schedule: tool({
     description:
-      "查询课表，返回每门课的上课时间、地点、教师、周次。默认自动探测最新有课表的学期（学期交界期也不会查错）；也可指定学期，如「2026-2027-1」。返回的 byWeek 是按周预分组好的索引（week -> 该周的课，已格式化可直接引用）：用户问「第一周的课」「第 5 周有什么」「这周哪几天有课」时，直接查 byWeek 对应 week 即可，不要自己解析 courses[].weeks 里的周次表达式。byWeek 里没有的周次即该周无课。",
+      "查询课表，返回每门课的上课时间、地点、教师、周次。默认自动探测最新有课表的学期（学期交界期也不会查错）；也可指定学期，如「2026-2027-1」。返回的 byWeek 是按周预分组好的索引（week -> 该周的课，已格式化可直接引用）：用户问「第一周的课」「第 5 周有什么」「这周哪几天有课」时，直接查 byWeek 对应 week 即可，不要自己解析 courses[].weeks 里的周次表达式。byWeek 里没有的周次即该周无课。注意：week 里带 holiday 字段表示该周放假日（普通课表作废，直接按放假安排回答），带 makeup 字段是调休补课日按被换周几课表补出的行——这两类覆盖普通课表，别按原始周一~周日回答。specialDays 是已落盘的全部放假/调休安排，todaySpecial 是今天的。",
     inputSchema: z.object({
       semester: z
         .string()
@@ -677,6 +698,14 @@ const raptorToolsAll = {
       // TUI 启动面板读缓存就够，不必每次登录都请求教务系统
       if (!semester) saveScheduleCache(term);
       const week = currentWeekOf(term.year, term.semester);
+      // 假期/调休按日期叠周需要 week1Monday；currentWeekOf 在假期里返回 null，
+      // 但周分组照样要标注，所以直接从真值源取
+      const week1Monday =
+        week?.week1Monday ?? resolveWeek1Monday(term.year, term.semester).week1Monday;
+      const now = new Date();
+      const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      const today = specialOnDate(todayIso);
+      const specialDays = listSpecialDays();
       return {
         term: term.label,
         currentWeek: week ? `第 ${week.week} 周` : "未开学或不在教学周内",
@@ -703,12 +732,70 @@ const raptorToolsAll = {
          * 用户问「第一周的课」「第 5 周有什么」时直接查表，不要再自己解析
          * weeks 字段里的 "2-6,8-12" 这类表达式——那部分已由工具层算好。
          * 只含有课的周；缺失的周次即该周无课。
+         * holiday=该周放假日（课表作废）；makeup=调休补课行（按被换周几的课表）。
          */
-        byWeek: buildWeekIndex(term.courses),
+        byWeek: annotateWeekGroups(
+          term.courses,
+          week1Monday,
+          buildWeekIndex(term.courses)
+        ),
+        /** 已落盘的放假/调休安排（空数组 = 教务处还没发通知，没记录） */
+        specialDays,
+        specialDaysSource: loadHolidayStore().source,
+        // 放假/调休的唯一合法来源是教务处通知：没有落盘记录时明确提醒模型
+        // 去查通知，而不是让它拿校历或印象回答「国庆放几天」这类问题
+        specialDaysNote: specialDays.length
+          ? undefined
+          : "尚无放假/调休落盘记录。法定节假日（国庆/元旦/清明/五一/端午/中秋/寒暑假）的具体安排以教务处通知为准：用户问放假安排、或问的课表周临近节假日时，先 get_news 查「放假/调休」相关通知，读到就 read_notice + set_holidays 落盘；查无通知再按「按国务院文件执行、另行通知」回答。",
+        todaySpecial: today ? { date: todayIso, ...today } : undefined,
         note:
           term.courses.length === 0
             ? "课表已查通但无排课（假期或学期未排课属正常）"
             : undefined,
+      };
+    },
+  }),
+
+  /** 7b. 放假/调休落盘 */
+  set_holidays: tool({
+    description:
+      "记录放假/调休安排到本地日历（get_schedule 之后的查询会自动叠加）。触发时机：教务处发布放假安排通知（get_news 标题含「放假」「调休」「节假日」）或用户转述放假安排时。流程：先 read_notice 读通知正文，把安排逐日拆成 days——放假日传 type=holiday + name（节日名）；调休补课日（如「10月10日（星期六）上课」）传 type=makeup + follows=按周几的课表上课（1-7=周一～周日）。同日期重复写入以新记录为准；通知更正/撤回某天时传 remove 数组删除。",
+    inputSchema: z.object({
+      days: z
+        .array(
+          z.object({
+            date: z.string().describe("日期，YYYY-MM-DD"),
+            type: z.enum(["holiday", "makeup"]),
+            name: z.string().optional().describe("holiday：节日名，如「国庆节」"),
+            follows: z
+              .number()
+              .int()
+              .min(1)
+              .max(7)
+              .optional()
+              .describe("makeup 必填：按周几的课表上课（1-7=周一～周日）"),
+          })
+        )
+        .min(1)
+        .describe("逐日安排（通知里的每一天一条）"),
+      remove: z.array(z.string()).optional().describe("要删除记录的日期（通知更正/撤回时用）"),
+      source: z.string().optional().describe("依据：通知标题或文号"),
+    }),
+    execute: async ({ days, remove, source }) => {
+      const removed = remove?.length ? removeSpecialDays(remove) : 0;
+      const r = recordSpecialDays(days as SpecialDayRecord[], source);
+      if (r.rejected.length) {
+        return {
+          recorded: r.recorded,
+          removed,
+          error: `以下日期无效（格式应为 YYYY-MM-DD，且 makeup 必须带 follows）：${r.rejected.join("、")}。请核对通知原文后重试。`,
+        };
+      }
+      const holidays = days.filter((d) => d.type === "holiday").length;
+      return {
+        recorded: r.recorded,
+        removed,
+        summary: `已落盘 ${r.recorded} 天（放假 ${holidays} 天、调休补课 ${r.recorded - holidays} 天）${source ? `，依据：${source}` : ""}。之后 get_schedule 会自动叠加。`,
       };
     },
   }),
@@ -957,7 +1044,7 @@ const raptorToolsAll = {
     },
   }),
 
-  /** 15. 通知正文阅读 */
+  /** 16. 通知正文阅读 */
   read_notice: tool({
     description:
       "读取学校官网任意文章页面的正文全文（webplus CMS 结构解析）。两种用法：① 读 get_news 列表里的通知（用 items[].url）；② 直接读用户贴出来的链接（如 https://jwc.njtech.edu.cn/info/1158/6876.htm，用户发来 jwc/学校官网链接时就用本工具读）。返回标题、正文全文与附件下载链接。",
@@ -991,18 +1078,30 @@ const raptorToolsAll = {
     },
   }),
 
-  /** 15. 附件获取（Firecrawl 云解析 / 本地下载） */
+  /** 17. 附件获取（自动缓存，表格回概览、长文可分页/检索） */
   fetch_attachment: tool({
     description:
-      "获取并解析通知的文件附件（URL 与文件名来自 read_notice 返回的 attachments）。docx/xlsx/pdf 自动本地解析成文本直接返回（离线零费用，网课目录、课程清单都能读）；其他格式下载到本地 downloads 目录返回路径。问「附件里有哪些课」「网课目录读一下」时调用。",
+      "获取并解析通知的文件附件（URL 与文件名来自 read_notice 返回的 attachments）。自动落盘缓存：同一附件再查不用重新下载。xlsx/xls/csv 表格 → 回概览（表头+每 sheet 前 15 行+总行数），千行明细必须用 query_table 按关键词/条件筛选，别想着一口读完；docx/pdf/txt → 全文分页（offset/limit 续读）或直接 keyword 定位（返回含关键词的上下文段落，适合找「我的专业/班级/时间」）。问「附件里有哪些课」「网课目录读一下」时调用。",
     inputSchema: z.object({
       url: z.string().describe("附件下载 URL（read_notice 返回的 attachments[].url）"),
       name: z
         .string()
         .optional()
         .describe("附件文件名（read_notice 返回的 attachments[].name，含扩展名）"),
+      offset: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe("长文本续读起点（用上次返回的 nextOffset）"),
+      limit: z.number().int().min(500).max(20000).optional().describe("长文本单页长度（默认 6000）"),
+      keyword: z
+        .string()
+        .optional()
+        .describe("长文本关键词定位：只回含该词的上下文片段，省去通读"),
+      refresh: z.boolean().optional().describe("忽略缓存强制重新下载（默认用缓存）"),
     }),
-    execute: async ({ url, name }) => {
+    execute: async ({ url, name, offset, limit, keyword, refresh }) => {
       const isNjtech = /^https?:\/\/[a-z0-9.-]*\.njtech\.edu\.cn\//.test(url);
       if (!isNjtech && !config.firecrawlApiKey) {
         return {
@@ -1011,14 +1110,274 @@ const raptorToolsAll = {
         };
       }
       try {
-        return await fetchAttachment(url, name);
+        return await fetchAttachment(url, name, { offset, limit, keyword, refresh });
       } catch (e) {
         return { error: `附件获取失败：${(e as Error).message.slice(0, 120)}` };
       }
     },
   }),
 
-  /** 17. 长期记忆维护 */
+  /** 18. 读取本机文件（用户给路径） */
+  read_local_file: tool({
+    description:
+      "读取用户电脑上的文件（用户告诉你路径时用，如「我下载了网课目录，在 D:\\\\Downloads\\\\xx.xlsx」）。docx/pdf/txt/md 回全文分页（offset 续读、keyword 定位），xlsx/xls/csv 回表格概览（后续用 query_table 筛选）。只读入缓存副本，绝不修改用户文件。路径必须是用户明确给出的，不要自行扫描猜测。",
+    inputSchema: z.object({
+      path: z.string().describe("本机文件绝对路径（用户提供的）"),
+      offset: z.number().int().min(0).optional().describe("长文本续读起点"),
+      limit: z.number().int().min(500).max(20000).optional().describe("长文本单页长度（默认 6000）"),
+      keyword: z.string().optional().describe("长文本关键词定位（返回上下文片段）"),
+      refresh: z.boolean().optional().describe("文件内容变了？忽略缓存重读"),
+    }),
+    execute: async ({ path: p, offset, limit, keyword, refresh }) => {
+      try {
+        return await openLocalFile(p, { offset, limit, keyword, refresh });
+      } catch (e) {
+        return { error: (e as Error).message.slice(0, 200) };
+      }
+    },
+  }),
+
+  /** 19. 表格筛选查询（大表按需取行） */
+  query_table: tool({
+    description:
+      "对已缓存的表格（id 来自 fetch_attachment / read_local_file 返回的 id 字段）做结构化查询，替代「通读整个 Excel」。action：sheets=看所有 sheet 的表头与行数（默认 sheet 不确定时先这个）；rows=按分页/排序读行；filter=关键词（keyword 全列模糊匹配）+ 多条件（where，col/op/value，AND 关系，op 支持 contains/eq/ne/gt/ge/lt/le/regex/empty/notEmpty，数值条件自动按数字比较）+ 排序（sortBy/sortDesc）+ 分页（offset/limit）；values=某列去重计数（如「表里有哪些学院」）。典型用法：学生问「网课目录里我们专业大三要上哪门」→ filter 用 where 专业列 contains + keyword 年级。结果行用「 | 」拼接，表头在 headers。",
+    inputSchema: z.object({
+      id: z.string().describe("附件缓存 id"),
+      action: z
+        .enum(["sheets", "rows", "filter", "values"])
+        .default("sheets")
+        .describe("查询类型"),
+      sheet: z.string().optional().describe("sheet 名（可模糊；省略用第一个）"),
+      keyword: z.string().optional().describe("filter：任意列（或 keywordCols）包含，不分大小写"),
+      keywordCols: z.array(z.string()).optional().describe("限定关键词检索的列"),
+      where: z
+        .array(
+          z.object({
+            col: z.string().describe("列名（支持精确/模糊/1-based 序号）"),
+            op: z.enum([
+              "contains",
+              "notContains",
+              "eq",
+              "ne",
+              "gt",
+              "ge",
+              "lt",
+              "le",
+              "regex",
+              "empty",
+              "notEmpty",
+            ]),
+            value: z.string().optional().describe("比较值（empty/notEmpty 省略）"),
+          })
+        )
+        .optional()
+        .describe("filter：多条件 AND"),
+      col: z.string().optional().describe("values：目标列"),
+      columns: z.array(z.string()).optional().describe("只返回这些列（省 token）"),
+      sortBy: z.string().optional().describe("按列排序（数字列按数值）"),
+      sortDesc: z.boolean().optional().describe("降序"),
+      offset: z.number().int().min(0).default(0),
+      limit: z.number().int().min(1).max(200).default(40).describe("本次最多返回行数"),
+    }),
+    execute: async (input) => {
+      const meta = getMeta(input.id);
+      if (!meta) {
+        return {
+          error: `缓存中不存在 id=${input.id} 的表格（可能已清理）。先 fetch_attachment 或 read_local_file 重新获取。`,
+        };
+      }
+      const buf = readStoredBuffer(meta.id);
+      const sheets = buf ? loadWorkbook(buf, meta.filename) : null;
+      if (!sheets) {
+        return { error: `「${meta.filename}」不是可解析的表格文件（支持 xlsx/xls/csv/tsv）` };
+      }
+      let sheet;
+      if (input.sheet?.trim()) {
+        const q = input.sheet.trim().toLowerCase();
+        sheet =
+          sheets.find((s) => s.name.toLowerCase() === q) ??
+          sheets.find((s) => s.name.toLowerCase().includes(q));
+        if (!sheet) {
+          return {
+            error: `无 sheet「${input.sheet}」（现有：${sheets.map((s) => s.name).join("、")}）`,
+          };
+        }
+      } else if (sheets.length === 1) {
+        sheet = sheets[0];
+      } else if (input.action === "sheets") {
+        // 多 sheet 不指定：直接给全部概览
+        return {
+          id: meta.id,
+          filename: meta.filename,
+          sheets: sheets.map((s) => sheetOverview(s, 5)),
+          note: "多 sheet 表格：确认目标后带 sheet 参数再查。",
+        };
+      } else {
+        sheet = sheets[0];
+      }
+      const sheetNote =
+        sheets.length > 1
+          ? `当前 sheet=「${sheet.name}」（全部：${sheets.map((s) => s.name).join("、")}）`
+          : undefined;
+      try {
+        if (input.action === "sheets") {
+          return {
+            id: meta.id,
+            filename: meta.filename,
+            sheets: sheets.map((s) => sheetOverview(s, 5)),
+            sheetNote,
+          };
+        }
+        if (input.action === "values") {
+          if (!input.col?.trim()) return { error: "values 需要 col（目标列名）" };
+          const values = distinctValues(sheet, input.col);
+          return {
+            id: meta.id,
+            sheet: sheet.name,
+            col: sheet.headers[0] !== undefined && input.col ? input.col : undefined,
+            distinct: values.length,
+            values,
+            totalRows: sheet.rows.length,
+            sheetNote,
+          };
+        }
+        if (input.action === "filter" && !input.keyword?.trim() && !input.where?.length) {
+          return { error: "filter 至少要给 keyword 或 where 一个条件（全表读取用 action=rows 分页）" };
+        }
+        const r = querySheet(sheet, {
+          keyword: input.keyword,
+          keywordCols: input.keywordCols,
+          where: input.where,
+          columns: input.columns,
+          sortBy: input.sortBy,
+          sortDesc: input.sortDesc,
+          offset: input.offset,
+          limit: input.limit,
+        });
+        return {
+          id: meta.id,
+          sheet: sheet.name,
+          totalRows: sheet.rows.length,
+          matched: r.matched,
+          offset: r.offset,
+          returned: r.returned,
+          headers: r.headers,
+          rows: r.rows.map((x) => x.join(" | ")),
+          nextOffset: r.truncated ? r.offset + r.returned : undefined,
+          note: r.truncated
+            ? `还有 ${r.matched - r.offset - r.returned} 行未返回，用 offset=${r.offset + r.returned} 续取`
+            : undefined,
+          sheetNote,
+        };
+      } catch (e) {
+        return { error: (e as Error).message.slice(0, 300) };
+      }
+    },
+  }),
+
+  /** 20. 沙箱 JS 计算台 */
+  run_js: tool({
+    description:
+      "沙箱 JavaScript：对已经拿到的数据做去重、计数、分组求和、正则摘取、排序、JSON/文本转换等小计算。约束：无网络无磁盘（禁用 require/process/fetch），3 秒超时，输出截断；最后一条表达式的值就是结果，多行逻辑用 console.log 输出。数据先用 query_table 筛小，再把数组/JSON 贴进代码——别把千行大表整个塞进来。",
+    inputSchema: z.object({
+      code: z.string().describe("要执行的 JS 代码（纯计算与文本处理）"),
+    }),
+    execute: async ({ code }) => runSandboxedJs(code),
+  }),
+
+  /** 21. 附件缓存管理（可删自己下载的） */
+  manage_attachments: tool({
+    description:
+      "管理附件缓存（data/attachments/，只存 agent 自己下载/读入的副本）：list=列出全部缓存（id/文件名/大小/来源）；delete=按 id 删除一条；delete_all=清空。附件任务答完、用户不再需要追问明细时可主动清理省磁盘。安全边界：只认缓存索引，用户本机原文件（read_local_file 也只是读副本）永远不会被删。",
+    inputSchema: z.object({
+      action: z.enum(["list", "delete", "delete_all"]),
+      id: z.string().optional().describe("delete 必填：缓存 id"),
+    }),
+    execute: async ({ action, id }) => {
+      if (action === "list") {
+        const stats = attachmentStats();
+        return {
+          count: stats.count,
+          totalSizeMB: (stats.totalBytes / 1024 / 1024).toFixed(1),
+          files: listAttachments().map((m) => ({
+            id: m.id,
+            filename: m.filename,
+            kind: m.kind,
+            format: m.format,
+            sizeKB: (m.size / 1024).toFixed(0),
+            fetchedAt: m.fetchedAt.slice(0, 10),
+            source: m.source === "url" ? m.url : m.originPath,
+            sheets: m.sheetNames?.length ? m.sheetNames.join("、") : undefined,
+            textLength: m.textLength,
+          })),
+          note: stats.count ? "追问附件内容前先 list，别重新下载。" : undefined,
+        };
+      }
+      if (action === "delete") {
+        if (!id?.trim()) return { error: "delete 需要 id（来自 list）" };
+        const ok = await deleteAttachment(id);
+        return ok
+          ? { ok: true, deletedId: id.trim(), note: "已删除缓存副本" }
+          : { error: `未找到缓存 id=${id}（可能已删过；list 确认）` };
+      }
+      const removed = await clearAttachments();
+      return { ok: true, removed, note: "已清空附件缓存（不涉及用户本机原文件）" };
+    },
+  }),
+
+  /** 22. 天气查询 */
+  get_weather: tool({
+    description:
+      "查询天气：实况（温度/体感/湿度/风）+ 未来若干天预报。天气码已翻成中文，并给出带伞与穿衣建议。默认查学校所在城市（南京工业大学→南京），用户提到别的城市就用 city 传（如「三亚」）。用户问「明天冷不冷」「要带伞吗」「周末天气」「老家天气」时直接调用，不要反问城市。",
+    inputSchema: z.object({
+      city: z
+        .string()
+        .optional()
+        .describe("中文城市名，如「南京」「海口」；不填则查学校所在城市"),
+      days: z
+        .number()
+        .int()
+        .min(1)
+        .max(14)
+        .default(7)
+        .describe("预报天数（默认 7，最多 14）"),
+    }),
+    execute: async ({ city, days }) => {
+      const wanted = city?.trim();
+      const r = await fetchWeather(wanted || defaultWeatherCity(), days);
+      if (!r.ok) {
+        // 与课表同一套契约：查不到 ≠ 天气好，别让模型拿空数据编一个晴天
+        return {
+          error: `天气查询失败：${r.error}。这与「当地天气晴好」不是一回事，请如实告知用户查询失败。`,
+        };
+      }
+      const w = r.data;
+      return {
+        city: w.city,
+        localTime: w.localTime,
+        now: {
+          text: w.now.text,
+          tempC: w.now.tempC,
+          feelsLikeC: w.now.feelsLikeC,
+          humidity: `${w.now.humidity}%`,
+          wind: `${w.now.windKmh} km/h`,
+        },
+        days: w.days.map((d) => ({
+          date: d.date,
+          weekday: d.weekday,
+          text: d.text,
+          temp: `${d.minC}~${d.maxC}℃`,
+          rainChance: d.rainChance == null ? undefined : `${d.rainChance}%`,
+        })),
+        advice: w.advice.length ? w.advice : undefined,
+        note: wanted
+          ? undefined
+          : `未指定城市，按学校所在地查询：${w.city}。用户想查别的地方，让他直接说城市名。`,
+      };
+    },
+  }),
+
+  /** 23. 长期记忆维护 */
   save_memory: tool({
     description:
       "长期记忆维护（跨会话持久，存于本地 memory.json，启动时自动注入新会话）。值得跨会话记住的信息出现时主动调用：用户偏好（年级/作息）、要抢/盯的目标课程、重要时间结论（选课考试安排）、任务状态。用户说「记住××」必须立即调用。",

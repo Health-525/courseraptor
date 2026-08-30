@@ -83,6 +83,19 @@ export interface WeekGroup {
   lines: string[];
 }
 
+/** 课程行去掉星期后的主体（节次 · 时间 · 课程 · 地点 · 教师），供周分组与调休覆盖行复用 */
+export function courseLineBody(c: CourseData): string {
+  return [
+    c.periods.length ? `${c.periods[0]}-${c.periods[c.periods.length - 1]}节` : "",
+    periodTimeRange(c.periods),
+    c.title,
+    c.location,
+    c.teacher,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 /**
  * 按周预分组课表：week -> 该周实际要上的课。
  * 只含有课的周；周次解析在工具层完成，模型查表即可。
@@ -90,17 +103,7 @@ export interface WeekGroup {
 export function buildWeekIndex(courses: CourseData[]): WeekGroup[] {
   const byWeek = new Map<number, string[]>();
   for (const c of courses) {
-    const time = periodTimeRange(c.periods);
-    const line = [
-      WEEKDAY_NAMES[c.weekday] ?? `周${c.weekday}`,
-      c.periods.length ? `${c.periods[0]}-${c.periods[c.periods.length - 1]}节` : "",
-      time,
-      c.title,
-      c.location,
-      c.teacher,
-    ]
-      .filter(Boolean)
-      .join(" · ");
+    const line = `${WEEKDAY_NAMES[c.weekday] ?? `周${c.weekday}`} · ${courseLineBody(c)}`;
     for (const w of expandWeeks(c.weeks)) {
       const list = byWeek.get(w) ?? [];
       list.push(line);

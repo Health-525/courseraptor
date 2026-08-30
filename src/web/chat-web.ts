@@ -22,19 +22,15 @@ import type { ModelMessage } from "ai";
 import { config } from "../config";
 import { saveCredentialsStore } from "../credentials";
 import { getDeepSeekKeyStatus, setDeepSeekApiKey } from "../onboarding";
-import { loadScheduleCache } from "../schedule-cache";
 import {
   appendRound,
   contextMessages,
   DEFAULT_ID,
   deleteSession,
   getSession,
-  latestCount,
   listSessions,
   resetAll,
 } from "../chat-sessions";
-import { currentWeekOf } from "../jwgl/term-dates";
-import { expandWeeks, periodTimeRange, WEEKDAY_NAMES } from "../jwgl/academics";
 
 /** 前端 Markdown 渲染器（marked 的 UMD 构建，静态吐给浏览器） */
 const MARKED_UMD = path.resolve(
@@ -171,8 +167,9 @@ function json(res: http.ServerResponse, obj: unknown, status = 200): void {
 }
 
 const SESSIONS_PREFIX = "/api/sessions/";
-/** uuid/十六进制串/默认档；防手滑传入垃圾 id 撑爆存档 */
-const SESSION_ID_RE = /^[0-9a-fA-F-]{1,64}$/;
+/** 会话 id 白名单：uuid/十六进制/default。注意必须放行字母——无 sessionId
+ * 的对话落 default 档，只收十六进制会让侧栏点击默认档被误判非法而 404 */
+const SESSION_ID_RE = /^[0-9A-Za-z_-]{1,64}$/;
 const sidOf = (v: unknown): string =>
   typeof v === "string" && SESSION_ID_RE.test(v) ? v : DEFAULT_ID;
 
@@ -245,10 +242,6 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         res.writeHead(404);
         res.end("// marked 不可用，页面会退回纯文本渲染");
       }
-      return;
-    }
-    if (url === "/api/brief") {
-      json(res, briefPayload());
       return;
     }
     if (url === "/api/sessions") {
@@ -459,35 +452,6 @@ async function runTurn(
 // ⚠ 整个页面是一个 TS 模板字符串：页面 JS 里的换行符必须写 \\n（如
 // buf.split("\\n")），页面代码禁用反引号模板串与 ${——它们会被外层解析。
 
-/** 首屏「今日速览」数据：与 TUI 欢迎面板同源（课表缓存），无缓存就不显示 */
-export function briefPayload(): Record<string, unknown> {
-  const cached = loadScheduleCache();
-  if (!cached) return { hasData: false, historyLen: latestCount() };
-  const s = cached.schedule;
-  const week = currentWeekOf(s.year, s.semester);
-  const weekday = ((new Date().getDay() + 6) % 7) + 1;
-  const today = s.courses
-    .filter(
-      (c) =>
-        c.weekday === weekday &&
-        (!week || expandWeeks(c.weeks).includes(week.week)),
-    )
-    .sort((a, b) => (a.periods[0] ?? 0) - (b.periods[0] ?? 0))
-    .map((c) => ({
-      time: periodTimeRange(c.periods),
-      title: c.title,
-      location: c.location || "待定",
-    }));
-  return {
-    hasData: true,
-    historyLen: latestCount(),
-    term: s.label,
-    week: week?.week,
-    weekdayLabel: WEEKDAY_NAMES[weekday] ?? `周${weekday}`,
-    today,
-  };
-}
-
 function chatPage(): string {
   return `<!doctype html>
 <html lang="zh-CN">
@@ -520,7 +484,10 @@ function chatPage(): string {
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
+  /* 锁定整页：只有消息区能滚，输入/发送条永远钉在视口底部；
+     dvh 让移动端键盘弹出时底栏跟着抬进可见区而不是被顶出屏幕 */
   body { margin: 0; display: grid; grid-template-columns: 268px 1fr;
+         height: 100vh; height: 100dvh; overflow: hidden;
          background: var(--paper); color: var(--ink);
          font-family: var(--sans); font-size: 14px; line-height: 1.75; }
   ::selection { background: var(--accent-soft); }
@@ -528,13 +495,11 @@ function chatPage(): string {
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* ── 左栏：档头 ── */
-  aside { display: flex; flex-direction: column; gap: 26px;
+  aside { display: flex; flex-direction: column; gap: 26px; min-height: 0;
           padding: 24px 20px 18px; border-right: 1px solid var(--rule);
           overflow-y: auto; }
   .mast h1 { margin: 0; font-family: var(--kai); font-weight: 400;
              font-size: 23px; color: var(--accent); letter-spacing: .5px; }
-  .mast .kicker { margin-top: 5px; font-family: var(--mono); font-size: 10px;
-                  letter-spacing: .24em; color: var(--ink-3); }
   .sec h2 { display: flex; justify-content: space-between; align-items: baseline;
             margin: 0 0 10px; padding-bottom: 6px;
             font-family: var(--mono); font-size: 10.5px; font-weight: 600;
@@ -547,15 +512,7 @@ function chatPage(): string {
                             font-weight: 600; letter-spacing: .12em; }
   .mastbtns .tbtn.primary:hover { background: var(--accent-deep);
                                   border-color: var(--accent-deep); color: #fff; }
-  .slip { border: 1px solid var(--rule); background: var(--card); }
-  .srow { display: grid; grid-template-columns: 86px 1fr; column-gap: 10px;
-          padding: 9px 12px; border-bottom: 1px dashed var(--rule); }
-  .srow:last-child { border-bottom: 0; }
-  .stime { font-family: var(--mono); font-size: 11px; color: var(--accent-deep);
-           padding-top: 2px; }
-  .sname { font-size: 13px; }
-  .sloc { grid-column: 2; font-size: 11.5px; color: var(--ink-3); }
-  .sempty { padding: 11px 12px; color: var(--ink-3); font-size: 12.5px; }
+  .foot-btn { margin-top: auto; width: 100%; }
 
   /* 会话档案列表：标题 + 时间元数据，悬停出删除 */
   .sess { list-style: none; margin: 0; padding: 0; }
@@ -570,30 +527,28 @@ function chatPage(): string {
   .sess .sm { grid-column: 1; font-family: var(--mono); font-size: 9.5px;
               color: var(--ink-3); letter-spacing: .05em; }
   .sess .sx { grid-row: 1; grid-column: 2; justify-self: end; border: 0;
-              background: none; color: var(--ink-3); font-size: 11px;
-              cursor: pointer; padding: 0 2px; visibility: hidden; }
-  .sess li:hover .sx { visibility: visible; }
-  .sess .sx:hover { color: var(--accent); }
+              background: none; color: var(--ink-3); opacity: .5;
+              font-size: 11px; cursor: pointer; padding: 0 4px;
+              transition: opacity .15s ease, color .15s ease; }
+  .sess .sx:hover { opacity: 1; color: var(--accent); }
   .sess .snone { display: block; color: var(--ink-3); font-size: 12px;
                  padding: 4px 2px; cursor: default; }
 
-  .foot { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--rule); }
   .tbtn { background: none; border: 1px solid var(--rule-2); color: var(--ink-2);
           font-size: 12.5px; padding: 5px 14px; border-radius: 2px;
           cursor: pointer; transition: border-color .15s ease, color .15s ease; }
   .tbtn:hover { border-color: var(--accent); color: var(--accent); }
-  .foot .meta { font-family: var(--mono); font-size: 9.5px;
-                letter-spacing: .08em; color: var(--ink-3); line-height: 1.9; }
 
   /* ── 右栏：正文 ── */
-  main { display: flex; flex-direction: column; min-width: 0; height: 100%; }
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0;
+         height: 100%; }
   .topbar { display: none; align-items: center; gap: 10px;
             padding: 10px 14px; border-bottom: 1px solid var(--rule);
             background: var(--paper); }
   .topbar .tb-title { font-family: var(--kai); font-size: 16px;
                       color: var(--accent); }
   .topbar .tbtn { margin-left: auto; padding: 4px 10px; font-size: 11.5px; }
-  #log { flex: 1; overflow-y: auto; padding: 38px 28px 28px; }
+  #log { flex: 1; min-height: 0; overflow-y: auto; padding: 38px 28px 28px; }
   .inner { max-width: 672px; margin: 0 auto; }
 
   /* 对话按「往来文书」排版：一行题注 + 正文，不做聊天气泡 */
@@ -671,13 +626,6 @@ function chatPage(): string {
             color: var(--ink-2); line-height: 2; }
   .hero .hint { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
                 letter-spacing: .05em; }
-  /* 今日课程回退卡：窄屏时左栏隐藏，课表信息落在首屏（仅移动端显示） */
-  .mbrief { display: none; text-align: left; max-width: 420px; margin: 26px
-            auto 0; }
-  .mbrief .mh { font-family: var(--mono); font-size: 10.5px; letter-spacing: .18em;
-                color: var(--ink-3); padding-bottom: 6px; margin-bottom: 0;
-                border-bottom: 1px solid var(--rule); display: flex;
-                justify-content: space-between; }
 
   /* ── Markdown 正文样式 ── */
   .md > :first-child { margin-top: 0; }
@@ -827,7 +775,6 @@ function chatPage(): string {
     body { grid-template-columns: 1fr; }
     aside { display: none; }
     .topbar { display: flex; }
-    .mbrief { display: block; }
     #log { padding: 22px 16px; }
     form { padding: 10px 14px 10px; }
     .quickbar { margin-bottom: 7px; }
@@ -844,23 +791,15 @@ function chatPage(): string {
 <aside>
   <div class="mast">
     <h1>CourseRaptor</h1>
-    <div class="kicker">校园教务 · 对话式助手</div>
   </div>
   <div class="mastbtns">
     <button class="tbtn primary" id="newSession" title="另起一个会话（旧会话保留在档案里）">新会话</button>
-    <button class="tbtn" id="openSettings" title="教务账号与 API Key">设置</button>
   </div>
-  <section class="sec" id="slipSec" hidden>
-    <h2>今日课程<span id="dayLabel"></span></h2>
-    <div class="slip" id="slip"></div>
-  </section>
   <section class="sec">
     <h2>会话档案<span id="sessCount"></span></h2>
     <ul class="sess" id="sessList"></ul>
   </section>
-  <div class="foot">
-    <div class="meta" id="meta"></div>
-  </div>
+  <button class="tbtn foot-btn" id="openSettings" title="教务账号与 API Key">设置</button>
 </aside>
 <main>
   <div class="topbar">
@@ -874,7 +813,6 @@ function chatPage(): string {
       <h2>同学，你好。</h2>
       <p>课表、成绩、考试、通知——直接用一句话问。<br>
       <span class="hint">对话只在本机流转（127.0.0.1）；会话自动存档，重启不丢。</span></p>
-      <div class="mbrief" id="mBrief"></div>
     </div>
   </div></div>
   <form id="f">
@@ -964,11 +902,6 @@ function fmtWhen(ts) {
     ? clock(ts) : (d.getMonth() + 1) + "月" + d.getDate() + "日";
 }
 
-/* ── 侧栏页脚：本机服务信息 ── */
-const port = location.host.split(":")[1] || "80";
-document.getElementById("meta").innerHTML =
-  "服务 127.0.0.1:" + port + "<br>本地存档 data/chat-sessions.json<br>上下文 ≤ 40 条";
-
 /* ── 快速提问：常驻在输入框上方 ── */
 const QUESTIONS = ["这周课表", "教务处最近有什么通知", "我的成绩和 GPA", "最近的考试安排"];
 const qchips = document.getElementById("qchips");
@@ -1029,29 +962,6 @@ function scroll(force) {
 function clearTurns() {
   [...inner.querySelectorAll(".turn")].forEach((n) => n.remove());
 }
-
-/* ── 首屏数据：学期周次读数 + 今日课程（来自本地课表缓存）── */
-function slipRows(list) {
-  if (!list.length) return '<div class="sempty">今天没有课，安心安排自己的事。</div>';
-  return list.map((c) =>
-    '<div class="srow"><span class="stime">' + escHtml(c.time) +
-    '</span><span class="sname">' + escHtml(c.title) +
-    '</span><span class="sloc">@' + escHtml(c.location) + "</span></div>",
-  ).join("");
-}
-fetch("/api/brief").then((r) => r.json()).then((d) => {
-  if (!d.hasData) return;
-  const now = new Date();
-  const dateStr = (now.getMonth() + 1) + "月" + now.getDate() + "日";
-  const rows = slipRows(d.today);
-  document.getElementById("slip").innerHTML = rows;
-  document.getElementById("slipSec").hidden = false;
-  document.getElementById("dayLabel").textContent = (d.weekdayLabel || "") + " " + dateStr;
-  const mBrief = document.getElementById("mBrief");
-  mBrief.innerHTML = '<div class="mh"><span>今日课程</span><span>' +
-    (d.weekdayLabel || "") + "</span></div><div class=\\\"slip\\\">" + rows + "</div>";
-  mBrief.hidden = false;
-}).catch(() => {});
 
 /* ── 消息渲染：一行题注（谁 · 时间 · 耗时）+ 正文 ── */
 function addTurn(cls) {
@@ -1265,7 +1175,7 @@ sessList.addEventListener("click", (e) => {
   const del = e.target.closest("button[data-del]");
   if (del) { delSession(del.dataset.del); return; }
   const li = e.target.closest("li[data-id]");
-  if (li && !busy && li.dataset.id !== activeId) openSession(li.dataset.id);
+  if (li && !busy) openSession(li.dataset.id);
 });
 
 async function doNewSession() {

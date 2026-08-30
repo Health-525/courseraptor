@@ -131,51 +131,17 @@ test("空消息返回 400", async () => {
   assert.equal(res.status, 400);
 });
 
-test("GET /api/brief：有课表缓存返回今日速览，无缓存返回 hasData=false", async () => {
-  const url = (await startChatWeb())!;
-  const { saveScheduleCache } = await import("../src/schedule-cache");
-
-  // 无缓存：hasData=false，前端据此隐藏速览条
-  fs.rmSync(path.join(process.env.RAPTOR_DATA_DIR!, "schedule-cache.json"), { force: true });
-  let brief = await (await fetch(`${url}/api/brief`)).json();
-  assert.equal(brief.hasData, false);
-
-  // 有缓存：term/周次/今日课齐全
-  const weekday = ((new Date().getDay() + 6) % 7) + 1;
-  saveScheduleCache({
-    year: 2026,
-    semester: 3,
-    label: "2026-2027-1",
-    courses: [
-      {
-        title: "高等数学",
-        weekday,
-        periods: [1, 2],
-        weeks: "1-16",
-        location: "教A-101",
-        teacher: "张三",
-      },
-    ],
-  });
-  brief = await (await fetch(`${url}/api/brief`)).json();
-  assert.equal(brief.hasData, true);
-  assert.equal(brief.term, "2026-2027-1");
-  assert.equal(brief.today.length, 1);
-  assert.equal(brief.today[0].title, "高等数学");
-  assert.equal(brief.today[0].location, "教A-101");
-});
-
 test("POST /api/reset 清空服务端会话上下文", async () => {
   const url = (await startChatWeb())!;
   // 发一轮让服务端历史非空
   await post(url, { message: "第一条" });
-  let brief = await (await fetch(`${url}/api/brief`)).json();
-  assert.ok(brief.historyLen > 0, "对话后服务端应有历史");
+  let list = await (await fetch(`${url}/api/sessions`)).json();
+  assert.ok(list.sessions.length > 0, "对话后服务端应有会话档案");
 
   const res = await fetch(`${url}/api/reset`, { method: "POST" });
   assert.equal(res.status, 200);
-  brief = await (await fetch(`${url}/api/brief`)).json();
-  assert.equal(brief.historyLen, 0);
+  list = await (await fetch(`${url}/api/sessions`)).json();
+  assert.equal(list.sessions.length, 0, "reset 后会话档案应清空");
 });
 
 test("多会话历史：sessionId 隔离上下文，列表/详情/删除接口", async () => {
@@ -265,6 +231,17 @@ test("GET /api/settings 只回脱敏状态，不吐明文密钥", async () => {
   if (fullKey) {
     assert.ok(!JSON.stringify(s).includes(fullKey), "响应任意位置都不得出现完整 Key");
   }
+});
+
+test("default 会话可被侧栏点击读取（id 白名单必须放行字母）", async () => {
+  const url = (await startChatWeb())!;
+  // 不带 sessionId 的对话落到 default 档
+  await post(url, { message: "无会话id的一问" });
+  const list = await (await fetch(`${url}/api/sessions`)).json();
+  assert.ok(list.sessions.some((s: { id: string }) => s.id === "default"),
+    "default 档应出现在会话列表");
+  const res = await fetch(`${url}/api/sessions/default`);
+  assert.equal(res.status, 200, "GET default 档不得 404（曾致点击无反应）");
 });
 
 test("POST /api/settings：坏格式 Key 与半套教务凭证都被拒且不落盘", async () => {
