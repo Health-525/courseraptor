@@ -40,6 +40,35 @@ test("空回答只存提问；空白回答不落库", () => {
   assert.equal(s.messages.length, 1);
 });
 
+test("思考挂在本轮 assistant 消息上：不单独成条，没正文时也不入库", () => {
+  S.appendRound("eeee5555", "带思考的一问", "回答", "先查课表再对比周次");
+  const s = S.getSession("eeee5555");
+  assert.ok(s);
+  assert.equal(s.messages.length, 2, "思考不额外占一条消息");
+  assert.equal(s.messages[1].role, "assistant");
+  assert.equal(s.messages[1].text, "回答");
+  assert.equal(s.messages[1].think, "先查课表再对比周次");
+
+  // 半截轮次（无正文）：照旧只存提问，思考不能把空轮次带进历史
+  S.appendRound("ffff6666", "没答上来的一问", null, "想了一堆但没输出");
+  const s2 = S.getSession("ffff6666");
+  assert.ok(s2);
+  assert.equal(s2.messages.length, 1);
+  assert.ok(!JSON.stringify(s2).includes("想了一堆"), "无正文的思考不落盘");
+
+  // 超长思考截断，别把档案文件撑肥
+  S.appendRound("gggg7777", "长思考", "答", "思".repeat(S.MAX_THINK_CHARS + 500));
+  const long = S.getSession("gggg7777")?.messages[1].think ?? "";
+  assert.ok(long.length < S.MAX_THINK_CHARS + 30, "应截到上限附近");
+  assert.match(long, /已截断）$/);
+});
+
+test("思考绝不回流进模型上下文：contextMessages 只读 text", () => {
+  const dump = JSON.stringify(S.contextMessages("eeee5555"));
+  assert.ok(dump.includes("回答"), "正文仍在上下文里");
+  assert.ok(!dump.includes("先查课表再对比周次"), "思考不该喂回模型");
+});
+
 test("contextMessages 输出 ModelMessage 形状（user 纯串 / assistant 块数组）", () => {
   const ctx = S.contextMessages("aaaa1111");
   assert.equal(ctx.length, 2);

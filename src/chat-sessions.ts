@@ -1,5 +1,5 @@
 /**
- * 网页对话的多会话存储 — data/chat-sessions.json
+ * 多会话对话存储 — data/chat-sessions.json（网页与 QQ 共用一份历史）
  *
  * 之前网页对话只有一份内存历史：主程序一重启就全丢（交接文档
  * 「已知取舍」里的头一条）。这个模块把会话变成可管理的档案：
@@ -10,6 +10,9 @@
  * - 给 Agent 的上下文取最后 CONTEXT_WINDOW 条（语义同旧 MAX_HISTORY）
  * - 会话数、单会话消息数都有上限，防文件无限膨胀
  * - RAPTOR_DATA_DIR 可指到临时目录做测试隔离（与 schedule-cache 同款）
+ * - 写入方有两个：网页（读写都走这里）和 QQ 桥（只往里落盘，上下文仍用
+ *   自己那份内存窗口）。QQ 档 id 由 src/qq/session-archive.ts 生成，
+ *   统一带 qq- 前缀，与网页的 uuid/default 天然不串档
  */
 
 import fs from "node:fs";
@@ -36,6 +39,9 @@ export interface StoredMessage {
   role: "user" | "assistant";
   text: string;
   ts: number;
+  /** 助手消息可选：本轮模型的思考过程（reasoning）。只供界面回看，
+   * contextMessages 不读它——把思考喂回去会污染上下文、白烧 token */
+  think?: string;
 }
 
 export interface ChatSession {
@@ -59,6 +65,9 @@ export const MAX_SESSIONS = 30;
 export const MAX_STORED_MSGS = 200;
 /** 每轮传给 Agent 的上下文窗口（条）——旧版内存历史的 MAX_HISTORY */
 export const CONTEXT_WINDOW = 40;
+/** 单轮思考文本落盘上限（字）：思考只给人在界面上回看，超长尾部截断即可，
+ *  不然一次深思考几千字会把会话档案文件撑肥 */
+export const MAX_THINK_CHARS = 4000;
 /** 请求不带 sessionId 时使用（兼容旧行为与既有测试） */
 export const DEFAULT_ID = "default";
 
@@ -94,10 +103,21 @@ function writeSessions(list: ChatSession[]): void {
 
 const byRecent = (a: ChatSession, b: ChatSession): number => b.updatedAt - a.updatedAt;
 
-/** 一行标题：首问压成空格并截断 */
-function titleOf(text: string): string {
+/** 一行标题：首问压成空格并截断；渠道前缀（如「QQ」）拼在最前面 */
+function titleOf(text: string, prefix?: string): string {
   const flat = text.replace(/\s+/g, " ").trim();
-  return flat.length > 24 ? flat.slice(0, 24) + "…" : flat;
+  const topic = flat.length > 24 ? flat.slice(0, 24) + "…" : flat;
+  const p = prefix?.trim();
+  return p ? `${p}｜${topic}` : topic;
+}
+
+/** 思考文本入库前的收口：空→null，超长→截断（只为界面回看，不必完整） */
+function clampThink(text: string | null | undefined): string | null {
+  const t = text?.trim();
+  if (!t) return null;
+  return t.length > MAX_THINK_CHARS
+    ? `${t.slice(0, MAX_THINK_CHARS)}…（思考内容过长，已截断）`
+    : t;
 }
 
 export function listSessions(): SessionMeta[] {
@@ -123,11 +143,17 @@ export function deleteSession(id: string): boolean {
   return true;
 }
 
-/** 完整的一轮问答入库（回答为空只存提问）；会话不存在则建档 */
+/** 完整的一轮问答入库（回答为空只存提问）；会话不存在则建档。
+ *  reasoningText 是本轮模型的思考过程：挂在 assistant 消息的 think 字段上
+ *  供界面回看，不单独成条、不进上下文。没有正文的半截轮次照旧不入库。
+ *  opts.titlePrefix 给非网页渠道标记来源（QQ 桥传「QQ」/「QQ群」）：只在
+ *  建档那一刻跟着首问拼进标题，已有标题的会话不会被改写。 */
 export function appendRound(
   id: string,
   userText: string,
   assistantText: string | null,
+  reasoningText?: string | null,
+  opts: { titlePrefix?: string } = {},
 ): void {
   const list = readSessions();
   let s = list.find((x) => x.id === id);
@@ -138,11 +164,14 @@ export function appendRound(
   const now = Date.now();
   s.messages.push({ role: "user", text: userText, ts: now });
   if (assistantText && assistantText.trim()) {
-    s.messages.push({ role: "assistant", text: assistantText.trim(), ts: now });
+    const msg: StoredMessage = { role: "assistant", text: assistantText.trim(), ts: now };
+    const think = clampThink(reasoningText);
+    if (think) msg.think = think;
+    s.messages.push(msg);
   }
   if (!s.title) {
     const firstUser = s.messages.find((m) => m.role === "user");
-    if (firstUser) s.title = titleOf(firstUser.text);
+    if (firstUser) s.title = titleOf(firstUser.text, opts.titlePrefix);
   }
   if (s.messages.length > MAX_STORED_MSGS) {
     s.messages = s.messages.slice(-MAX_STORED_MSGS);
@@ -151,7 +180,8 @@ export function appendRound(
   writeSessions(list.sort(byRecent).slice(0, MAX_SESSIONS));
 }
 
-/** 本轮发给 Agent 的上下文：最后 CONTEXT_WINDOW 条，转 ModelMessage 形状 */
+/** 本轮发给 Agent 的上下文：最后 CONTEXT_WINDOW 条，转 ModelMessage 形状。
+ *  只读 text——助手消息上的 think（思考过程）刻意不回流给模型 */
 export function contextMessages(id: string): ModelMessage[] {
   const s = getSession(id);
   if (!s) return [];

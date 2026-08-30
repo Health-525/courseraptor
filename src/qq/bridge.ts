@@ -9,7 +9,8 @@
  * - 场景：单聊（C2C）直接对话；群聊需 @机器人 触发（mentionGate）
  * - 授权：白名单制。官方平台只给 openid（非 QQ 号），首次使用发送
  *   暗号（QQBOT_PASSCODE）激活，openid 落盘 qq-allowlist.json
- * - 会话：每发送者独立历史（内存滑动窗口 20 条）
+ * - 会话：每发送者独立历史（内存滑动窗口 20 条）；每轮问答另外写进
+ *   网页那套会话档案（data/chat-sessions.json），侧栏能回看 QQ 里的对话
  */
 
 import fs from "node:fs/promises";
@@ -31,7 +32,9 @@ import { ensureLicense } from "../license";
 import { ensureCredentials } from "../onboarding";
 import { createRaptorAgent } from "../agent";
 import { quarantineCorruptFile, writeFileAtomic } from "../atomic-write";
+import { appendRound } from "../chat-sessions";
 import { mdToPlain, splitMessage } from "./format";
+import { qqArchiveSlot, type QqArchiveInput } from "./session-archive";
 import { localOnlyCommandMessage } from "../tui/slash-menu";
 
 type BridgeLogger = Pick<Console, "log" | "info" | "warn" | "error" | "debug">;
@@ -61,6 +64,9 @@ async function saveAllowlist(): Promise<void> {
 }
 
 // ── 会话历史（每发送者独立，滑动窗口）─────────────────────────
+// 这里只是喂模型的上下文窗口。网页侧栏看到的「历史记录」是另一条线：
+// 每轮问答另外写进 chat-sessions（见 src/qq/session-archive.ts 的归档
+// 粒度），只写不读——网页里删改 QQ 档不会反过来影响这里的上下文。
 
 const MAX_HISTORY_TURNS = 20;
 const histories = new Map<string, ModelMessage[]>();
@@ -108,6 +114,29 @@ function humanizeError(e: unknown): string {
     return "教务页面结构可能变了，这个查询暂时用不了。其他功能不受影响。";
   }
   return "这件事没办成。稍后再试一次，或者换个说法告诉我。";
+}
+
+/**
+ * 把一轮 QQ 问答写进网页那套会话档案（data/chat-sessions.json）。
+ *
+ * 只写不读：QQ 的模型上下文照旧走上面的内存窗口，网页里删改这些档案
+ * 不会反过来影响 QQ 对话。落盘是附加品，写坏了只记日志，绝不让用户在
+ * 那头等不到回复。抽成具名函数是为了能被单测钉住「桥确实会写」。
+ */
+export function archiveQQRound(
+  msg: QqArchiveInput,
+  answer: string | null,
+  log: BridgeLogger = console
+): void {
+  const slot = qqArchiveSlot(msg);
+  if (!slot) return;
+  try {
+    appendRound(slot.id, slot.userText, answer, null, {
+      titlePrefix: slot.titlePrefix,
+    });
+  } catch (e) {
+    log.error(`[qq] 历史落盘失败：${(e as Error)?.message ?? e}`);
+  }
 }
 
 // ── 主流程 ────────────────────────────────────────────────────
@@ -177,6 +206,16 @@ export async function startQQBridge(
 
     const history = histories.get(senderId) ?? [];
     const userMsg: ModelMessage = { role: "user", content: text };
+
+    // 网页侧栏的历史记录：私聊每人一档、群聊每群一档（粒度见 session-archive.ts）。
+    // 一轮只记一次——成功记整轮问答，失败只留「他在 QQ 里问过这句」
+    let archived = false;
+    const archive = (answer: string | null): void => {
+      if (archived) return;
+      archived = true;
+      archiveQQRound(msg, answer, log);
+    };
+
     const stopNotices = startWaitingNotices((t) =>
       bot.sendText(msg.replyTarget, t)
     );
@@ -186,6 +225,8 @@ export async function startQQBridge(
       });
       stopNotices();
       const reply = mdToPlain(result.text || "（无输出）");
+      // 先留档再发送：分段发送中途被限流，这一轮也已经进得了历史
+      archive(result.text || null);
       for (const seg of splitMessage(reply)) {
         await bot.sendText(msg.replyTarget, seg);
       }
@@ -199,6 +240,8 @@ export async function startQQBridge(
       );
     } catch (e) {
       stopNotices();
+      // 答砸了也把「他在 QQ 里问过这句」留下：只有提问，跟网页侧同一口径
+      archive(null);
       log.error(`[qq] 处理失败（openid=${senderId}）：${(e as Error)?.message ?? e}`);
       await bot.sendText(msg.replyTarget, `❌ ${humanizeError(e)}`);
     }
