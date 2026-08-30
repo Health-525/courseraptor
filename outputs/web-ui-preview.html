@@ -137,8 +137,9 @@ if(__exports != exports)module.exports = exports;return module.exports}));
                             font-weight: 600; letter-spacing: .12em; }
   .mastbtns .tbtn.primary:hover { background: var(--accent-deep);
                                   border-color: var(--accent-deep); color: #fff; }
+  .foot-btn { margin-top: auto; width: 100%; }
 
-  /* 会话档案列表：标题 + 时间元数据，悬停出删除 */
+  /* 会话档案列表：标题 + 时间元数据，行尾常驻半透明删除钮 */
   .sess { list-style: none; margin: 0; padding: 0; }
   .sess li { display: grid; grid-template-columns: 1fr 18px; column-gap: 6px;
              padding: 7px 8px 7px 10px; border-left: 2px solid transparent;
@@ -151,10 +152,10 @@ if(__exports != exports)module.exports = exports;return module.exports}));
   .sess .sm { grid-column: 1; font-family: var(--mono); font-size: 9.5px;
               color: var(--ink-3); letter-spacing: .05em; }
   .sess .sx { grid-row: 1; grid-column: 2; justify-self: end; border: 0;
-              background: none; color: var(--ink-3); font-size: 11px;
-              cursor: pointer; padding: 0 2px; visibility: hidden; }
-  .sess li:hover .sx { visibility: visible; }
-  .sess .sx:hover { color: var(--accent); }
+              background: none; color: var(--ink-3); opacity: .5;
+              font-size: 11px; cursor: pointer; padding: 0 4px;
+              transition: opacity .15s ease, color .15s ease; }
+  .sess .sx:hover { opacity: 1; color: var(--accent); }
   .sess .snone { display: block; color: var(--ink-3); font-size: 12px;
                  padding: 4px 2px; cursor: default; }
 
@@ -418,12 +419,12 @@ if(__exports != exports)module.exports = exports;return module.exports}));
   </div>
   <div class="mastbtns">
     <button class="tbtn primary" id="newSession" title="另起一个会话（旧会话保留在档案里）">新会话</button>
-    <button class="tbtn" id="openSettings" title="教务账号与 API Key">设置</button>
   </div>
   <section class="sec">
     <h2>会话档案<span id="sessCount"></span></h2>
     <ul class="sess" id="sessList"></ul>
   </section>
+  <button class="tbtn foot-btn" id="openSettings" title="教务账号与 API Key">设置</button>
 </aside>
 <main>
   <div class="topbar">
@@ -891,7 +892,7 @@ sessList.addEventListener("click", (e) => {
   const del = e.target.closest("button[data-del]");
   if (del) { delSession(del.dataset.del); return; }
   const li = e.target.closest("li[data-id]");
-  if (li && !busy && li.dataset.id !== activeId) openSession(li.dataset.id);
+  if (li && !busy) openSession(li.dataset.id);
 });
 
 async function doNewSession() {

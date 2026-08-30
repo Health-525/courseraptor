@@ -514,7 +514,7 @@ function chatPage(): string {
                                   border-color: var(--accent-deep); color: #fff; }
   .foot-btn { margin-top: auto; width: 100%; }
 
-  /* 会话档案列表：标题 + 时间元数据，悬停出删除 */
+  /* 会话档案列表：标题 + 时间元数据，行尾常驻半透明删除钮 */
   .sess { list-style: none; margin: 0; padding: 0; }
   .sess li { display: grid; grid-template-columns: 1fr 18px; column-gap: 6px;
              padding: 7px 8px 7px 10px; border-left: 2px solid transparent;
