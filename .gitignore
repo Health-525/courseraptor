@@ -12,3 +12,4 @@ data/
 .workbuddy/
 credentials.enc
 update-data/
+.spec-workflow/

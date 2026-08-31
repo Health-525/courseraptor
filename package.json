@@ -16,8 +16,16 @@
   "bin": {
     "raptor": "bin/raptor.cjs"
   },
-  "keywords": [],
-  "author": "",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Health-525/courseraptor.git"
+  },
+  "homepage": "https://github.com/Health-525/courseraptor#readme",
+  "bugs": {
+    "url": "https://github.com/Health-525/courseraptor/issues"
+  },
+  "keywords": ["njtech", "agent", "cli", "deepseek", "教务"],
+  "author": "jiangshu",
   "license": "ISC",
   "engines": {
     "node": ">=24.0.0"
