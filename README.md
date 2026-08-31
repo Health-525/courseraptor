@@ -42,6 +42,22 @@ $ raptor
 
 选课季还能开抢课模式（见 [🎯 选课作战](#-选课作战默认关闭)）。
 
+## 📸 界面预览
+
+同一个 agent，两种入口：终端里敲 `raptor` 直接对话，或浏览器打开 `http://localhost:3210` 用网页版。思考过程、工具调用、每轮问答都会归档进会话历史。
+
+<div align="center">
+
+**网页版 · 红头档案 UI**
+
+<img src="docs/screenshot-web.png" width="880" alt="CourseRaptor 网页对话界面：思考草稿卡片 + 工具调用 + 教务通知回答" />
+
+**终端版 · TUI 欢迎面板**
+
+<img src="docs/screenshot-tui.png" width="880" alt="CourseRaptor 终端对话界面：启动即展示今日课表与最新通知" />
+
+</div>
+
 ## ✨ 能力总览
 
 Agent 默认可调用 **20 个工具**（选课季 +3 抢课工具共 23 个），覆盖教务查询、通知情报、文件与数据、天气生活、两层记忆、QQ 接入六条线。
