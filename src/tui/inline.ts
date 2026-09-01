@@ -261,6 +261,27 @@ export async function runInlineTUI(options: {
     write(`\x1b[${menuRows}A\r\x1b[${cursorCol() + 1}G`);
   };
 
+  const refreshSlashMenu = (): void => {
+    if (suppressMenu || activeAbort) return;
+    const line = rl.line ?? "";
+    // 删空 = 新的一行，解除 ESC 的菜单抑制（下一行是新的意图）
+    if (!line) menuDismissed = false;
+    if (menuDismissed) return;
+    const query = line.startsWith("/") ? line : "";
+    if (query === menuQuery) return;
+    menuQuery = query;
+    menuItems = query ? filterSlashCommands(query, menuPool) : [];
+    menuIndex = 0;
+    drawMenu();
+  };
+
+  const writeBackspace = (): void => {
+    // stdin 经 PassThrough 代理后，readline 不再把 DEL 解析成编辑键；直接复用
+    // 它自己的删除实现，保留 Unicode 光标与终端重绘逻辑。
+    (rl as typeof rl & { _deleteLeft(): void })._deleteLeft();
+    refreshSlashMenu();
+  };
+
   /** Tab/回车补全：把选中命令的剩余字符写进 readline（走与打字相同的
    * 按键路径，readline 自己刷新输入行）。带参数命令额外补一个空格并等待输入。
    * @returns 是否已进入等待参数状态；此时回车不应提交整行。 */
@@ -277,6 +298,10 @@ export async function runInlineTUI(options: {
   const handleRawKey = (text: string): void => {
     // 防御：吞掉终端的光标位置报告（实现不依赖 CPR，混进输入行会成乱码）
     if (/^\x1b\[\d+;\d+R$/.test(text)) return;
+    if (text === "\x7f" || text === "\b") {
+      writeBackspace();
+      return;
+    }
     if (suppressMenu) {
       proxy.write(text);
       return;
@@ -328,7 +353,7 @@ export async function runInlineTUI(options: {
   const rejectVisibleKeyArgument = (): void => {
     eraseMenu();
     resetMenuState();
-    for (let i = 0; i < (rl.line ?? "").length; i++) proxy.write("\x7f");
+    for (let i = 0; i < (rl.line ?? "").length; i++) writeBackspace();
     rawLine = "";
     blockingKeyArgument = true;
   };
@@ -383,20 +408,8 @@ export async function runInlineTUI(options: {
   // readline 处理完按键（行文本已更新、光标已归位）后刷新菜单过滤。
   // keypress 发在输入流（= 下面的 proxy）上而不是接口对象上
   // （emitKeypressEvents(input, this)），接口自身的 onkeypress 先挂先跑，
-  // 这里后挂、拿到的是已处理完的行文本
-  proxy.on("keypress", () => {
-    if (suppressMenu || activeAbort) return;
-    const line = rl.line ?? "";
-    // 删空 = 新的一行，解除 ESC 的菜单抑制（下一行是新的意图）
-    if (!line) menuDismissed = false;
-    if (menuDismissed) return;
-    const query = line.startsWith("/") ? line : "";
-    if (query === menuQuery) return;
-    menuQuery = query;
-    menuItems = query ? filterSlashCommands(query, menuPool) : [];
-    menuIndex = 0;
-    drawMenu();
-  });
+  // 这里后挂、拿到的是已处理完的行文本。
+  proxy.on("keypress", refreshSlashMenu);
 
   /** 非空的一轮流式处理期间置为非 null，Ctrl+C 走中断而非退出 */
 
