@@ -29,16 +29,16 @@
 import readline from "node:readline";
 import { PassThrough } from "node:stream";
 import {
+  coalesceText,
   commandsForMode,
   displayWidth,
   filterSlashCommands,
-  renderSlashMenu,
-  coalesceText,
   isLocalKeyCommandWithArgumentPrefix,
   isLocalOnlyKeyCommand,
   isPrintableKey,
-  splitKeys,
+  renderSlashMenu,
   type SlashCommand,
+  splitKeys,
 } from "./slash-menu";
 
 // ── 流事件（对 ai 包 fullStream 的宽松视图，字段按需取用）────────
@@ -94,7 +94,7 @@ function summarizeInput(input: unknown): string {
   if (typeof input === "string") return oneLine(input, 80);
   if (typeof input === "object") {
     const entries = Object.entries(input as Record<string, unknown>).filter(
-      ([, v]) => v !== undefined && v !== "" && v !== null
+      ([, v]) => v !== undefined && v !== "" && v !== null,
     );
     // 无参工具（get_schedule 等）不显示 "{}"，只留工具名
     if (!entries.length) return "";
@@ -137,11 +137,7 @@ function summarizeResult(output: unknown): string {
   for (const k of ["summary", "term", "gpa", "isXkOpenLabel", "title"]) {
     if (o[k] !== undefined && o[k] !== null) bits.push(oneLine(String(o[k]), 48));
   }
-  if (
-    o.total !== undefined &&
-    o.total !== null &&
-    !listLengths.includes(Number(o.total))
-  ) {
+  if (o.total !== undefined && o.total !== null && !listLengths.includes(Number(o.total))) {
     bits.push(String(o.total));
   }
   bits.push(...counts);
@@ -187,7 +183,7 @@ export async function runInlineTUI(options: {
 
   write(
     `${CYAN}${options.title}${RESET}\n` +
-      `${DIM}  Enter 发送 · 输入 / 唤出命令菜单（↑↓ 选择） · /card 切回全屏卡片 · Ctrl+C 退出${RESET}\n\n`
+      `${DIM}  Enter 发送 · 输入 / 唤出命令菜单（↑↓ 选择） · /card 切回全屏卡片 · Ctrl+C 退出${RESET}\n\n`,
   );
 
   // ── 输入代理：原始按键先过菜单拦截，再喂给 readline ─────────
@@ -196,8 +192,7 @@ export async function runInlineTUI(options: {
   const proxy = new PassThrough();
   Object.defineProperty(proxy, "isTTY", { value: true });
   Object.defineProperty(proxy, "setRawMode", {
-    value: (flag: boolean) =>
-      input.setRawMode?.(flag),
+    value: (flag: boolean) => input.setRawMode?.(flag),
   });
 
   const rl = readline.createInterface({
@@ -272,7 +267,7 @@ export async function runInlineTUI(options: {
   const completeInline = (): boolean => {
     const sel = menuItems[Math.min(menuIndex, menuItems.length - 1)];
     const line = rl.line ?? "";
-    if (!sel || !sel.name.startsWith(line)) return false;
+    if (!sel?.name.startsWith(line)) return false;
     const suffix = sel.name.slice(line.length);
     const awaitingArgument = Boolean(sel.requiresArgument && !line.includes(" "));
     if (suffix || awaitingArgument) proxy.write(`${suffix}${awaitingArgument ? " " : ""}`);
@@ -290,8 +285,7 @@ export async function runInlineTUI(options: {
       if (text === "\x1b[A" || text === "\x1b[B") {
         const n = menuItems.length;
         if (n) {
-          menuIndex =
-            text === "\x1b[A" ? (menuIndex - 1 + n) % n : (menuIndex + 1) % n;
+          menuIndex = text === "\x1b[A" ? (menuIndex - 1 + n) % n : (menuIndex + 1) % n;
           drawMenu();
         }
         return;
@@ -356,11 +350,8 @@ export async function runInlineTUI(options: {
     }
 
     if (isPrintableKey(text)) {
-      const candidate = rawLine === ""
-        ? text
-        : rawLine === "\u0000"
-          ? rawLine
-          : `${rawLine}${text}`;
+      const candidate =
+        rawLine === "" ? text : rawLine === "\u0000" ? rawLine : `${rawLine}${text}`;
       if (isLocalKeyCommandWithArgumentPrefix(candidate)) {
         rejectVisibleKeyArgument();
         return;
@@ -476,9 +467,7 @@ export async function runInlineTUI(options: {
             const name = p.toolName ?? "tool";
             if (p.toolCallId) toolStart.set(p.toolCallId, Date.now());
             const input = summarizeInput(p.input);
-            write(
-              `  ${DIM}⟳ ${name}${input ? ` ${input}` : ""}…${RESET}\n`
-            );
+            write(`  ${DIM}⟳ ${name}${input ? ` ${input}` : ""}…${RESET}\n`);
             break;
           }
           case "tool-result": {
@@ -488,7 +477,7 @@ export async function runInlineTUI(options: {
             const brief = summarizeResult(p.output);
             write(
               `  ${GREEN}✓${RESET} ${name}${dur ? ` ${DIM}· ${dur}${RESET}` : ""}` +
-                `${brief ? ` ${DIM}· ${brief}${RESET}` : ""}\n`
+                `${brief ? ` ${DIM}· ${brief}${RESET}` : ""}\n`,
             );
             break;
           }
@@ -538,10 +527,11 @@ export async function runInlineTUI(options: {
       }
       const total = fmtDuration(Date.now() - startedAt);
       const tokens =
-        usage &&
-        `↑${fmtTokens(usage.inputTokens)} ↓${fmtTokens(usage.outputTokens)} tokens`;
-      write(`  ${DIM}── ${abort.signal.aborted ? "已中断" : "完成"} · ${total}` +
-        `${tokens ? ` · ${tokens}` : ""}${RESET}\n\n`);
+        usage && `↑${fmtTokens(usage.inputTokens)} ↓${fmtTokens(usage.outputTokens)} tokens`;
+      write(
+        `  ${DIM}── ${abort.signal.aborted ? "已中断" : "完成"} · ${total}` +
+          `${tokens ? ` · ${tokens}` : ""}${RESET}\n\n`,
+      );
       activeAbort = null;
       rl.resume();
     }

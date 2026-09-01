@@ -31,11 +31,7 @@ export interface TermStartDate {
   recordedAt?: string;
 }
 
-const PROJECT_ROOT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  ".."
-);
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /** 数据目录（测试可用 RAPTOR_DATA_DIR 指到临时目录） */
 function dataDir(): string {
@@ -74,10 +70,7 @@ let cache: Record<string, TermStartDate> | null = null;
 export function loadStore(): Record<string, TermStartDate> {
   if (cache) return cache;
   try {
-    cache = JSON.parse(fs.readFileSync(storePath(), "utf8")) as Record<
-      string,
-      TermStartDate
-    >;
+    cache = JSON.parse(fs.readFileSync(storePath(), "utf8")) as Record<string, TermStartDate>;
   } catch {
     // 首次运行：用存量值播种并落盘，之后就以文件为准。
     // 但如果是文件写坏了（半截 JSON），静默用种子覆盖会把已经实测记录过的学期
@@ -108,7 +101,7 @@ export function recordWeek1Monday(
   semester: number,
   week1Monday: string,
   source: TermDateSource,
-  evidence?: string
+  evidence?: string,
 ): TermStartDate {
   const store = loadStore();
   const key = termKey(year, semester);
@@ -155,19 +148,16 @@ function estimatedWeek1(year: number, semester: number): string {
  * 从通知正文里解析开学日期。
  * 命中即返回该周的周一，并附上原始句子作为证据。
  */
-export function parseTermStartDate(
-  text: string
-): { week1Monday: string; evidence: string } | null {
+export function parseTermStartDate(text: string): { week1Monday: string; evidence: string } | null {
   if (!text) return null;
   const flat = text.replace(/\s+/g, " ");
   const ctxYear = new Date().getFullYear();
 
   // 候选：(年月日, 是否被「开学/上课/第一周」语义锚定, 证据句)
-  const candidates: Array<{ y: number; m: number; d: number; evidence: string; score: number }> = [];
+  const candidates: Array<{ y: number; m: number; d: number; evidence: string; score: number }> =
+    [];
 
-  const push = (
-    y: number, m: number, d: number, sentence: string, score: number
-  ) => {
+  const push = (y: number, m: number, d: number, sentence: string, score: number) => {
     if (m < 1 || m > 12 || d < 1 || d > 31) return;
     candidates.push({ y, m, d, evidence: sentence.trim().slice(0, 120), score });
   };
@@ -182,9 +172,7 @@ export function parseTermStartDate(
     const hasTermWord = /第一周从|第1周从/.test(s);
 
     // ① 强信号：「第一周从 2026-08-31（周一）开始」
-    const m1 = s.match(
-      /第[一1]周从\s*(\d{4})\s*[-/年]\s*(\d{1,2})\s*[-/月]\s*(\d{1,2})/
-    );
+    const m1 = s.match(/第[一1]周从\s*(\d{4})\s*[-/年]\s*(\d{1,2})\s*[-/月]\s*(\d{1,2})/);
     if (m1) {
       push(+m1[1], +m1[2], +m1[3], s, 100);
       continue;
@@ -192,7 +180,7 @@ export function parseTermStartDate(
 
     // ② 「2026年8月31日（星期一）正式上课」/「8月31日开学」（容忍「8 月 31 日」这类空格）
     const m2 = s.match(
-      /(?:(\d{4})\s*[-/年]\s*)?(\d{1,2})\s*[-/月]\s*(\d{1,2})\s*日?\s*[（(]?\s*周[一二三四五六日天]\s*[)）]?\s*[^，。]{0,6}?(正式上课|开始上课|开学)/
+      /(?:(\d{4})\s*[-/年]\s*)?(\d{1,2})\s*[-/月]\s*(\d{1,2})\s*日?\s*[（(]?\s*周[一二三四五六日天]\s*[)）]?\s*[^，。]{0,6}?(正式上课|开始上课|开学)/,
     );
     if (m2) {
       push(m2[1] ? +m2[1] : ctxYear, +m2[2], +m2[3], s, hasTermWord ? 95 : 80);
@@ -201,7 +189,7 @@ export function parseTermStartDate(
 
     // ③ 「8月31日起开始上课」「于8月31日开学」
     const m3 = s.match(
-      /(?:(\d{4})\s*[-/年]\s*)?(\d{1,2})\s*[-/月]\s*(\d{1,2})\s*日?[^。]{0,8}?(正式上课|开始上课|开学)/
+      /(?:(\d{4})\s*[-/年]\s*)?(\d{1,2})\s*[-/月]\s*(\d{1,2})\s*日?[^。]{0,8}?(正式上课|开始上课|开学)/,
     );
     if (m3 && hasStartWord) {
       push(m3[1] ? +m3[1] : ctxYear, +m3[2], +m3[3], s, 60);
@@ -210,7 +198,7 @@ export function parseTermStartDate(
 
     // ④ 「开学时间：2026-08-31」（日期在语义词之后）
     const m4 = s.match(
-      /(开学|正式上课|开始上课|第一周)[^0-9]{0,8}(\d{4})\s*[-/年]\s*(\d{1,2})\s*[-/月]\s*(\d{1,2})/
+      /(开学|正式上课|开始上课|第一周)[^0-9]{0,8}(\d{4})\s*[-/年]\s*(\d{1,2})\s*[-/月]\s*(\d{1,2})/,
     );
     if (m4) {
       push(+m4[2], +m4[3], +m4[4], s, hasTermWord ? 90 : 50);
@@ -220,7 +208,9 @@ export function parseTermStartDate(
   if (!candidates.length) return null;
 
   // 取分数最高的；同分取日期最早的（开学日一般早于注册/补退选日期）
-  candidates.sort((a, b) => b.score - a.score || (a.y * 400 + a.m * 32 + a.d) - (b.y * 400 + b.m * 32 + b.d));
+  candidates.sort(
+    (a, b) => b.score - a.score || a.y * 400 + a.m * 32 + a.d - (b.y * 400 + b.m * 32 + b.d),
+  );
   const best = candidates[0];
   return { week1Monday: mondayOf(best.y, best.m, best.d), evidence: best.evidence };
 }
@@ -229,9 +219,7 @@ export function parseTermStartDate(
  * 解析学期归属：从通知正文里找「2026-2027学年第一学期」这类表述
  * 找不到时按日期推断（8 月及以后属于当年秋学期）
  */
-export function parseTermRef(
-  text: string
-): { year: number; semester: number } | null {
+export function parseTermRef(text: string): { year: number; semester: number } | null {
   const m = text.match(/(\d{4})\s*[-–—~]\s*(\d{4})\s*学年\s*第?\s*([一1二2])\s*学期/);
   if (m) return { year: parseInt(m[1], 10), semester: m[3] === "1" || m[3] === "一" ? 3 : 12 };
 
@@ -247,10 +235,7 @@ export function parseTermRef(
  * 取某学期的开学日期。查不到就估算，并明确标注 estimated——
  * 调用方必须把这个标记透传出去，不能当成既定事实讲给用户。
  */
-export function resolveWeek1Monday(
-  year: number,
-  semester: number
-): TermStartDate {
+export function resolveWeek1Monday(year: number, semester: number): TermStartDate {
   const store = loadStore();
   const hit = store[termKey(year, semester)];
   if (hit) return hit;
@@ -268,7 +253,7 @@ export function resolveWeek1Monday(
 /** 当前教学周；未开学或超出 30 周返回 null */
 export function currentWeekOf(
   year: number,
-  semester: number
+  semester: number,
 ): { week: number; week1Monday: string; source: TermDateSource; evidence?: string } | null {
   const info = resolveWeek1Monday(year, semester);
   const start = new Date(`${info.week1Monday}T00:00:00`).getTime();

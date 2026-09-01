@@ -21,10 +21,7 @@ import { fileURLToPath } from "node:url";
 import type { ModelMessage } from "ai";
 import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
 
-const PROJECT_ROOT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  ".."
-);
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /** 数据目录（测试可用 RAPTOR_DATA_DIR 指到临时目录） */
 function dataDir(): string {
@@ -106,7 +103,7 @@ const byRecent = (a: ChatSession, b: ChatSession): number => b.updatedAt - a.upd
 /** 一行标题：首问压成空格并截断；渠道前缀（如「QQ」）拼在最前面 */
 function titleOf(text: string, prefix?: string): string {
   const flat = text.replace(/\s+/g, " ").trim();
-  const topic = flat.length > 24 ? flat.slice(0, 24) + "…" : flat;
+  const topic = flat.length > 24 ? `${flat.slice(0, 24)}…` : flat;
   const p = prefix?.trim();
   return p ? `${p}｜${topic}` : topic;
 }
@@ -115,9 +112,7 @@ function titleOf(text: string, prefix?: string): string {
 function clampThink(text: string | null | undefined): string | null {
   const t = text?.trim();
   if (!t) return null;
-  return t.length > MAX_THINK_CHARS
-    ? `${t.slice(0, MAX_THINK_CHARS)}…（思考内容过长，已截断）`
-    : t;
+  return t.length > MAX_THINK_CHARS ? `${t.slice(0, MAX_THINK_CHARS)}…（思考内容过长，已截断）` : t;
 }
 
 export function listSessions(): SessionMeta[] {
@@ -163,7 +158,7 @@ export function appendRound(
   }
   const now = Date.now();
   s.messages.push({ role: "user", text: userText, ts: now });
-  if (assistantText && assistantText.trim()) {
+  if (assistantText?.trim()) {
     const msg: StoredMessage = { role: "assistant", text: assistantText.trim(), ts: now };
     const think = clampThink(reasoningText);
     if (think) msg.think = think;
@@ -185,11 +180,14 @@ export function appendRound(
 export function contextMessages(id: string): ModelMessage[] {
   const s = getSession(id);
   if (!s) return [];
-  return s.messages.slice(-CONTEXT_WINDOW).map((m): ModelMessage =>
-    m.role === "user"
-      ? { role: "user", content: m.text }
-      : { role: "assistant", content: [{ type: "text", text: m.text }] },
-  );
+  return s.messages
+    .slice(-CONTEXT_WINDOW)
+    .map(
+      (m): ModelMessage =>
+        m.role === "user"
+          ? { role: "user", content: m.text }
+          : { role: "assistant", content: [{ type: "text", text: m.text }] },
+    );
 }
 
 /** 清空全部会话档案（/api/reset 背后，UI 不挂按钮，留给自救与测试） */

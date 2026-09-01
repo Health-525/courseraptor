@@ -11,8 +11,8 @@
  * 5. 结果缓存 2 分钟：挡住一次提问里连续调用把免费接口打爆。
  */
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 
 const {
   weatherText,
@@ -64,7 +64,7 @@ const FORECAST_FIXTURE = JSON.stringify({
 
 /** 假 fetch：按 URL 前缀路由，并记下每次被请求的地址 */
 function stubFetch(
-  routes: Array<{ match: string; body?: string; status?: number; throw?: Error }>
+  routes: Array<{ match: string; body?: string; status?: number; throw?: Error }>,
 ) {
   const calls: string[] = [];
   const impl = async (url: string) => {
@@ -172,10 +172,7 @@ test("同名地点按人口挑大的，人口缺失时比行政级别", () => {
 test("百万人口或一二级政区驻地才算可信城市", () => {
   assert.equal(isMajorCity(GEO), true); // 9314685
   assert.equal(isMajorCity({ ...GEO, population: undefined }), true); // PPLA 本身即驻地
-  assert.equal(
-    isMajorCity({ ...GEO, featureCode: "PPLA4", population: 112644 }),
-    false
-  );
+  assert.equal(isMajorCity({ ...GEO, featureCode: "PPLA4", population: 112644 }), false);
   assert.equal(isMajorCity(null), false);
 });
 
@@ -203,12 +200,9 @@ test("is_day 为 0 或缺失时都不许说成白天", () => {
   // NaN !== 0 为真，字段缺失若按「不等于 0 就是白天」处理会在夜里报「白天」
   assert.equal(
     parseForecast(FORECAST_FIXTURE.replace('"is_day":1', '"is_day":0'), GEO).now.isDay,
-    false
+    false,
   );
-  assert.equal(
-    parseForecast(FORECAST_FIXTURE.replace(',"is_day":1', ""), GEO).now.isDay,
-    false
-  );
+  assert.equal(parseForecast(FORECAST_FIXTURE.replace(',"is_day":1', ""), GEO).now.isDay, false);
 });
 
 test("结构不对的响应抛错，由上层转成失败（不返回半个报告）", () => {
@@ -258,10 +252,13 @@ test("近三天降水概率高 → 建议带伞并给出概率", () => {
 
 test("第 4 天以后的雨不催带伞", () => {
   const days: DayArg[] = Array.from({ length: 6 }, (_, i) =>
-    makeDay({ date: `2026-09-0${i + 1}`, rainChance: i >= 3 ? 90 : 5 })
+    makeDay({ date: `2026-09-0${i + 1}`, rainChance: i >= 3 ? 90 : 5 }),
   );
   const advice = buildAdvice(makeNow(), days);
-  assert.equal(advice.some((a) => a.includes("带伞")), false);
+  assert.equal(
+    advice.some((a) => a.includes("带伞")),
+    false,
+  );
 });
 
 test("正在下雨时先说当前带伞", () => {
@@ -271,11 +268,13 @@ test("正在下雨时先说当前带伞", () => {
 
 test("昼夜温差大要提醒加衣，温差小就不啰嗦", () => {
   const big = [makeDay({ date: "2026-11-02", weekday: "周一", maxC: 20, minC: 9, rainChance: 0 })];
-  const small = [makeDay({ date: "2026-11-02", weekday: "周一", maxC: 18, minC: 14, rainChance: 0 })];
+  const small = [
+    makeDay({ date: "2026-11-02", weekday: "周一", maxC: 18, minC: 14, rainChance: 0 }),
+  ];
   assert.match(buildAdvice(makeNow(), big)[0], /温差/);
   assert.equal(
     buildAdvice(makeNow(), small).some((a) => a.includes("温差")),
-    false
+    false,
   );
 });
 
@@ -377,7 +376,7 @@ test("海口这种同名小地名会自动补查「海口市」，挑中海南�
   assert.equal(
     calls.filter((u) => u.includes("geocoding")).length,
     2,
-    "只在第一轮不够可信时补查一次"
+    "只在第一轮不够可信时补查一次",
   );
 });
 

@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
 import { PassThrough } from "node:stream";
+import { test } from "node:test";
 import { runAgentTUI } from "@ai-sdk/tui";
 import { createKeyProxy } from "../src/tui/keys";
 
-const waitForIO = (): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, 30));
+const waitForIO = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 30));
 
 test("卡片模式无参 /key 请求外层安全设置流程，不提交给 Agent", async () => {
   const stdin = new PassThrough();

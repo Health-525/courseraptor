@@ -8,11 +8,11 @@
  *    /api/sessions/:id 详情都能读到，且不会串进网页自己的会话上下文
  */
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { test } from "node:test";
 
 // 与真实数据目录隔离（必须在 import chat-sessions 之前设好）
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-qq-arch-"));
@@ -42,9 +42,27 @@ test("私聊按人分档：同一 openid 每轮同一档案，不同 openid 互�
 });
 
 test("群聊按群分档：同群不同人进同一档案，提问带 [昵称] 才分得清是谁", () => {
-  const g1 = qqArchiveSlot({ kind: "group", groupOpenid: "GROUP_X", senderId: "u1", senderName: "张三", content: "课表发下" });
-  const g2 = qqArchiveSlot({ kind: "group", groupOpenid: "GROUP_X", senderId: "u2", senderName: "李四", content: "周日有课吗" });
-  const other = qqArchiveSlot({ kind: "group", groupOpenid: "GROUP_Y", senderId: "u1", senderName: "张三", content: "课表发下" });
+  const g1 = qqArchiveSlot({
+    kind: "group",
+    groupOpenid: "GROUP_X",
+    senderId: "u1",
+    senderName: "张三",
+    content: "课表发下",
+  });
+  const g2 = qqArchiveSlot({
+    kind: "group",
+    groupOpenid: "GROUP_X",
+    senderId: "u2",
+    senderName: "李四",
+    content: "周日有课吗",
+  });
+  const other = qqArchiveSlot({
+    kind: "group",
+    groupOpenid: "GROUP_Y",
+    senderId: "u1",
+    senderName: "张三",
+    content: "课表发下",
+  });
   assert.ok(g1 && g2 && other);
   assert.equal(g1.id, g2.id, "同一个群合成一档");
   assert.notEqual(g1.id, other.id, "不同群分开");
@@ -154,7 +172,7 @@ test("桥的落盘入口 archiveQQRound：写对档案，认不出归属时一�
   assert.equal(session.title, "QQ｜体育课上完了吗");
   assert.deepEqual(
     S.getSession(session.id)?.messages.map((m) => m.text),
-    ["体育课上完了吗", "周四第 3 节"]
+    ["体育课上完了吗", "周四第 3 节"],
   );
 
   // 认不出是谁发的：宁可不记，也不能糊进别人的档案

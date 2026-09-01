@@ -12,20 +12,19 @@
  */
 
 import fs from "node:fs/promises";
-import path from "node:path";
 import { createRequire } from "node:module";
-
-import { config } from "./config";
+import path from "node:path";
 import {
-  findByUrl,
-  findByLocalPath,
-  getMeta,
-  readStoredBuffer,
-  putAttachment,
-  touchAttachment,
-  attachmentIdForSource,
   type AttachmentMeta,
+  attachmentIdForSource,
+  findByLocalPath,
+  findByUrl,
+  getMeta,
+  putAttachment,
+  readStoredBuffer,
+  touchAttachment,
 } from "./attachment-store";
+import { config } from "./config";
 import { isTableFilename, loadWorkbook, sheetOverview, type TableSheet } from "./spreadsheet";
 
 const require = createRequire(import.meta.url);
@@ -103,13 +102,13 @@ const TEXT_EXT_RE = /\.(docx|pdf|txt|md|log|json|html?)$/i;
 /** docx/pdf 抽全文；txt/md 等直接解码。解析不出内容返回 null */
 async function extractText(
   buf: Buffer,
-  filename: string
+  filename: string,
 ): Promise<{ format: string; text: string } | null> {
   const ext = filename.toLowerCase().match(/\.([a-z0-9]{1,8})$/)?.[1] ?? "";
   try {
     if (ext === "pdf") {
       const pdfParse = require("pdf-parse/lib/pdf-parse.js") as (
-        b: Buffer
+        b: Buffer,
       ) => Promise<{ text: string }>;
       const r = await pdfParse(buf);
       return { format: "pdf", text: r.text };
@@ -135,7 +134,7 @@ function searchText(
   text: string,
   keyword: string,
   radius = 160,
-  maxMatches = 30
+  maxMatches = 30,
 ): { matchCount: number; matches: string[] } {
   const hay = text.toLowerCase();
   const needle = keyword.trim().toLowerCase();
@@ -150,7 +149,7 @@ function searchText(
       const start = Math.max(0, at - radius);
       const end = Math.min(text.length, at + needle.length + radius);
       matches.push(
-        `${start > 0 ? "…" : ""}${text.slice(start, end).replace(/\s+/g, " ").trim()}${end < text.length ? "…" : ""}`
+        `${start > 0 ? "…" : ""}${text.slice(start, end).replace(/\s+/g, " ").trim()}${end < text.length ? "…" : ""}`,
       );
     }
     from = at + needle.length;
@@ -161,7 +160,7 @@ function searchText(
 function textResult(
   meta: { id: string; filename: string; format: string },
   text: string,
-  opts: AnalyzeOpts
+  opts: AnalyzeOpts,
 ): AttachmentResult {
   const charCount = text.length;
   if (opts.keyword?.trim()) {
@@ -204,7 +203,7 @@ async function analyzeBuffer(
   buf: Buffer,
   filename: string,
   source: { type: "url"; url: string } | { type: "local"; path: string },
-  opts: AnalyzeOpts
+  opts: AnalyzeOpts,
 ): Promise<AttachmentResult> {
   const id =
     source.type === "url"
@@ -215,7 +214,7 @@ async function analyzeBuffer(
   const existing = getMeta(id);
   const reused = existing && existing.size === buf.length ? existing : null;
   const register = (
-    input: Omit<Parameters<typeof putAttachment>[0], "id">
+    input: Omit<Parameters<typeof putAttachment>[0], "id">,
   ): Promise<AttachmentMeta> =>
     reused ? Promise.resolve(reused) : putAttachment({ id, ...input });
 
@@ -226,7 +225,7 @@ async function analyzeBuffer(
       const meta = await register({
         filename,
         kind: "table",
-        format: (filename.toLowerCase().match(/\.([a-z0-9]+)$/) ?? [, "bin"])[1],
+        format: (filename.toLowerCase().match(/\.([a-z0-9]+)$/) ?? [undefined, "bin"])[1],
         source: source.type,
         ...(source.type === "url" ? { url: source.url } : { originPath: source.path }),
         buf,
@@ -238,7 +237,7 @@ async function analyzeBuffer(
 
   // 2) 文本类：全文缓存 + 分页/检索视图
   const parsed = await extractText(buf, filename);
-  if (parsed && parsed.text.trim()) {
+  if (parsed?.text.trim()) {
     const meta = await register({
       filename,
       kind: "text",
@@ -255,7 +254,7 @@ async function analyzeBuffer(
   const meta = await register({
     filename,
     kind: "other",
-    format: (filename.toLowerCase().match(/\.([a-z0-9]+)$/) ?? [, "bin"])[1],
+    format: (filename.toLowerCase().match(/\.([a-z0-9]+)$/) ?? [undefined, "bin"])[1],
     source: source.type,
     ...(source.type === "url" ? { url: source.url } : { originPath: source.path }),
     buf,
@@ -286,7 +285,7 @@ async function analyzeBuffer(
 function tableResult(
   meta: AttachmentMeta,
   sheets: TableSheet[],
-  opts: AnalyzeOpts
+  opts: AnalyzeOpts,
 ): AttachmentResult {
   return {
     mode: "table",
@@ -370,9 +369,7 @@ async function getOcrWorker() {
  * 首次请求返回验证码页 -> 拉验证码图 -> OCR 识别 -> 带 codeValue 重试。
  * 验证码存于 session，全程必须复用同一 cookie。识别失败自动换新码重试。
  */
-async function downloadWithCaptcha(
-  url: string
-): Promise<{ buf: Buffer; contentType: string }> {
+async function downloadWithCaptcha(url: string): Promise<{ buf: Buffer; contentType: string }> {
   if (!CAPTCHA_OCR_ENABLED) {
     throw new Error(CAPTCHA_DISABLED_MSG);
   }
@@ -392,7 +389,7 @@ async function downloadWithCaptcha(
       const key = kv.split("=")[0];
       cookie = cookie
         .split("; ")
-        .filter((x) => x && !x.startsWith(key + "="))
+        .filter((x) => x && !x.startsWith(`${key}=`))
         .concat(kv)
         .join("; ");
     }
@@ -414,15 +411,15 @@ async function downloadWithCaptcha(
 
     // 验证码页：拉图 + OCR（worker 常驻，不重复加载模型）
     const imgUrl = new URL(
-      "/system/resource/js/filedownload/createimage.jsp?randnum=" + Date.now(),
-      url
+      `/system/resource/js/filedownload/createimage.jsp?randnum=${Date.now()}`,
+      url,
     ).href;
     const img = await get(imgUrl);
     const code = await ocrCaptcha(img.buf);
     if (!code) continue;
 
     const file = await get(
-      url + (url.includes("?") ? "&" : "?") + "codeValue=" + encodeURIComponent(code)
+      `${url + (url.includes("?") ? "&" : "?")}codeValue=${encodeURIComponent(code)}`,
     );
     if (!file.type.includes("html")) {
       return { buf: file.buf, contentType: file.type };
@@ -431,7 +428,7 @@ async function downloadWithCaptcha(
   }
   throw new Error(
     `验证码识别失败（已重试 ${CAPTCHA_MAX_TRIES} 次）。可在浏览器中下载后手动提供文件；` +
-      `或确认该附件确属本人有权获取的内容后重试。`
+      `或确认该附件确属本人有权获取的内容后重试。`,
   );
 }
 
@@ -462,7 +459,7 @@ function sanitizeFilenameKeepExt(name: string): string {
 export async function fetchAttachment(
   url: string,
   name?: string,
-  opts: AnalyzeOpts = {}
+  opts: AnalyzeOpts = {},
 ): Promise<AttachmentResult> {
   // 0. 缓存优先：同一 URL 不重复下载（jwc 验证码链路尤其省）
   if (!opts.refresh) {
@@ -477,8 +474,7 @@ export async function fetchAttachment(
   }
 
   // jwc 的 download.jsp 带验证码，走专门链路；其余直链
-  const isJwcDownload =
-    /jwc\.njtech\.edu\.cn\/system\/_content\/download\.jsp/.test(url);
+  const isJwcDownload = /jwc\.njtech\.edu\.cn\/system\/_content\/download\.jsp/.test(url);
   let buf: Buffer;
   try {
     if (isJwcDownload) {
@@ -502,8 +498,7 @@ export async function fetchAttachment(
     throw e;
   }
 
-  const filename =
-    name || decodeURIComponent(new URL(url).pathname.split("/").pop() || "");
+  const filename = name || decodeURIComponent(new URL(url).pathname.split("/").pop() || "");
   return analyzeBuffer(buf, sanitizeFilenameKeepExt(filename), { type: "url", url }, opts);
 }
 
@@ -513,7 +508,7 @@ export async function fetchAttachment(
  */
 export async function openLocalFile(
   inputPath: string,
-  opts: AnalyzeOpts = {}
+  opts: AnalyzeOpts = {},
 ): Promise<AttachmentResult> {
   const abs = path.resolve(inputPath);
   let stat;
@@ -549,10 +544,11 @@ export async function openLocalFile(
 /** 从缓存按 id 重新出视图（query_table / 续读用，不重新下载） */
 export async function viewCachedAttachment(
   id: string,
-  opts: AnalyzeOpts
+  opts: AnalyzeOpts,
 ): Promise<AttachmentResult | { error: string }> {
   const meta = getMeta(id);
-  if (!meta) return { error: `缓存中不存在附件 ${id}（可能已清理）。用 fetch_attachment 重新获取。` };
+  if (!meta)
+    return { error: `缓存中不存在附件 ${id}（可能已清理）。用 fetch_attachment 重新获取。` };
   const buf = readStoredBuffer(meta.id);
   if (!buf) return { error: `缓存文件 ${id} 读取失败。` };
   touchAttachment(meta.id);

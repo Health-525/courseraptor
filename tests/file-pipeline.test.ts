@@ -7,12 +7,12 @@
  * 全程离线（不碰网络），数据目录隔离在临时路径。
  */
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
-import { createRequire } from "node:module";
+import { test } from "node:test";
 
 const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-pipeline-"));
 const tmpFiles = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-userfiles-"));
@@ -31,15 +31,17 @@ function makeCatalog(): string {
   aoa.push(["课程号", "课程名称", "学院", "学分", "上课时间"]);
   const majors = ["信息学院", "管理学院", "艺术学院"];
   for (let i = 1; i <= 300; i++) {
-    aoa.push([`K${String(i).padStart(4, "0")}`, `课程${i}`, majors[i % 3], String(1 + (i % 3)), `周${(i % 7) + 1}`]);
+    aoa.push([
+      `K${String(i).padStart(4, "0")}`,
+      `课程${i}`,
+      majors[i % 3],
+      String(1 + (i % 3)),
+      `周${(i % 7) + 1}`,
+    ]);
   }
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "总表");
-  XLSX.utils.book_append_sheet(
-    wb,
-    XLSX.utils.aoa_to_sheet([["说明：本目录仅供参考"]]),
-    "备注"
-  );
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["说明：本目录仅供参考"]]), "备注");
   const file = path.join(tmpFiles, "网课目录.xlsx");
   fs.writeFileSync(file, XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer);
   return file;
@@ -101,7 +103,10 @@ test("query_table 工具：筛选/排序/去重统计/分页全链路", async ()
   const values = await q.execute({ id, action: "values", sheet: "总表", col: "学院" });
   const vs = values.values as Array<{ value: string; count: number }>;
   assert.equal(vs.length, 3);
-  assert.equal(vs.reduce((s, x) => s + x.count, 0), 300);
+  assert.equal(
+    vs.reduce((s, x) => s + x.count, 0),
+    300,
+  );
 
   const bad = await q.execute({
     id,
@@ -117,7 +122,8 @@ test("query_table 工具：筛选/排序/去重统计/分页全链路", async ()
 
 test("长文本：分页续读 + keyword 定位（读得完，也不谎称没读全）", async () => {
   const paras: string[] = [];
-  for (let i = 0; i < 400; i++) paras.push(`第${i}段：这是用于占位的教务通知内容，涉及补考与重修安排。`);
+  for (let i = 0; i < 400; i++)
+    paras.push(`第${i}段：这是用于占位的教务通知内容，涉及补考与重修安排。`);
   paras.push("关键句：2026年秋季运动会因故取消，届时以新通知为准。");
   const file = path.join(tmpFiles, "长通知.txt");
   fs.writeFileSync(file, paras.join("\n"), "utf8");

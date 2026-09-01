@@ -1,10 +1,10 @@
-# 将 license.example.com 替换为你的实际子域名，然后复制到
+# 将 updates.example.com 替换为你的实际子域名，然后复制到
 # /etc/nginx/sites-available/courseraptor 并建立 sites-enabled 软链接。
-# 证书可先用 certbot --nginx -d license.example.com 申请；申请后确认下方路径正确。
+# 证书可先用 certbot --nginx -d updates.example.com 申请；申请后确认下方路径正确。
 
 server {
     listen 80;
-    server_name license.example.com;
+    server_name updates.example.com;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -17,10 +17,10 @@ server {
 
 server {
     listen 443 ssl http2;
-    server_name license.example.com;
+    server_name updates.example.com;
 
-    ssl_certificate /etc/letsencrypt/live/license.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/license.example.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/updates.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/updates.example.com/privkey.pem;
     add_header Strict-Transport-Security "max-age=31536000" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header Referrer-Policy "no-referrer" always;

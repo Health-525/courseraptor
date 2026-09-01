@@ -6,19 +6,19 @@
  * 解析函数是纯函数，钉住它们之后，教务系统改版时测试先挂、而不是用户拿到空列表。
  */
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 
 import {
-  parseCourseList,
-  parseCourseRowsFromHtml,
-  parseCoursePage,
-  parseXkStatus,
+  buildCourseListForm,
   isSessionExpired,
   matchTargets,
-  buildCourseListForm,
-  type XkSession,
+  parseCourseList,
+  parseCoursePage,
+  parseCourseRowsFromHtml,
+  parseXkStatus,
   type XkRound,
+  type XkSession,
 } from "../src/jwgl/xk";
 
 // ── parseCourseList（JSON 路径）──────────────────────────────

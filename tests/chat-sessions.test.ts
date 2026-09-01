@@ -5,11 +5,11 @@
  * 形状、显示存档/上下文窗口两级截断、删除与清空。
  */
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { test } from "node:test";
 
 // 与真实数据目录隔离
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-sessions-"));
@@ -21,10 +21,7 @@ test("appendRound 自动建档：标题取首问，列表按最近活跃返回",
   S.appendRound("bbbb2222", "另一个会话的问题", "回答二");
   const list = S.listSessions();
   assert.equal(list.length, 2);
-  assert.deepEqual(
-    list.map((x) => x.title).sort(),
-    ["另一个会话的问题", "第一个问题"],
-  );
+  assert.deepEqual(list.map((x) => x.title).sort(), ["另一个会话的问题", "第一个问题"]);
   const s = S.getSession("aaaa1111");
   assert.ok(s);
   assert.equal(s.messages.length, 2);
@@ -79,7 +76,7 @@ test("contextMessages 输出 ModelMessage 形状（user 纯串 / assistant 块�
 });
 
 test("长会话两级截断：显示存档 ≤ MAX_STORED_MSGS，上下文只取最后窗口", () => {
-  for (let i = 0; i < 130; i++) S.appendRound("dddd4444", "问题" + i, "回答" + i);
+  for (let i = 0; i < 130; i++) S.appendRound("dddd4444", `问题${i}`, `回答${i}`);
   const s = S.getSession("dddd4444");
   assert.ok(s);
   assert.ok(s.messages.length <= S.MAX_STORED_MSGS, "显示存档要封顶");

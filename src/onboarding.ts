@@ -5,7 +5,7 @@
 
 import readline from "node:readline/promises";
 
-import { config, maskDeepSeekApiKey, type DeepSeekApiKeySource } from "./config";
+import { config, type DeepSeekApiKeySource, maskDeepSeekApiKey } from "./config";
 import { saveCredentialsStore, saveStoredCredentials } from "./credentials";
 import { loginJwgl } from "./jwgl/auth";
 import { createMutedTerminalOutput } from "./secret-input";

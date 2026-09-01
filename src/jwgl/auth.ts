@@ -16,24 +16,17 @@ export interface JwglSession {
 /**
  * 登录教务系统，返回 session（含 cookie）
  */
-export async function loginJwgl(
-  username: string,
-  password: string
-): Promise<JwglSession> {
+export async function loginJwgl(username: string, password: string): Promise<JwglSession> {
   const client = createClient(BASE);
 
   // Step 1: 获取登录页面 -> 提取 CSRF token
   const pg = await client.req("/xtgl/login_slogin.html");
-  const csrfMatch = pg.body.match(
-    /id="csrftoken"[^>]*value="([^"]+)"/
-  );
+  const csrfMatch = pg.body.match(/id="csrftoken"[^>]*value="([^"]+)"/);
   const csrf = csrfMatch ? csrfMatch[1].split(",")[0] : "";
   if (!csrf) throw new Error("无法提取 CSRF token");
 
   // Step 2: 获取 RSA 公钥
-  const keyResp = await client.req(
-    "/xtgl/login_getPublicKey.html?time=" + Date.now()
-  );
+  const keyResp = await client.req(`/xtgl/login_getPublicKey.html?time=${Date.now()}`);
   const keyData = JSON.parse(keyResp.body);
   const { modulus, exponent } = keyData;
 
@@ -49,7 +42,11 @@ export async function loginJwgl(
   // 正方教务系统登录失败时仍返回 200，但响应体包含错误信息
   const body = loginResp.body || "";
 
-  if (body.includes("用户名或密码不正确") || body.includes("密码错误") || body.includes("验证码错误")) {
+  if (
+    body.includes("用户名或密码不正确") ||
+    body.includes("密码错误") ||
+    body.includes("验证码错误")
+  ) {
     throw new Error("学号或密码不正确");
   }
 
@@ -60,7 +57,7 @@ export async function loginJwgl(
 
   // 检查 cookie 是否包含 JSESSIONID - 登录成功的标志
   const cookie = client.getCookie();
-  if (!cookie || !cookie.includes("JSESSIONID")) {
+  if (!cookie?.includes("JSESSIONID")) {
     throw new Error("登录失败：未获取到有效会话");
   }
 

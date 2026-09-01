@@ -16,10 +16,7 @@ import { fileURLToPath } from "node:url";
 import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
 import type { ScheduleResult } from "./jwgl/academics";
 
-const PROJECT_ROOT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  ".."
-);
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 /** 数据目录（测试可用 RAPTOR_DATA_DIR 指到临时目录） */
 function dataDir(): string {

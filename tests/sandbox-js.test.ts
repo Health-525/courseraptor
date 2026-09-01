@@ -6,8 +6,8 @@
  * eval 式完成值、console 捕获、越界写法静态拒绝、死循环限时掐断、输出截断。
  */
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 
 import { runSandboxedJs } from "../src/sandbox-js";
 

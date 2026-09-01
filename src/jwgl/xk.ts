@@ -6,9 +6,9 @@
  * `scripts/xk.ts inspect` dump 原始响应进行校准，只需调整常量。
  */
 
-import { loginJwgl, BASE } from "./auth";
-import { createClient } from "./http";
+import { BASE, loginJwgl } from "./auth";
 import type { HttpClient } from "./http";
+import { createClient } from "./http";
 
 // ── 接口路径常量（已从官方前端 zzxkYzb.js 逆向确认）──────────────
 /**
@@ -80,7 +80,7 @@ export function refOfRound(r: XkRound): XkRoundRef {
  */
 export function roundRefOf(
   course: Pick<XkCourse, "kklxdm" | "xkkzId" | "xkkzXh">,
-  session: XkSession
+  session: XkSession,
 ): XkRoundRef {
   return {
     kklxdm: course.kklxdm ?? "",
@@ -152,7 +152,7 @@ function pickNumber(raw: Record<string, unknown>, keys: string[]): number {
     const v = raw[k];
     if (v !== undefined && v !== null && v !== "") {
       const n = typeof v === "number" ? v : parseInt(String(v), 10);
-      if (!isNaN(n)) return n;
+      if (!Number.isNaN(n)) return n;
     }
   }
   return 0;
@@ -191,38 +191,17 @@ export function parseCourseList(json: unknown): XkCourse[] {
 
   return list.map((item) => {
     // 新版嵌套结构：jxb（教学班）/ kkxx（开课信息）
-    const obj = (item && typeof item === "object" ? item : {}) as Record<
+    const obj = (item && typeof item === "object" ? item : {}) as Record<string, unknown>;
+    const jxb = (obj.jxb && typeof obj.jxb === "object" ? obj.jxb : {}) as Record<string, unknown>;
+    const kkxx = (obj.kkxx && typeof obj.kkxx === "object" ? obj.kkxx : {}) as Record<
       string,
       unknown
     >;
-    const jxb = (obj.jxb && typeof obj.jxb === "object" ? obj.jxb : {}) as Record<
-      string,
-      unknown
-    >;
-    const kkxx = (obj.kkxx && typeof obj.kkxx === "object"
-      ? obj.kkxx
-      : {}) as Record<string, unknown>;
     const merged: Record<string, unknown> = { ...kkxx, ...obj, ...jxb };
 
-    const capacity = pickNumber(merged, [
-      "jxbrl",
-      "jxb_rl",
-      "rl",
-      "capacity",
-    ]);
-    const selected = pickNumber(merged, [
-      "yxzrs",
-      "yxjxrs",
-      "xkrs",
-      "yxbrs",
-      "jxbrs",
-    ]);
-    const remain = pickNumber(merged, [
-      "syrl",
-      "jg0xxrs",
-      "kxrs",
-      "remain",
-    ]);
+    const capacity = pickNumber(merged, ["jxbrl", "jxb_rl", "rl", "capacity"]);
+    const selected = pickNumber(merged, ["yxzrs", "yxjxrs", "xkrs", "yxbrs", "jxbrs"]);
+    const remain = pickNumber(merged, ["syrl", "jg0xxrs", "kxrs", "remain"]);
     // 通识课/网课无容量字段（PartDisplay 平铺结构只有 jxb_id/kcmc/kch/jxbxf/kzmc），
     // 此时 capacity=selected=0，判定为不限容量
     const unlimited =
@@ -234,12 +213,7 @@ export function parseCourseList(json: unknown): XkCourse[] {
       selected === 0;
 
     return {
-      jxbId: pickString(merged, [
-        "jxb_id",
-        "jxbid",
-        "do_jxb_id",
-        "do_jxbid",
-      ]),
+      jxbId: pickString(merged, ["jxb_id", "jxbid", "do_jxb_id", "do_jxbid"]),
       courseCode: pickString(merged, ["kch", "kch_id", "courseCode"]),
       courseName: pickString(merged, ["kcmc", "kcm", "courseName"]),
       teacher: pickString(merged, ["jsxx", "jgxm", "teacher"]),
@@ -248,11 +222,7 @@ export function parseCourseList(json: unknown): XkCourse[] {
       capacity,
       selected,
       // 部分学校不返回 remain 字段，用容量-已选兜底；不限容量课恒为正
-      remain: unlimited
-        ? 9999
-        : remain > 0
-          ? remain
-          : Math.max(0, capacity - selected),
+      remain: unlimited ? 9999 : remain > 0 ? remain : Math.max(0, capacity - selected),
       unlimited,
       raw: obj,
     };
@@ -274,7 +244,7 @@ export function parseXkStatus(html: string): {
   const xkkz = html.match(/id="firstXkkzId"[^>]*value="([^"]*)"/);
   return {
     isXkOpen: iskxk?.[1] === "1",
-    xkkzId: xkkz && xkkz[1] ? xkkz[1] : null,
+    xkkzId: xkkz?.[1] ? xkkz[1] : null,
   };
 }
 
@@ -284,9 +254,7 @@ export function parseXkStatus(html: string): {
 export function isSessionExpired(body: string): boolean {
   if (!body) return false;
   return (
-    body.includes("login_slogin") ||
-    body.includes('id="csrftoken"') ||
-    body.includes("用户登录")
+    body.includes("login_slogin") || body.includes('id="csrftoken"') || body.includes("用户登录")
   );
 }
 
@@ -308,10 +276,7 @@ export function matchTargets(course: XkCourse, targets: XkTarget[]): boolean {
  * 登录并进入选课，返回选课会话（含选课控制 ID 与开放状态）
  * 复刻浏览器时序：登录 -> 入口页（取 iskxk/xkkz_id/csrftoken）-> Display 预热
  */
-export async function openXkSession(
-  username: string,
-  password: string
-): Promise<XkSession> {
+export async function openXkSession(username: string, password: string): Promise<XkSession> {
   // 1. 登录教务系统
   const { cookie } = await loginJwgl(username, password);
 
@@ -334,7 +299,7 @@ export async function openXkSession(
   // 每个轮次参数独立（通识选修轮 ≠ 首轮），提交必须用课程所在轮次的参数
   const rounds: XkRound[] = [];
   for (const t of entry.body.matchAll(
-    /queryCourse\(this,'(\w+)','(\w+)','(\w*)','(\w*)','(\w+)'\)/g
+    /queryCourse\(this,'(\w+)','(\w+)','(\w*)','(\w*)','(\w+)'\)/g,
   )) {
     const tabName =
       entry.body.match(new RegExp(`id="tab_kklx_${t[1]}_[^"]*"[^>]*>([^<]*)<`))?.[1]?.trim() ?? "";
@@ -351,10 +316,20 @@ export async function openXkSession(
   // 3.7 提取入口页学生维度字段（PartDisplay 查询必须携带）
   const studentParams: Record<string, string> = {};
   for (const [id, key] of [
-    ["xqh_id", "xqh_id"], ["jg_id_1", "jg_id"], ["xz", "xz"], ["ccdm", "ccdm"],
-    ["xslbdm", "xslbdm"], ["bh_id", "bh_id"], ["xbm", "xbm"], ["mzm", "mzm"],
-    ["xsbj", "xsbj"], ["njdm_id_1", "njdm_id_1"], ["zyh_id_1", "zyh_id_1"],
-    ["zyfx_id", "zyfx_id"], ["xkxnm", "xkxnm"], ["xkxqm", "xkxqm"],
+    ["xqh_id", "xqh_id"],
+    ["jg_id_1", "jg_id"],
+    ["xz", "xz"],
+    ["ccdm", "ccdm"],
+    ["xslbdm", "xslbdm"],
+    ["bh_id", "bh_id"],
+    ["xbm", "xbm"],
+    ["mzm", "mzm"],
+    ["xsbj", "xsbj"],
+    ["njdm_id_1", "njdm_id_1"],
+    ["zyh_id_1", "zyh_id_1"],
+    ["zyfx_id", "zyfx_id"],
+    ["xkxnm", "xkxnm"],
+    ["xkxqm", "xkxqm"],
   ] as const) {
     const m = entry.body.match(new RegExp(`id="${id}"[^>]*value="([^"]*)"`));
     if (m) studentParams[key] = m[1];
@@ -424,7 +399,7 @@ export function buildCourseListForm(
   session: XkSession,
   round: XkRound,
   keyword?: string,
-  page = { kspage: "1", jspage: "100" }
+  page = { kspage: "1", jspage: "100" },
 ): Record<string, string> {
   return {
     csrftoken: session.csrftoken,
@@ -453,9 +428,7 @@ export function buildCourseListForm(
  * 响应可能是 JSON（主路径）也可能是 HTML 分页渲染（旧版），两条路径都保留，
  * 但必须记录实际走了哪条——否则永远不知道线上跑的是哪一半代码。
  */
-export function parseCoursePage(
-  body: string
-): { courses: XkCourse[]; via: "json" | "html" } {
+export function parseCoursePage(body: string): { courses: XkCourse[]; via: "json" | "html" } {
   try {
     return { courses: parseCourseList(JSON.parse(body)), via: "json" };
   } catch {
@@ -473,7 +446,7 @@ export function parseCoursePage(
 export async function searchCourses(
   session: XkSession,
   keyword?: string,
-  round?: XkRound
+  round?: XkRound,
 ): Promise<XkCourse[]> {
   const targets: XkRound[] = round ? [round] : queryRounds(session);
 
@@ -520,14 +493,10 @@ export function parseCourseRowsFromHtml(html: string): XkCourse[] {
   const blocks = html.split(/<div[^>]*class="[^"]*panel-info[^"]*"/).slice(1);
   for (const block of blocks) {
     const nameMatch = block.match(/title="([^"]+)"[^>]*class="[^"]*kcmc/);
-    const kchMatch = block.match(
-      /<td class="kch_id"[^>]*>([^<]+)<\/td>/
-    );
-    const jxbIdMatch = block.match(
-      /btn-xk-([^"']+)"/
-    );
+    const kchMatch = block.match(/<td class="kch_id"[^>]*>([^<]+)<\/td>/);
+    const jxbIdMatch = block.match(/btn-xk-([^"']+)"/);
     const remainMatch = block.match(
-      /class="jxbrs"[^>]*>([^<]*)<\/font>\s*\/\s*<font class="jxbrl"[^>]*>([^<]*)/
+      /class="jxbrs"[^>]*>([^<]*)<\/font>\s*\/\s*<font class="jxbrl"[^>]*>([^<]*)/,
     );
     if (nameMatch || kchMatch) {
       // 无容量字段的网课与 JSON 路径同一套判定：视为不限容量。
@@ -560,7 +529,7 @@ export function parseCourseRowsFromHtml(html: string): XkCourse[] {
  */
 export async function fetchJxbList(
   session: XkSession,
-  course: XkRoundRef & { courseCode: string }
+  course: XkRoundRef & { courseCode: string },
 ): Promise<XkCourse[]> {
   const form: Record<string, string> = {
     csrftoken: session.csrftoken,
@@ -605,7 +574,7 @@ export async function fetchJxbList(
 export async function submitCourse(
   session: XkSession,
   course: XkCourse,
-  round?: XkRoundRef
+  round?: XkRoundRef,
 ): Promise<XkSubmitResult> {
   // 跨轮次提交会失败，所以默认取课程自带的凭证（与查询同源）
   const ref = round ?? roundRefOf(course, session);
@@ -639,8 +608,7 @@ export async function submitCourse(
   try {
     const data = JSON.parse(resp.body);
     const flag = data?.flag ?? data?.success;
-    const msg =
-      (data?.msg as string) || (data?.message as string) || "未知响应";
+    const msg = (data?.msg as string) || (data?.message as string) || "未知响应";
     if (flag === "1" || flag === 1 || flag === true) {
       return { ok: true, message: msg };
     }
@@ -670,9 +638,18 @@ export interface XkProbeResult {
   rawHead: string;
 }
 
-function classifyProbe(body: string, hasXh: boolean): Omit<XkProbeResult, "kklxdm" | "tabName" | "rawHead"> {
+function classifyProbe(
+  body: string,
+  hasXh: boolean,
+): Omit<XkProbeResult, "kklxdm" | "tabName" | "rawHead"> {
   if (!body) {
-    return { sentXkkzXh: hasXh, status: "error", parsedVia: null, courseCount: 0, message: "空响应" };
+    return {
+      sentXkkzXh: hasXh,
+      status: "error",
+      parsedVia: null,
+      courseCount: 0,
+      message: "空响应",
+    };
   }
   if (body.includes("加密串")) {
     return {
@@ -711,7 +688,7 @@ function classifyProbe(body: string, hasXh: boolean): Omit<XkProbeResult, "kklxd
  */
 export async function inspectXk(
   username: string,
-  password: string
+  password: string,
 ): Promise<{
   isXkOpen: boolean;
   xkkzId: string | null;
@@ -752,4 +729,3 @@ export async function inspectXk(
     courseQueryBlocked: probes.some((p) => p.status === "blocked"),
   };
 }
-

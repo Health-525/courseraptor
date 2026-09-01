@@ -11,11 +11,10 @@
  * 4. 拿不到的学期要报告，不能静默变成「没有这门课的成绩」。
  */
 
-import type { GradeResult, GradeCourse } from "./types";
-
-import { createClient, httpFailure } from "./http";
 import { BASE } from "./auth";
 
+import { createClient, httpFailure } from "./http";
+import type { GradeCourse, GradeResult } from "./types";
 
 // ── GPA 计算 ────────────────────────────────────────────────
 
@@ -27,7 +26,7 @@ import { BASE } from "./auth";
 export function toGP(score: string): number | null {
   // 数字制
   const s = parseFloat(score);
-  if (!isNaN(s)) {
+  if (!Number.isNaN(s)) {
     if (s >= 90) return 4.0;
     if (s >= 86) return 3.7;
     if (s >= 82) return 3.3;
@@ -56,7 +55,7 @@ export function toGP(score: string): number | null {
 
 /** 是否通过型成绩（有学分但不计绩点） */
 export function isPassFailGrade(score: string): boolean {
-  if (!isNaN(parseFloat(score))) return false;
+  if (!Number.isNaN(parseFloat(score))) return false;
   const t = String(score || "").trim();
   if (!t || t.includes("不及格") || t.includes("不合格")) return false;
   return /(合格|通过|免修|免考)/.test(t) || !/(优秀|良好|中等|及格)/.test(t);
@@ -76,7 +75,7 @@ function isRequired(type: string): boolean {
 export function enrollYearFromStudentId(username: string): number {
   const y = parseInt((username || "").slice(0, 4), 10);
   const now = new Date().getFullYear();
-  if (!isNaN(y) && y >= 2000 && y <= now) return y;
+  if (!Number.isNaN(y) && y >= 2000 && y <= now) return y;
   // 学号不规范：往前多查几年，宁可多几次空学期请求也不漏数据
   return now - 5;
 }
@@ -86,10 +85,7 @@ export function enrollYearFromStudentId(username: string): number {
  * @param cookie - 登录后的 cookie
  * @param username - 学号（前四位用于推入学年份）
  */
-export async function fetchAllGrades(
-  cookie: string,
-  username: string
-): Promise<GradeResult> {
+export async function fetchAllGrades(cookie: string, username: string): Promise<GradeResult> {
   const client = createClient(BASE, cookie);
 
   const all: GradeCourse[] = [];
@@ -101,13 +97,10 @@ export async function fetchAllGrades(
   const fetchTerm = async (y: number, q: number): Promise<GradeCourse[] | null> => {
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        const resp = await client.req(
-          "/cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005",
-          {
-            method: "POST",
-            body: `xnm=${y}&xqm=${q}&_search=false&nd=${Date.now()}&queryModel.showCount=200&queryModel.currentPage=1`,
-          }
-        );
+        const resp = await client.req("/cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005", {
+          method: "POST",
+          body: `xnm=${y}&xqm=${q}&_search=false&nd=${Date.now()}&queryModel.showCount=200&queryModel.currentPage=1`,
+        });
         // 传输层失败要进入重试，而不是被 JSON.parse 吞成「空学期」
         const failure = httpFailure(resp);
         if (failure) throw new Error(failure);
@@ -123,7 +116,7 @@ export async function fetchAllGrades(
             semester: String(g.xnmmc ?? "") + String(g.xqmmc ?? ""),
             category: String(g.kcgsmc || ""),
             courseClass: String(g.kclbmc || ""),
-          })
+          }),
         );
       } catch (e) {
         if (attempt === 3) {
@@ -158,9 +151,7 @@ export async function fetchAllGrades(
   const deduped = [...best.values()];
 
   // GPA 计算（只计必修课；通过型/未知型成绩移出分母）
-  const required = deduped.filter(
-    (g) => isRequired(g.type) && parseFloat(g.credit) > 0
-  );
+  const required = deduped.filter((g) => isRequired(g.type) && parseFloat(g.credit) > 0);
   const gpaCourses = required.filter((g) => toGP(g.score) !== null);
   const excludedPassFail = required.length - gpaCourses.length;
 
@@ -189,5 +180,5 @@ export async function fetchAllGrades(
 /** 成绩数值化（用于重修比较；等级制返回 -1，视为低于任何数字分） */
 function numScore(score: string): number {
   const n = parseFloat(score);
-  return isNaN(n) ? -1 : n;
+  return Number.isNaN(n) ? -1 : n;
 }

@@ -10,19 +10,19 @@
  *  - RAPTOR_NO_UPDATE_CHECK=1（.env 或环境变量）关闭。
  */
 
-import { createRequire } from "node:module";
+import { exec as execCb } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { exec as execCb } from "node:child_process";
-import { promisify } from "node:util";
+import { createRequire } from "node:module";
 import path from "node:path";
-import { PROJECT_ROOT } from "./paths";
+import { promisify } from "node:util";
 import { writeFileAtomic } from "./atomic-write";
+import { PROJECT_ROOT } from "./paths";
 
 const exec = promisify(execCb);
 
 /**
- * 发版脚本会把占位符替换为 HTTPS 授权后台地址并随 zip 一起分发；
+ * 发版脚本会把占位符替换为 HTTPS 更新后台地址并随 zip 一起分发；
  * 源码开发时占位符会解析为空，避免没有后台的本地开发被阻断。
  * .env 的 RAPTOR_UPDATE_SERVER 只用于维护者/本地测试覆盖。
  */
@@ -40,7 +40,7 @@ export function getUpdateServerUrl(): string {
   return (process.env.RAPTOR_UPDATE_SERVER || bundledServer).replace(/\/+$/, "");
 }
 
-/** 授权与更新包都含敏感凭据，公开服务只能走 HTTPS。 */
+/** 更新包来自远端服务，公开服务只能走 HTTPS。 */
 function isSecureUpdateServer(server: string): boolean {
   try {
     return new URL(server).protocol === "https:";
@@ -51,8 +51,8 @@ function isSecureUpdateServer(server: string): boolean {
 
 export function requireSecureUpdateServerUrl(): string {
   const server = getUpdateServerUrl();
-  if (!server) throw new Error("未配置更新与授权后台地址");
-  if (!isSecureUpdateServer(server)) throw new Error("更新与授权后台必须使用 HTTPS 地址");
+  if (!server) throw new Error("未配置更新后台地址");
+  if (!isSecureUpdateServer(server)) throw new Error("更新后台必须使用 HTTPS 地址");
   return server;
 }
 
@@ -155,7 +155,7 @@ async function writeCache(latest: string | null, notes?: string): Promise<void> 
     // 原子写：半截的缓存会被 readCache 当成「没缓存」，于是每次启动都联网查
     await writeFileAtomic(
       CACHE_FILE,
-      JSON.stringify({ checkedAt: Date.now(), latest, notes } satisfies CacheEntry)
+      JSON.stringify({ checkedAt: Date.now(), latest, notes } satisfies CacheEntry),
     );
   } catch {
     /* 缓存写失败无所谓，下次再查 */
@@ -179,7 +179,7 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
     const fromServer = server ? await fetchLatestFromServer(server) : null;
     latest = fromServer
       ? fromServer.version
-      : (await fetchLatestViaGitTag()) ?? (await fetchLatestViaRaw());
+      : ((await fetchLatestViaGitTag()) ?? (await fetchLatestViaRaw()));
     notes = fromServer?.notes;
     await writeCache(latest, notes); // 查不到（网络不通/还没发过版）也记下来，下次启动不再白等
   }

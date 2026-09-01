@@ -8,9 +8,8 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
-
-import { PROJECT_ROOT } from "../config";
 import { quarantineCorruptFile, writeFileAtomic } from "../atomic-write";
+import { PROJECT_ROOT } from "../config";
 
 export interface MemoryEntry {
   id: string;
@@ -50,8 +49,7 @@ function similarity(a: string, b: string): number {
   for (let i = 1; i <= A.length; i++) {
     const cur = new Array<number>(B.length + 1).fill(0);
     for (let j = 1; j <= B.length; j++) {
-      cur[j] =
-        A[i - 1] === B[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+      cur[j] = A[i - 1] === B[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
     }
     prev = cur;
   }
@@ -93,7 +91,7 @@ export async function loadMemory(): Promise<MemoryEntry[]> {
 async function persist(entries: MemoryEntry[]): Promise<void> {
   await writeFileAtomic(
     MEMORY_FILE,
-    JSON.stringify({ updatedAt: new Date().toISOString(), entries }, null, 2)
+    JSON.stringify({ updatedAt: new Date().toISOString(), entries }, null, 2),
   );
 }
 
@@ -104,14 +102,14 @@ function newId(): string {
 export async function addMemory(
   content: string,
   category = "事实",
-  expiresAt?: string
+  expiresAt?: string,
 ): Promise<{ entry: MemoryEntry; total: number; merged: boolean }> {
   const entries = await loadMemory();
   const now = new Date().toISOString();
 
   // 完全相同的直接刷新时间
   const exact = entries.find(
-    (e) => e.content === content && e.category === category && isActive(e)
+    (e) => e.content === content && e.category === category && isActive(e),
   );
   if (exact) {
     exact.updatedAt = now;
@@ -123,9 +121,7 @@ export async function addMemory(
   // 一样的「不要提及抢课」）。以较新的表述为准覆盖，避免条目无限膨胀。
   const near = entries.find(
     (e) =>
-      e.category === category &&
-      isActive(e) &&
-      similarity(e.content, content) >= DEDUPE_THRESHOLD
+      e.category === category && isActive(e) && similarity(e.content, content) >= DEDUPE_THRESHOLD,
   );
   if (near) {
     near.content = content;
@@ -149,10 +145,7 @@ export async function addMemory(
   return { entry, total: capped.length, merged: false };
 }
 
-export async function updateMemory(
-  id: string,
-  content: string
-): Promise<MemoryEntry | null> {
+export async function updateMemory(id: string, content: string): Promise<MemoryEntry | null> {
   const entries = await loadMemory();
   const entry = entries.find((e) => e.id === id);
   if (!entry) return null;
@@ -228,7 +221,7 @@ export async function formatMemoryForPrompt(): Promise<string> {
   }
   let text = lines.join("\n");
   if (text.length > MAX_PROMPT_CHARS) {
-    text = text.slice(0, MAX_PROMPT_CHARS) + "\n…（已截断，完整条目用 save_memory list 查看）";
+    text = `${text.slice(0, MAX_PROMPT_CHARS)}\n…（已截断，完整条目用 save_memory list 查看）`;
   }
   return `## 长期记忆（跨会话持久，条目格式 [id] 内容）\n\n${text}`;
 }

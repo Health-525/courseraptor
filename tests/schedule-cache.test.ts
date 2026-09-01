@@ -6,19 +6,17 @@
  * 结构不对的 JSON 不当作有效缓存。
  */
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { test } from "node:test";
 
 // 必须在导入被测模块之前指向临时数据目录，避免读写真实 data/
 const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-schedule-"));
 process.env.RAPTOR_DATA_DIR = tmpData;
 
-const { loadScheduleCache, saveScheduleCache } = await import(
-  "../src/schedule-cache"
-);
+const { loadScheduleCache, saveScheduleCache } = await import("../src/schedule-cache");
 
 const sampleSchedule = {
   year: 2026,

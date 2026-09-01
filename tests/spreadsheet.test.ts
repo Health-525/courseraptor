@@ -7,17 +7,17 @@
  * 这组测试钉住筛选语义与列名解析的边界行为。
  */
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
+import { test } from "node:test";
 
 import {
+  distinctValues,
+  isTableFilename,
   loadWorkbook,
   querySheet,
-  distinctValues,
   resolveColumn,
   sheetOverview,
-  isTableFilename,
   type TableSheet,
 } from "../src/spreadsheet";
 
@@ -41,9 +41,7 @@ const CATALOG = xlsxBuffer({
     ["A004", "人工智能伦理", "信息学院", "1", "考试"],
     ["A005", "心理健康", "马院", "2", "考查"],
   ],
-  说明: [
-    ["本表为示例"],
-  ],
+  说明: [["本表为示例"]],
 });
 
 test("isTableFilename: 只认表格扩展名", () => {
@@ -95,7 +93,7 @@ test("resolveColumn: 精确 / 忽略大小写 / 唯一包含 / 序号 / 歧义�
   assert.equal(
     resolveColumn(["教师", "教师工号", "教师电话"], "教师"),
     0,
-    "精确匹配优先于模糊，不该报歧义"
+    "精确匹配优先于模糊，不该报歧义",
   );
   assert.throws(() => resolveColumn(["教师工号", "教师电话"], "教师"), /同时匹配多列/);
   assert.throws(() => resolveColumn(headers, "教室"), /找不到列/);
@@ -128,10 +126,7 @@ test("querySheet: where 多条件 AND + 数值比较自动按数字", () => {
       { col: "课程名称", op: "notContains", value: "音乐" },
     ],
   });
-  assert.deepEqual(
-    notFull.rows.map((r2) => r2[1]).sort(),
-    ["创新创业基础", "心理健康"]
-  );
+  assert.deepEqual(notFull.rows.map((r2) => r2[1]).sort(), ["创新创业基础", "心理健康"]);
 });
 
 test("querySheet: regex / empty 条件", () => {
@@ -140,7 +135,7 @@ test("querySheet: regex / empty 条件", () => {
   assert.equal(re.matched, 2);
   assert.throws(
     () => querySheet(sheet, { where: [{ col: "课程号", op: "regex", value: "(((" }] }),
-    /正则无效/
+    /正则无效/,
   );
   const noEmpty = querySheet(sheet, { where: [{ col: "学院", op: "notEmpty" }] });
   assert.equal(noEmpty.matched, 5);
@@ -149,7 +144,10 @@ test("querySheet: regex / empty 条件", () => {
 test("querySheet: 排序（数值列按数值）+ 投影 + 分页", () => {
   const [sheet] = loadWorkbook(CATALOG, "网课目录.xlsx")!;
   const asc = querySheet(sheet, { sortBy: "学分", limit: 2 });
-  assert.deepEqual(asc.rows.map((r) => r[3]), ["1", "1"]);
+  assert.deepEqual(
+    asc.rows.map((r) => r[3]),
+    ["1", "1"],
+  );
   const desc = querySheet(sheet, { sortBy: "学分", sortDesc: true, columns: ["课程名称", "学分"] });
   assert.deepEqual(desc.headers, ["课程名称", "学分"]);
   assert.equal(desc.rows[0][0], "人工智能导论", "2.5 是数值最大，不该按字典序排");
@@ -171,7 +169,10 @@ test("distinctValues: 去重计数按频次降序", () => {
   const [sheet] = loadWorkbook(CATALOG, "网课目录.xlsx")!;
   const v = distinctValues(sheet, "学院");
   assert.deepEqual(v[0], { value: "信息学院", count: 2 }, "出现最多的排前面");
-  assert.equal(v.reduce((s, x) => s + x.count, 0), 5);
+  assert.equal(
+    v.reduce((s, x) => s + x.count, 0),
+    5,
+  );
 });
 
 test("sheetOverview: 概览行数与 moreRows 提示", () => {

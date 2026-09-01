@@ -5,10 +5,7 @@
 
 import { config } from "../config";
 import { loginJwgl } from "../jwgl/auth";
-import {
-  openXkSession,
-  type XkSession,
-} from "../jwgl/xk";
+import { openXkSession, type XkSession } from "../jwgl/xk";
 
 const RETRY_MAX = 5;
 
@@ -91,7 +88,9 @@ async function openXkSessionWithRetry(): Promise<XkSession> {
       }
     }
   }
-  throw new Error(`选课会话建立失败（已重试 ${RETRY_MAX} 次）：${lastError?.message ?? "未知错误"}`);
+  throw new Error(
+    `选课会话建立失败（已重试 ${RETRY_MAX} 次）：${lastError?.message ?? "未知错误"}`,
+  );
 }
 
 export function sleep(ms: number): Promise<void> {

@@ -27,7 +27,7 @@ export interface SandboxResult {
 
 function clip(s: string): { text: string; truncated: boolean } {
   return s.length > MAX_OUT
-    ? { text: s.slice(0, MAX_OUT) + "\n…（输出超长已截断）", truncated: true }
+    ? { text: `${s.slice(0, MAX_OUT)}\n…（输出超长已截断）`, truncated: true }
     : { text: s, truncated: false };
 }
 
@@ -60,7 +60,10 @@ export function runSandboxedJs(code: string): SandboxResult {
   const src = code.trim();
   if (!src) return { ok: false, error: "代码为空" };
   if (src.length > MAX_CODE) {
-    return { ok: false, error: `代码超过 ${MAX_CODE} 字符（本工具做小计算，大数据处理请交给 query_table 筛选）` };
+    return {
+      ok: false,
+      error: `代码超过 ${MAX_CODE} 字符（本工具做小计算，大数据处理请交给 query_table 筛选）`,
+    };
   }
   const hit = BANNED.find(([re]) => re.test(src));
   if (hit) {
@@ -97,7 +100,10 @@ export function runSandboxedJs(code: string): SandboxResult {
   } catch (e) {
     const msg = (e as Error).message ?? String(e);
     if (/timed?\s*out|Script execution timed out/i.test(msg)) {
-      return { ok: false, error: `执行超过 ${TIMEOUT_MS / 1000} 秒被掐断（死循环？大排序？把数据先筛小再算）` };
+      return {
+        ok: false,
+        error: `执行超过 ${TIMEOUT_MS / 1000} 秒被掐断（死循环？大排序？把数据先筛小再算）`,
+      };
     }
     return { ok: false, error: msg.slice(0, 300), logs: logs.length ? logs : undefined };
   }

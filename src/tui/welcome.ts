@@ -5,17 +5,17 @@
  * 任何一段失败只降级那一段的文案，不影响其他段和正常对话。
  */
 
-import { getCookie } from "../tools/session";
-import { fetchJwcNews } from "../jwgl/news";
 import {
   expandWeeks,
   fetchScheduleSmart,
   periodTimeRange,
-  WEEKDAY_NAMES,
   type ScheduleResult,
+  WEEKDAY_NAMES,
 } from "../jwgl/academics";
+import { fetchJwcNews } from "../jwgl/news";
 import { currentWeekOf } from "../jwgl/term-dates";
 import { loadScheduleCache, saveScheduleCache } from "../schedule-cache";
+import { getCookie } from "../tools/session";
 import { startChatWeb } from "../web/chat-web";
 
 declare global {
@@ -55,9 +55,7 @@ function render() {
     "",
     header("最新通知"),
     ...panel.newsLines,
-    ...(panel.webUrl
-      ? ["", `💬 网页对话：${panel.webUrl} ${dim("（浏览器打开即聊）")}`]
-      : []),
+    ...(panel.webUrl ? ["", `💬 网页对话：${panel.webUrl} ${dim("（浏览器打开即聊）")}`] : []),
   );
   lines.push("", dim("快捷键：滚轮/↑↓ 滚动 · ESC 打断回复 · 输入 / 唤出命令菜单 · Ctrl+C 退出"));
   globalThis.__raptorWelcome = lines;
@@ -122,15 +120,11 @@ function renderSchedule(data: ScheduleResult) {
   panel.week = week?.week;
   const today = data.courses
     .filter(
-      (c) =>
-        c.weekday === todayWeekday() &&
-        (!week || expandWeeks(c.weeks).includes(week.week)),
+      (c) => c.weekday === todayWeekday() && (!week || expandWeeks(c.weeks).includes(week.week)),
     )
     .sort((a, b) => (a.periods[0] ?? 0) - (b.periods[0] ?? 0));
   if (today.length === 0) {
-    panel.scheduleLines = [
-      dim(week ? `  今天没有课（第${week.week}周）` : "  今天没有课"),
-    ];
+    panel.scheduleLines = [dim(week ? `  今天没有课（第${week.week}周）` : "  今天没有课")];
   } else {
     panel.scheduleLines = today.slice(0, 5).map((c) => {
       const time = periodTimeRange(c.periods);

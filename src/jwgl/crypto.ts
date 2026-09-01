@@ -5,7 +5,7 @@
  * 用法: const encrypted = encryptPassword(password, modulus, exponent);
  */
 
-import crypto from "crypto";
+import crypto from "node:crypto";
 
 /**
  * RSA 加密密码（正方教务系统登录）
@@ -14,11 +14,7 @@ import crypto from "crypto";
  * @param exponentB64 - RSA exponent (base64)
  * @returns base64 编码的加密结果
  */
-export function encryptJwglPassword(
-  pwd: string,
-  modulusB64: string,
-  exponentB64: string
-): string {
+export function encryptJwglPassword(pwd: string, modulusB64: string, exponentB64: string): string {
   const mb = Buffer.from(modulusB64, "base64");
   const eb = Buffer.from(exponentB64, "base64");
 
@@ -44,13 +40,16 @@ export function encryptJwglPassword(
 
   const pem =
     "-----BEGIN RSA PUBLIC KEY-----\n" +
-    der.toString("base64").match(/.{1,64}/g)!.join("\n") +
+    der
+      .toString("base64")
+      .match(/.{1,64}/g)!
+      .join("\n") +
     "\n-----END RSA PUBLIC KEY-----";
 
   return crypto
     .publicEncrypt(
       { key: pem, padding: crypto.constants.RSA_PKCS1_PADDING },
-      Buffer.from(pwd, "utf8")
+      Buffer.from(pwd, "utf8"),
     )
     .toString("base64");
 }

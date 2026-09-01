@@ -8,12 +8,10 @@
  * - 「不及格」包含「及格」，includes 误判成 1.0 绩点
  */
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
+import { test } from "node:test";
 
-const { toGP, isPassFailGrade, enrollYearFromStudentId } = await import(
-  "../src/jwgl/grades"
-);
+const { toGP, isPassFailGrade, enrollYearFromStudentId } = await import("../src/jwgl/grades");
 
 // ── 数字制 ────────────────────────────────────────────────────
 

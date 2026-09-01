@@ -15,7 +15,7 @@
  * 3. 重定向有上限。正方失效时会 302 回登录页，无跳数限制的递归迟早出事。
  */
 
-import https from "https";
+import https from "node:https";
 
 export interface HttpResponse {
   status: number;
@@ -106,10 +106,7 @@ export function createClient(baseURL: string, initialCookie = ""): HttpClient {
 
   const buildCookie = (): string => [...cookieMap.values()].join("; ");
 
-  function absorbCookies(
-    sc: string[] | undefined,
-    map: Map<string, string>
-  ): void {
+  function absorbCookies(sc: string[] | undefined, map: Map<string, string>): void {
     if (!sc) return;
     for (const c of sc) {
       const kv = c.split(";")[0];
@@ -119,10 +116,7 @@ export function createClient(baseURL: string, initialCookie = ""): HttpClient {
   }
 
   /** 单次请求（不含重定向跟随） */
-  function once(
-    url: URL,
-    opts: HttpOptions & { method: string }
-  ): Promise<HttpResponse> {
+  function once(url: URL, opts: HttpOptions & { method: string }): Promise<HttpResponse> {
     return new Promise((resolve) => {
       let settled = false;
       const finish = (r: HttpResponse) => {
@@ -137,13 +131,10 @@ export function createClient(baseURL: string, initialCookie = ""): HttpClient {
           hostname: url.hostname,
           path: url.pathname + url.search,
           headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             Cookie: buildCookie(),
             Referer: baseURL,
-            ...(opts.body
-              ? { "Content-Type": "application/x-www-form-urlencoded" }
-              : {}),
+            ...(opts.body ? { "Content-Type": "application/x-www-form-urlencoded" } : {}),
           },
         },
         (r) => {
@@ -158,16 +149,16 @@ export function createClient(baseURL: string, initialCookie = ""): HttpClient {
               status: r.statusCode ?? 0,
               body: Buffer.concat(chunks).toString("utf8"),
               headers: r.headers as Record<string, string | string[] | undefined>,
-            })
+            }),
           );
-        }
+        },
       );
 
       q.on("error", (e: Error) =>
-        finish({ status: 0, body: "", headers: {}, error: `网络错误：${e.message}` })
+        finish({ status: 0, body: "", headers: {}, error: `网络错误：${e.message}` }),
       );
       q.setTimeout(REQUEST_TIMEOUT_MS, () =>
-        q.destroy(new Error(`请求超时（${REQUEST_TIMEOUT_MS}ms）`))
+        q.destroy(new Error(`请求超时（${REQUEST_TIMEOUT_MS}ms）`)),
       );
 
       if (opts.body) q.write(opts.body);
@@ -175,11 +166,7 @@ export function createClient(baseURL: string, initialCookie = ""): HttpClient {
     });
   }
 
-  async function req(
-    urlPath: string,
-    opts: HttpOptions = {},
-    hops = 0
-  ): Promise<HttpResponse> {
+  async function req(urlPath: string, opts: HttpOptions = {}, hops = 0): Promise<HttpResponse> {
     await acquireToken();
 
     const method = opts.method || "GET";
@@ -223,9 +210,7 @@ export function httpFailure(resp: HttpResponse): string | null {
 }
 
 /** 统一的抓取结果：ok=false 时必须把 error 如实上报给模型，不许降级成空列表 */
-export type FetchResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; error: string };
+export type FetchResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
 /**
  * 抓取 + 解析的通用包装：传输失败直接短路，解析失败也区分成因。
@@ -234,7 +219,7 @@ export type FetchResult<T> =
  */
 export async function fetchJson<T>(
   fetch: () => Promise<HttpResponse>,
-  parse: (body: string) => T
+  parse: (body: string) => T,
 ): Promise<FetchResult<T>> {
   const resp = await fetch();
   const failure = httpFailure(resp);

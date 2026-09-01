@@ -12,25 +12,21 @@
  * 注册表与渲染共用 src/tui/slash-menu.ts。
  */
 
-import { config } from "./config";
 import { createRaptorAgent } from "./agent";
-import { ensureCredentials, runDeepSeekKeySetup } from "./onboarding";
-import { ensureLicense } from "./license";
+import { config } from "./config";
 import { flushCapturedSession } from "./memory/shortterm";
-import { runUpdateCommand } from "./updater";
+import { ensureCredentials, runDeepSeekKeySetup } from "./onboarding";
+import { SLASH_COMMANDS } from "./tui/slash-menu";
 import {
   checkForUpdate,
   formatUpdateBadge,
   formatUpdateBanner,
   type UpdateInfo,
 } from "./update-check";
-import { SLASH_COMMANDS } from "./tui/slash-menu";
+import { runUpdateCommand } from "./updater";
 
 // 更新检查先发出，与凭证加载/agent 构建并行跑，后面收结果
 const updatePromise = checkForUpdate();
-
-// 激活密钥在服务端仅绑定本机随机安装 ID，不接触教务账号或对话内容。
-await ensureLicense();
 
 // 教务凭证缺失时引导录入（.env > credentials.enc 加密文件 > 首次引导）
 await ensureCredentials();

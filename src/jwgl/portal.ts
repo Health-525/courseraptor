@@ -6,9 +6,9 @@
  * （返回「系统维护页面」），任何客户端均不可用。
  */
 
-import { createClient } from "./http";
-import { BASE } from "./auth";
 import { candidateXnxqList, termLabel } from "./academics";
+import { BASE } from "./auth";
+import { createClient } from "./http";
 
 function queryBody(extra: Record<string, string> = {}): string {
   const params: Record<string, string> = {
@@ -30,9 +30,7 @@ function queryBody(extra: Record<string, string> = {}): string {
 const PROFILE_URL = "/xsxxxggl/xsgrxxwh_cxXsgrxx.html";
 
 /** 解析「个人信息」页的 label/value 表单组 */
-export async function fetchProfile(
-  cookie: string
-): Promise<Record<string, string>> {
+export async function fetchProfile(cookie: string): Promise<Record<string, string>> {
   const client = createClient(BASE, cookie);
   const r = await client.req(PROFILE_URL, { method: "GET" });
   const html = r.body ?? "";
@@ -46,7 +44,7 @@ export async function fetchProfile(
     const pContent = block.match(/<p[^>]*>([\s\S]*?)<\/p>/)?.[1];
     const value = pContent
       ? pContent.replace(/<[^>]+>/g, "").trim()
-      : block.match(/value="([^"]*)"/)?.[1]?.trim() ?? "";
+      : (block.match(/value="([^"]*)"/)?.[1]?.trim() ?? "");
     if (label && value && !out[label]) out[label] = value;
   }
   return out;
@@ -62,9 +60,7 @@ export interface RetakeCourse {
   credit: string;
 }
 
-export async function fetchRetakeCourses(
-  cookie: string
-): Promise<RetakeCourse[]> {
+export async function fetchRetakeCourses(cookie: string): Promise<RetakeCourse[]> {
   const client = createClient(BASE, cookie);
   const r = await client.req("/cxkccx/cxkccx_cxCxkccxIndex.html?doType=query", {
     method: "POST",
@@ -79,7 +75,7 @@ export async function fetchRetakeCourses(
         semester: `${i.cxxnmc ?? ""}${i.cxxqmc ?? ""}`,
         department: String(i.kkbmmc ?? ""),
         credit: String(i.xf ?? ""),
-      })
+      }),
     );
   } catch {
     return [];
@@ -105,9 +101,7 @@ export interface EnrolledClass {
  * 数据源为「选课名单查询」，但仅取教学班维度字段
  * （返回行含同学个人证件/联系方式，一律不导出）。
  */
-export async function fetchEnrolledClasses(
-  cookie: string
-): Promise<EnrolledClass[]> {
+export async function fetchEnrolledClasses(cookie: string): Promise<EnrolledClass[]> {
   const client = createClient(BASE, cookie);
   const r = await client.req("/xkcx/xkmdcx_cxXkmdcxIndex.html?doType=query", {
     method: "POST",
@@ -145,11 +139,15 @@ export async function fetchEnrolledClasses(
 export async function fetchLabGradesSmart(
   cookie: string,
   xnm?: number,
-  xqm?: number
-): Promise<{ year: number; semester: number; label: string; items: Array<Record<string, unknown>> }> {
+  xqm?: number,
+): Promise<{
+  year: number;
+  semester: number;
+  label: string;
+  items: Array<Record<string, unknown>>;
+}> {
   const client = createClient(BASE, cookie);
-  const candidates =
-    xnm && xqm ? [{ year: xnm, semester: xqm }] : candidateXnxqList();
+  const candidates = xnm && xqm ? [{ year: xnm, semester: xqm }] : candidateXnxqList();
 
   for (const c of candidates) {
     const r = await client.req("/xssygl/sycjcx_cxSycjcxIndex.html?doType=query", {

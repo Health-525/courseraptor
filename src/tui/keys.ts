@@ -44,20 +44,20 @@
  * 不感知的模式，由本模块启用、restore() 时关闭。
  */
 
-import { PassThrough } from "node:stream";
 import type { Readable } from "node:stream";
-import { emitSoftInterrupt } from "./soft-interrupt";
+import { PassThrough } from "node:stream";
 import {
-  filterSlashCommands,
-  renderSlashMenu,
-  setCardSlashMenu,
-  repaintCardFrame,
   coalesceText,
-  isPrintableKey,
+  filterSlashCommands,
   isLocalKeyCommandWithArgumentPrefix,
-  splitKeys,
+  isPrintableKey,
+  renderSlashMenu,
+  repaintCardFrame,
   type SlashCommand,
+  setCardSlashMenu,
+  splitKeys,
 } from "./slash-menu";
+import { emitSoftInterrupt } from "./soft-interrupt";
 
 /** 一次滚轮滚格 / 一次 ↑/↓ 对应的滚动行数（库原生是 1，太慢） */
 const SCROLL_LINES = 3;
@@ -91,10 +91,7 @@ export interface KeyProxyOptions {
   commands?: Record<string, SlashCommandSpec>;
 }
 
-export function createKeyProxy(
-  stdin: Readable,
-  options: KeyProxyOptions = {},
-): KeyProxy {
+export function createKeyProxy(stdin: Readable, options: KeyProxyOptions = {}): KeyProxy {
   const commands = options.commands ?? {};
   const proxy = new PassThrough();
   // 库检查 input.isTTY 才启用交互模式，并对 input 调 setRawMode——
@@ -221,8 +218,7 @@ export function createKeyProxy(
     if (menuItems.length) {
       if (text === "\x1b[A" || text === "\x1b[B") {
         const n = menuItems.length;
-        menuIndex =
-          text === "\x1b[A" ? (menuIndex - 1 + n) % n : (menuIndex + 1) % n;
+        menuIndex = text === "\x1b[A" ? (menuIndex - 1 + n) % n : (menuIndex + 1) % n;
         setCardSlashMenu(renderSlashMenu(menuItems, menuIndex));
         repaintCardFrame();
         return;
@@ -293,11 +289,14 @@ export function createKeyProxy(
         if (!cmdBuffer) resetLine(); // 删空 = 本行结束，解除菜单抑制
         refreshMenu();
       } else if (isPrintable(text)) {
-        const candidate = cmdBuffer === ""
-          ? (text.startsWith("/") ? text : "\u0000")
-          : cmdBuffer.startsWith("/")
-            ? `${cmdBuffer}${text}`
-            : cmdBuffer;
+        const candidate =
+          cmdBuffer === ""
+            ? text.startsWith("/")
+              ? text
+              : "\u0000"
+            : cmdBuffer.startsWith("/")
+              ? `${cmdBuffer}${text}`
+              : cmdBuffer;
         if (isLocalKeyCommandWithArgumentPrefix(candidate)) {
           // 已显示的命令名前缀也立即擦掉；参数段从未写入 TUI。
           for (let i = 0; i < cmdBuffer.length; i++) proxy.write("\x7f");
@@ -320,14 +319,11 @@ export function createKeyProxy(
     // SGR 鼠标事件：滚轮(编码 64/65)翻译成合成方向键，其余（按下/释放/移动）吞掉
     let wheelUp = 0;
     let wheelDown = 0;
-    const text = chunk.toString("utf8").replace(
-      /\x1b\[<(\d+);\d+;\d+[Mm]/g,
-      (_m, code: string) => {
-        if (code === "64") wheelUp++;
-        else if (code === "65") wheelDown++;
-        return "";
-      },
-    );
+    const text = chunk.toString("utf8").replace(/\x1b\[<(\d+);\d+;\d+[Mm]/g, (_m, code: string) => {
+      if (code === "64") wheelUp++;
+      else if (code === "65") wheelDown++;
+      return "";
+    });
 
     // 菜单打开时滚轮 = 移动选中项（一格一项，放大就跳过头了）；
     // 否则 = 滚正文（一格 3 行）

@@ -7,6 +7,10 @@
     "start": "tsx src/index.ts",
     "qq": "tsx src/qq/bridge.ts",
     "typecheck": "tsc --noEmit",
+    "lint": "biome check src tests",
+    "lint:fix": "biome check --write src tests",
+    "format": "biome format --write src tests",
+    "format:check": "biome format src tests",
     "postinstall": "node scripts/patch-tui.mjs",
     "release": "node scripts/release.mjs",
     "publish": "node scripts/publish-release.mjs",
@@ -24,7 +28,13 @@
   "bugs": {
     "url": "https://github.com/Health-525/courseraptor/issues"
   },
-  "keywords": ["njtech", "agent", "cli", "deepseek", "教务"],
+  "keywords": [
+    "njtech",
+    "agent",
+    "cli",
+    "deepseek",
+    "教务"
+  ],
   "author": "jiangshu",
   "license": "ISC",
   "engines": {
@@ -36,15 +46,20 @@
     "@ai-sdk/tui": "^1.0.84",
     "@tencent-connect/qqbot-nodejs": "^1.0.4",
     "ai": "^7.0.83",
+    "docx": "^9.7.1",
+    "fontkit": "^2.0.4",
     "mammoth": "^1.12.1",
     "marked": "^18.0.11",
     "pdf-parse": "^2.4.5",
+    "pdfkit": "^0.20.2",
+    "pptxgenjs": "^4.0.1",
     "tesseract.js": "^7.0.0",
     "tsx": "^4.23.12",
     "xlsx": "^0.18.5",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.11",
     "@types/node": "^26.2.0",
     "typescript": "^7.0.2"
   }

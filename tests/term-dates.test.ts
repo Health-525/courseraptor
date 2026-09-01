@@ -6,11 +6,11 @@
  * 整个学期周次系统性偏差一周。这组测试钉住单一真值源的规则。
  */
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { test } from "node:test";
 
 // 必须在导入被测模块之前指向临时数据目录，避免读写真实 data/
 const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-terms-"));
@@ -80,7 +80,7 @@ test("落盘持久化：写进 RAPTOR_DATA_DIR 指向的目录", () => {
 
 test("parseTermStartDate: 「第一周从 2026-08-31（周一）开始」强信号", () => {
   const r = parseTermStartDate(
-    "各学院：2026-2027学年第一学期第一周从 2026-08-31（周一）开始，请做好教学安排。"
+    "各学院：2026-2027学年第一学期第一周从 2026-08-31（周一）开始，请做好教学安排。",
   );
   assert.equal(r?.week1Monday, "2026-08-31");
 });

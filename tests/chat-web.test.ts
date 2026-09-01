@@ -5,13 +5,13 @@
  * 多轮历史逐轮累积传给 agent、agent 未就绪时返回明确错误而不是挂掉。
  */
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import { test } from "node:test";
 
 // 课表工具内部读写 data/，指向临时目录避免污染真实数据
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-chat-"));
@@ -103,7 +103,12 @@ test("SSE 流式回传文本与工具状态，历史逐轮累积", async () => {
       calls.push(messages ?? []);
       async function* gen() {
         yield { type: "tool-call", toolCallId: "t1", toolName: "get_schedule" };
-        yield { type: "tool-result", toolCallId: "t1", toolName: "get_schedule", output: { term: "2026-2027-1", total: 5 } };
+        yield {
+          type: "tool-result",
+          toolCallId: "t1",
+          toolName: "get_schedule",
+          output: { term: "2026-2027-1", total: 5 },
+        };
         yield { type: "text-delta", text: "你" };
         yield { type: "text-delta", text: "好" };
         yield { type: "finish" };
@@ -129,11 +134,10 @@ test("SSE 流式回传文本与工具状态，历史逐轮累积", async () => {
   // 第二轮：历史应带上第一轮的 user + assistant 消息
   const r2 = await post(url, { message: "谢谢" });
   const secondCall = calls[1] as { role: string; content: unknown }[];
-  assert.deepEqual(secondCall.map((m) => m.role), [
-    "user",
-    "assistant",
-    "user",
-  ]);
+  assert.deepEqual(
+    secondCall.map((m) => m.role),
+    ["user", "assistant", "user"],
+  );
   assert.equal(secondCall[0].content, "查课表");
   assert.match(String(r2.events.at(-1)?.t), /end/);
 });
@@ -255,8 +259,10 @@ test("default 会话可被侧栏点击读取（id 白名单必须放行字母）
   // 不带 sessionId 的对话落到 default 档
   await post(url, { message: "无会话id的一问" });
   const list = await (await fetch(`${url}/api/sessions`)).json();
-  assert.ok(list.sessions.some((s: { id: string }) => s.id === "default"),
-    "default 档应出现在会话列表");
+  assert.ok(
+    list.sessions.some((s: { id: string }) => s.id === "default"),
+    "default 档应出现在会话列表",
+  );
   const res = await fetch(`${url}/api/sessions/default`);
   assert.equal(res.status, 200, "GET default 档不得 404（曾致点击无反应）");
 });
@@ -299,7 +305,12 @@ test("reasoning 走独立 think 通道，绝不混进正文 text", async () => {
         yield { type: "reasoning-delta", text: "想想" };
         yield { type: "reasoning-end", id: "r1" };
         yield { type: "tool-call", toolCallId: "z1", toolName: "get_schedule" };
-        yield { type: "tool-result", toolCallId: "z1", toolName: "get_schedule", output: { term: "1" } };
+        yield {
+          type: "tool-result",
+          toolCallId: "z1",
+          toolName: "get_schedule",
+          output: { term: "1" },
+        };
         // 第二段思考没有 reasoning-end（各家实现不保证）：靠后续事件收尾
         yield { type: "reasoning-delta", delta: "再核对周次" };
         yield { type: "text-delta", text: "答案在此" };
@@ -313,13 +324,22 @@ test("reasoning 走独立 think 通道，绝不混进正文 text", async () => {
 
   const thinkEvs = r.events.filter((e) => e.t === "think");
   assert.equal(
-    thinkEvs.filter((e) => e.v).map((e) => e.v).join(""),
+    thinkEvs
+      .filter((e) => e.v)
+      .map((e) => e.v)
+      .join(""),
     "先想想再核对周次",
     "两段思考都完整下发",
   );
-  assert.ok(thinkEvs.some((e) => e.phase === "end"), "段末有 end 标记供前端折叠卡片");
+  assert.ok(
+    thinkEvs.some((e) => e.phase === "end"),
+    "段末有 end 标记供前端折叠卡片",
+  );
   assert.equal(
-    r.events.filter((e) => e.t === "text").map((e) => e.v).join(""),
+    r.events
+      .filter((e) => e.t === "text")
+      .map((e) => e.v)
+      .join(""),
     "答案在此",
     "正文通道只有正文，思考没漏进去",
   );

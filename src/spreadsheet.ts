@@ -13,7 +13,7 @@ const require = createRequire(import.meta.url);
 
 export const TABLE_EXT = ["xlsx", "xls", "csv", "tsv"] as const;
 
-const require2 = require as unknown as { (id: string): unknown };
+const require2 = require as unknown as (id: string) => unknown;
 
 export function isTableFilename(filename: string): boolean {
   return new RegExp(`\\.(${TABLE_EXT.join("|")})$`, "i").test(filename);
@@ -29,7 +29,9 @@ export interface TableSheet {
 
 function cellText(v: unknown): string {
   if (v == null) return "";
-  return String(v).replace(/[\r\n]+/g, " ").trim();
+  return String(v)
+    .replace(/[\r\n]+/g, " ")
+    .trim();
 }
 
 /** 解析工作簿（buffer 版，下载附件与本地文件共用） */
@@ -45,11 +47,7 @@ export function loadWorkbook(buf: Buffer, filename: string): TableSheet[] | null
       // xlsx = zip（PK），xls = OLE2（D0 CF 11 E0）
       const zip = buf[0] === 0x50 && buf[1] === 0x4b;
       const ole =
-        buf.length > 4 &&
-        buf[0] === 0xd0 &&
-        buf[1] === 0xcf &&
-        buf[2] === 0x11 &&
-        buf[3] === 0xe0;
+        buf.length > 4 && buf[0] === 0xd0 && buf[1] === 0xcf && buf[2] === 0x11 && buf[3] === 0xe0;
       if (!zip && !ole) return null;
     }
     const wb = isText
@@ -81,9 +79,7 @@ export function loadWorkbook(buf: Buffer, filename: string): TableSheet[] | null
         while (c.length < cols) c.push("");
         return c;
       };
-      const headers = pad(grid[firstData]).map(
-        (h, i) => h || `列${i + 1}`
-      );
+      const headers = pad(grid[firstData]).map((h, i) => h || `列${i + 1}`);
       const rows = grid
         .slice(firstData + 1)
         .filter((r) => r.some((c) => c !== ""))
@@ -99,7 +95,7 @@ export function loadWorkbook(buf: Buffer, filename: string): TableSheet[] | null
 /** sheet 概览：规模 + 表头 + 前 n 行渲染（给模型的默认视图） */
 export function sheetOverview(
   sheet: TableSheet,
-  previewRows = 20
+  previewRows = 20,
 ): {
   name: string;
   dataRows: number;
@@ -135,13 +131,13 @@ export function resolveColumn(headers: string[], ref: string): number {
   if (partial.length > 1) {
     // 「教师」同时命中「教师」「教师工号」这类情况不算错，但要让用户看见歧义
     throw new Error(
-      `列名「${ref}」同时匹配多列：${partial.map((i) => headers[i]).join("、")}，请写全列名`
+      `列名「${ref}」同时匹配多列：${partial.map((i) => headers[i]).join("、")}，请写全列名`,
     );
   }
   const num = Number(q);
   if (Number.isInteger(num) && num >= 1 && num <= headers.length) return num - 1;
   throw new Error(
-    `找不到列「${ref}」（现有列：${headers.slice(0, 15).join("、")}${headers.length > 15 ? `… 共 ${headers.length} 列` : ""}）`
+    `找不到列「${ref}」（现有列：${headers.slice(0, 15).join("、")}${headers.length > 15 ? `… 共 ${headers.length} 列` : ""}）`,
   );
 }
 
@@ -299,7 +295,7 @@ export function querySheet(sheet: TableSheet, opts: QueryOpts = {}): QueryResult
 export function distinctValues(
   sheet: TableSheet,
   col: string,
-  top = 50
+  top = 50,
 ): Array<{ value: string; count: number }> {
   const idx = resolveColumn(sheet.headers, col);
   const m = new Map<string, number>();

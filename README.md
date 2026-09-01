@@ -60,11 +60,11 @@ $ raptor
 
 ## ✨ 能力总览
 
-Agent 默认可调用 **20 个工具**（选课季 +3 抢课工具共 23 个），覆盖教务查询、通知情报、文件与数据、天气生活、两层记忆、QQ 接入六条线。
+Agent 默认可调用 **22 个工具**（选课季 +3 抢课工具共 25 个），覆盖教务查询、通知情报、文件与数据、文档写作、天气生活、两层记忆、QQ 接入七条线。
 
-| 📚 教务查询 | 📰 通知情报 | 📁 文件与数据 | 🧠 两层记忆 | 💬 QQ 接入 |
-|---|---|---|---|---|
-| 课表/成绩/考试/学籍一句话查 | 通知正文+附件（xlsx/docx/pdf）都能读 | 千行 Excel 概览+筛选按需查，长文分页读得完 | 记住偏好和结论，跨会话不丢 | 官方机器人零封号，群里 @ 就能用 |
+| 📚 教务查询 | 📰 通知情报 | 📁 文件与数据 | ✍️ 文档写作 | 🧠 两层记忆 | 💬 QQ 接入 |
+|---|---|---|---|---|---|
+| 课表/成绩/考试/学籍一句话查 | 通知正文+附件（xlsx/docx/pdf）都能读 | 千行 Excel 概览+筛选按需查，长文分页读得完 | AI 辅助写作，直接产出 Word/Excel/PPT/PDF 成品 | 记住偏好和结论，跨会话不丢 | 官方机器人零封号，群里 @ 就能用 |
 
 ### 📚 教务查询
 
@@ -97,6 +97,15 @@ Agent 默认可调用 **20 个工具**（选课季 +3 抢课工具共 23 个）�
 | `query_table` | Excel 筛选查询：`keyword` 全列检索、`where` 多条件（contains/eq/数值比较/正则/空值）、`sortBy` 排序、`columns` 选列、`values` 某列去重计数、`offset/limit` 分页——千行大表按问题取行，不再整本塞给模型 |
 | `run_js` | 沙箱 JS 计算台：去重/计数/分组求和/正则摘取。无网络无磁盘，3 秒超时、输出截断 |
 | `manage_attachments` | 附件缓存管理：list / delete / delete_all。只认缓存索引，agent 只能删自己下载/读入的副本，用户本机文件永远删不到 |
+
+### ✍️ 文档写作（AI 辅助学生产出交付物）
+
+| 工具 | 说明 | 耗时 |
+|---|---|---|
+| `generate_document` | 按结构化内容直接生成 **Word / Excel / PPT / PDF** 成品文件，中文原生可写（PDF 自动嵌入系统中文字体）。要「实践报告 / 开题课件 / 成绩表 / 简历模板」等交付物时用：docx·pdf 给 `blocks`（标题/正文/列表/表格/分页）、pptx 给 `slides`、xlsx 给 `sheets`。成品写进本机 `data/generated/`，返回完整路径；QQ 里会自动把文件回传给你 | ~1-3s |
+| `convert_document` | 跨格式转换重排：把已有内容（`fetch_attachment` 读入的附件 id、或本机文件路径、或一段文本）转成 Word/Excel/PPT/PDF，如「PDF 转 PPT」「表格转 Word」「把这段整理成排版好的文档」。源文件**只读不动**，成品写 `data/generated/` | ~1-3s |
+
+> 改写润色（换词、调结构）由模型在文本层完成，改好后交给 `generate_document` 出稿；`convert_document` 专注跨格式搬运与排版。
 
 ### 🌦️ 天气生活
 
@@ -158,7 +167,7 @@ npm run qq
 
 ### 方式一：下载安装包（推荐给同学）
 
-维护者会把安装包和**个人激活密钥**一同私发给同学，然后：
+任何人均可下载安装包并自行配置所需凭证：
 
 1. 装 [Node.js](https://nodejs.org/zh-cn) LTS（装过可跳过）
 2. 解压 zip，双击里面的 **`start.bat`**（首次自动装依赖并引导配置）
@@ -184,7 +193,7 @@ npm run dev            # 或项目内开发模式
 
 ### 🔄 更新（给同学）
 
-raptor **启动时会校验激活状态，并每 24 小时检查一次新版本**。有新版时标题栏会出现 `🔄 新版 vX.Y.Z，/update 可更新` 徽标，对话里直接输入：
+raptor **每 24 小时检查一次新版本**。有新版时标题栏会出现 `🔄 新版 vX.Y.Z，/update 可更新` 徽标，对话里直接输入：
 
 ```text
 /update
@@ -192,24 +201,21 @@ raptor **启动时会校验激活状态，并每 24 小时检查一次新版本*
 
 即一键完成：下载新版 → 覆盖安装（你的凭证 / 记忆 / 会话 / QQ 授权名单不受影响）→ 自动装依赖，然后重启 raptor 即可。嫌下载进度看不清可以先 `/inline` 切行内模式再执行。
 
-密钥和设备绑定会在每次启动时校验；如需换电脑，请联系维护者在 `/admin` 重置设备绑定后再启动。
-
 不想要提醒：`.env` 里加 `RAPTOR_NO_UPDATE_CHECK=1`。
 
 ### 🛠️ 部署更新后台 + 发版（给维护者）
 
-分发链路四件套：**授权后台**（个人密钥与设备绑定）、**更新后台**（同学端查版本/下载包）、**发版命令**（打 zip 并发布）、**客户端自更新**（`/update`）。后台使用 Node.js 24+ 的内置 SQLite，不需要额外数据库或 npm 依赖；任何能跑 Node 的机器（云服务器/宿舍旧电脑）都能部署：
+分发链路由 **更新后台**（同学端查版本/下载包）、**发版命令**（打 zip 并发布）、**客户端自更新**（`/update`）组成。后台不需要数据库或额外 npm 依赖；任何能跑 Node 的机器（云服务器/宿舍旧电脑）都能部署：
 
 ```bash
-# 0. 先把 server/nginx.conf.example 复制到服务器并替换 license.example.com；
+# 0. 先把 server/nginx.conf.example 复制到服务器并替换 updates.example.com；
 #    用 Nginx + Let's Encrypt 对外提供 HTTPS。Node 服务默认只监听 127.0.0.1。
 
-# 1. 部署后台（建议 pm2 常驻；两个密钥都必须是高强度随机值）
-UPDATE_ADMIN_TOKEN=你的管理员密钥 LICENSE_SECRET=你的授权哈希密钥 HOST=127.0.0.1 PORT=8787 pm2 start server/update-server.mjs --name raptor-update
-#    管理后台 https://license.你的域名.com/admin（生成/禁用/重置同学的激活密钥）
+# 1. 部署后台（建议 pm2 常驻；管理员密钥必须是高强度随机值）
+UPDATE_ADMIN_TOKEN=你的管理员密钥 HOST=127.0.0.1 PORT=8787 pm2 start server/update-server.mjs --name raptor-update
 
 # 2. 本机 .env 配置 HTTPS 后台地址与发布密钥
-#    UPDATE_SERVER_URL=https://license.你的域名.com
+#    UPDATE_SERVER_URL=https://updates.你的域名.com
 #    UPDATE_ADMIN_TOKEN=你的管理员密钥
 
 # 3. 改完代码、提交后，一条命令发版（打包时会把 HTTPS 地址写入同学安装包）
@@ -223,8 +229,8 @@ npm run publish -- major "更新说明"          # 0.1.0 -> 1.0.0
 其他配置：
 
 - 客户端后台地址由 `npm run publish` 在打包时写入安装包；仅维护者本地可用 `.env` 的 `RAPTOR_UPDATE_SERVER` 覆盖
-- 未配置后台仅视为源码开发模式；正式 zip 没有 HTTPS 授权地址将无法发版
-- 后台数据在 `update-data/`（版本 zip、meta 与 `licenses.sqlite`），部署时记得备份、别删
+- 未配置后台时仍可正常使用；正式 zip 没有 HTTPS 更新地址将无法使用自动更新
+- 后台数据在 `update-data/`（版本 zip 与 meta），部署时记得备份、别删
 
 <details>
 <summary><b>⚙️ 环境变量</b></summary>
@@ -239,8 +245,8 @@ npm run publish -- major "更新说明"          # 0.1.0 -> 1.0.0
 | `QQBOT_APP_ID` / `QQBOT_APP_SECRET` | QQ 官方机器人凭证（可选） |
 | `QQBOT_PASSCODE` | QQ 授权暗号：首次给机器人发此暗号完成授权 |
 | `RAPTOR_NO_UPDATE_CHECK` | 设 `1` 关闭启动时的版本更新检查（默认开启） |
-| `RAPTOR_UPDATE_SERVER` | 仅维护者本地测试时覆盖授权后台地址；必须为 HTTPS，正式安装包由发版命令内置地址 |
-| `UPDATE_SERVER_URL` / `UPDATE_ADMIN_TOKEN` / `LICENSE_SECRET` | 维护者配置：后台地址、管理员密钥、授权密钥哈希专用密钥；`LICENSE_SECRET` 上线后不得随意更换 |
+| `RAPTOR_UPDATE_SERVER` | 仅维护者本地测试时覆盖更新后台地址；必须为 HTTPS，正式安装包由发版命令内置地址 |
+| `UPDATE_SERVER_URL` / `UPDATE_ADMIN_TOKEN` | 维护者配置：更新后台地址与发布管理员密钥 |
 | `DEEPSEEK_BASE_URL` | 自定义 API 地址（可选） |
 
 </details>
@@ -255,7 +261,7 @@ npm run publish -- major "更新说明"          # 0.1.0 -> 1.0.0
 <details>
 <summary><b>教务系统模块覆盖清单（55 个菜单模块）</b></summary>
 
-- **已接入 20 个工具（+3 抢课季工具，共 23）**：课表 / 成绩 GPA / 考试 / 学籍 / 已选教学班 / 可重修 / 实验成绩 / 选课查询三件套 / 教务处通知三件套 / 文件与数据四件套（本地文件读取、Excel 筛选、沙箱计算、附件缓存管理）/ 放假调休落盘 / 天气 / 记忆
+- **已接入 22 个工具（+3 抢课季工具，共 25）**：课表 / 成绩 GPA / 考试 / 学籍 / 已选教学班 / 可重修 / 实验成绩 / 选课查询三件套 / 教务处通知三件套 / 文件与数据四件套（本地文件读取、Excel 筛选、沙箱计算、附件缓存管理）/ 文档写作两件套（Word·Excel·PPT·PDF 生成与跨格式转换）/ 放假调休落盘 / 天气 / 记忆
 - **学校侧停用**（返回「系统维护页面」，任何客户端不可用）：空闲教室、班级课表、学业情况、实验课表、培养方案、站内通知
 - **申请/流程类**（提交表单操作，非查询，暂未接入）：学籍异动、转专业、重修报名、毕业学位申请、毕设流程等 30+ 项
 

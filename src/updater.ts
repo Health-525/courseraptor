@@ -9,12 +9,11 @@
  *    同学的凭证、记忆、会话永远不会被新包冲掉。
  */
 
-import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { exec as execCb } from "node:child_process";
-import { promisify } from "node:util";
+import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 import { PROJECT_ROOT } from "./paths";
-import { getLicenseDownloadHeaders } from "./license";
 import { checkForUpdate, requireSecureUpdateServerUrl } from "./update-check";
 
 const exec = promisify(execCb);
@@ -92,7 +91,6 @@ export async function applyUpdate(log: (msg: string) => void = () => {}): Promis
 
 async function downloadPackage(server: string): Promise<string> {
   const res = await fetch(`${server}/download`, {
-    headers: getLicenseDownloadHeaders(),
     signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`下载失败：HTTP ${res.status}（后台可能还没发过版）`);

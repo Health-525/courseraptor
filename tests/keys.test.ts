@@ -7,17 +7,12 @@
  * - 运行时切换 UI 需要在代理层识别 /inline 命令并注入 Ctrl+C 优雅退出
  */
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
-import { onSoftInterrupt, emitSoftInterrupt } from "../src/tui/soft-interrupt";
+import { test } from "node:test";
 import type { SlashCommandSpec } from "../src/tui/keys";
-import {
-  coalesceText,
-  commandsForMode,
-  SLASH_COMMANDS,
-  splitKeys,
-} from "../src/tui/slash-menu";
+import { coalesceText, commandsForMode, SLASH_COMMANDS, splitKeys } from "../src/tui/slash-menu";
+import { emitSoftInterrupt, onSoftInterrupt } from "../src/tui/soft-interrupt";
 
 const { createKeyProxy } = await import("../src/tui/keys");
 
@@ -30,9 +25,7 @@ interface Harness {
 
 // keys.ts 创建代理时会给 stdout 写鼠标启用序列，仅在创建瞬间屏蔽，
 // 避免污染测试输出（不能全局替换 stdout.write——node:test 报告也走它）
-function makeProxy(
-  commands?: Record<string, SlashCommandSpec>,
-): Harness {
+function makeProxy(commands?: Record<string, SlashCommandSpec>): Harness {
   const stdin = new PassThrough();
   const out: string[] = [];
   const realWrite = process.stdout.write.bind(process.stdout);
@@ -69,8 +62,7 @@ const flush = (): Promise<void> => new Promise((r) => setImmediate(r));
  * 读当前菜单帧行。makeProxy 里给全局赋了 undefined，流分析会把后续读取窄化
  * 成 never，所以统一走这个带断言的入口。
  */
-const menuLines = (): string[] | undefined =>
-  globalThis.__raptorSlashMenu as string[] | undefined;
+const menuLines = (): string[] | undefined => globalThis.__raptorSlashMenu as string[] | undefined;
 
 test("滚轮上/下翻译成合成方向键，一格 3 行", async () => {
   const h = makeProxy();
@@ -221,11 +213,7 @@ test("菜单：ESC 收起菜单，方向键恢复滚动放大语义", async () =
   await flush();
   write(h, "\x1b[A");
   await flush();
-  assert.deepEqual(
-    h.out.slice(1),
-    ["\x1b[A", "\x1b[A", "\x1b[A"],
-    "ESC 后 ↑ 恢复 3 行放大透传",
-  );
+  assert.deepEqual(h.out.slice(1), ["\x1b[A", "\x1b[A", "\x1b[A"], "ESC 后 ↑ 恢复 3 行放大透传");
   h.restore();
 });
 
@@ -356,13 +344,11 @@ test("命令文案单一来源：菜单候选的 desc 全部取自 SLASH_COMMAND
   }
 });
 
-
 test("共享 /key 命令不要求在普通输入框填写参数", () => {
   const command = commandsForMode("card").find((item) => item.name === "/key");
   assert.ok(command, "/key 必须出现在卡片模式菜单");
   assert.equal(command.requiresArgument, undefined);
 });
-
 
 test("/key 携带旧式可见参数时本地拒绝，不切换也不透传回车", async () => {
   let rejected = 0;
@@ -383,7 +369,6 @@ test("/key 携带旧式可见参数时本地拒绝，不切换也不透传回车
   assert.ok(!h.out.includes("\r"), "回车不得透传给 Agent");
   h.restore();
 });
-
 
 test("/Key 大小写变体同样请求本地设置，不透传给 Agent", async () => {
   const h = makeProxy({

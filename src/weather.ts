@@ -29,13 +29,14 @@ const RESULT_TTL_MS = 2 * 60_000;
 const GEO_TTL_MS = 7 * 24 * 60 * 60_000;
 
 /** 只用到 ok/status/text 三件套，测试里塞个假响应就够 */
-export interface WeatherFetch {
-  (url: string, init?: { signal?: AbortSignal }): Promise<{
-    ok: boolean;
-    status: number;
-    text(): Promise<string>;
-  }>;
-}
+export type WeatherFetch = (
+  url: string,
+  init?: { signal?: AbortSignal },
+) => Promise<{
+  ok: boolean;
+  status: number;
+  text(): Promise<string>;
+}>;
 
 const httpFetch: WeatherFetch = async (url, init) => {
   const res = await fetch(url, init);
@@ -186,12 +187,10 @@ export function parseGeoResponse(body: string): GeoCandidate[] {
       name,
       admin1: typeof o.admin1 === "string" ? o.admin1 : undefined,
       country: typeof o.country === "string" ? o.country : undefined,
-      countryCode:
-        typeof o.country_code === "string" ? o.country_code : undefined,
+      countryCode: typeof o.country_code === "string" ? o.country_code : undefined,
       latitude,
       longitude,
-      featureCode:
-        typeof o.feature_code === "string" ? o.feature_code : undefined,
+      featureCode: typeof o.feature_code === "string" ? o.feature_code : undefined,
       population: Number.isFinite(population) ? population : undefined,
     });
   }
@@ -245,9 +244,7 @@ export function isMajorCity(c: GeoCandidate | null): boolean {
 
 /** 候选 → 展示名，带上省/国，让模型有机会发现「查的不是那个城市」 */
 export function labelOf(c: GeoCandidate): string {
-  const parts = [c.admin1, c.country].filter(
-    (p): p is string => !!p && p !== c.name
-  );
+  const parts = [c.admin1, c.country].filter((p): p is string => !!p && p !== c.name);
   return parts.length ? `${c.name}（${parts.join("·")}）` : c.name;
 }
 
@@ -271,11 +268,7 @@ export function parseForecast(body: string, geo: GeoCandidate): WeatherReport {
   const codes = (daily.weather_code ?? []) as unknown[];
   const maxs = (daily.temperature_2m_max ?? []) as unknown[];
   const mins = (daily.temperature_2m_min ?? []) as unknown[];
-  const chances = (daily.precipitation_probability_max ?? []) as (
-    | number
-    | null
-    | unknown
-  )[];
+  const chances = (daily.precipitation_probability_max ?? []) as (number | null | unknown)[];
 
   const code = toNum(cur.weather_code);
   const now: WeatherNow = {
@@ -339,18 +332,14 @@ export function buildAdvice(now: WeatherNow, days: WeatherDay[]): string[] {
   const soon = days.slice(0, 3);
 
   const wetNow = isWetCode(now.code) || now.precipMm > 0.1;
-  const wetDays = soon.filter(
-    (d) => isWetCode(d.code) || (d.rainChance ?? 0) >= UMBRELLA_CHANCE
-  );
+  const wetDays = soon.filter((d) => isWetCode(d.code) || (d.rainChance ?? 0) >= UMBRELLA_CHANCE);
 
   if (wetNow) {
     out.push("当前正在降水，出门带伞");
   } else if (wetDays.length > 0) {
     const detail = wetDays
       .map((d) =>
-        d.rainChance != null
-          ? `${dayLabel(d, today)} ${d.rainChance}%`
-          : dayLabel(d, today)
+        d.rainChance != null ? `${dayLabel(d, today)} ${d.rainChance}%` : dayLabel(d, today),
       )
       .join("、");
     out.push(`${detail} 降水概率高，出门带伞`);
@@ -395,10 +384,7 @@ export function resetWeatherCache(): void {
 
 // ── 网络 ──────────────────────────────────────────────────────
 
-async function requestText(
-  url: string,
-  fetchImpl: WeatherFetch
-): Promise<FetchResult<string>> {
+async function requestText(url: string, fetchImpl: WeatherFetch): Promise<FetchResult<string>> {
   let res: Awaited<ReturnType<WeatherFetch>>;
   try {
     res = await fetchImpl(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
@@ -407,7 +393,7 @@ async function requestText(
     const msg =
       err?.name === "TimeoutError" || err?.name === "AbortError"
         ? `请求超时（${REQUEST_TIMEOUT_MS / 1000}s）`
-        : err?.message ?? String(e);
+        : (err?.message ?? String(e));
     return { ok: false, error: `天气服务连不上：${msg.slice(0, 100)}` };
   }
   if (!res.ok) return { ok: false, error: `天气服务返回 HTTP ${res.status}` };
@@ -431,7 +417,7 @@ async function geoSearch(query: string, fetchImpl: WeatherFetch) {
  */
 async function resolveCity(
   city: string,
-  fetchImpl: WeatherFetch
+  fetchImpl: WeatherFetch,
 ): Promise<FetchResult<GeoCandidate>> {
   const hit = geoCache.get(city);
   if (hit && Date.now() - hit.at < GEO_TTL_MS) return { ok: true, data: hit.value };
@@ -474,7 +460,7 @@ export async function fetchWeather(
   city: string,
   days = 7,
   fetchImpl: WeatherFetch = httpFetch,
-  now = () => Date.now()
+  now = () => Date.now(),
 ): Promise<FetchResult<WeatherReport>> {
   const trimmed = city.trim();
   if (!trimmed) return { ok: false, error: "城市名为空" };
@@ -494,8 +480,7 @@ export async function fetchWeather(
     longitude: String(geo.data.longitude),
     current:
       "temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m,precipitation,is_day",
-    daily:
-      "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+    daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
     forecast_days: String(span),
     timezone: "auto",
   });

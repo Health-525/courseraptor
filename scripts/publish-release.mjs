@@ -94,12 +94,12 @@ cpSync(ROOT, stage, {
   },
 });
 
-// 仅在待发布副本写入服务地址：源码本地开发不要求激活，发给同学的 zip 则必定校验。
+// 仅在待发布副本写入更新服务地址；源码本地开发无需配置更新后台。
 const stagedUpdateCheck = path.join(stage, "src", "update-check.ts");
 const updateCheckSource = readFileSync(stagedUpdateCheck, "utf8");
 const placeholderLine = 'const DEFAULT_UPDATE_SERVER = "__RAPTOR_RELEASE_SERVER__";';
 if (!updateCheckSource.includes(placeholderLine)) {
-  throw new Error("未找到客户端授权服务器占位符，已中止打包");
+  throw new Error("未找到客户端更新服务器占位符，已中止打包");
 }
 writeFileSync(
   stagedUpdateCheck,

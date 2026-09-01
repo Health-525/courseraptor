@@ -73,7 +73,7 @@ try {
 
 function env(key: string): string | undefined {
   const v = process.env[key];
-  return v && v.trim() ? v.trim() : undefined;
+  return v?.trim() ? v.trim() : undefined;
 }
 
 function loadConfig(): RaptorConfig {

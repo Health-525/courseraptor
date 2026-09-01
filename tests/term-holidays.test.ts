@@ -6,11 +6,11 @@
  * holiday 覆盖课表、makeup 按 follows 周几补出行。
  */
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { test } from "node:test";
 
 // 必须在导入被测模块之前指向临时数据目录，避免读写真实 data/
 const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-holidays-"));
@@ -37,7 +37,7 @@ test("recordSpecialDays: 合法记录落盘并可读回", () => {
       { date: "2026-11-02", type: "holiday", name: "校庆假" },
       { date: "2026-11-03", type: "holiday", name: "校庆假" },
     ],
-    "测试通知"
+    "测试通知",
   );
   assert.equal(r.recorded, 3);
   assert.deepEqual(r.rejected, []);
@@ -87,7 +87,14 @@ test("annotateWeekGroups: holiday 周带合并后的放假说明", () => {
     { date: "2026-10-03", type: "holiday", name: "国庆节" },
   ]);
   const courses = [
-    { title: "高等数学", weekday: 4, periods: [3, 4], weeks: "1-16", location: "明德楼", teacher: "张" },
+    {
+      title: "高等数学",
+      weekday: 4,
+      periods: [3, 4],
+      weeks: "1-16",
+      location: "明德楼",
+      teacher: "张",
+    },
   ];
   const groups = annotateWeekGroups(courses, WEEK1_MONDAY, buildWeekIndex(courses));
   const week5 = groups.find((g) => g.week === 5)!;
@@ -106,7 +113,14 @@ test("annotateWeekGroups: makeup 日按 follows 周几补出课行", () => {
   // 9-05（第 1 周周六）补周三的课
   recordSpecialDays([{ date: "2026-09-05", type: "makeup", follows: 3, name: "军训调休" }]);
   const courses = [
-    { title: "大学英语", weekday: 3, periods: [1, 2], weeks: "1-16", location: "仁智楼", teacher: "李" },
+    {
+      title: "大学英语",
+      weekday: 3,
+      periods: [1, 2],
+      weeks: "1-16",
+      location: "仁智楼",
+      teacher: "李",
+    },
   ];
   const groups = annotateWeekGroups(courses, WEEK1_MONDAY, buildWeekIndex(courses));
   const week1 = groups.find((g) => g.week === 1)!;
@@ -126,7 +140,10 @@ test("annotateWeekGroups: makeup 不在该周周次范围内的课不会补", ()
   ];
   const groups = annotateWeekGroups(courses, WEEK1_MONDAY, buildWeekIndex(courses));
   // 该课只排在 3/5/7 周：第 1 周（含 9-05 调休日）根本无分组，周三的课也补不进任何周
-  assert.equal(groups.find((g) => g.week === 1), undefined);
+  assert.equal(
+    groups.find((g) => g.week === 1),
+    undefined,
+  );
   for (const g of groups) {
     assert.equal(g.makeup, undefined, `第 ${g.week} 周不应有调休补课行`);
   }

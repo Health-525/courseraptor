@@ -3,14 +3,14 @@
  * 移植自 ScholarFlow lib/schools/njtech/jwgl.ts（课表/考试部分）
  */
 
-import type { CourseData, ExamData } from "./types";
-import { createClient, httpFailure, type FetchResult } from "./http";
 import { BASE } from "./auth";
+import { createClient, type FetchResult, httpFailure } from "./http";
 import { currentWeekOf as resolveCurrentWeek } from "./term-dates";
+import type { CourseData, ExamData } from "./types";
 
 export {
-  parseTermStartDate,
   parseTermRef,
+  parseTermStartDate,
   recordWeek1Monday,
   resolveWeek1Monday,
   type TermDateSource,
@@ -163,9 +163,7 @@ export function candidateXnxqList(): Array<{ year: number; semester: number }> {
 }
 
 /** 解析用户/模型给定的学期串，如「2026-2027-1」「2025-2026第2学期」「2026-1」 */
-export function parseSemesterString(
-  s: string
-): { year: number; semester: number } | null {
+export function parseSemesterString(s: string): { year: number; semester: number } | null {
   let m = s.match(/(\d{4})\D+(\d{4})\D*(1|2|一|二)(?!\d)/);
   if (m) {
     return { year: parseInt(m[1], 10), semester: m[3] === "1" || m[3] === "一" ? 3 : 12 };
@@ -193,10 +191,9 @@ export type ScheduleResult = TermRef & { courses: CourseData[] };
 export async function fetchScheduleSmart(
   cookie: string,
   xnm?: number,
-  xqm?: number
+  xqm?: number,
 ): Promise<FetchResult<ScheduleResult>> {
-  const candidates =
-    xnm && xqm ? [{ year: xnm, semester: xqm }] : candidateXnxqList();
+  const candidates = xnm && xqm ? [{ year: xnm, semester: xqm }] : candidateXnxqList();
 
   const failures: string[] = [];
 
@@ -217,14 +214,17 @@ export async function fetchScheduleSmart(
 
   // 至少有一个学期查通了但没排课：保持「假期空课表」语义
   const first = candidates[0];
-  return { ok: true, data: { ...first, label: termLabel(first.year, first.semester), courses: [] } };
+  return {
+    ok: true,
+    data: { ...first, label: termLabel(first.year, first.semester), courses: [] },
+  };
 }
 
 /** 抓取指定单个学期的课表（kbList 为空时回退用考试数据反推） */
 async function fetchScheduleFor(
   cookie: string,
   year: number,
-  semester: number
+  semester: number,
 ): Promise<FetchResult<CourseData[]>> {
   const client = createClient(BASE, cookie);
 
@@ -252,7 +252,7 @@ async function fetchScheduleFor(
       ok: true,
       data: kbList.map((item: Record<string, unknown>) => ({
         title: (item.kcmc as string) || "",
-        weekday: parseInt(item.xqj as string) || 0,
+        weekday: parseInt(item.xqj as string, 10) || 0,
         periods: parsePeriods(item.jc as string),
         weeks: cleanWeekSpec((item.zcd as string) || ""),
         location: (item.cdmc as string) || (item.xqmc as string) || "",
@@ -273,7 +273,7 @@ async function fetchScheduleFor(
 async function buildScheduleFromExams(
   cookie: string,
   year: number,
-  semester: number
+  semester: number,
 ): Promise<CourseData[]> {
   // 回退路径只作补充：拿不到就算了，不把错误冒泡成「课表查询失败」
   const r = await fetchExamsFor(cookie, year, semester);
@@ -285,8 +285,7 @@ async function buildScheduleFromExams(
   const seen = new Set<string>();
 
   for (const exam of exams) {
-    const title =
-      exam.subject || (exam as Record<string, unknown>).kcmc as string || "";
+    const title = exam.subject || ((exam as Record<string, unknown>).kcmc as string) || "";
     if (!title || seen.has(title)) continue;
     seen.add(title);
 
@@ -303,13 +302,19 @@ async function buildScheduleFromExams(
       if (!weekdayMatch) continue;
 
       const weekdayMap: Record<string, number> = {
-        "一": 1, "二": 2, "三": 3, "四": 4,
-        "五": 5, "六": 6, "日": 7, "天": 7,
+        一: 1,
+        二: 2,
+        三: 3,
+        四: 4,
+        五: 5,
+        六: 6,
+        日: 7,
+        天: 7,
       };
       const weekday = weekdayMap[weekdayMatch[1]] || 0;
 
-      const startPeriod = periodMatch ? parseInt(periodMatch[1]) : 0;
-      const endPeriod = periodMatch?.[2] ? parseInt(periodMatch[2]) : startPeriod;
+      const startPeriod = periodMatch ? parseInt(periodMatch[1], 10) : 0;
+      const endPeriod = periodMatch?.[2] ? parseInt(periodMatch[2], 10) : startPeriod;
       const periods: number[] = [];
       for (let i = startPeriod; i <= endPeriod; i++) periods.push(i);
 
@@ -343,13 +348,13 @@ function cleanWeekSpec(spec: string): string {
 function parsePeriods(jc: string): number[] {
   const match = jc.match(/(\d+)-(\d+)/);
   if (match) {
-    const start = parseInt(match[1]);
-    const end = parseInt(match[2]);
+    const start = parseInt(match[1], 10);
+    const end = parseInt(match[2], 10);
     const periods: number[] = [];
     for (let i = start; i <= end; i++) periods.push(i);
     return periods;
   }
-  const single = parseInt(jc);
+  const single = parseInt(jc, 10);
   if (single > 0) return [single];
   return [];
 }
@@ -362,10 +367,9 @@ export type ExamResult = TermRef & { exams: ExamData[] };
 export async function fetchExamsSmart(
   cookie: string,
   xnm?: number,
-  xqm?: number
+  xqm?: number,
 ): Promise<FetchResult<ExamResult>> {
-  const candidates =
-    xnm && xqm ? [{ year: xnm, semester: xqm }] : candidateXnxqList();
+  const candidates = xnm && xqm ? [{ year: xnm, semester: xqm }] : candidateXnxqList();
 
   const failures: string[] = [];
 
@@ -392,17 +396,14 @@ export async function fetchExamsSmart(
 async function fetchExamsFor(
   cookie: string,
   year: number,
-  semester: number
+  semester: number,
 ): Promise<FetchResult<ExamData[]>> {
   const client = createClient(BASE, cookie);
 
-  const resp = await client.req(
-    "/kwgl/kscx_cxXsksxxIndex.html?doType=query&gnmkdm=N358105",
-    {
-      method: "POST",
-      body: `xnm=${year}&xqm=${semester}&_search=false&nd=${Date.now()}&queryModel.showCount=100&queryModel.currentPage=1`,
-    }
-  );
+  const resp = await client.req("/kwgl/kscx_cxXsksxxIndex.html?doType=query&gnmkdm=N358105", {
+    method: "POST",
+    body: `xnm=${year}&xqm=${semester}&_search=false&nd=${Date.now()}&queryModel.showCount=100&queryModel.currentPage=1`,
+  });
 
   const failure = httpFailure(resp);
   if (failure) return { ok: false, error: failure };

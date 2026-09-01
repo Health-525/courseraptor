@@ -10,13 +10,12 @@
  *   agent 只能删自己下载的东西，永远删不到用户的文件
  */
 
+import crypto from "node:crypto";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import crypto from "node:crypto";
-
-import { PROJECT_ROOT } from "./config";
 import { writeFileAtomic } from "./atomic-write";
+import { PROJECT_ROOT } from "./config";
 
 /** 数据目录（测试可用 RAPTOR_DATA_DIR 指到临时目录，与 chat-sessions 同款） */
 function dataDir(): string {
@@ -77,10 +76,7 @@ async function saveIndex(idx: IndexShape): Promise<void> {
 
 /** 稳定 id：同一 URL / 同一路径永远映射到同一个 id */
 export function attachmentIdForSource(source: "url" | "local", key: string): string {
-  const norm =
-    source === "url"
-      ? key.trim()
-      : path.resolve(key).toLowerCase().replace(/\\/g, "/");
+  const norm = source === "url" ? key.trim() : path.resolve(key).toLowerCase().replace(/\\/g, "/");
   return crypto.createHash("sha256").update(norm).digest("hex").slice(0, 12);
 }
 
@@ -137,7 +133,7 @@ export async function putAttachment(input: {
   await fsp.mkdir(filesDir(), { recursive: true });
   const ext = (input.filename.toLowerCase().match(/\.[a-z0-9]{1,8}$/)?.[0] ?? "").replace(
     /[^a-z0-9.]/g,
-    ""
+    "",
   );
   const storedPath = path.join(filesDir(), input.id + ext);
   await fsp.writeFile(storedPath, input.buf);
@@ -178,9 +174,7 @@ export function touchAttachment(id: string): void {
 }
 
 export function listAttachments(): AttachmentMeta[] {
-  return Object.values(loadIndexSync()).sort((a, b) =>
-    b.fetchedAt.localeCompare(a.fetchedAt)
-  );
+  return Object.values(loadIndexSync()).sort((a, b) => b.fetchedAt.localeCompare(a.fetchedAt));
 }
 
 /** 缓存目录总占用（字节）与条数 */

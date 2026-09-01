@@ -9,9 +9,8 @@
 
 import fs from "node:fs/promises";
 import path from "node:path";
-
-import { PROJECT_ROOT } from "../config";
 import { writeFileAtomic } from "../atomic-write";
+import { PROJECT_ROOT } from "../config";
 
 const SESSION_FILE = path.join(PROJECT_ROOT, "session.json");
 const MAX_PERSIST_MESSAGES = 200;
@@ -35,8 +34,9 @@ export function captureSessionPrompt(prompt: unknown): void {
   const messages = prompt
     .filter(
       (m): m is CapturedMessage =>
-        !!m && typeof (m as CapturedMessage).role === "string" &&
-        (m as CapturedMessage).role !== "system"
+        !!m &&
+        typeof (m as CapturedMessage).role === "string" &&
+        (m as CapturedMessage).role !== "system",
     )
     .slice(-MAX_PERSIST_MESSAGES);
   if (messages.length === 0) return;
@@ -46,8 +46,8 @@ export function captureSessionPrompt(prompt: unknown): void {
     .then(() =>
       writeFileAtomic(
         SESSION_FILE,
-        JSON.stringify({ savedAt: new Date().toISOString(), messages }, null, 2)
-      )
+        JSON.stringify({ savedAt: new Date().toISOString(), messages }, null, 2),
+      ),
     )
     .catch(() => {
       /* 落盘失败不影响对话 */
@@ -66,7 +66,7 @@ function extractText(content: unknown): string {
   return content
     .filter(
       (p): p is { text: string } =>
-        !!p && typeof p === "object" && (p as { type?: string }).type === "text"
+        !!p && typeof p === "object" && (p as { type?: string }).type === "text",
     )
     .map((p) => p.text.trim())
     .filter(Boolean)
@@ -101,9 +101,7 @@ export async function loadLastSessionTranscript(): Promise<string> {
 
   let transcript = lines.join("\n");
   if (transcript.length > MAX_TRANSCRIPT_CHARS) {
-    transcript =
-      "…（更早已截断）\n" +
-      transcript.slice(transcript.length - MAX_TRANSCRIPT_CHARS);
+    transcript = `…（更早已截断）\n${transcript.slice(transcript.length - MAX_TRANSCRIPT_CHARS)}`;
   }
   const savedAt = data.savedAt ? new Date(data.savedAt).toLocaleString("zh-CN") : "未知时间";
   const head = `## 上次会话记录（${savedAt}，短期记忆自动恢复）`;

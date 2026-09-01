@@ -21,9 +21,9 @@ export interface QQFileLogger {
 
 function write(level: string, msg: string, meta?: Record<string, unknown>): void {
   const line = `[${new Date().toISOString()}] [${level}] ${msg}${
-    meta ? " " + JSON.stringify(meta) : ""
+    meta ? ` ${JSON.stringify(meta)}` : ""
   }`;
-  stream.write(line + "\n");
+  stream.write(`${line}\n`);
 }
 
 export function createQQFileLogger(): QQFileLogger {

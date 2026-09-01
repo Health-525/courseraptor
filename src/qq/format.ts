@@ -43,7 +43,10 @@ export function mdToPlain(md: string): string {
     }
     out.push(converted);
   }
-  return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  return out
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 /** 按行边界分段；单行自身超长时硬切（QQ 长消息保险） */
@@ -62,11 +65,11 @@ export function splitMessage(text: string, max = 1500): string[] {
       rest = rest.slice(max);
     }
     if (!rest) continue;
-    if ((current + "\n" + rest).length > max && current) {
+    if (`${current}\n${rest}`.length > max && current) {
       segments.push(current.trim());
       current = rest;
     } else {
-      current = current ? current + "\n" + rest : rest;
+      current = current ? `${current}\n${rest}` : rest;
     }
   }
   if (current.trim()) segments.push(current.trim());

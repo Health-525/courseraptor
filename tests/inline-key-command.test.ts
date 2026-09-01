@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
 import { PassThrough } from "node:stream";
+import { test } from "node:test";
 import { runInlineTUI, type TUIStreamableAgent } from "../src/tui/inline";
 
 const nullAgent: TUIStreamableAgent = {
   stream: async () => ({ fullStream: (async function* () {})() }),
 };
 
-function makeTTYStream(): PassThrough & { isTTY?: boolean; setRawMode?: (value: boolean) => void; columns?: number } {
+function makeTTYStream(): PassThrough & {
+  isTTY?: boolean;
+  setRawMode?: (value: boolean) => void;
+  columns?: number;
+} {
   const stream = new PassThrough() as PassThrough & {
     isTTY?: boolean;
     setRawMode?: (value: boolean) => void;
@@ -51,7 +55,6 @@ test("行内模式无参 /key 请求外层安全设置流程，不进入 Agent",
     clearTimeout(cleanupTimer);
   }
 });
-
 
 test("行内旧式 /Key 参数不会回显、进入历史或提交给 Agent", async () => {
   const input = makeTTYStream();

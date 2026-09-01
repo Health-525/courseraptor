@@ -7,11 +7,11 @@
  * 3. 索引被外部改坏指向缓存目录之外时，删除必须拒绝、绝不越界。
  */
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { test } from "node:test";
 
 // 必须在导入被测模块之前指向临时数据目录，避免读写真实 data/
 const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-attstore-"));
@@ -30,18 +30,16 @@ const {
   attachmentStats,
 } = await import("../src/attachment-store");
 
-const URL_A = "https://jwc.njtech.edu.cn/system/_content/download.jsp?urltype=news.DownloadAttachUrl&owner=1&wbfileid=ABC";
+const URL_A =
+  "https://jwc.njtech.edu.cn/system/_content/download.jsp?urltype=news.DownloadAttachUrl&owner=1&wbfileid=ABC";
 
 test("id 稳定：同 URL 永远同 id，不同来源不同 id", () => {
   assert.equal(attachmentIdForSource("url", URL_A), attachmentIdForSource("url", URL_A));
-  assert.notEqual(
-    attachmentIdForSource("url", URL_A),
-    attachmentIdForSource("url", URL_A + "X")
-  );
+  assert.notEqual(attachmentIdForSource("url", URL_A), attachmentIdForSource("url", `${URL_A}X`));
   // Windows 路径大小写不敏感：同一文件不同写法应归一
   assert.equal(
     attachmentIdForSource("local", "D:\\DownLoads\\List.XLSX"),
-    attachmentIdForSource("local", "d:/downloads/list.xlsx")
+    attachmentIdForSource("local", "d:/downloads/list.xlsx"),
   );
 });
 
@@ -97,7 +95,10 @@ test("delete：删文件删索引；未知 id 返回 false 不碰磁盘", async 
   const target = getMeta(id)!.storedPath;
   assert.equal(await deleteAttachment(id), true);
   assert.ok(!fs.existsSync(target));
-  assert.equal(listAttachments().find((m) => m.id === id), undefined);
+  assert.equal(
+    listAttachments().find((m) => m.id === id),
+    undefined,
+  );
   assert.equal(await deleteAttachment("ffffffffffff"), false);
 });
 
@@ -108,7 +109,7 @@ test("越界护栏：索引被改成缓存目录外的路径时，删除必须�
 
   const idxFile = path.join(tmpData, "attachments", "index.json");
   const idx = JSON.parse(fs.readFileSync(idxFile, "utf8")) as Record<string, unknown>;
-  idx["evil00000001"] = {
+  idx.evil00000001 = {
     id: "evil00000001",
     filename: "x.xlsx",
     kind: "table",

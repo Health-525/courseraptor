@@ -15,14 +15,11 @@
  * 每轮把该会话最后 40 条转成 ModelMessage 传给 agent，多轮上下文完整。
  */
 
-import http from "node:http";
 import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ModelMessage } from "ai";
-import { config } from "../config";
-import { saveCredentialsStore } from "../credentials";
-import { getDeepSeekKeyStatus, setDeepSeekApiKey } from "../onboarding";
 import {
   appendRound,
   contextMessages,
@@ -32,6 +29,9 @@ import {
   listSessions,
   resetAll,
 } from "../chat-sessions";
+import { config } from "../config";
+import { saveCredentialsStore } from "../credentials";
+import { getDeepSeekKeyStatus, setDeepSeekApiKey } from "../onboarding";
 
 /** 前端 Markdown 渲染器（marked 的 UMD 构建，静态吐给浏览器） */
 const MARKED_UMD = path.resolve(
@@ -430,7 +430,8 @@ async function runTurn(
           break;
         }
         case "tool-call": {
-          if (p.toolCallId) toolStart.set(p.toolCallId, { name: p.toolName ?? "tool", at: Date.now() });
+          if (p.toolCallId)
+            toolStart.set(p.toolCallId, { name: p.toolName ?? "tool", at: Date.now() });
           send({
             t: "tool",
             phase: "start",

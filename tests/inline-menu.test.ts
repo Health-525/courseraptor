@@ -11,9 +11,9 @@
  * readline 会被当成历史翻阅、把上一轮内容翻进输入行；必须先切分再处理。
  */
 
-import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
+import { describe, test } from "node:test";
 import { runInlineTUI, type TUIStreamableAgent } from "../src/tui/inline";
 
 /** 不产生任何流事件的假 agent：本测试只关心输入行与菜单的交互 */
@@ -148,13 +148,12 @@ describe("行内模式斜杠菜单", { concurrency: 1 }, () => {
   });
 });
 
-
-  test("选择 /key 请求安全设置流程，不补全可见参数或提交给 agent", async () => {
-    await withInline(async (rig) => {
-      await rig.press("/");
-      await rig.press("\x1b[B"); // 第二项 /key
-      const frame = await rig.press("\r");
-      assert.ok(!frame.includes("key "), "不应补全可见 API Key 参数输入");
-      assert.ok(!frame.includes("── 完成"), "/key 不应提交给 agent");
-    });
+test("选择 /key 请求安全设置流程，不补全可见参数或提交给 agent", async () => {
+  await withInline(async (rig) => {
+    await rig.press("/");
+    await rig.press("\x1b[B"); // 第二项 /key
+    const frame = await rig.press("\r");
+    assert.ok(!frame.includes("key "), "不应补全可见 API Key 参数输入");
+    assert.ok(!frame.includes("── 完成"), "/key 不应提交给 agent");
   });
+});

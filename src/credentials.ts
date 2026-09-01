@@ -13,9 +13,8 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-
-import { PROJECT_ROOT } from "./paths";
 import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
+import { PROJECT_ROOT } from "./paths";
 
 const CRED_FILE = path.join(PROJECT_ROOT, "credentials.enc");
 
@@ -38,10 +37,6 @@ export interface CredentialsStore {
   deepseekApiKey?: string;
   /** 经 /key 明确确认的本机覆盖值；启动时优先于 .env。 */
   deepseekApiKeyOverride?: boolean;
-  /** 独立激活密钥；与教务凭证一样仅加密保存在本机。 */
-  licenseKey?: string;
-  /** 本机随机安装 ID，不采集硬件序列号或个人信息。 */
-  licenseDeviceId?: string;
   savedAt: string;
 }
 
@@ -57,7 +52,7 @@ export function loadCredentialsStore(): CredentialsStore | null {
     const decipher = crypto.createDecipheriv(
       "aes-256-gcm",
       machineKey(raw.salt),
-      Buffer.from(raw.iv, "base64")
+      Buffer.from(raw.iv, "base64"),
     );
     decipher.setAuthTag(Buffer.from(raw.tag, "base64"));
     const plain = Buffer.concat([
@@ -79,7 +74,7 @@ export function saveCredentialsStore(patch: Partial<CredentialsStore>): void {
   if (!existing && hasStoredCredentials()) {
     quarantineCorruptFileSync(CRED_FILE);
     console.warn(
-      "⚠️ 本机凭证文件无法解密（换过机器或文件已损坏），已另存备份后重建；教务账号可能需要重新配置。"
+      "⚠️ 本机凭证文件无法解密（换过机器或文件已损坏），已另存备份后重建；教务账号可能需要重新配置。",
     );
   }
   const payload: CredentialsStore = {
@@ -90,10 +85,7 @@ export function saveCredentialsStore(patch: Partial<CredentialsStore>): void {
   const salt = crypto.randomBytes(16).toString("base64");
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv("aes-256-gcm", machineKey(salt), iv);
-  const data = Buffer.concat([
-    cipher.update(JSON.stringify(payload), "utf8"),
-    cipher.final(),
-  ]);
+  const data = Buffer.concat([cipher.update(JSON.stringify(payload), "utf8"), cipher.final()]);
   writeFileAtomicSync(
     CRED_FILE,
     JSON.stringify(
@@ -105,8 +97,8 @@ export function saveCredentialsStore(patch: Partial<CredentialsStore>): void {
         data: data.toString("base64"),
       },
       null,
-      2
-    )
+      2,
+    ),
   );
 }
 

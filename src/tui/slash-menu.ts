@@ -66,10 +66,7 @@ export function localOnlyCommandMessage(input: string): string | undefined {
  * 前缀过滤。区分大小写是刻意的：补全按「已输入长度」截取命令名剩余部分，
  * 忽略大小写会让 "/K" 补成 "/Key" 错位。
  */
-export function filterSlashCommands(
-  query: string,
-  pool: SlashCommand[],
-): SlashCommand[] {
+export function filterSlashCommands(query: string, pool: SlashCommand[]): SlashCommand[] {
   if (!query.startsWith("/")) return [];
   return pool.filter((c) => c.name.startsWith(query));
 }
@@ -85,8 +82,7 @@ export function filterSlashCommands(
  * 同一个 chunk（"\x1b\x1b[A"），若让 `\x1b` 吃掉下一个字符，剩下的 "[A" 会
  * 被当成普通文本拼进输入行/命令镜像。排除后能正确切成 ESC + \x1b[A。
  */
-const ESC_SEQ =
-  /^(?:\x1b\[[0-9;?]*[A-Za-z~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[^\x1b[]?)/;
+const ESC_SEQ = /^(?:\x1b\[[0-9;?]*[A-Za-z~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[^\x1b[]?)/;
 
 /**
  * 把一次 data 事件的 chunk 切成一个个按键序列。
@@ -212,10 +208,7 @@ function ellipsis(s: string, width: number): string {
  * 渲染菜单框。selected 为高亮项（越界自动钳制）；无候选返回 []（= 隐藏）。
  * 最多展示 9 项，命令总数远小于此，纯防御。
  */
-export function renderSlashMenu(
-  items: SlashCommand[],
-  selected: number,
-): string[] {
+export function renderSlashMenu(items: SlashCommand[], selected: number): string[] {
   if (!items.length) return [];
   const total = MENU_INNER + 2;
   // "┌ 命令 " 前缀占 7 列，加收尾 "┐"，横线补满 total - 8 列
@@ -231,9 +224,7 @@ export function renderSlashMenu(
     const name = padTo(ellipsis(c.name, nameW), nameW);
     const desc = padTo(ellipsis(c.desc, descW), descW);
     // 选中项整块反显（反显里不再叠 DIM，颜色会打架）
-    const body = active
-      ? `${INVERT} ${name}${desc} ${RESET}`
-      : ` ${name}${DIM}${desc}${RESET} `;
+    const body = active ? `${INVERT} ${name}${desc} ${RESET}` : ` ${name}${DIM}${desc}${RESET} `;
     lines.push(`│ ${mark} ${body} │`);
   });
   lines.push(`└${"─".repeat(total - 2)}┘`);

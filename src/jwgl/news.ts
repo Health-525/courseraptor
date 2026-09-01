@@ -6,8 +6,8 @@
  * 无需认证（公开页面）
  */
 
-import http from "http";
-import https from "https";
+import http from "node:http";
+import https from "node:https";
 
 import type { NewsItem } from "./types";
 
@@ -24,11 +24,7 @@ const TARGETS = [
 /** 跟随重定向的上限：A↔B 互跳时没有上限就是无限请求 */
 const MAX_REDIRECTS = 5;
 
-function fetchHtml(
-  url: string,
-  timeout = 15000,
-  hops = 0
-): Promise<string> {
+function fetchHtml(url: string, timeout = 15000, hops = 0): Promise<string> {
   return new Promise((resolve, reject) => {
     const lib = url.startsWith("https") ? https : http;
     const req = lib.get(
@@ -37,19 +33,14 @@ function fetchHtml(
         headers: {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-          Accept:
-            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
           "Accept-Language": "zh-CN,zh;q=0.9",
           Connection: "keep-alive",
         },
       },
       (res) => {
         // Handle redirects
-        if (
-          (res.statusCode ?? 0) >= 300 &&
-          (res.statusCode ?? 0) < 400 &&
-          res.headers.location
-        ) {
+        if ((res.statusCode ?? 0) >= 300 && (res.statusCode ?? 0) < 400 && res.headers.location) {
           const redirectUrl = res.headers.location.startsWith("http")
             ? res.headers.location
             : new URL(res.headers.location, url).href;
@@ -59,7 +50,9 @@ function fetchHtml(
           if (hops >= MAX_REDIRECTS) {
             return reject(new Error(`重定向次数超过上限（${MAX_REDIRECTS}）：${url}`));
           }
-          return fetchHtml(redirectUrl, timeout, hops + 1).then(resolve).catch(reject);
+          return fetchHtml(redirectUrl, timeout, hops + 1)
+            .then(resolve)
+            .catch(reject);
         }
         if ((res.statusCode ?? 0) < 200 || (res.statusCode ?? 0) >= 400) {
           return reject(new Error(`HTTP ${res.statusCode ?? 0} for ${url}`));
@@ -72,11 +65,9 @@ function fetchHtml(
           resolve(buf.toString("utf8"));
         });
         res.on("error", reject);
-      }
+      },
     );
-    req.setTimeout(timeout, () =>
-      req.destroy(new Error(`Timeout ${url}`))
-    );
+    req.setTimeout(timeout, () => req.destroy(new Error(`Timeout ${url}`)));
     req.on("error", reject);
   });
 }
@@ -87,33 +78,25 @@ function parseNewsList(html: string, baseUrl: string): NewsItem[] {
   const items: NewsItem[] = [];
 
   // <ul class="my-list"><li><a href="...">标题</a><span class="date">日期</span></li></ul>
-  const listMatch = html.match(
-    /<ul[^>]*class="my-list"[^>]*>([\s\S]*?)<\/ul>/i
-  );
+  const listMatch = html.match(/<ul[^>]*class="my-list"[^>]*>([\s\S]*?)<\/ul>/i);
   if (!listMatch) return items;
 
   const liRegex = /<li>([\s\S]*?)<\/li>/gi;
   let liMatch: RegExpExecArray | null;
   while ((liMatch = liRegex.exec(listMatch[1])) !== null) {
-    const aMatch = liMatch[1].match(
-      /<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i
-    );
+    const aMatch = liMatch[1].match(/<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
     if (!aMatch) continue;
     const title = aMatch[2].replace(/<[^>]+>/g, "").trim();
     if (title.length < 4) continue;
 
-    const dateMatch = liMatch[1].match(
-      /<span[^>]*class="date"[^>]*>([^<]+)<\/span>/i
-    );
+    const dateMatch = liMatch[1].match(/<span[^>]*class="date"[^>]*>([^<]+)<\/span>/i);
     const date = dateMatch ? dateMatch[1].trim() : "";
 
     let fullUrl: string;
     try {
       fullUrl = new URL(aMatch[1], baseUrl).href;
     } catch {
-      fullUrl =
-        baseUrl.replace(/\/[^/]*$/, "") +
-        aMatch[1].replace(/^\.\./, "");
+      fullUrl = baseUrl.replace(/\/[^/]*$/, "") + aMatch[1].replace(/^\.\./, "");
     }
 
     items.push({ title, url: fullUrl, date });
@@ -137,7 +120,7 @@ function parseNewsList(html: string, baseUrl: string): NewsItem[] {
  */
 export async function fetchJwcNews(
   existingItems: NewsItem[] = [],
-  maxItems = 20
+  maxItems = 20,
 ): Promise<NewsItem[]> {
   const allItems: NewsItem[] = [];
 
@@ -156,9 +139,7 @@ export async function fetchJwcNews(
     // Merge with existing, deduplicate by URL, keep latest
     const merged = [
       ...allItems,
-      ...existingItems.filter(
-        (e) => !allItems.some((n) => n.url === e.url)
-      ),
+      ...existingItems.filter((e) => !allItems.some((n) => n.url === e.url)),
     ];
     merged.sort((a, b) => b.date.localeCompare(a.date));
     return merged.slice(0, maxItems);
@@ -183,7 +164,10 @@ export interface JwcArticle {
 export async function fetchJwcArticle(url: string): Promise<JwcArticle> {
   const html = await fetchHtml(url);
   const title =
-    html.match(/<title>([^<]*)<\/title>/i)?.[1]?.trim().replace(/-南京工业大学教务处.*$/, "") ?? "";
+    html
+      .match(/<title>([^<]*)<\/title>/i)?.[1]
+      ?.trim()
+      .replace(/-南京工业大学教务处.*$/, "") ?? "";
 
   // 正文在 v_news_content / vsb_content 容器内；容器有嵌套 div，
   // 必须做配对计数提取（正则非贪婪会在第一个 </div> 截断）
@@ -198,13 +182,10 @@ export async function fetchJwcArticle(url: string): Promise<JwcArticle> {
   // <li>附件【<a href="/system/_content/download.jsp?...">名称.xlsx</a>】），
   // 且下载 URL 无文件后缀（文件名在链接文本里）
   const attachments: JwcArticle["attachments"] = [];
-  for (const m of html.matchAll(
-    /<a[^>]*href="([^"]+)"[^>]*>([\s\S]{0,150}?)<\/a>/gi
-  )) {
+  for (const m of html.matchAll(/<a[^>]*href="([^"]+)"[^>]*>([\s\S]{0,150}?)<\/a>/gi)) {
     const href = m[1];
     const text = m[2].replace(/<[^>]+>/g, "").trim();
-    const isDownload =
-      href.includes("download.jsp") || href.includes("DownloadAttachUrl");
+    const isDownload = href.includes("download.jsp") || href.includes("DownloadAttachUrl");
     const hasExt = /\.(xls|xlsx|pdf|doc|docx|zip|rar|wps)(?:[?#]|$)/i.test(href);
     if (!isDownload && !hasExt) continue;
     if (!text || text.length < 3) continue;

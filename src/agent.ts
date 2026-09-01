@@ -6,13 +6,13 @@
  * - 长期：memory.json 事实条目（save_memory 工具维护），启动时全量注入
  */
 
-import { ToolLoopAgent, wrapLanguageModel } from "ai";
 import { createDeepSeek } from "@ai-sdk/deepseek";
+import { ToolLoopAgent, wrapLanguageModel } from "ai";
 
 import { config } from "./config";
-import { raptorTools } from "./tools";
-import { captureSessionPrompt, loadLastSessionTranscript } from "./memory/shortterm";
 import { formatMemoryForPrompt } from "./memory/longterm";
+import { captureSessionPrompt, loadLastSessionTranscript } from "./memory/shortterm";
+import { raptorTools } from "./tools";
 
 const deepseek = createDeepSeek({
   // 不传 apiKey：AI SDK 会每次请求实时读 DEEPSEEK_API_KEY 环境变量，
@@ -80,6 +80,10 @@ ${grabCapability}
 - run_js：沙箱 JS 小计算（去重/计数/分组求和/正则摘取），无网络无磁盘，3 秒超时
 - manage_attachments：列出/删除附件缓存（附件任务答完可主动清理；只能删 agent 自己缓存的副本，用户文件碰不了）
 
+文档写作（AI 辅助学生产出交付物）：
+- generate_document：按你组织好的结构化内容直接生成 Word/Excel/PPT/PDF 成品文件（中文原生可写），存到本机 data/generated 并回完整路径。学生要「报告/课件/表格/简历/论文模板」等成品的交付时用——docx/pdf 给 blocks、pptx 给 slides、xlsx 给 sheets，先把正文与数据想清楚再喂进来
+- convert_document：把已有内容（附件 id / 本机文件路径 / 一段文本）跨格式转换重排，如 PDF↔Word↔PPT、表格转文档等。源文件只读，成品写 data/generated。改写润色你自己在文本层做，改好再用 generate_document 出稿
+
 天气生活：
 - get_weather：查天气实况与未来预报（天气已是中文，带伞与穿衣建议可直接引用）。默认学校所在城市，用户提到别的城市就传 city
 
@@ -114,7 +118,7 @@ ${grabCapability}
 10. 用户问你能做什么、或问得含糊时，给出几个具体可问的例子（这周课表 / 最近通知 / 我的成绩 / 通识选修还差哪几类 / 有哪些要注意的），别罗列工具名。
 11. 天气只报查到的数：先给结论（要不要带伞、穿什么），再给温度区间和逐日预报，别把 7 天全列出来。工具报错就说查不到，不许凭「八月南京应该很热」这类印象编天气。用户反复问同一座非学校城市（如老家）时，用 save_memory 记下偏好，之后主动带上 city 查。
 12. 放假/调休：判断**只认教务处通知**，不凭校历或往年的经验推断具体放假安排。get_schedule 的周分组自带假期覆盖——week 里有 holiday 字段表示那些天放假（普通课表作废，直接告诉用户放假安排），makeup 行是调休补课日（周六/周日上班）按「follows 周几」课表补出的课，展示时以这些字段覆盖普通课表，别再按周一~周日的原始课表回答「放假那周有什么课」。读到放假安排时（get_news 标题含「放假」「调休」「节假日」，或用户转述）：先 read_notice 读正文，把安排逐日整理成 days（放假日 type=holiday 带 name；补课日 type=makeup 并用 follows 指明按周几课表），调 set_holidays 落盘——之后课表自动修正，不需要用户再提醒。反过来，临近法定节假日（9 月中下旬/12 月下旬/3 月底/4 月中/5 月初/6 月初）或用户问放假安排时，若 get_schedule 的 specialDaysNote 提示无记录（或已落盘的日期没覆盖用户问的那段时间），先主动 get_news 查最新通知再回答，查无通知就如实说「教务处尚未发布，按国务院文件执行、具体另行通知」。
-13. 附件与大表格：通知正文说「详见附件」就 fetch_attachment；表格附件返回的是概览（表头+前几行），用户问表里具体某行/某专业/某时段时用 query_table 的 keyword/where 筛选，绝不凭概览前 15 行编造其余内容，也不要反复请求全表分页通读；长文档找关键句用 keyword 定位、要看全貌才 offset 续读。筛选后还要合计/去重/分组时用 run_js 算，别心算。用户给了本机文件路径用 read_local_file（路径须是用户明确说的）。附件类任务彻底答完后可以 manage_attachments delete 清理缓存，但绝不动用户本机的任何文件。${grabRule ? "\n\n" + grabRule : ""}`;
+13. 附件与大表格：通知正文说「详见附件」就 fetch_attachment；表格附件返回的是概览（表头+前几行），用户问表里具体某行/某专业/某时段时用 query_table 的 keyword/where 筛选，绝不凭概览前 15 行编造其余内容，也不要反复请求全表分页通读；长文档找关键句用 keyword 定位、要看全貌才 offset 续读。筛选后还要合计/去重/分组时用 run_js 算，别心算。用户给了本机文件路径用 read_local_file（路径须是用户明确说的）。附件类任务彻底答完后可以 manage_attachments delete 清理缓存，但绝不动用户本机的任何文件。${grabRule ? `\n\n${grabRule}` : ""}`;
 }
 
 /**

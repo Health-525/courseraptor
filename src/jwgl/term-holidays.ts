@@ -18,13 +18,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { quarantineCorruptFileSync, writeFileAtomicSync } from "../atomic-write";
-import {
-  courseLineBody,
-  expandWeeks,
-  WEEKDAY_NAMES,
-  type WeekGroup,
-} from "./academics";
+import { writeFileAtomicSync } from "../atomic-write";
+import { courseLineBody, expandWeeks, WEEKDAY_NAMES, type WeekGroup } from "./academics";
 import type { CourseData } from "./types";
 
 export type SpecialDayType = "holiday" | "makeup";
@@ -55,11 +50,7 @@ interface HolidayStore {
   recordedAt?: string;
 }
 
-const PROJECT_ROOT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-  ".."
-);
+const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 function dataDir(): string {
   return process.env.RAPTOR_DATA_DIR ?? path.join(PROJECT_ROOT, "data");
@@ -108,7 +99,7 @@ function isValidDate(date: string): boolean {
  */
 export function recordSpecialDays(
   entries: SpecialDayRecord[],
-  source?: string
+  source?: string,
 ): { recorded: number; rejected: string[] } {
   const store = loadHolidayStore();
   const rejected: string[] = [];
@@ -159,7 +150,7 @@ export function specialOnDate(date: string): SpecialDay | null {
   return loadHolidayStore().days[date] ?? null;
 }
 
-function weekdayOf(date: string): number {
+function _weekdayOf(date: string): number {
   const day = new Date(`${date}T00:00:00`).getDay();
   return day === 0 ? 7 : day;
 }
@@ -174,7 +165,7 @@ export function specialDaysOfWeek(week1Monday: string, week: number): WeekSpecia
   for (let i = 0; i < 7; i++) {
     const d = new Date(start + i * 86400000);
     const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-      d.getDate()
+      d.getDate(),
     ).padStart(2, "0")}`;
     const hit = loadHolidayStore().days[iso];
     if (hit) out.push({ date: iso, weekday: i + 1, ...hit });
@@ -214,9 +205,9 @@ function mergeHolidayRuns(days: WeekSpecialDay[]): string[] {
       run.length === 1
         ? `${shortDate(run[0].date)}（${WEEKDAY_NAMES[run[0].weekday]}）`
         : `${shortDate(run[0].date)}（${WEEKDAY_NAMES[run[0].weekday]}）～${shortDate(
-            run[run.length - 1].date
+            run[run.length - 1].date,
           )}（${WEEKDAY_NAMES[run[run.length - 1].weekday]}）`;
-    runs.push(`${label}放假${names.length ? "：" + names.join("、") : ""}`);
+    runs.push(`${label}放假${names.length ? `：${names.join("、")}` : ""}`);
     run = [];
   };
 
@@ -243,7 +234,7 @@ function mergeHolidayRuns(days: WeekSpecialDay[]): string[] {
 export function annotateWeekGroups(
   courses: CourseData[],
   week1Monday: string,
-  groups: WeekGroup[]
+  groups: WeekGroup[],
 ): AnnotatedWeekGroup[] {
   return groups.map((g) => {
     const specials = specialDaysOfWeek(week1Monday, g.week);
@@ -263,7 +254,7 @@ export function annotateWeekGroups(
             courseLineBody(c),
           ]
             .filter(Boolean)
-            .join(" · ")
+            .join(" · "),
         );
       }
     }

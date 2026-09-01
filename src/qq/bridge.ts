@@ -13,31 +13,57 @@
  *   网页那套会话档案（data/chat-sessions.json），侧栏能回看 QQ 里的对话
  */
 
-import fs from "node:fs/promises";
 import { realpathSync } from "node:fs";
+import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ModelMessage } from "ai";
 import {
-  QQBot,
-  errorHandler,
-  messageFilter,
-  contentSanitizer,
-  mentionGate,
   concurrencyGuard,
+  contentSanitizer,
+  errorHandler,
+  mentionGate,
+  messageFilter,
+  QQBot,
 } from "@tencent-connect/qqbot-nodejs";
-
-import { config, PROJECT_ROOT } from "../config";
-import { ensureLicense } from "../license";
-import { ensureCredentials } from "../onboarding";
+import type { ModelMessage } from "ai";
 import { createRaptorAgent } from "../agent";
 import { quarantineCorruptFile, writeFileAtomic } from "../atomic-write";
 import { appendRound } from "../chat-sessions";
-import { mdToPlain, splitMessage } from "./format";
-import { qqArchiveSlot, type QqArchiveInput } from "./session-archive";
+import { config, PROJECT_ROOT } from "../config";
+import { drainGeneratedRound, runInDocumentRound } from "../document/save";
+import { ensureCredentials } from "../onboarding";
 import { localOnlyCommandMessage } from "../tui/slash-menu";
+import { mdToPlain, splitMessage } from "./format";
+import { type QqArchiveInput, qqArchiveSlot } from "./session-archive";
 
 type BridgeLogger = Pick<Console, "log" | "info" | "warn" | "error" | "debug">;
+
+/**
+ * 回传本轮生成的文档成品到 QQ。
+ * bot.sendFile 走「上传媒体 + 文件消息(msg_type)」，官方机器人需具备文件消息
+ * 权限，未开通会抛错——此时降级成一条文字，把文件名与本机路径告知用户，
+ * 绝不静默吞掉。target 复用消息自带的 replyTarget，私聊/群聊都适用。
+ */
+type SendFileFn = QQBot["sendFile"];
+async function deliverGeneratedFiles(
+  bot: QQBot,
+  target: Parameters<SendFileFn>[0],
+  roundId: string,
+  log: BridgeLogger,
+): Promise<void> {
+  const files = drainGeneratedRound(roundId);
+  for (const f of files) {
+    try {
+      await bot.sendFile(target, { localPath: f.filePath }, { fileName: f.filename });
+      log.log(`[qq] 已回传文件 ${f.filename}`);
+    } catch (e) {
+      log.warn(`[qq] 文件回传失败 ${f.filename}：${(e as Error)?.message ?? e}`);
+      await bot
+        .sendText(target, `📄 ${f.filename}\n（文件消息发送失败，已存本机：${f.filePath}）`)
+        .catch(() => {});
+    }
+  }
+}
 
 // ── 授权：白名单 + 暗号激活 ────────────────────────────────────
 
@@ -57,10 +83,7 @@ async function loadAllowlist(): Promise<void> {
 }
 
 async function saveAllowlist(): Promise<void> {
-  await writeFileAtomic(
-    ALLOWLIST_FILE,
-    JSON.stringify({ openids: [...allowedOpenids] }, null, 2)
-  );
+  await writeFileAtomic(ALLOWLIST_FILE, JSON.stringify({ openids: [...allowedOpenids] }, null, 2));
 }
 
 // ── 会话历史（每发送者独立，滑动窗口）─────────────────────────
@@ -88,8 +111,7 @@ function startWaitingNotices(send: (text: string) => Promise<unknown>): () => vo
   const tick = () => {
     beat++;
     const sec = Math.round((Date.now() - startedAt) / 1000);
-    const text =
-      beat === 1 ? "🦖 收到，正在查…" : `…还在查（已 ${sec} 秒），马上回你`;
+    const text = beat === 1 ? "🦖 收到，正在查…" : `…还在查（已 ${sec} 秒），马上回你`;
     void send(text).catch(() => {});
     timer = setTimeout(tick, HEARTBEAT_MS);
   };
@@ -126,7 +148,7 @@ function humanizeError(e: unknown): string {
 export function archiveQQRound(
   msg: QqArchiveInput,
   answer: string | null,
-  log: BridgeLogger = console
+  log: BridgeLogger = console,
 ): void {
   const slot = qqArchiveSlot(msg);
   if (!slot) return;
@@ -141,14 +163,12 @@ export function archiveQQRound(
 
 // ── 主流程 ────────────────────────────────────────────────────
 
-export async function startQQBridge(
-  opts: { logger?: BridgeLogger } = {}
-): Promise<void> {
+export async function startQQBridge(opts: { logger?: BridgeLogger } = {}): Promise<void> {
   const log = opts.logger ?? console;
 
   if (!config.qqBotAppId || !config.qqBotAppSecret) {
     throw new Error(
-      "缺少 QQ 机器人配置：请在 .env 填写 QQBOT_APP_ID / QQBOT_APP_SECRET（q.qq.com 开放平台获取）"
+      "缺少 QQ 机器人配置：请在 .env 填写 QQBOT_APP_ID / QQBOT_APP_SECRET（q.qq.com 开放平台获取）",
     );
   }
   await loadAllowlist();
@@ -172,7 +192,7 @@ export async function startQQBridge(
   // 拒绝回复防刷：每个陌生人只提示一次，避免被刷被动回复额度
   const rejectedNotified = new Set<string>();
 
-  bot.on("message", async (ctx, msg) => {
+  bot.on("message", async (_ctx, msg) => {
     const senderId = msg.senderId;
 
     // 未授权：暗号激活或拒绝
@@ -183,13 +203,13 @@ export async function startQQBridge(
         log.log(`[auth] 新授权 openid=${senderId}`);
         await bot.sendText(
           msg.replyTarget,
-          "✅ 已授权，迅猛龙上线！直接说需求即可：查课表 / 盯课 / 抢课 / 读教务通知。"
+          "✅ 已授权，迅猛龙上线！直接说需求即可：查课表 / 盯课 / 抢课 / 读教务通知。",
         );
       } else if (!rejectedNotified.has(senderId)) {
         rejectedNotified.add(senderId);
         await bot.sendText(
           msg.replyTarget,
-          "⛔ 未授权。首次使用请发送激活暗号（管理员在 .env 的 QQBOT_PASSCODE 中设置）。"
+          "⛔ 未授权。首次使用请发送激活暗号（管理员在 .env 的 QQBOT_PASSCODE 中设置）。",
         );
       }
       return;
@@ -216,13 +236,16 @@ export async function startQQBridge(
       archiveQQRound(msg, answer, log);
     };
 
-    const stopNotices = startWaitingNotices((t) =>
-      bot.sendText(msg.replyTarget, t)
-    );
+    const stopNotices = startWaitingNotices((t) => bot.sendText(msg.replyTarget, t));
     try {
-      const result = await agent.generate({
-        messages: [...history, userMsg],
-      });
+      // 给这一轮对话打一个 roundId：文档生成工具落盘时会盖上此章，
+      // 结束后按章回捞，只把「本轮生成的成品」回传（跨用户并行也不串台）。
+      const roundId = `${senderId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+      const result = await runInDocumentRound(roundId, () =>
+        agent.generate({
+          messages: [...history, userMsg],
+        }),
+      );
       stopNotices();
       const reply = mdToPlain(result.text || "（无输出）");
       // 先留档再发送：分段发送中途被限流，这一轮也已经进得了历史
@@ -230,14 +253,13 @@ export async function startQQBridge(
       for (const seg of splitMessage(reply)) {
         await bot.sendText(msg.replyTarget, seg);
       }
+      // 回传本轮生成的文档成品（官方机器人文件消息需权限，失败降级为文字告知路径）
+      await deliverGeneratedFiles(bot, msg.replyTarget, roundId, log);
       const assistantMsg: ModelMessage = {
         role: "assistant",
         content: result.text,
       };
-      histories.set(
-        senderId,
-        [...history, userMsg, assistantMsg].slice(-MAX_HISTORY_TURNS)
-      );
+      histories.set(senderId, [...history, userMsg, assistantMsg].slice(-MAX_HISTORY_TURNS));
     } catch (e) {
       stopNotices();
       // 答砸了也把「他在 QQ 里问过这句」留下：只有提问，跟网页侧同一口径
@@ -265,7 +287,6 @@ const isEntry = (() => {
 })();
 
 export interface StandaloneQQDependencies {
-  ensureLicense(): Promise<void>;
   ensureCredentials(): Promise<void>;
   startBridge(): Promise<void>;
 }
@@ -273,12 +294,10 @@ export interface StandaloneQQDependencies {
 /** 独立 QQ 入口与主程序共用相同的授权前置条件。 */
 export async function startStandaloneQQ(
   dependencies: StandaloneQQDependencies = {
-    ensureLicense,
     ensureCredentials,
     startBridge: () => startQQBridge(),
   },
 ): Promise<void> {
-  await dependencies.ensureLicense();
   await dependencies.ensureCredentials();
   await dependencies.startBridge();
 }

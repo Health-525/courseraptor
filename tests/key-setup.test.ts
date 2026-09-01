@@ -1,13 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import {
-  maskDeepSeekApiKey,
-  resolveDeepSeekApiKey,
-} from "../src/config";
-import {
-  runDeepSeekKeySetup,
-  type KeySetupIO,
-} from "../src/onboarding";
+import { maskDeepSeekApiKey, resolveDeepSeekApiKey } from "../src/config";
+import { type KeySetupIO, runDeepSeekKeySetup } from "../src/onboarding";
 
 const NEW_KEY = "sk-NewKey1234567890ABCDE";
 
