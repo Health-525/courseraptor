@@ -29,9 +29,23 @@ import { runUpdateCommand } from "./updater";
 const updatePromise = checkForUpdate();
 
 // 教务凭证缺失时引导录入（.env > credentials.enc 加密文件 > 首次引导）
+const needsJwglSetup = !(config.jwglUsername && config.jwglPassword);
 await ensureCredentials();
-if (config.credentialsSource === "encrypted") {
-  console.log("🔐 教务凭证：已从本机加密存储解密加载");
+if (needsJwglSetup) {
+  console.log("💡 以后使用：直接双击安装包中的 start.bat，它会自动打开 CourseRaptor；查询教务信息时会自动登录，不必重新输入学号和密码。");
+  console.log("   如需更换账号，请删除安装目录中的 credentials.enc 后重新启动。\n");
+} else if (config.credentialsSource === "encrypted") {
+  console.log("🔐 已读取本机加密保存的教务账号；以后直接双击 start.bat 即可打开 CourseRaptor。\n");
+}
+
+// 对话依赖 DeepSeek API Key。首次缺失时立刻在终端完成安全配置，而非让新用户
+// 进入界面后再自行发现 /key 命令；取消或格式错误时仍保留 /key 作为重试入口。
+if (!config.deepseekApiKey) {
+  console.log("🦖 首次使用：第 2 步，共 2 步——配置 DeepSeek API Key（用于对话）");
+  const keySetup = await runDeepSeekKeySetup();
+  if (keySetup !== "saved") {
+    console.log("⚠️ API Key 尚未配置完成。进入后随时输入无参数 /key 可重新设置。\n");
+  }
 }
 
 const updateInfo: UpdateInfo | null = await updatePromise;

@@ -13,7 +13,8 @@ import { createMutedTerminalOutput } from "./secret-input";
 export async function ensureCredentials(): Promise<void> {
   if (config.jwglUsername && config.jwglPassword) return;
 
-  console.log("🦖 首次使用：先配置教务系统账号（将 AES-256-GCM 加密保存在本机，不明文落盘）");
+  console.log("🦖 首次使用：第 1 步，共 2 步——配置教务系统账号");
+  console.log("   账号和密码将 AES-256-GCM 加密保存在本机，不会明文落盘。\n");
   const out = createMutedTerminalOutput();
   // terminal: true 不能省：output 是自定义 Writable（没有 isTTY），省了它
   // readline 就判定为非终端、不给 stdin 开 raw mode，终端自身的回显会把密码
@@ -27,10 +28,10 @@ export async function ensureCredentials(): Promise<void> {
 
   try {
     for (let attempt = 1; ; attempt++) {
-      const username = (await rl.question("学号: ")).trim();
+      const username = (await rl.question("学号（输入后按回车）: ")).trim();
       // 先直接写出提示，再关闭 readline 的回显。若先静音再把提示交给
       // rl.question，Windows 终端会把「请输入密码」也吞掉，用户看起来像卡住。
-      process.stdout.write("教务系统密码（输入不回显）: ");
+      process.stdout.write("教务系统密码（输入不回显，输入后按回车）: ");
       out.setMuted(true);
       let password: string;
       try {
@@ -52,7 +53,7 @@ export async function ensureCredentials(): Promise<void> {
         config.jwglUsername = username;
         config.jwglPassword = password;
         config.credentialsSource = "encrypted";
-        console.log("✅ 登录验证通过，凭证已加密保存\n");
+        console.log("✅ 教务账号验证通过，已加密保存。\n");
         return;
       } catch (e) {
         const msg = (e as Error).message;
