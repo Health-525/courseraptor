@@ -1,6 +1,6 @@
 {
   "name": "courseraptor",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "NJTECH 教务对话式 agent：抢课/课表/成绩/考试，一句话搞定",
   "scripts": {
     "dev": "tsx src/index.ts",

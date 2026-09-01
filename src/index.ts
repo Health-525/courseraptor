@@ -32,10 +32,10 @@ const updatePromise = checkForUpdate();
 const needsJwglSetup = !(config.jwglUsername && config.jwglPassword);
 await ensureCredentials();
 if (needsJwglSetup) {
-  console.log("💡 以后使用：直接双击安装包中的 start.bat，它会自动打开 CourseRaptor；查询教务信息时会自动登录，不必重新输入学号和密码。");
+  console.log("💡 下次打开 Raptor：直接双击安装包中的 start.bat，它会自动启动 CourseRaptor；查询教务信息时会自动登录，不必重新输入学号和密码。");
   console.log("   如需更换账号，请删除安装目录中的 credentials.enc 后重新启动。\n");
 } else if (config.credentialsSource === "encrypted") {
-  console.log("🔐 已读取本机加密保存的教务账号；以后直接双击 start.bat 即可打开 CourseRaptor。\n");
+  console.log("🔐 已读取本机加密保存的教务账号；下次双击 start.bat 即可再次打开 Raptor。\n");
 }
 
 // 对话依赖 DeepSeek API Key。首次缺失时立刻在终端完成安全配置，而非让新用户
