@@ -28,10 +28,17 @@ export async function ensureCredentials(): Promise<void> {
   try {
     for (let attempt = 1; ; attempt++) {
       const username = (await rl.question("学号: ")).trim();
+      // 先直接写出提示，再关闭 readline 的回显。若先静音再把提示交给
+      // rl.question，Windows 终端会把「请输入密码」也吞掉，用户看起来像卡住。
+      process.stdout.write("教务系统密码（输入不回显）: ");
       out.setMuted(true);
-      const password = await rl.question("教务系统密码（输入不回显）: ");
-      out.setMuted(false);
-      process.stdout.write("\n");
+      let password: string;
+      try {
+        password = await rl.question("");
+      } finally {
+        out.setMuted(false);
+        process.stdout.write("\n");
+      }
 
       if (!username || !password) {
         console.log("❌ 学号和密码不能为空");
