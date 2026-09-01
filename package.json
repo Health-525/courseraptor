@@ -55,7 +55,7 @@
     "pptxgenjs": "^4.0.1",
     "tesseract.js": "^7.0.0",
     "tsx": "^4.23.12",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.4.3"
   },
   "devDependencies": {
