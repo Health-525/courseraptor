@@ -1,8 +1,8 @@
 <div align="center">
 
-<img src="docs/hero-banner.png" width="100%" alt="CourseRaptor — 教务琐事，一句话。戴眼镜的小恐龙为南工同学整理课表。" />
+<img src="docs/hero-banner.png" width="100%" alt="CourseRaptor — 教务琐事，一句话。开源教务助手，为南工同学打造。" />
 
-# 🦖 CourseRaptor
+# CourseRaptor
 
 ### 把教务琐事交给小恐龙，把时间留给大学生活。
 
@@ -10,11 +10,9 @@
 
 [简体中文](README.md) · [English](README.en.md)
 
-[![GitHub Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=for-the-badge&logo=github&color=BDE88A&labelColor=071B30)](https://github.com/Health-525/courseraptor/stargazers) [![GitHub Forks](https://img.shields.io/github/forks/Health-525/courseraptor?style=for-the-badge&logo=git&color=79C6AB&labelColor=071B30)](https://github.com/Health-525/courseraptor/forks) [![License ISC](https://img.shields.io/badge/License-ISC-79C6AB?style=for-the-badge&labelColor=071B30)](LICENSE) [![Node.js 24+](https://img.shields.io/badge/Node.js-24%2B-79C6AB?style=for-the-badge&logo=nodedotjs&logoColor=white&labelColor=071B30)](https://nodejs.org/zh-cn/download)
+[![Checks](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml) [![License ISC](https://img.shields.io/badge/License-ISC-8f2b21)](LICENSE) [![Node.js 24+](https://img.shields.io/badge/Node.js-24%2B-8f2b21?logo=nodedotjs&logoColor=white)](https://nodejs.org/zh-cn/download) [![TypeScript](https://img.shields.io/badge/TypeScript-typed-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-typed-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/) [![Vercel AI SDK](https://img.shields.io/badge/Vercel_AI_SDK-Agent-071B30?style=flat-square&logo=vercel)](https://ai-sdk.dev/) [![DeepSeek](https://img.shields.io/badge/LLM-DeepSeek-4D6BFE?style=flat-square)](https://www.deepseek.com/) [![Checks](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml) [![Last commit](https://img.shields.io/github/last-commit/Health-525/courseraptor?style=flat-square&color=79C6AB)](https://github.com/Health-525/courseraptor/commits/master)
-
-**[🚀 开始体验](#-先体验再登录) · [✨ 看看能做什么](#-你的问题小恐龙来接) · [📖 使用指南](docs/student-guide.md) · [💬 交流想法](https://github.com/Health-525/courseraptor/discussions) · [🐛 反馈问题](https://github.com/Health-525/courseraptor/issues/new/choose)**
+**[开始体验](#先体验再登录) · [能做什么](#你的问题小恐龙来接) · [使用指南](docs/student-guide.md) · [交流想法](https://github.com/Health-525/courseraptor/discussions) · [反馈问题](https://github.com/Health-525/courseraptor/issues/new/choose)**
 
 </div>
 
@@ -28,41 +26,41 @@ CourseRaptor 把课表、成绩、考试、教务通知和日历导出放进同�
 
 **目前适配南京工业大学，适合个人电脑自用。** 这是非官方开源项目；正式查询需要自己的教务账号和 DeepSeek API Key，模型 API 可能产生费用。先运行离线演示，无需填写任何凭证。
 
-## ✨ 你的问题，小恐龙来接
+## 你的问题，小恐龙来接
 
 <table>
 <tr>
 <td width="50%" valign="top">
-<h3>🗓️ 课表随口问</h3>
+<h3>课表随口问</h3>
 <p><b>“这周有什么课，在哪上？”</b></p>
 <p>按学期、教学周整理课程、节次和地点，结合单双周及已记录的调休安排。</p>
 </td>
 <td width="50%" valign="top">
-<h3>📊 学业看得清</h3>
+<h3>学业看得清</h3>
 <p><b>“哪些课还需要我留意？”</b></p>
 <p>GPA、已获学分、未通过与待确认课程一起看；通识分类辅助核对修读情况。</p>
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<h3>⏰ 考试有条理</h3>
+<h3>考试有条理</h3>
 <p><b>“最近什么时候考试？”</b></p>
 <p>查询科目、日期、时间、考场与座位信息，把复习准备的第一步理清楚。</p>
 </td>
 <td width="50%" valign="top">
-<h3>📰 通知读重点</h3>
+<h3>通知读重点</h3>
 <p><b>“这条通知需要我做什么？”</b></p>
 <p>从通知列表读到正文和附件，按你的问题提取重点，再回到原文核对。</p>
 </td>
 </tr>
 <tr>
 <td width="50%" valign="top">
-<h3>📱 手机日历见</h3>
+<h3>手机日历见</h3>
 <p><b>“把课表和考试导出到日历。”</b></p>
 <p>生成 .ics 文件，网页下载后导入手机；也可选配 GitHub / Gitee 公开订阅源。</p>
 </td>
 <td width="50%" valign="top">
-<h3>📝 材料变成品</h3>
+<h3>材料变成品</h3>
 <p><b>“把这份材料整理成文档。”</b></p>
 <p>读文档、筛表格、辅助写作，生成 Word / Excel / PPT / PDF 后直接下载。</p>
 </td>
@@ -72,27 +70,27 @@ CourseRaptor 把课表、成绩、考试、教务通知和日历导出放进同�
 <details>
 <summary><b>还有这些：记忆、天气、QQ 接入与可选选课能力</b></summary>
 
-- **🧠 跨会话记忆**：记录偏好与事实，减少重复说明。
-- **🌤️ 天气查询**：查看天气、降水与穿衣建议。
-- **💬 QQ 接入**：使用腾讯官方机器人接口；共用本机教务身份，适合个人使用。
-- **🔎 选课信息查询**：搜索课程、对比教学班与余量；真实选课提交默认关闭。
+- **跨会话记忆**：记录偏好与事实，减少重复说明。
+- **天气查询**：查看天气、降水与穿衣建议。
+- **QQ 接入**：使用腾讯官方机器人接口；共用本机教务身份，适合个人使用。
+- **选课信息查询**：搜索课程、对比教学班与余量；真实选课提交默认关闭。
 
 全部工具、适用范围与限制见[能力参考](docs/capabilities.md)。
 
 </details>
 
-## 🎬 先看一眼
+## 先看一眼
 
 <div align="center">
 
 <img src="docs/screenshot-demo.jpg" width="100%" alt="CourseRaptor 浏览器界面：离线演示的一周课表、会话档案与常用提问按钮，全部使用虚构数据" />
 
-<sub>真实网页界面，虚构演示数据。宣传插画与产品界面分别展示。</sub>
+<sub>真实网页界面，虚构演示数据。</sub>
 
 </div>
 
 <details>
-<summary><b>💬 展开看：可以怎样和它聊？</b></summary>
+<summary><b>展开看：可以怎样和它聊？</b></summary>
 
 下面是**示例对话**，不代表真实查询结果。
 
@@ -110,7 +108,7 @@ CourseRaptor 把课表、成绩、考试、教务通知和日历导出放进同�
 
 </details>
 
-## 🚀 先体验，再登录
+## 先体验，再登录
 
 ### 01 / 三条命令，认识小恐龙
 
@@ -154,22 +152,22 @@ npm start
 
 保持终端运行即可。一般无需编辑 `.env`；遇到问题先看[同学使用指南](docs/student-guide.md)，进阶选项看[配置参考](docs/configuration.md)。
 
-## 🧭 下一站，由真实需求决定
+## 下一站，由真实需求决定
 
 现有能力继续打磨，下面这些是**规划方向，尚未实现**：
 
 | 方向 | 想解决的事 |
 |---|---|
-| 🏠 今日日程 | 打开就看到下一节课、最近考试和数据更新时间 |
-| 🔔 截止提醒 | 把通知中的报名、补选和材料截止日期变成可确认待办 |
-| 🔄 变更提示 | 成绩更新、换教室、考试改期，一眼看到差异 |
-| 🎓 培养方案核对 | 按年级与专业核对学分缺口，保留规则来源 |
-| 🧩 选课冲突检查 | 对比周次、节次与备选教学班 |
-| 📚 复习计划 | 按考试日期和个人可用时间安排复习 |
+| 今日日程 | 打开就看到下一节课、最近考试和数据更新时间 |
+| 截止提醒 | 把通知中的报名、补选和材料截止日期变成可确认待办 |
+| 变更提示 | 成绩更新、换教室、考试改期，一眼看到差异 |
+| 培养方案核对 | 按年级与专业核对学分缺口，保留规则来源 |
+| 选课冲突检查 | 对比周次、节次与备选教学班 |
+| 复习计划 | 按考试日期和个人可用时间安排复习 |
 
 [查看详细路线图 →](docs/roadmap.md)　[说说你最想要的功能 →](https://github.com/Health-525/courseraptor/issues/new?template=feature_request.yml)
 
-## 🔐 好用，也把边界说清楚
+## 好用，也把边界说清楚
 
 | 你可能关心 | 实际情况 |
 |---|---|
@@ -182,7 +180,7 @@ npm start
 
 分享仓库地址或维护者检查过的干净安装包，让每位同学配置自己的账号。**请勿转发已经使用过的整个项目目录。** 数据去向、使用边界与安全报告方式见 [SECURITY.md](SECURITY.md)。
 
-## 🛠️ 给想一起做点东西的你
+## 给想一起做点东西的你
 
 ```text
 你的问题
@@ -204,13 +202,13 @@ npm test
 
 [贡献指南](CONTRIBUTING.md) · [完整能力](docs/capabilities.md) · [维护与分发](docs/maintainers.md) · [推广素材包](docs/promotion.md)
 
-## 💚 让更多同学遇见小恐龙
+## 让更多同学遇见小恐龙
 
 <table>
 <tr>
-<td align="center" width="33%"><h3>⭐ 觉得有用</h3><p>给仓库一个 Star，方便以后找到。</p><a href="https://github.com/Health-525/courseraptor">打开仓库</a></td>
-<td align="center" width="33%"><h3>💬 有个想法</h3><p>分享具体场景，告诉我们哪里还不顺手。</p><a href="https://github.com/Health-525/courseraptor/discussions">参与讨论</a></td>
-<td align="center" width="33%"><h3>🛠️ 想动手</h3><p>改文档、补测试，或修好一个真实问题。</p><a href="CONTRIBUTING.md">开始贡献</a></td>
+<td align="center" width="33%"><h3>觉得有用</h3><p>给仓库一个 Star，方便以后找到。</p><a href="https://github.com/Health-525/courseraptor">打开仓库</a></td>
+<td align="center" width="33%"><h3>有个想法</h3><p>分享具体场景，告诉我们哪里还不顺手。</p><a href="https://github.com/Health-525/courseraptor/discussions">参与讨论</a></td>
+<td align="center" width="33%"><h3>想动手</h3><p>改文档、补测试，或修好一个真实问题。</p><a href="CONTRIBUTING.md">开始贡献</a></td>
 </tr>
 </table>
 

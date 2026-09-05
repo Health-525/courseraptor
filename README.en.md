@@ -2,7 +2,7 @@
 
 <img src="docs/hero-banner.png" width="100%" alt="CourseRaptor, an open-source academic assistant featuring a friendly dinosaur mascot" />
 
-# 🦖 CourseRaptor
+# CourseRaptor
 
 ### Less time navigating academic portals. More time for student life.
 
@@ -10,7 +10,7 @@
 
 [简体中文](README.md) · **English**
 
-[![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=for-the-badge&logo=github&color=BDE88A&labelColor=071B30)](https://github.com/Health-525/courseraptor/stargazers) [![ISC License](https://img.shields.io/badge/License-ISC-79C6AB?style=for-the-badge&labelColor=071B30)](LICENSE) [![Node 24+](https://img.shields.io/badge/Node.js-24%2B-79C6AB?style=for-the-badge&logo=nodedotjs&logoColor=white&labelColor=071B30)](https://nodejs.org/en/download)
+[![Checks](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml) [![ISC License](https://img.shields.io/badge/License-ISC-8f2b21)](LICENSE) [![Node 24+](https://img.shields.io/badge/Node.js-24%2B-8f2b21?logo=nodedotjs&logoColor=white)](https://nodejs.org/en/download)
 
 [Try the demo](#try-it-without-credentials) · [Discuss](https://github.com/Health-525/courseraptor/discussions) · [Contribute](CONTRIBUTING.md)
 
