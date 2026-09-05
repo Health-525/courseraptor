@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/hero-banner.png" width="100%" alt="CourseRaptor, an open-source academic assistant featuring a friendly dinosaur mascot" />
+<img src="docs/courseraptor-logo.png" width="160" alt="CourseRaptor logo: a flat three-color raptor with round glasses" />
 
 # CourseRaptor
 

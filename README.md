@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/hero-banner.png" width="100%" alt="CourseRaptor — 教务琐事，一句话。开源教务助手，为南工同学打造。" />
+<img src="docs/courseraptor-logo.png" width="160" alt="CourseRaptor 小恐龙 logo：圆框眼镜的扁平三色迅猛龙" />
 
 # CourseRaptor
 
