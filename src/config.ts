@@ -24,6 +24,10 @@ export interface RaptorConfig {
   credentialsSource: "env" | "encrypted" | "unset";
   /** Firecrawl 云解析（通知附件转 markdown），可选 */
   firecrawlApiKey?: string;
+  /** GitHub 个人访问令牌（可选）：publish_calendar 把课表日历发布成手机可订阅的公开仓库 */
+  githubToken?: string;
+  /** Gitee 私人令牌（可选）：国内直连的日历订阅源（github.io/raw 国内常不可达） */
+  giteeToken?: string;
   /** QQ 官方机器人（开放平台 q.qq.com，可选，npm run qq 启动桥接） */
   qqBotAppId?: string;
   qqBotAppSecret?: string;
@@ -94,6 +98,8 @@ function loadConfig(): RaptorConfig {
     jwglPassword: env("JWGL_PASSWORD") ?? "",
     credentialsSource: "env",
     firecrawlApiKey: env("FIRECRAWL_API_KEY"),
+    githubToken: env("GITHUB_TOKEN"),
+    giteeToken: env("GITEE_TOKEN"),
     qqBotAppId: env("QQBOT_APP_ID"),
     qqBotAppSecret: env("QQBOT_APP_SECRET"),
     qqBotPasscode: env("QQBOT_PASSCODE"),
