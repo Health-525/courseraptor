@@ -20,8 +20,8 @@ export {
  * 当前教学周。真值来自 term-dates 单一数据源；
  * 返回值带 source —— 估算出来的必须如实标注，不能当既定事实讲。
  */
-export function currentWeekOf(year: number, semester: number) {
-  return resolveCurrentWeek(year, semester);
+export function currentWeekOf(year: number, semester: number, now: Date = new Date()) {
+  return resolveCurrentWeek(year, semester, now);
 }
 
 // ── NJTECH 节次时间表 ──────────────────────────────────────────
@@ -135,9 +135,10 @@ export function termLabel(year: number, semester: number): string {
   return `${year}-${year + 1}学年${semester === 3 ? "第一" : "第二"}学期`;
 }
 
-/** 候选学期列表（新到旧）。交界月（7-8 月）优先探测即将开始的秋学期 */
-export function candidateXnxqList(): Array<{ year: number; semester: number }> {
-  const now = new Date();
+/** 候选学期列表（新到旧）。交界月（7-8 月）优先探测即将开始的秋学期。now 可注入 */
+export function candidateXnxqList(
+  now: Date = new Date(),
+): Array<{ year: number; semester: number }> {
   const y = now.getFullYear();
   const m = now.getMonth() + 1;
   if (m >= 9) {

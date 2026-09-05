@@ -250,14 +250,15 @@ export function resolveWeek1Monday(year: number, semester: number): TermStartDat
   };
 }
 
-/** 当前教学周；未开学或超出 30 周返回 null */
+/** 当前教学周；未开学或超出 30 周返回 null。now 可注入（时间工具/测试需要） */
 export function currentWeekOf(
   year: number,
   semester: number,
+  now: Date = new Date(),
 ): { week: number; week1Monday: string; source: TermDateSource; evidence?: string } | null {
   const info = resolveWeek1Monday(year, semester);
   const start = new Date(`${info.week1Monday}T00:00:00`).getTime();
-  const week = Math.floor((Date.now() - start) / (7 * 86400000)) + 1;
+  const week = Math.floor((now.getTime() - start) / (7 * 86400000)) + 1;
   if (week < 1 || week > 30) return null;
   return {
     week,
