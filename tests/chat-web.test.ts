@@ -17,6 +17,7 @@ import { test } from "node:test";
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-chat-"));
 
 const { setChatAgent, startChatWeb } = await import("../src/web/chat-web");
+const { generatedDir } = await import("../src/document/save");
 
 /** SSE 客户端：收集整条流的 data 事件 */
 function post(
@@ -358,6 +359,99 @@ test("思考随本轮落盘成 think，但不回流进模型上下文", async ()
   const lastCall = JSON.stringify(thinkCalls.at(-1));
   assert.ok(lastCall.includes("答案在此"), "正文照常进上下文");
   assert.ok(!lastCall.includes("先想想"), "思考不喂回模型（省 token 也防自我复读）");
+});
+
+// ── 成品文件：SSE 透出 files + /files/ 下载端点 ───────────────
+
+/** 在临时 generated 目录里放一个真实的 ics 成品 */
+async function seedGeneratedFile(name: string, content: string): Promise<string> {
+  const dir = generatedDir();
+  await fs.promises.mkdir(dir, { recursive: true });
+  const filePath = path.join(dir, name);
+  await fs.promises.writeFile(filePath, content, "utf8");
+  return filePath;
+}
+
+test("工具结果带成品文件时 SSE 透出 files（两种返回形状都认）", async () => {
+  const icsPath = await seedGeneratedFile(
+    "calendar-2026-1.ics",
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n",
+  );
+  const docPath = await seedGeneratedFile("学习报告.docx", "fake-docx-bytes");
+
+  setChatAgent({
+    stream() {
+      async function* gen() {
+        yield { type: "tool-call", toolCallId: "e1", toolName: "export_calendar" };
+        yield {
+          type: "tool-result",
+          toolCallId: "e1",
+          toolName: "export_calendar",
+          output: { file: { filename: "calendar-2026-1.ics", filePath: icsPath, bytes: 42 } },
+        };
+        yield { type: "tool-call", toolCallId: "d1", toolName: "generate_document" };
+        yield {
+          type: "tool-result",
+          toolCallId: "d1",
+          toolName: "generate_document",
+          output: { filename: "学习报告.docx", path: docPath, format: "docx", bytes: 15 },
+        };
+        // 目录外的路径绝不是可下载成品：不透出（哪怕字段形状对）
+        yield { type: "tool-call", toolCallId: "x1", toolName: "read_local_file" };
+        yield {
+          type: "tool-result",
+          toolCallId: "x1",
+          toolName: "read_local_file",
+          output: { filename: "secret.txt", path: path.join(os.tmpdir(), "secret.txt") },
+        };
+        yield { type: "text-delta", text: "已导出" };
+        yield { type: "finish" };
+      }
+      return Promise.resolve({ fullStream: gen() });
+    },
+  });
+
+  const url = (await startChatWeb())!;
+  const r = await post(url, { message: "导出课表", sessionId: "files1" });
+  const toolEnds = r.events.filter((e) => e.t === "tool" && e.phase === "end");
+  const byId = Object.fromEntries(toolEnds.map((e) => [e.id, e]));
+
+  assert.deepEqual(byId.e1?.files, [{ name: "calendar-2026-1.ics", size: 42 }]);
+  assert.deepEqual(byId.d1?.files, [{ name: "学习报告.docx", size: 15 }]);
+  assert.equal(byId.x1?.files, undefined, "generated 目录外的路径不得出现在 files 里");
+});
+
+test("GET /files/<名> 下载 generated 内的成品：类型、附件头与内容正确", async () => {
+  await seedGeneratedFile(
+    "calendar-2026-1.ics",
+    "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nEND:VCALENDAR\r\n",
+  );
+  const url = (await startChatWeb())!;
+  const res = await fetch(`${url}/files/calendar-2026-1.ics`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get("content-type") ?? "", /text\/calendar/);
+  const cd = res.headers.get("content-disposition") ?? "";
+  assert.match(cd, /attachment/);
+  assert.match(cd, /filename\*=UTF-8''calendar-2026-1\.ics/);
+  assert.match(await res.text(), /BEGIN:VCALENDAR/);
+});
+
+test("中文文件名下载与穿越/不存在一律处理正确", async () => {
+  await seedGeneratedFile("学习报告.docx", "fake-docx-bytes");
+  const url = (await startChatWeb())!;
+
+  // 中文文件名（URL 编码）可下载，disposition 带 UTF-8 名
+  const res = await fetch(`${url}/files/${encodeURIComponent("学习报告.docx")}`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get("content-disposition") ?? "", /filename\*=UTF-8''/);
+
+  // 路径穿越被 basename 拦下后落不到任何真实文件 → 404
+  const evil = await fetch(`${url}/files/${encodeURIComponent("../../../../etc/passwd")}`);
+  assert.equal(evil.status, 404);
+  // 不存在的文件 → 404（不能兜底吐 HTML 页面骗 200）
+  const none = await fetch(`${url}/files/nope.ics`);
+  assert.equal(none.status, 404);
+  assert.match(none.headers.get("content-type") ?? "", /text\/plain/);
 });
 
 test("渲染产物语法自检 + 思考卡片与齿轮图标锚点", async () => {

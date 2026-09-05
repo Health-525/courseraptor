@@ -30,6 +30,13 @@ export interface GeneratedFile {
   bytes: number;
 }
 
+/** 可回传给用户的成品（文档之外的交付物如 .ics 日历也走同一套流水） */
+export interface DeliverableFile {
+  filename: string;
+  filePath: string;
+  bytes: number;
+}
+
 /**
  * 本轮生成登记表（进程内）。
  * 动机：生成工具深在 agent 内部执行，QQ 桥拿不到工具返回值里的路径；而
@@ -50,13 +57,20 @@ export function runInDocumentRound<T>(roundId: string, fn: () => Promise<T>): Pr
   return documentRoundStore.run({ roundId }, fn);
 }
 
-interface GeneratedStamp extends GeneratedFile {
+interface GeneratedStamp extends DeliverableFile {
+  /** 文档成品才有；ics 等其他交付物为空 */
+  format?: DocFormat;
   roundId: string | null;
 }
 const RECENT_CAP = 200;
 const recentGenerated: GeneratedStamp[] = [];
 
 function recordGenerated(f: GeneratedFile): void {
+  recordDeliverable(f);
+}
+
+/** 把一份成品登记进本轮流水（QQ 桥按 roundId 捞回并回传）。ics 等非文档成品也走这里 */
+export function recordDeliverable(f: DeliverableFile): void {
   recentGenerated.push({ ...f, roundId: documentRoundStore.getStore()?.roundId ?? null });
   if (recentGenerated.length > RECENT_CAP)
     recentGenerated.splice(0, recentGenerated.length - RECENT_CAP);
@@ -66,10 +80,10 @@ function recordGenerated(f: GeneratedFile): void {
  * 取出（并从流水移除）属于该 roundId 且确实位于 generatedDir 内的成品。
  * 路径校验是护栏：只认本目录产出的文件，绝不把外部路径喂给 sendFile。
  */
-export function drainGeneratedRound(roundId: string): GeneratedFile[] {
+export function drainGeneratedRound(roundId: string): DeliverableFile[] {
   const root = path.resolve(generatedDir());
   const keep: GeneratedStamp[] = [];
-  const out: GeneratedFile[] = [];
+  const out: DeliverableFile[] = [];
   for (const item of recentGenerated) {
     const inDir = path.resolve(item.filePath).startsWith(root + path.sep);
     if (item.roundId === roundId && inDir) out.push(item);
@@ -89,7 +103,7 @@ function sanitize(name: string): string {
 }
 
 /** 同名自动追加 (2)(3)…，避免覆盖历史成品 */
-function uniquePath(dir: string, base: string, ext: string): string {
+export function uniquePath(dir: string, base: string, ext: string): string {
   let candidate = path.join(dir, base + ext);
   let i = 2;
   while (fs.existsSync(candidate)) {

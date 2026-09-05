@@ -31,6 +31,7 @@ import {
 } from "../chat-sessions";
 import { config } from "../config";
 import { saveCredentialsStore } from "../credentials";
+import { generatedDir } from "../document/save";
 import { getDeepSeekKeyStatus, setDeepSeekApiKey } from "../onboarding";
 
 /** 前端 Markdown 渲染器（marked 的 UMD 构建，静态吐给浏览器） */
@@ -176,6 +177,95 @@ function json(res: http.ServerResponse, obj: unknown, status = 200): void {
   res.end(JSON.stringify(obj));
 }
 
+// ── 成品文件下载：只服务 data/generated，别处一律 404 ──────────
+
+const FILE_MIME: Record<string, string> = {
+  ".ics": "text/calendar; charset=utf-8",
+  ".pdf": "application/pdf",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ".csv": "text/csv; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8",
+  ".md": "text/markdown; charset=utf-8",
+};
+
+/** 工具产物路径是否确实落在 generated 目录内（与 QQ 桥 sendFile 同一道护栏） */
+function insideGenerated(filePath: string): boolean {
+  const root = path.resolve(generatedDir());
+  const target = path.resolve(filePath);
+  return target.startsWith(root + path.sep);
+}
+
+/** GET /files/ 的统一 404：明确 text/plain，绝不兜底吐 HTML 页面骗 200 */
+function fileNotFound(res: http.ServerResponse): void {
+  res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+  res.end("not found");
+}
+
+/**
+ * GET /files/<文件名>：下载本轮工具产出的成品（ics/文档）。
+ * 文件名先 basename 再解析校验，路径穿越（../）到不了目录外。
+ */
+async function serveGeneratedFile(rawName: string, res: http.ServerResponse): Promise<void> {
+  let name = "";
+  try {
+    name = path.basename(decodeURIComponent(rawName));
+  } catch {
+    // 半截百分号编码：当非法名处理
+  }
+  if (!name) {
+    fileNotFound(res);
+    return;
+  }
+  const root = path.resolve(generatedDir());
+  const target = path.resolve(root, name);
+  if (!target.startsWith(root + path.sep)) {
+    fileNotFound(res);
+    return;
+  }
+  try {
+    const buf = await fs.promises.readFile(target);
+    const stat = await fs.promises.stat(target);
+    if (!stat.isFile()) throw new Error("not a file");
+    const mime = FILE_MIME[path.extname(name).toLowerCase()] ?? "application/octet-stream";
+    // 文件名常含中文：ASCII 兜底 + RFC 5987 编码双写
+    const ascii = name.replace(/[^\x20-\x7E]/g, "_").replace(/"/g, "");
+    res.writeHead(200, {
+      "content-type": mime,
+      "content-length": buf.length,
+      "content-disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+      "cache-control": "no-store",
+    });
+    res.end(buf);
+  } catch {
+    fileNotFound(res);
+  }
+}
+
+/**
+ * 从工具结果里提取可下载的成品（网页端下载按钮的数据源）。
+ * 兼容两种返回形状：文档工具的顶层 {filename, path} 与
+ * export_calendar 的 {file: {filename, filePath, bytes}}；
+ * 路径不在 generated 目录内的一律不透出。
+ */
+function filesOfToolOutput(output: unknown): Array<{ name: string; size: number }> {
+  if (typeof output !== "object" || output == null || Array.isArray(output)) return [];
+  const o = output as Record<string, unknown>;
+  const out: Array<{ name: string; size: number }> = [];
+  const push = (name: unknown, p: unknown, size: unknown) => {
+    if (typeof name !== "string" || !name) return;
+    if (typeof p !== "string" || !insideGenerated(p)) return;
+    out.push({ name, size: typeof size === "number" ? size : 0 });
+  };
+  push(o.filename, o.path, o.bytes);
+  if (typeof o.file === "object" && o.file != null) {
+    const f = o.file as Record<string, unknown>;
+    push(f.filename, f.filePath, f.bytes);
+  }
+  return out;
+}
+
 const SESSIONS_PREFIX = "/api/sessions/";
 /** 会话 id 白名单：uuid/十六进制/default。注意必须放行字母——无 sessionId
  * 的对话落 default 档，只收十六进制会让侧栏点击默认档被误判非法而 404 */
@@ -244,6 +334,10 @@ function applySettings(body: Record<string, unknown>): {
 async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   const url = req.url ?? "";
   if (req.method === "GET") {
+    if (url.startsWith("/files/")) {
+      await serveGeneratedFile(url.slice("/files/".length), res);
+      return;
+    }
     if (url === "/vendor/marked.min.js") {
       try {
         res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
@@ -443,6 +537,7 @@ async function runTurn(
         }
         case "tool-result": {
           const t0 = p.toolCallId ? toolStart.get(p.toolCallId) : undefined;
+          const files = filesOfToolOutput(p.output);
           send({
             t: "tool",
             phase: "end",
@@ -451,6 +546,8 @@ async function runTurn(
             dur: t0 ? Date.now() - t0.at : undefined,
             brief: summarizeResult(p.output),
             out: previewJson(p.output),
+            // 有成品文件时前端在工具卡下方渲染下载行
+            ...(files.length ? { files } : {}),
           });
           break;
         }
@@ -646,6 +743,19 @@ function chatPage(): string {
               overflow: auto; font-family: var(--mono); font-size: 10.5px;
               line-height: 1.6; color: var(--ink-2);
               white-space: pre-wrap; word-break: break-all; }
+
+  /* 成品文件下载行：工具卡片下方一枚「附件条」，与工具卡同宽同族 */
+  .frow { display: flex; align-items: center; gap: 10px; margin-bottom: 9px;
+          border: 1px solid var(--rule-2); background: var(--card);
+          padding: 7px 12px; font-family: var(--mono); font-size: 11px;
+          color: var(--ink-2); }
+  .frow .fmark { flex: none; color: var(--accent); }
+  .frow .fname { flex: 1; min-width: 0; overflow: hidden;
+                 text-overflow: ellipsis; white-space: nowrap;
+                 word-break: break-all; }
+  .frow a.tbtn { flex: none; text-decoration: none; padding: 3px 14px;
+                 font-size: 11.5px; }
+  .frow a.tbtn:hover { background: var(--accent-soft); }
 
   /* 思考过程：独立建模成草稿卡片。与工具卡片同族但更轻（虚线框、无底色），
      内容用楷体灰字小一号——正文是系统黑体 15px，这里是 --kai 13px，两级层次
@@ -1226,6 +1336,30 @@ function lineBad(tl, text, mark) {
   scroll(false);
 }
 
+/* ── 成品文件下载行：工具结果带 files 时渲染在工具卡下方 ── */
+function fmtSize(n) {
+  if (!n) return "";
+  return n >= 1048576
+    ? (n / 1048576).toFixed(1) + " MB"
+    : Math.max(1, Math.round(n / 1024)) + " KB";
+}
+function fileRows(tl, files) {
+  files.forEach((f) => {
+    const row = el("frow");
+    row.appendChild(el2("fmark", "📎"));
+    const nm = el2("fname", f.name + (f.size ? "（" + fmtSize(f.size) + "）" : ""));
+    row.appendChild(nm);
+    const a = document.createElement("a");
+    a.className = "tbtn";
+    a.href = "/files/" + encodeURIComponent(f.name);
+    a.setAttribute("download", f.name);
+    a.textContent = "下载";
+    row.appendChild(a);
+    tl.appendChild(row);
+  });
+  scroll(false);
+}
+
 /* ── 会话档案：列表 / 打开 / 删除 / 新会话 ── */
 const sessList = document.getElementById("sessList");
 function renderSessList() {
@@ -1455,7 +1589,10 @@ async function send(text) {
         } else if (ev.t === "tool") {
           thinkClose(shell);
           if (ev.phase === "start") toolCard(shell, ev);
-          else toolDone(shell, ev, ev.phase === "end");
+          else {
+            toolDone(shell, ev, ev.phase === "end");
+            if (ev.files && ev.files.length) fileRows(shell.tl, ev.files);
+          }
         } else if (ev.t === "err") {
           thinkClose(shell);
           lineBad(shell.tl, ev.v);

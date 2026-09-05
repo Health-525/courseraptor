@@ -1,6 +1,6 @@
 /**
  * CourseRaptor agent 工具集（聚合层）
- * 26 个工具按领域拆分到独立模块，本文件只负责合并与抢课开关过滤。
+ * 27 个工具按领域拆分到独立模块，本文件只负责合并与抢课开关过滤。
  *
  * 模块划分：
  * - schedule.ts        课表 / 校历（2）
@@ -13,9 +13,11 @@
  * - memory.ts          长期记忆（1）
  * - weather.ts         天气（1）
  * - time.ts            时间（1，模型的唯一时钟）
+ * - calendar.ts        日历导出（1，整学期 .ics）
  */
 
 import { config } from "../config";
+import { calendarTools } from "./calendar";
 import { courseSelectionTools } from "./course-selection";
 import { documentTools } from "./document";
 import { filesTools } from "./files";
@@ -38,6 +40,7 @@ const raptorToolsAll = {
   ...memoryTools,
   ...weatherTools,
   ...timeTools,
+  ...calendarTools,
 };
 
 // 抢课相关工具按开关条件构建，而不是全建好再 delete——

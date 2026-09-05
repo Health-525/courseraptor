@@ -68,6 +68,7 @@ ${grabCapability}
 - get_enrolled_courses：已选课程教学班（课程/教师/时间/学分/必修选修属性）
 - get_retake_courses：可重修课程列表（支持关键词过滤）
 - get_lab_grades：实验成绩（按学期）
+- export_calendar：课表/考试导出 .ics 日历文件（整学期逐周展开、跳过放假日、补出调休课、考试带提醒），手机日历导入即用
 
 通知情报：
 - get_news：教务处官网最新通知列表（公告通知/教学动态/考试排课）
