@@ -25,8 +25,9 @@ import type { GradeCourse, GradeResult } from "./types";
  */
 export function toGP(score: string): number | null {
   // 数字制
-  const s = parseFloat(score);
-  if (!Number.isNaN(s)) {
+  const normalized = String(score || "").trim();
+  const s = /^\d+(?:\.\d+)?$/.test(normalized) ? Number(normalized) : NaN;
+  if (Number.isFinite(s) && s <= 100) {
     if (s >= 90) return 4.0;
     if (s >= 86) return 3.7;
     if (s >= 82) return 3.3;
@@ -41,24 +42,22 @@ export function toGP(score: string): number | null {
   // 等级制。注意顺序：「不合格」包含「合格」，必须先判。
   const t = String(score || "").trim();
   if (!t) return null;
-  if (t.includes("不及格") || t.includes("不合格")) return 0;
-  if (t.includes("优秀")) return 4.0;
-  if (t.includes("良好")) return 3.0;
-  if (t.includes("中等")) return 2.0;
-  if (t.includes("及格")) return 1.0;
+  if (["不及格", "不合格", "未通过", "不通过"].includes(t)) return 0;
+  if (t === "优秀") return 4.0;
+  if (t === "良好") return 3.0;
+  if (t === "中等") return 2.0;
+  if (t === "及格") return 1.0;
   // 通过型：有学分、无绩点。军训/毕业实习/部分实验课记「合格」，
   // 算 0 绩点会错误拉低 GPA，正确做法是整体移出计算。
-  if (/(合格|通过|免修|免考)/.test(t)) return null;
+  if (isPassFailGrade(t)) return null;
   // 缓考/缺考/未知标记：不猜，移出计算
   return null;
 }
 
 /** 是否通过型成绩（有学分但不计绩点） */
 export function isPassFailGrade(score: string): boolean {
-  if (!Number.isNaN(parseFloat(score))) return false;
   const t = String(score || "").trim();
-  if (!t || t.includes("不及格") || t.includes("不合格")) return false;
-  return /(合格|通过|免修|免考)/.test(t) || !/(优秀|良好|中等|及格)/.test(t);
+  return ["合格", "通过", "免修", "免考"].includes(t);
 }
 
 /**
@@ -110,7 +109,7 @@ export async function fetchAllGrades(cookie: string, username: string): Promise<
           (g: Record<string, unknown>): GradeCourse => ({
             course: String(g.kcmc || ""),
             courseCode: String(g.kch || ""),
-            score: String(g.cj || g.bfzcj || ""),
+            score: String(g.cj === 0 ? 0 : g.cj || g.bfzcj || ""),
             credit: String(g.xf || ""),
             type: String(g.kcxzmc || ""),
             semester: String(g.xnmmc ?? "") + String(g.xqmmc ?? ""),
@@ -140,15 +139,7 @@ export async function fetchAllGrades(cookie: string, username: string): Promise<
   // 去重取最高分。键 = 课程号 + 课程性质：
   // 重修同课程号取最高分是本意；多学期同名课（体育/大学英语）课程号不同，
   // 按「课程名」去重会把它们合并、学分凭空消失。
-  const best = new Map<string, GradeCourse>();
-  for (const g of all) {
-    const k = `${g.courseCode || g.course}|${g.type || ""}`;
-    const prev = best.get(k);
-    if (!prev || numScore(g.score) > numScore(prev.score)) {
-      best.set(k, g);
-    }
-  }
-  const deduped = [...best.values()];
+  const deduped = deduplicateGrades(all);
 
   // GPA 计算（只计必修课；通过型/未知型成绩移出分母）
   const required = deduped.filter((g) => isRequired(g.type) && parseFloat(g.credit) > 0);
@@ -177,8 +168,22 @@ export async function fetchAllGrades(cookie: string, username: string): Promise<
   };
 }
 
-/** 成绩数值化（用于重修比较；等级制返回 -1，视为低于任何数字分） */
+/** 重修先保留已通过记录，再比较分数；未知状态不能覆盖有效成绩。 */
+export function deduplicateGrades(courses: GradeCourse[]): GradeCourse[] {
+  const best = new Map<string, GradeCourse>();
+  for (const course of courses) {
+    const key = `${course.courseCode || course.course}|${course.type || ""}`;
+    const previous = best.get(key);
+    if (!previous || numScore(course.score) > numScore(previous.score)) best.set(key, course);
+  }
+  return [...best.values()];
+}
+
+/** 等级制转换仅用于重修优先级，不替代 toGP 的绩点规则。 */
 function numScore(score: string): number {
-  const n = parseFloat(score);
-  return Number.isNaN(n) ? -1 : n;
+  const t = score.trim();
+  const gp = toGP(t);
+  if (gp === null) return isPassFailGrade(t) ? 60 : -1;
+  if (/^\d+(?:\.\d+)?$/.test(t)) return Number(t);
+  return ({ 优秀: 90, 良好: 80, 中等: 70, 及格: 60 } as Record<string, number>)[t] ?? 0;
 }

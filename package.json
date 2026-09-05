@@ -1,10 +1,13 @@
 {
   "name": "courseraptor",
   "version": "0.1.3",
-  "description": "NJTECH 教务对话式 agent：抢课/课表/成绩/考试，一句话搞定",
+  "description": "面向南京工业大学学生的开源教务助手：课表、成绩、学业概览、考试和通知，一句话查询",
   "scripts": {
     "dev": "tsx src/index.ts",
     "start": "tsx src/index.ts",
+    "demo": "tsx src/demo.ts",
+    "doctor": "node scripts/doctor.mjs",
+    "preview:readme": "node scripts/preview-readme.mjs",
     "qq": "tsx src/qq/bridge.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome check src tests",

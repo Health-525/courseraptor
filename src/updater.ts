@@ -20,8 +20,7 @@ const exec = promisify(execCb);
 
 /**
  * 覆盖安装时按相对路径（/ 分隔）排除：命中自身或任一父级目录即跳过。
- * 注意 data/ 下的 term-dates.json（校历真值）必须允许更新，所以 data 只
- * 排除运行时产物，不整目录跳过。
+ * data/ 整目录保留（会话、附件、成品、个人校历修正）；公共校历种子随源码更新。
  */
 const PROTECTED_PATHS = new Set([
   // 本机凭证 / 记忆 / 会话 / 授权名单
@@ -35,14 +34,13 @@ const PROTECTED_PATHS = new Set([
   ".git",
   // 运行时产物
   "downloads",
-  "data/update-check.json",
-  "data/update-download",
-  "data/publish",
+  "data",
+  "outputs",
 ]);
 
 /** 相对路径命中保护名单（自身或任一父级目录）则跳过 */
-function isProtected(rel: string): boolean {
-  const seg = rel.split("/");
+export function isProtected(rel: string): boolean {
+  const seg = rel.replaceAll("\\", "/").split("/");
   for (let i = 1; i <= seg.length; i++) {
     if (PROTECTED_PATHS.has(seg.slice(0, i).join("/"))) return true;
   }

@@ -1,0 +1,40 @@
+name: 学生功能建议
+description: 告诉我们你在什么场景下需要帮助
+title: "[建议] "
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 什么时候需要这个功能
+      description: 描述具体学生场景、使用频率和困扰，不需要提供学号或成绩。
+      placeholder: "选课前比较几个教学班时，很难同时核对周次是否重叠。"
+    validations:
+      required: true
+  - type: textarea
+    id: workaround
+    attributes:
+      label: 现在怎么解决
+      description: 你现在用什么办法，最费时间或最容易出错的步骤是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 怎样算好用
+      description: 描述一个能判断是否解决问题的结果。
+    validations:
+      required: true
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: 大概多久遇到一次
+      options:
+        - 每天
+        - 每周
+        - 选课或考试期间
+        - 偶尔
+  - type: textarea
+    id: source
+    attributes:
+      label: 可参考的公开来源（可选）
+      description: 学校通知或公开说明链接；不要提供带登录信息的 URL。

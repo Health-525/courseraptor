@@ -18,6 +18,7 @@ import { execSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { shouldPackagePath } from "./package-policy.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -62,23 +63,7 @@ const version = pkg.version;
 console.log(`版本号 -> v${version}${notes ? `（${notes}）` : ""}`);
 
 // ── 打包：工作区 -> 暂存目录（排除本机数据/隐私）-> zip ──
-// 注意：data/ 下的 term-dates.json 是「随代码下发」的校历真值，必须进包；
-// 只排除 data 里的运行时产物（更新缓存 / 下载暂存 / 打包暂存）。
-const EXCLUDE_DIRS = new Set([
-  "node_modules", ".git", "downloads", "update-data", "server", ".workbuddy",
-]);
-// 相对路径（/ 分隔）精确排除；命中自身或其任一父级目录即跳过
-const EXCLUDE_PATHS = new Set([
-  ".env", "credentials.enc", "session.json", "memory.json", "qq-allowlist.json",
-  "data/update-check.json", "data/update-download", "data/publish",
-]);
-const isExcluded = (rel) => {
-  const seg = rel.split("/");
-  for (let i = 1; i <= seg.length; i++) {
-    if (EXCLUDE_PATHS.has(seg.slice(0, i).join("/"))) return true;
-  }
-  return false;
-};
+// data/ 全部属于本机运行数据，不能打包。校历公共种子由 src/jwgl/term-dates.ts 分发。
 // 暂存目录必须放在项目外：cpSync 源目录嵌在项目里会自我嵌套报 ERR_FS_CP_EINVAL
 const publishWork = path.join(tmpdir(), `raptor-publish-${Date.now()}`);
 const stage = path.join(publishWork, "stage");
@@ -88,9 +73,7 @@ cpSync(ROOT, stage, {
   recursive: true,
   filter: (src) => {
     const rel = path.relative(ROOT, src).split(path.sep).join("/");
-    if (!rel) return true;
-    const top = rel.split("/")[0];
-    return !EXCLUDE_DIRS.has(top) && !top.endsWith(".log") && !isExcluded(rel);
+    return shouldPackagePath(rel);
   },
 });
 

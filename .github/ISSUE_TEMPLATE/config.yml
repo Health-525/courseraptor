@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 交流用法与分享场景
+    url: https://github.com/Health-525/courseraptor/discussions
+    about: 问答、使用想法和同学交流请先到 Discussions。
+  - name: 先看同学使用指南
+    url: https://github.com/Health-525/courseraptor/blob/master/docs/student-guide.md
+    about: 安装、账号配置、日历导出和常见故障。

@@ -62,7 +62,7 @@ ${grabCapability}
 教务查询：
 - get_schedule：本学期课表（含节次时间段、当前周次；自动探测最新学期，也可指定如 2026-2027-1；放假/调休安排会自动叠加在对应周里）
 - set_holidays：记录放假/调休安排（读放假通知后落盘，课表自动叠加假期与调休覆盖）
-- get_grades：全部成绩 + GPA（含通识选修六类统计）
+- get_grades：全部成绩 + GPA、academicSummary 学业概览（已获学分/未通过/待确认课程）及通识选修六类统计。问学分缺口或挂科时引用工具结果，不自行把未通过课程学分计入已获学分。dataComplete=false 时先说明学期数据不全；missingCategories 仅代表未覆盖，是否必修及最低学分必须核对本人培养方案，不能断言已经满足毕业要求。
 - get_exams：考试安排
 - get_student_info：学籍个人信息（学院/专业/班级/年级等）
 - get_enrolled_courses：已选课程教学班（课程/教师/时间/学分/必修选修属性）

@@ -14,7 +14,9 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
 
 | 文件 | 作用 |
 |---|---|
-| `src/web/chat-web.ts` | **核心文件**。HTTP 服务 + SSE 流式接口 + 前端单页（HTML/CSS/JS 全内联在这一个文件的 `chatPage()` 模板字符串里） |
+| `src/web/chat-web.ts` | HTTP 服务 + SSE 流式接口，连接正式 Agent 与会话存储 |
+| `src/web/chat-page.ts` | 共用前端视图，HTML/CSS/JS 在 `chatPage()` 模板字符串中，正式服务和离线演示共用 |
+| `src/web/demo-server.ts` | 独立离线演示，虚构数据、内存会话，不加载个人配置 |
 | `src/chat-sessions.ts` | 多会话落盘存储（`data/chat-sessions.json`，原子写 + 读坏隔离）。建档/截断/上下文窗口都在这里，网页历史重启不丢。**写入方有两个**：网页（读写）与 QQ 桥（只写，见下两行） |
 | `src/qq/session-archive.ts` | QQ 消息 → 会话档案的映射（纯函数，不引 SDK）：私聊按人、群聊按群、频道按频道，id = `qq-` + sha256 摘要 20 位，群聊提问前补 `[昵称]` |
 | `src/schedule-cache.ts` | 课表本地缓存（`data/schedule-cache.json`）。`get_schedule` 查通即落盘，TUI 启动面板直读免登录；**网页已不展示课表卡**（用户要求删除，问课表走对话） |
@@ -29,7 +31,7 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
 
 ## 三、架构要点
 
-- **零前端框架**：Node 内置 `http` 起服务，前端是单文件原生 JS，无构建步骤。改前端就是改 `chat-web.ts` 里的 `chatPage()` 模板字符串。
+- **零前端框架**：Node 内置 `http` 起服务，前端是单文件原生 JS，无构建步骤。改前端就是改 `chat-page.ts` 里的 `chatPage()` 模板字符串。
 - **接口**：
   - `GET /` → 对话页面
   - `POST /api/chat` → 对话。请求体 `{ message, sessionId }`（不带 sessionId 走 `default` 档），响应是 SSE 流，事件格式 `data: {"t":"text|think|tool|err|end", ...}`
