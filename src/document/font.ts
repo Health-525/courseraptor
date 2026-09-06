@@ -9,6 +9,9 @@
  */
 
 import fs from "node:fs";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 const CANDIDATES = [
   "C:/Windows/Fonts/simhei.ttf",
@@ -27,4 +30,36 @@ export function resolveCjkFont(): string | null {
     if (fs.existsSync(p)) return p;
   }
   return null;
+}
+
+/**
+ * .ttc/.otc 是字体集合：pdfkit 内部走 `fontkit.create(src, family)`，不传 family
+ * 时拿到的是集合对象，没有 createSubset，于是报
+ * 「this.font.createSubset is not a function」（Windows 的 simhei.ttf 是纯 TTF，
+ * 所以本地一直正常，Linux CI 命中 Noto CJK 的 .ttc 才暴露）。
+ *
+ * 这里替它挑一个集合内的简体中文字体，返回其 postscriptName；纯字体文件返回 undefined。
+ */
+export function resolveCjkFontFamily(path: string): string | undefined {
+  if (!/\.(ttc|otc)$/i.test(path)) return undefined;
+  try {
+    // fontkit 无类型声明，沿用 render.ts 的 createRequire + any 约定
+    const fontkit = require("fontkit") as {
+      openSync(file: string): {
+        fonts?: { postscriptName: string; familyName?: string }[];
+      };
+    };
+    const collection = fontkit.openSync(path);
+    const fonts = collection.fonts ?? [];
+    if (fonts.length === 0) return undefined;
+    const preferred =
+      fonts.find((f) =>
+        /sc|simhei|heiti|simsun|song|pingfang|yahei|uming/i.test(
+          `${f.postscriptName} ${f.familyName ?? ""}`,
+        ),
+      ) ?? fonts[0];
+    return preferred.postscriptName;
+  } catch {
+    return undefined;
+  }
 }

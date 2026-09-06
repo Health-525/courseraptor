@@ -22,7 +22,7 @@ process.env.RAPTOR_DATA_DIR = tmpData;
 const require = createRequire(import.meta.url);
 
 import { convertDocument, textToBlocks } from "../src/document/convert";
-import { resolveCjkFont } from "../src/document/font";
+import { resolveCjkFont, resolveCjkFontFamily } from "../src/document/font";
 import {
   renderDocument,
   renderDocx,
@@ -234,4 +234,23 @@ test("工具层接线：raptorTools.generate_document / convert_document 可直�
   assert.equal(c.ok, true);
   const cErr = await conv({ target: "docx" });
   assert.ok(!cErr.ok && !!cErr.error, "无来源应报错");
+});
+
+test("CJK 字体族名解析：集合必须给出成员名，纯字体不给", () => {
+  // 纯 TTF/OTF 不是集合：多传 family 反而会让 pdfkit 查不到字体
+  assert.equal(resolveCjkFontFamily("C:/Windows/Fonts/simhei.ttf"), undefined);
+  assert.equal(resolveCjkFontFamily("/usr/share/fonts/Source.otf"), undefined);
+  // 打不开的集合文件静默降级为 undefined，绝不抛异常拖垮整份文档
+  assert.equal(resolveCjkFontFamily("/nonexistent/dir/fake.ttc"), undefined);
+
+  const font = resolveCjkFont();
+  if (font && /\.(ttc|otc)$/i.test(font)) {
+    // Linux CI 命中 Noto CJK 的 .ttc：不传成员名时 pdfkit 拿到的是集合对象，
+    // 报「this.font.createSubset is not a function」，四份 PDF 用例会全挂。
+    const family = resolveCjkFontFamily(font);
+    assert.ok(
+      typeof family === "string" && family.length > 0,
+      `命中字体集合 ${font} 时必须解析出集合内字体名`,
+    );
+  }
 });

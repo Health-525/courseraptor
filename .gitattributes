@@ -1,0 +1,14 @@
+# 统一以 LF 存取：Windows 的 core.autocrlf=true（GitHub Actions 的 checkout
+# 在 Windows 上同样默认如此）会把源文件检出成 CRLF，biome check 于是对
+# 每个文件报格式差异，Windows CI 长期红。
+* text=auto eol=lf
+
+# 二进制文件不参与行尾转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.woff binary
+*.woff2 binary

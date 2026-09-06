@@ -11,7 +11,7 @@
  */
 
 import { createRequire } from "node:module";
-import { resolveCjkFont } from "./font";
+import { resolveCjkFont, resolveCjkFontFamily } from "./font";
 import type { DocBlock, DocumentSpec, SheetSpec, SlideSpec, TableSpec } from "./types";
 
 const require = createRequire(import.meta.url);
@@ -325,7 +325,8 @@ export async function renderPdf(spec: DocumentSpec): Promise<Buffer> {
 
   const font = resolveCjkFont();
   if (font) {
-    doc.registerFont("cjk", font);
+    // .ttc/.otc 必须带上集合内的具体字体名，否则 pdfkit 拿到的是集合对象
+    doc.registerFont("cjk", font, resolveCjkFontFamily(font));
     doc.font("cjk");
   } else {
     doc.font("Helvetica");
