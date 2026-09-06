@@ -49,11 +49,13 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   /* ── 左栏：档头 ── */
   aside { display: flex; flex-direction: column; gap: 28px; min-height: 0;
           padding: 27px 22px 20px; border-right: 1px solid var(--rule);
-          background: var(--paper-deep); overflow-y: auto; }
+          background: var(--paper-deep); overflow: hidden; }
   .mast h1 { margin: 0; font-family: var(--kai); font-weight: 400;
              font-size: 24px; line-height: 1.2; color: var(--accent);
              letter-spacing: .4px; }
+  .sec { display: flex; flex: 1; min-height: 0; flex-direction: column; }
   .sec h2 { display: flex; justify-content: space-between; align-items: baseline;
+            flex: none;
             margin: 0 0 11px; padding-bottom: 8px;
             font-family: var(--mono); font-size: 12px; font-weight: 600;
             letter-spacing: .14em; color: var(--ink-3);
@@ -65,10 +67,17 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                             font-weight: 600; letter-spacing: .12em; }
   .mastbtns .tbtn.primary:hover { background: var(--accent-deep);
                                   border-color: var(--accent-deep); color: #fff; }
-  .foot-btn { margin-top: auto; width: 100%; }
+  .foot-btn { flex: none; width: 100%; background: rgba(252, 251, 247, .48);
+              color: var(--ink-2); }
 
-  /* 会话档案列表：标题 + 时间元数据，行尾常驻半透明删除钮 */
-  .sess { list-style: none; margin: 0; padding: 0; }
+  /* 只有会话列表可以滚动；设置按钮固定在侧栏底部，不进入滚动区。
+     滚动条默认隐去，指针进入列表或键盘焦点落在列表内时才显现。 */
+  .sess { flex: 1; min-height: 0; list-style: none; margin: 0; padding: 0 3px 0 0;
+          overflow-y: auto; overscroll-behavior: contain;
+          scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  .sess:hover, .sess:focus-within {
+    scrollbar-color: var(--rule-2) transparent;
+  }
   .sess li { display: grid; grid-template-columns: 1fr 24px; column-gap: 6px;
              padding: 9px 8px 9px 11px; border-left: 2px solid transparent;
              border-radius: 0 4px 4px 0; cursor: pointer;
@@ -285,8 +294,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
            background: var(--card); border: 1px solid var(--rule-2);
            border-radius: 6px; padding: 7px 8px 7px 17px;
            transition: border-color 0.15s ease, box-shadow 0.15s ease; }
-  .cwrap:focus-within { border-color: var(--accent);
-                        box-shadow: 0 0 0 3px rgba(173, 57, 44, .08); }
+  .cwrap:focus-within { border-color: var(--ink-3); box-shadow: var(--shadow-sm); }
   .clabel { flex: none; font-family: var(--kai); font-size: 16px;
             letter-spacing: 2px; color: var(--ink-3);
             border-right: 1px solid var(--rule); padding-right: 12px;
@@ -296,7 +304,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   textarea { flex: 1; background: none; border: 0; outline: none; resize: none;
              min-width: 0; color: var(--ink); font-size: 16px; line-height: 1.6;
              padding: 6px 0; max-height: 180px; align-self: center; }
-  textarea:focus-visible { outline: none; }  /* 聚焦态交给 .cwrap 描边表达，不叠红圈 */
+  textarea:focus-visible { outline: none; }  /* 聚焦态交给 .cwrap 的中性描边表达 */
   textarea::placeholder { color: var(--ink-3); }
   #b { flex: none; align-self: center; display: inline-flex;
        align-items: center; gap: 7px;
@@ -335,6 +343,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .dclose:hover { color: var(--accent); }
   .dlg-rule { border-bottom: 2px solid var(--accent); margin: 0 18px; }
   .dlg-body { padding: 16px 18px 6px; }
+  .dlg-intro { margin: 0 0 16px; color: var(--ink-2); font-size: 14px;
+               line-height: 1.75; }
   .fld-l { font-family: var(--mono); font-size: 12px; letter-spacing: .16em;
            color: var(--ink-3); padding-bottom: 5px; margin: 16px 0 10px;
            border-bottom: 1px solid var(--rule); }
@@ -347,7 +357,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                background: var(--card); color: var(--ink);
                font-family: var(--mono); font-size: 14px; padding: 9px 10px;
                border-radius: 2px; outline: none; }
-  .fld input:focus { border-color: var(--accent); }
+  .fld input:focus { border-color: var(--ink-3);
+                     box-shadow: 0 0 0 2px rgba(90, 85, 74, .08); }
   .cur { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
          margin-left: 82px; letter-spacing: .04em; min-height: 14px; }
   .setnote { font-size: 13px; color: var(--ink-3); margin: 14px 0 2px;
@@ -372,14 +383,24 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   #toBottom[hidden] { display: none; }
   #toBottom:hover { border-color: var(--accent); color: var(--accent); }
 
-  #log::-webkit-scrollbar, aside::-webkit-scrollbar { width: 10px; }
-  #log::-webkit-scrollbar-thumb, aside::-webkit-scrollbar-thumb {
+  #log::-webkit-scrollbar { width: 10px; }
+  #log::-webkit-scrollbar-thumb {
     background: var(--rule-2); border: 3px solid transparent;
     background-clip: content-box; border-radius: 5px; }
-  #log::-webkit-scrollbar-thumb:hover, aside::-webkit-scrollbar-thumb:hover {
+  #log::-webkit-scrollbar-thumb:hover {
     background: var(--ink-3); background-clip: content-box; }
-  #log::-webkit-scrollbar-track, aside::-webkit-scrollbar-track {
+  #log::-webkit-scrollbar-track {
     background: transparent; }
+  .sess::-webkit-scrollbar { width: 8px; }
+  .sess::-webkit-scrollbar-track { background: transparent; }
+  .sess::-webkit-scrollbar-thumb {
+    background: transparent; border: 2px solid transparent;
+    background-clip: content-box; border-radius: 4px; }
+  .sess:hover::-webkit-scrollbar-thumb,
+  .sess:focus-within::-webkit-scrollbar-thumb {
+    background: var(--rule-2); background-clip: content-box; }
+  .sess::-webkit-scrollbar-thumb:hover {
+    background: var(--ink-3); background-clip: content-box; }
 
   @media (max-width: 960px) {
     body { grid-template-columns: 1fr; }
@@ -437,7 +458,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     <h2>会话档案<span id="sessCount"></span></h2>
     <ul class="sess" id="sessList"></ul>
   </section>
-  <button class="tbtn foot-btn" id="openSettings" title="教务账号与 API Key" ${demo ? "disabled" : ""}>设置</button>
+  <button class="tbtn foot-btn" id="openSettings" title="管理教务账号与 AI 模型" ${demo ? "disabled" : ""}>账号与模型</button>
 </aside>
 <main>
   ${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 全部为虚构数据</strong><span>不连接教务或 AI，不保存到磁盘。请勿输入个人信息。正式使用请在终端运行 npm start。</span></div>' : ""}
@@ -471,22 +492,23 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 </main>
 <div class="overlay" id="overlay" hidden>
   <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
-    <div class="dlg-head"><span id="dlgTitle">设置</span><button class="dclose" id="closeSettings" aria-label="关闭设置">✕</button></div>
+    <div class="dlg-head"><span id="dlgTitle">账号与模型</span><button class="dclose" id="closeSettings" aria-label="关闭账号与模型设置">✕</button></div>
     <div class="dlg-rule"></div>
     <div class="dlg-body">
-      <div class="fld-l">教务系统</div>
+      <p class="dlg-intro">正式查询前，请配置自己的教务账号与模型服务。已保存的信息不会在页面中完整显示。</p>
+      <div class="fld-l">教务账号</div>
       <label class="fld"><span>学号</span><input id="sUser" type="text" autocomplete="off"></label>
-      <label class="fld"><span>密码</span><input id="sPass" type="password" autocomplete="new-password"></label>
+      <label class="fld"><span>登录密码</span><input id="sPass" type="password" autocomplete="new-password"></label>
       <div class="cur" id="curJwgl"></div>
-      <div class="fld-l">模型服务</div>
-      <label class="fld"><span>API KEY</span><input id="sKey" type="password" autocomplete="new-password"></label>
+      <div class="fld-l">AI 模型</div>
+      <label class="fld"><span>API Key</span><input id="sKey" type="password" autocomplete="new-password"></label>
       <div class="cur" id="curKey"></div>
-      <div class="setnote">留空即不修改。教务密码与 Key 仅 AES 加密保存在本机（credentials.enc），接口只回传脱敏摘要。</div>
+      <div class="setnote">不需要修改的项目请留空。教务账号和 API Key 仅加密保存在当前电脑。</div>
       <div class="setmsg" id="setMsg"></div>
     </div>
     <div class="dlg-foot">
       <button class="tbtn" id="cancelSettings">取消</button>
-      <button class="tbtn primary" id="saveSettings">保存</button>
+      <button class="tbtn primary" id="saveSettings">保存设置</button>
     </div>
   </div>
 </div>
@@ -930,17 +952,17 @@ function showSettings() {
   fetch("/api/settings").then((r) => r.json()).then((d) => {
     setStatus = d;
     sUser.value = "";
-    sUser.placeholder = d.jwgl.username || "教务系统学号";
-    sPass.placeholder = d.jwgl.configured ? "已保存，留空不修改" : "教务系统登录密码";
+    sUser.placeholder = d.jwgl.username || "请输入教务系统学号";
+    sPass.placeholder = d.jwgl.configured ? "已保存；留空不修改" : "请输入教务系统密码";
     document.getElementById("curJwgl").textContent = d.jwgl.configured
-      ? "当前：学号 " + d.jwgl.username + "（" + d.jwgl.sourceLabel + "）"
-      : "当前：未配置教务账号";
+      ? "已保存：学号 " + d.jwgl.username + " · " + d.jwgl.sourceLabel
+      : "尚未配置教务账号";
     document.getElementById("curKey").textContent = d.deepseek.configured
-      ? "当前：" + (d.deepseek.masked || "已配置") + "（" + d.deepseek.sourceLabel + "）· 模型 " + d.model
-      : "当前：未配置 API Key · 模型 " + d.model;
-    sKey.placeholder = "sk-…（留空不修改）";
+      ? "已保存：" + (d.deepseek.masked || "API Key") + " · " + d.deepseek.sourceLabel + " · " + d.model
+      : "尚未配置 API Key · 当前模型 " + d.model;
+    sKey.placeholder = "sk-…；留空不修改";
     (d.jwgl.configured ? sPass : sUser).focus();
-  }).catch(() => { setMsg.textContent = "读取设置失败：本地服务没在跑？"; });
+  }).catch(() => { setMsg.textContent = "无法读取设置，请确认本地服务正在运行。"; });
 }
 function hideSettings() { overlay.hidden = true; }
 document.getElementById("openSettings").addEventListener("click", showSettings);
@@ -960,7 +982,7 @@ document.getElementById("saveSettings").addEventListener("click", () => {
     body.jwglUsername = u || (setStatus && setStatus.jwgl.username) || "";
   } else if (u) {
     setMsg.className = "setmsg";
-    setMsg.textContent = "只改学号不行：请连同新密码一起提交";
+    setMsg.textContent = "修改学号时，请同时填写新的登录密码。";
     return;
   }
   if (k) body.apiKey = k;
@@ -978,7 +1000,7 @@ document.getElementById("saveSettings").addEventListener("click", () => {
     if (ok) setTimeout(hideSettings, 900);
   }).catch(() => {
     saveBtn.disabled = false;
-    setMsg.textContent = "保存失败：本地服务没在跑？";
+    setMsg.textContent = "保存失败，请确认本地服务正在运行后重试。";
   });
 });
 
