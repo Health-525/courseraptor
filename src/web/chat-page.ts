@@ -46,13 +46,20 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   button, input, textarea { font-family: inherit; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+  /* 纯文字品牌标：不用徽章与副标题，靠字重和双色建立辨识度。 */
+  .wordmark { display: inline-flex; align-items: baseline; font-family: var(--sans);
+              font-weight: 500; letter-spacing: -.035em; white-space: nowrap; }
+  .wordmark .course { color: var(--ink-2); }
+  .wordmark .raptor { color: var(--accent); font-weight: 750; }
+
   /* ── 左栏：档头 ── */
   aside { display: flex; flex-direction: column; gap: 28px; min-height: 0;
           padding: 27px 22px 20px; border-right: 1px solid var(--rule);
           background: var(--paper-deep); overflow: hidden; }
-  .mast h1 { margin: 0; font-family: var(--kai); font-weight: 400;
-             font-size: 24px; line-height: 1.2; color: var(--accent);
-             letter-spacing: .4px; }
+  .mast { padding: 2px 0; }
+  .mast h1 { display: flex; margin: 0; font-size: 21px; line-height: 1.2; }
+  .mast h1::after { content: ""; flex: 1; align-self: center; height: 1px;
+                    margin: 2px 0 0 15px; background: var(--rule-2); }
   .sec { display: flex; flex: 1; min-height: 0; flex-direction: column; }
   .sec h2 { display: flex; justify-content: space-between; align-items: baseline;
             flex: none;
@@ -112,8 +119,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .topbar { display: none; align-items: center; gap: 10px;
             min-height: 60px; padding: 10px 16px;
             border-bottom: 1px solid var(--rule); background: var(--paper-deep); }
-  .topbar .tb-title { margin-right: auto; font-family: var(--kai); font-size: 19px;
-                      color: var(--accent); letter-spacing: .02em; }
+  .topbar .tb-title { margin-right: auto; font-size: 18px; }
   .topbar .tbtn { min-height: 34px; padding: 5px 11px; font-size: 13px; }
   .demo-banner { display: flex; align-items: baseline; gap: 12px;
                  padding: 12px 32px; border-bottom: 1px solid var(--rule);
@@ -449,7 +455,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 <body data-demo="${demo}">
 <aside>
   <div class="mast">
-    <h1>CourseRaptor</h1>
+    <h1 class="wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></h1>
   </div>
   <div class="mastbtns">
     <button class="tbtn primary" id="newSession" title="另起一个会话（旧会话保留在档案里）">新会话</button>
@@ -463,7 +469,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 <main>
   ${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 全部为虚构数据</strong><span>不连接教务或 AI，不保存到磁盘。请勿输入个人信息。正式使用请在终端运行 npm start。</span></div>' : ""}
   <div class="topbar">
-    <span class="tb-title">CourseRaptor</span>
+    <span class="tb-title wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></span>
     <button class="tbtn" id="newSessionM">新会话</button>
     <button class="tbtn" id="openSettingsM" ${demo ? "disabled" : ""}>设置</button>
   </div>
