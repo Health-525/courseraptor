@@ -15,17 +15,19 @@ export function chatPage(options: { demo?: boolean } = {}): string {
      没有渐变、没有光斑、没有玻璃——所有颜色只在这一个 :root 里定义。 */
   :root {
     color-scheme: light;
-    --paper: #F5F3EC;   /* 纸面 */
-    --card: #FBFAF6;    /* 浮起的纸片 */
+    --paper: #F6F4ED;   /* 纸面 */
+    --paper-deep: #F0EDE4;
+    --card: #FCFBF7;    /* 浮起的纸片 */
     --shade: #ECE8DD;   /* 压深的纸（表头/代码底） */
-    --ink: #26231D;     /* 墨 */
-    --ink-2: #5C574C;
-    --ink-3: #948E7F;
-    --rule: #E3DED1;    /* 细线 */
-    --rule-2: #CCC5B3;  /* 重一点的线 */
-    --accent: #AF3A2C;      /* 朱砂 */
-    --accent-deep: #8C2D22;
-    --accent-soft: #F4E5E1;
+    --ink: #25221C;     /* 墨 */
+    --ink-2: #5A554A;
+    --ink-3: #898274;
+    --rule: #E1DCCF;    /* 细线 */
+    --rule-2: #C9C1AF;  /* 重一点的线 */
+    --accent: #AD392C;      /* 朱砂 */
+    --accent-deep: #852B22;
+    --accent-soft: #F3E3DE;
+    --shadow-sm: 0 8px 24px rgba(50, 42, 31, 0.055);
     --serif: Georgia, "Times New Roman", "Songti SC", SimSun, serif;
     --kai: "KaiTi", "STKaiti", "Kaiti SC", var(--serif);
     --sans: system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -35,24 +37,26 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   html, body { height: 100%; }
   /* 锁定整页：只有消息区能滚，输入/发送条永远钉在视口底部；
      dvh 让移动端键盘弹出时底栏跟着抬进可见区而不是被顶出屏幕 */
-  body { margin: 0; display: grid; grid-template-columns: 268px 1fr;
+  body { margin: 0; display: grid; grid-template-columns: 284px 1fr;
          height: 100vh; height: 100dvh; overflow: hidden;
          background: var(--paper); color: var(--ink);
-         font-family: var(--sans); font-size: 14px; line-height: 1.75; }
+         font-family: var(--sans); font-size: 16px; line-height: 1.7;
+         -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
   ::selection { background: var(--accent-soft); }
   button, input, textarea { font-family: inherit; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* ── 左栏：档头 ── */
-  aside { display: flex; flex-direction: column; gap: 26px; min-height: 0;
-          padding: 24px 20px 18px; border-right: 1px solid var(--rule);
-          overflow-y: auto; }
+  aside { display: flex; flex-direction: column; gap: 28px; min-height: 0;
+          padding: 27px 22px 20px; border-right: 1px solid var(--rule);
+          background: var(--paper-deep); overflow-y: auto; }
   .mast h1 { margin: 0; font-family: var(--kai); font-weight: 400;
-             font-size: 23px; color: var(--accent); letter-spacing: .5px; }
+             font-size: 24px; line-height: 1.2; color: var(--accent);
+             letter-spacing: .4px; }
   .sec h2 { display: flex; justify-content: space-between; align-items: baseline;
-            margin: 0 0 10px; padding-bottom: 6px;
-            font-family: var(--mono); font-size: 10.5px; font-weight: 600;
-            letter-spacing: .18em; color: var(--ink-3);
+            margin: 0 0 11px; padding-bottom: 8px;
+            font-family: var(--mono); font-size: 12px; font-weight: 600;
+            letter-spacing: .14em; color: var(--ink-3);
             border-bottom: 1px solid var(--rule); }
   .sec h2 span { letter-spacing: .04em; font-weight: 400; }
   .mastbtns { display: flex; gap: 8px; }
@@ -65,52 +69,63 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 
   /* 会话档案列表：标题 + 时间元数据，行尾常驻半透明删除钮 */
   .sess { list-style: none; margin: 0; padding: 0; }
-  .sess li { display: grid; grid-template-columns: 1fr 18px; column-gap: 6px;
-             padding: 7px 8px 7px 10px; border-left: 2px solid transparent;
-             cursor: pointer; }
+  .sess li { display: grid; grid-template-columns: 1fr 24px; column-gap: 6px;
+             padding: 9px 8px 9px 11px; border-left: 2px solid transparent;
+             border-radius: 0 4px 4px 0; cursor: pointer;
+             transition: background .15s ease, border-color .15s ease; }
   .sess li:hover { background: var(--card); }
-  .sess li.on { border-left-color: var(--accent); background: var(--card); }
-  .sess .st { font-size: 12.5px; color: var(--ink-2); overflow: hidden;
+  .sess li.on { border-left-color: var(--accent); background: var(--card);
+                box-shadow: var(--shadow-sm); }
+  .sess .st { font-size: 14px; color: var(--ink-2); overflow: hidden;
               text-overflow: ellipsis; white-space: nowrap; }
   .sess li.on .st { color: var(--ink); font-weight: 600; }
-  .sess .sm { grid-column: 1; font-family: var(--mono); font-size: 9.5px;
-              color: var(--ink-3); letter-spacing: .05em; }
+  .sess .sm { grid-column: 1; font-family: var(--mono); font-size: 12px;
+              color: var(--ink-3); letter-spacing: .03em; }
   .sess .sx { grid-row: 1; grid-column: 2; justify-self: end; border: 0;
               background: none; color: var(--ink-3); opacity: .5;
-              font-size: 11px; cursor: pointer; padding: 0 4px;
+              font-size: 13px; cursor: pointer; padding: 0 5px;
               transition: opacity .15s ease, color .15s ease; }
   .sess .sx:hover { opacity: 1; color: var(--accent); }
-  .sess .snone { display: block; color: var(--ink-3); font-size: 12px;
-                 padding: 4px 2px; cursor: default; }
+  .sess .snone { display: block; color: var(--ink-3); font-size: 14px;
+                 padding: 6px 2px; cursor: default; }
 
   .tbtn { background: none; border: 1px solid var(--rule-2); color: var(--ink-2);
-          font-size: 12.5px; padding: 5px 14px; border-radius: 2px;
-          cursor: pointer; transition: border-color .15s ease, color .15s ease; }
-  .tbtn:hover { border-color: var(--accent); color: var(--accent); }
+          min-height: 38px; font-size: 14px; padding: 7px 14px; border-radius: 4px;
+          cursor: pointer; transition: border-color .15s ease, color .15s ease,
+          background .15s ease, transform .15s ease; }
+  .tbtn:hover { border-color: var(--accent); color: var(--accent);
+                background: var(--card); }
+  .tbtn:active { transform: translateY(1px); }
 
   /* ── 右栏：正文 ── */
   main { display: flex; flex-direction: column; min-width: 0; min-height: 0;
          height: 100%; }
   .topbar { display: none; align-items: center; gap: 10px;
-            padding: 10px 14px; border-bottom: 1px solid var(--rule);
-            background: var(--paper); }
-  .topbar .tb-title { font-family: var(--kai); font-size: 16px;
-                      color: var(--accent); }
-  .topbar .tbtn { margin-left: auto; padding: 4px 10px; font-size: 11.5px; }
-  #log { flex: 1; min-height: 0; overflow-y: auto; padding: 38px 28px 28px; }
-  .inner { max-width: 672px; margin: 0 auto; }
+            min-height: 60px; padding: 10px 16px;
+            border-bottom: 1px solid var(--rule); background: var(--paper-deep); }
+  .topbar .tb-title { margin-right: auto; font-family: var(--kai); font-size: 19px;
+                      color: var(--accent); letter-spacing: .02em; }
+  .topbar .tbtn { min-height: 34px; padding: 5px 11px; font-size: 13px; }
+  .demo-banner { display: flex; align-items: baseline; gap: 12px;
+                 padding: 12px 32px; border-bottom: 1px solid var(--rule);
+                 background: var(--accent-soft); color: var(--accent-deep);
+                 font-size: 14px; line-height: 1.55; }
+  .demo-banner strong { flex: none; font-size: 14px; }
+  .demo-banner span { color: var(--ink-2); }
+  #log { flex: 1; min-height: 0; overflow-y: auto; padding: 44px 40px 36px; }
+  .inner { width: min(100%, 800px); min-height: 100%; margin: 0 auto; }
 
   /* 对话按「往来文书」排版：一行题注 + 正文，不做聊天气泡 */
-  .turn { margin: 0 0 34px; }
+  .turn { margin: 0 0 40px; }
   .cap { display: flex; align-items: baseline; gap: 10px; margin-bottom: 7px;
-         font-family: var(--mono); font-size: 10px; letter-spacing: .14em;
+         font-family: var(--mono); font-size: 12px; letter-spacing: .1em;
          color: var(--ink-3); }
   .cap .who { font-weight: 600; letter-spacing: .28em; color: var(--ink-2); }
   .turn.user .cap .who { color: var(--accent-deep); }
   .turn.user .msg { border-left: 3px solid var(--accent); background: var(--card);
-                    padding: 9px 16px; white-space: pre-wrap;
-                    word-break: break-word; font-size: 14px; }
-  .turn.bot .msg { font-size: 15px; line-height: 1.9; word-break: break-word; }
+                    padding: 12px 18px; white-space: pre-wrap;
+                    box-shadow: var(--shadow-sm); word-break: break-word; font-size: 16px; }
+  .turn.bot .msg { font-size: 16px; line-height: 1.85; word-break: break-word; }
   .cursor::after { content: "▌"; color: var(--accent); margin-left: 2px;
                    animation: blink 1s steps(2, start) infinite; }
   @keyframes blink { to { visibility: hidden; } }
@@ -122,7 +137,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .tool { border: 1px solid var(--rule); background: var(--card); }
   .tool summary { display: flex; align-items: center; gap: 9px;
                   padding: 4px 10px; cursor: pointer; list-style: none;
-                  font-family: var(--mono); font-size: 11px;
+                  font-family: var(--mono); font-size: 12px;
                   color: var(--ink-2); }
   .tool summary::-webkit-details-marker { display: none; }
   .tool summary:hover .tname { color: var(--accent); }
@@ -142,26 +157,26 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .tool .tbody { border-top: 1px dashed var(--rule); padding: 2px 10px 8px; }
   .tool .tbody:empty { display: none; }
   .tool .psec { margin-top: 6px; }
-  .tool .plabel { display: block; font-family: var(--mono); font-size: 9px;
+  .tool .plabel { display: block; font-family: var(--mono); font-size: 12px;
                   letter-spacing: .2em; color: var(--ink-3);
                   margin-bottom: 3px; }
   .tool pre { margin: 0; padding: 6px 8px; background: var(--paper);
               border: 1px solid var(--rule); max-height: 160px;
-              overflow: auto; font-family: var(--mono); font-size: 10.5px;
+              overflow: auto; font-family: var(--mono); font-size: 12px;
               line-height: 1.6; color: var(--ink-2);
               white-space: pre-wrap; word-break: break-all; }
 
   /* 成品文件下载行：工具卡片下方一枚「附件条」，与工具卡同宽同族 */
   .frow { display: flex; align-items: center; gap: 10px; margin-bottom: 9px;
           border: 1px solid var(--rule-2); background: var(--card);
-          padding: 7px 12px; font-family: var(--mono); font-size: 11px;
+          padding: 9px 12px; font-family: var(--mono); font-size: 12px;
           color: var(--ink-2); }
   .frow .fmark { flex: none; color: var(--accent); }
   .frow .fname { flex: 1; min-width: 0; overflow: hidden;
                  text-overflow: ellipsis; white-space: nowrap;
                  word-break: break-all; }
   .frow a.tbtn { flex: none; text-decoration: none; padding: 3px 14px;
-                 font-size: 11.5px; }
+                 font-size: 12px; }
   .frow a.tbtn:hover { background: var(--accent-soft); }
 
   /* 思考过程：独立建模成草稿卡片。与工具卡片同族但更轻（虚线框、无底色），
@@ -170,8 +185,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .think { border: 1px dashed var(--rule-2); background: none; }
   .think summary { display: flex; align-items: center; gap: 9px;
                    padding: 4px 10px; cursor: pointer; list-style: none;
-                   font-family: var(--mono); font-size: 9.5px;
-                   letter-spacing: .18em; color: var(--ink-3); }
+                   font-family: var(--mono); font-size: 12px;
+                   letter-spacing: .1em; color: var(--ink-3); }
   .think summary::-webkit-details-marker { display: none; }
   .think summary:hover .tstat { color: var(--ink-2); }
   .think .tk { flex: none; color: var(--ink-3); }
@@ -180,39 +195,41 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                   letter-spacing: .04em; }
   .think .tdur { flex: none; letter-spacing: .04em; }
   .think .thbody { border-top: 1px dashed var(--rule); padding: 8px 12px 10px;
-                   font-family: var(--kai); font-size: 13px; line-height: 1.95;
+                   font-family: var(--kai); font-size: 14px; line-height: 1.9;
                    color: var(--ink-2); letter-spacing: .01em;
                    white-space: pre-wrap; word-break: break-word;
                    max-height: 300px; overflow: auto; }
 
   /* 兜底错误行（网络错误 / 中断这类非工具事件仍是等宽一行） */
-  .tline { display: flex; gap: 8px; font-family: var(--mono); font-size: 11px;
+  .tline { display: flex; gap: 8px; font-family: var(--mono); font-size: 12px;
            line-height: 1.7; padding: 2px 0; word-break: break-all; }
   .tline .mark { flex: none; width: 12px; }
   .tline.bad { color: var(--accent-deep); }
   .acts { margin-top: 9px; display: flex; gap: 8px; }
   .acts:empty { display: none; }
-  .acts .tbtn { padding: 3px 12px; font-size: 11.5px; color: var(--ink-3);
+  .acts .tbtn { min-height: 32px; padding: 3px 12px; font-size: 12px; color: var(--ink-3);
                 border-color: var(--rule); }
 
   /* ── 首屏：一张盖了章的空白纸 ── */
-  .hero { padding: 13vh 8px 30px; text-align: center; }
-  .hero .seal { position: relative; width: 92px; height: 92px;
-                margin: 0 auto 22px; transform: rotate(-7deg); }
+  .hero { display: flex; min-height: 100%; flex-direction: column;
+          align-items: center; justify-content: center;
+          padding: 48px 8px 72px; text-align: center; }
+  .hero .seal { position: relative; width: 104px; height: 104px;
+                margin: 0 auto 26px; transform: rotate(-7deg); }
   .hero .seal::before { content: ""; position: absolute; inset: 0;
                         border: 2px solid var(--accent); border-radius: 50%;
                         opacity: .9; }
   .hero .seal::after { content: ""; position: absolute; inset: 6px;
                        border: 1px solid var(--accent); border-radius: 50%;
                        opacity: .45; }
-  .hero .seal img { position: absolute; top: 11px; left: 11px;
-                    width: 70px; height: 70px; border-radius: 50%;
+  .hero .seal img { position: absolute; top: 12px; left: 12px;
+                    width: 80px; height: 80px; border-radius: 50%;
                     object-fit: cover; }
   .hero h2 { margin: 0 0 10px; font-family: var(--kai); font-weight: 400;
-             font-size: 30px; letter-spacing: 1px; }
-  .hero p { margin: 0 auto; max-width: 430px; font-size: 13px;
-            color: var(--ink-2); line-height: 2; }
-  .hero .hint { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
+             font-size: 34px; letter-spacing: 1.5px; }
+  .hero p { margin: 0 auto; max-width: 560px; font-size: 16px;
+            color: var(--ink-2); line-height: 1.95; }
+  .hero .hint { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
                 letter-spacing: .05em; }
 
   /* ── Markdown 正文样式 ── */
@@ -227,12 +244,12 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .md li { margin: 0.25em 0; }
   .md li::marker { color: var(--accent); }
   .md strong { font-weight: 650; }
-  .md table { border-collapse: collapse; margin: 0.8em 0; font-size: 13px;
+  .md table { border-collapse: collapse; margin: 0.9em 0; font-size: 14px;
               display: block; overflow-x: auto; max-width: 100%;
               border: 1px solid var(--rule); background: var(--card); }
   .md th, .md td { border: 1px solid var(--rule); padding: 6px 12px;
                    text-align: left; }
-  .md th { background: var(--shade); font-family: var(--mono); font-size: 11px;
+  .md th { background: var(--shade); font-family: var(--mono); font-size: 12px;
            letter-spacing: .06em; font-weight: 600; }
   .md code { font-family: var(--mono); font-size: 0.86em; background: var(--shade);
              border: 1px solid var(--rule); padding: 1px 5px; border-radius: 2px; }
@@ -247,24 +264,29 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .md hr { border: 0; border-top: 1px solid var(--rule-2); margin: 1.2em 0; }
 
   /* ── 底部：快速提问常驻 + 档案「留言」栏 ── */
-  form { flex: none; border-top: 1px solid var(--rule); background: var(--paper);
-         padding: 12px 28px 12px; }
+  form { flex: none; border-top: 1px solid var(--rule); background: var(--paper-deep);
+         padding: 14px 32px 13px; }
   .quickbar { display: flex; align-items: center; gap: 10px;
-              max-width: 672px; margin: 0 auto 8px; }
-  .qlabel { flex: none; font-family: var(--mono); font-size: 9.5px;
-            letter-spacing: .22em; color: var(--ink-3); }
-  .qchips { display: flex; flex-wrap: wrap; gap: 8px; }
+              max-width: 800px; margin: 0 auto 9px; }
+  .qlabel { flex: none; font-family: var(--mono); font-size: 12px;
+            letter-spacing: .14em; color: var(--ink-3); }
+  .qchips { display: flex; min-width: 0; flex-wrap: nowrap; gap: 8px;
+            overflow-x: auto; scrollbar-width: none; }
+  .qchips::-webkit-scrollbar { display: none; }
   .chip { border: 1px solid var(--rule-2); background: var(--card);
-          color: var(--ink-2); font-size: 12px; padding: 4px 12px;
-          border-radius: 2px; cursor: pointer;
-          transition: border-color 0.15s ease, color 0.15s ease; }
-  .chip:hover { border-color: var(--accent); color: var(--accent); }
-  .composer { max-width: 672px; margin: 0 auto; }
+          flex: none; min-height: 34px; color: var(--ink-2); font-size: 13px;
+          padding: 5px 12px; border-radius: 4px; cursor: pointer;
+          transition: border-color 0.15s ease, color 0.15s ease,
+                      background .15s ease; }
+  .chip:hover { border-color: var(--accent); color: var(--accent);
+                background: var(--accent-soft); }
+  .composer { max-width: 800px; margin: 0 auto; }
   .cwrap { display: flex; align-items: center; gap: 12px;
            background: var(--card); border: 1px solid var(--rule-2);
-           border-radius: 3px; padding: 6px 7px 6px 16px;
+           border-radius: 6px; padding: 7px 8px 7px 17px;
            transition: border-color 0.15s ease, box-shadow 0.15s ease; }
-  .cwrap:focus-within { border-color: var(--ink-3); }
+  .cwrap:focus-within { border-color: var(--accent);
+                        box-shadow: 0 0 0 3px rgba(173, 57, 44, .08); }
   .clabel { flex: none; font-family: var(--kai); font-size: 16px;
             letter-spacing: 2px; color: var(--ink-3);
             border-right: 1px solid var(--rule); padding-right: 12px;
@@ -272,18 +294,18 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             transition: color 0.15s ease; user-select: none; }
   .cwrap:focus-within .clabel { color: var(--accent); }
   textarea { flex: 1; background: none; border: 0; outline: none; resize: none;
-             color: var(--ink); font-size: 14.5px; line-height: 1.6;
+             min-width: 0; color: var(--ink); font-size: 16px; line-height: 1.6;
              padding: 6px 0; max-height: 180px; align-self: center; }
   textarea:focus-visible { outline: none; }  /* 聚焦态交给 .cwrap 描边表达，不叠红圈 */
   textarea::placeholder { color: var(--ink-3); }
   #b { flex: none; align-self: center; display: inline-flex;
        align-items: center; gap: 7px;
        border: 1px solid var(--accent); background: var(--accent);
-       color: #FBFAF6; font-size: 13.5px; font-weight: 600; padding: 8px 18px;
-       border-radius: 2px; cursor: pointer;
+       min-height: 42px; color: #FBFAF6; font-size: 14px; font-weight: 600;
+       padding: 9px 18px; border-radius: 4px; cursor: pointer;
        transition: background 0.15s ease, color 0.15s ease,
                    border-color 0.15s ease, opacity 0.15s ease; }
-  #b .kbd { font-family: var(--mono); font-size: 11px; opacity: .7; }
+  #b .kbd { font-family: var(--mono); font-size: 12px; opacity: .7; }
   #b:hover:not(:disabled) { background: var(--accent-deep);
                             border-color: var(--accent-deep); }
   #b:disabled { background: none; border-color: var(--rule-2);
@@ -294,43 +316,43 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                                  color: var(--accent-deep);
                                  border-color: var(--accent-deep); }
   .fhint { margin: 6px 4px 0; text-align: right; font-family: var(--mono);
-           font-size: 9.5px; letter-spacing: .14em; color: var(--ink-3); }
+           font-size: 12px; letter-spacing: .08em; color: var(--ink-3); }
 
   /* ── 设置弹窗：一张盖了红头的办理单 ── */
   .overlay { position: fixed; inset: 0; z-index: 50;
              background: rgba(38, 35, 29, 0.42);
              display: grid; place-items: center; padding: 20px; }
   .overlay[hidden] { display: none; }
-  .dlg { width: min(440px, 100%); background: var(--paper);
-         border: 1px solid var(--rule-2);
+  .dlg { width: min(480px, 100%); background: var(--paper);
+         border: 1px solid var(--rule-2); border-radius: 6px; overflow: hidden;
          box-shadow: 0 18px 60px rgba(38, 35, 29, 0.28); }
   .dlg-head { display: flex; align-items: center; justify-content: space-between;
               padding: 14px 18px 8px; }
-  .dlg-head span { font-family: var(--kai); font-size: 19px;
+  .dlg-head span { font-family: var(--kai); font-size: 21px;
                    color: var(--accent); letter-spacing: 2px; }
   .dclose { border: 0; background: none; color: var(--ink-3);
-            cursor: pointer; font-size: 13px; }
+            cursor: pointer; font-size: 15px; }
   .dclose:hover { color: var(--accent); }
   .dlg-rule { border-bottom: 2px solid var(--accent); margin: 0 18px; }
   .dlg-body { padding: 16px 18px 6px; }
-  .fld-l { font-family: var(--mono); font-size: 9.5px; letter-spacing: .2em;
+  .fld-l { font-family: var(--mono); font-size: 12px; letter-spacing: .16em;
            color: var(--ink-3); padding-bottom: 5px; margin: 16px 0 10px;
            border-bottom: 1px solid var(--rule); }
   .fld-l:first-child { margin-top: 0; }
   .fld { display: grid; grid-template-columns: 72px 1fr; align-items: center;
          gap: 10px; margin: 8px 0; }
-  .fld span { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3);
+  .fld span { font-family: var(--mono); font-size: 13px; color: var(--ink-3);
               letter-spacing: .1em; }
   .fld input { width: 100%; border: 1px solid var(--rule-2);
                background: var(--card); color: var(--ink);
-               font-family: var(--mono); font-size: 12.5px; padding: 7px 10px;
+               font-family: var(--mono); font-size: 14px; padding: 9px 10px;
                border-radius: 2px; outline: none; }
   .fld input:focus { border-color: var(--accent); }
-  .cur { font-family: var(--mono); font-size: 10px; color: var(--ink-3);
+  .cur { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
          margin-left: 82px; letter-spacing: .04em; min-height: 14px; }
-  .setnote { font-size: 11.5px; color: var(--ink-3); margin: 14px 0 2px;
+  .setnote { font-size: 13px; color: var(--ink-3); margin: 14px 0 2px;
              line-height: 1.8; }
-  .setmsg { font-family: var(--mono); font-size: 11px; min-height: 16px;
+  .setmsg { font-family: var(--mono); font-size: 12px; min-height: 16px;
             margin-top: 6px; white-space: pre-wrap; color: var(--accent-deep); }
   .setmsg.good { color: var(--ink-2); }
   .dlg-foot { display: flex; justify-content: flex-end; gap: 8px;
@@ -344,8 +366,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 
   #toBottom { position: fixed; right: 30px; bottom: 104px; z-index: 5;
               background: var(--card); border: 1px solid var(--rule-2);
-              color: var(--ink-2); font-size: 12px; padding: 6px 13px;
-              border-radius: 2px; cursor: pointer;
+              color: var(--ink-2); font-size: 13px; padding: 7px 13px;
+              border-radius: 4px; cursor: pointer;
               box-shadow: 0 2px 10px rgba(38, 35, 29, 0.08); }
   #toBottom[hidden] { display: none; }
   #toBottom:hover { border-color: var(--accent); color: var(--accent); }
@@ -359,15 +381,43 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   #log::-webkit-scrollbar-track, aside::-webkit-scrollbar-track {
     background: transparent; }
 
-  @media (max-width: 860px) {
+  @media (max-width: 960px) {
     body { grid-template-columns: 1fr; }
     aside { display: none; }
     .topbar { display: flex; }
-    #log { padding: 22px 16px; }
-    form { padding: 10px 14px 10px; }
-    .quickbar { margin-bottom: 7px; }
+    .demo-banner { padding: 10px 16px; }
+    #log { padding: 28px 20px 24px; }
+    form { padding: 11px 16px 10px; }
+    .quickbar { margin-bottom: 8px; }
     .fhint { display: none; }
     #toBottom { right: 14px; bottom: 96px; }
+  }
+  @media (max-width: 560px) {
+    .topbar { min-height: 54px; padding: 8px 12px; gap: 7px; }
+    .topbar .tb-title { font-size: 17px; }
+    .topbar .tbtn { min-height: 32px; padding: 4px 9px; font-size: 12px; }
+    .demo-banner { display: block; padding: 9px 14px; font-size: 12px; }
+    .demo-banner strong { display: block; margin-bottom: 2px; font-size: 13px; }
+    #log { padding: 22px 15px 18px; }
+    .hero { justify-content: center; padding: 32px 4px 48px; }
+    .hero .seal { width: 92px; height: 92px; margin-bottom: 22px; }
+    .hero .seal img { top: 11px; left: 11px; width: 70px; height: 70px; }
+    .hero h2 { font-size: 30px; }
+    .hero p { font-size: 16px; line-height: 1.85; }
+    .hero .hint { display: inline-block; margin-top: 5px; font-size: 12px; }
+    .turn { margin-bottom: 32px; }
+    .turn.bot .msg, .turn.user .msg { font-size: 16px; }
+    form { padding: 9px 12px 10px; }
+    .quickbar { gap: 8px; }
+    .qlabel { font-size: 12px; }
+    .chip { min-height: 32px; padding: 4px 10px; font-size: 12px; }
+    .cwrap { gap: 8px; padding-left: 12px; }
+    .clabel { display: none; }
+    textarea { font-size: 16px; }
+    #b { min-height: 40px; padding: 8px 14px; }
+    #b .kbd { display: none; }
+    .fld { grid-template-columns: 64px 1fr; }
+    .cur { margin-left: 74px; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important;
@@ -390,7 +440,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   <button class="tbtn foot-btn" id="openSettings" title="教务账号与 API Key" ${demo ? "disabled" : ""}>设置</button>
 </aside>
 <main>
-  ${demo ? '<div role="status" style="padding:12px 20px;background:var(--accent-soft);color:var(--accent);border-bottom:1px solid var(--rule)"><strong>离线演示 · 全部为虚构数据</strong><br>不连接教务或 AI，不保存到磁盘。请勿输入个人信息。正式使用请在终端运行 npm start。</div>' : ""}
+  ${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 全部为虚构数据</strong><span>不连接教务或 AI，不保存到磁盘。请勿输入个人信息。正式使用请在终端运行 npm start。</span></div>' : ""}
   <div class="topbar">
     <span class="tb-title">CourseRaptor</span>
     <button class="tbtn" id="newSessionM">新会话</button>
