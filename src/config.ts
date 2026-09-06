@@ -5,9 +5,10 @@
 
 import path from "node:path";
 import { loadCredentialsStore } from "./credentials";
-
 // 项目根目录解析独立成 paths.ts，避免与 credentials.ts 循环依赖
 import { PROJECT_ROOT as ROOT } from "./paths";
+// 学校 id 名单是叶子模块（不 import 任何适配器），否则 config 会被拖进抓取层的循环依赖
+import { normalizeSchoolId } from "./schools/ids";
 export const PROJECT_ROOT = ROOT;
 
 export type DeepSeekApiKeySource = "env" | "encrypted" | "unset";
@@ -18,6 +19,12 @@ export interface RaptorConfig {
   deepseekApiKeySource: DeepSeekApiKeySource;
   deepseekBaseUrl?: string;
   model: string;
+  /**
+   * 当前服务哪所学校（RAPTOR_SCHOOL，默认 njtech）。
+   * 单校运行是刻意的取舍：一个进程一套凭证，抓取层按这个 id 选适配器，
+   * 绝不允许「一所学校的密码被发往另一所学校的教务系统」。
+   */
+  school: string;
   jwglUsername: string;
   jwglPassword: string;
   /** 教务凭证来源（诊断用） */
@@ -82,6 +89,7 @@ function env(key: string): string | undefined {
 
 function loadConfig(): RaptorConfig {
   const stored = loadCredentialsStore();
+  const school = normalizeSchoolId(env("RAPTOR_SCHOOL"));
   const resolvedKey = resolveDeepSeekApiKey({
     environmentKey: env("DEEPSEEK_API_KEY"),
     storedKey: stored?.deepseekApiKey,
@@ -94,6 +102,7 @@ function loadConfig(): RaptorConfig {
     deepseekApiKeySource: resolvedKey.source,
     deepseekBaseUrl: env("DEEPSEEK_BASE_URL"),
     model: env("RAPTOR_MODEL") ?? "deepseek-v4-flash",
+    school,
     jwglUsername: env("JWGL_USERNAME") ?? "",
     jwglPassword: env("JWGL_PASSWORD") ?? "",
     credentialsSource: "env",

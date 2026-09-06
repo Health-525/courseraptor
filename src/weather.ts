@@ -17,8 +17,8 @@
  *    注入，坏网/超时/查无此城的分支都不用联网也能测。
  */
 
-import { BASE as JWGL_BASE } from "./jwgl/auth";
 import type { FetchResult } from "./jwgl/http";
+import { activeSchool } from "./schools/registry";
 
 const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
@@ -45,16 +45,20 @@ const httpFetch: WeatherFetch = async (url, init) => {
 
 // ── 默认城市：按学校判断 ──────────────────────────────────────
 // 本 agent 服务哪所学校，默认就查哪座城市。键是教务系统主机名，
-// 以后多接一所学校（如 ScholarFlow 侧的 HEBau）在这里加一行。
+// 新增学校时在适配器里写 city 即可，这里只兜「显式传入别的 base」的场合。
 
 const SCHOOL_CITY: Record<string, string> = {
   "jwgl.njtech.edu.cn": "南京", // 南京工业大学浦口校区
+  "urp.hebau.edu.cn": "保定", // 河北农业大学（教务在 1009 端口，剥掉端口再查）
 };
 
-/** 学校所在城市。主机名没登记时仍退回南京——当前只有 NJTECH 一套教务 */
-export function defaultWeatherCity(jwglBase: string = JWGL_BASE): string {
-  const host = jwglBase.replace(/^https?:\/\//, "").split("/")[0];
-  return SCHOOL_CITY[host] ?? "南京";
+/** 学校所在城市。主机名没登记时退回当前学校的城市 */
+export function defaultWeatherCity(jwglBase: string = activeSchool().jwglBase): string {
+  const host = jwglBase
+    .replace(/^https?:\/\//, "")
+    .split("/")[0]
+    .split(":")[0];
+  return SCHOOL_CITY[host] ?? activeSchool().city;
 }
 
 // ── WMO 天气码 → 中文 ─────────────────────────────────────────

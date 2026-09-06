@@ -5,7 +5,24 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { fetchEnrolledClasses, fetchProfile, fetchRetakeCourses } from "../jwgl/portal";
+import { activeSchool } from "../schools/registry";
+import {
+  type SchoolCapability,
+  supportsCapability,
+  unsupportedCapabilityMessage,
+} from "../schools/types";
 import { getCookie } from "./session";
+
+/**
+ * 能力门禁。这三块河北农大 URP 没有对应端点，取不到就必须直说「本校未接入」，
+ * 绝不去撞南工大的接口——那等于把 A 校的数据当成 B 校的答案。
+ */
+function gate(capability: SchoolCapability) {
+  const school = activeSchool();
+  return supportsCapability(school, capability)
+    ? null
+    : { error: unsupportedCapabilityMessage(school, capability) };
+}
 
 export const studentTools = {
   /** 学籍个人信息 */
@@ -14,6 +31,8 @@ export const studentTools = {
       "查询学籍个人信息：姓名、学号、性别、学院、专业、班级、年级、学制、入学/毕业日期等（从教务系统个人信息页解析）。需要确认用户身份信息、或查询班级/专业信息时调用。",
     inputSchema: z.object({}),
     execute: async () => {
+      const blocked = gate("student");
+      if (blocked) return blocked;
       const cookie = await getCookie();
       const profile = await fetchProfile(cookie);
       // 敏感字段打码（只留前4后4），避免完整证件/卡号进入模型上下文
@@ -44,6 +63,8 @@ export const studentTools = {
       "查询本学期已选的课程教学班列表：课程名、教学班、教师、上课时间、地点、学分、课程性质（必修/选修）。注意：与课表（get_schedule）互补，这里按教学班维度、含选课属性。",
     inputSchema: z.object({}),
     execute: async () => {
+      const blocked = gate("enrolledCourses");
+      if (blocked) return blocked;
       const cookie = await getCookie();
       const classes = await fetchEnrolledClasses(cookie);
       return {
@@ -62,6 +83,8 @@ export const studentTools = {
       keyword: z.string().optional().describe("课程名关键词过滤（可选）"),
     }),
     execute: async ({ keyword }) => {
+      const blocked = gate("retakeCourses");
+      if (blocked) return blocked;
       const cookie = await getCookie();
       const all = await fetchRetakeCourses(cookie);
       const filtered = keyword ? all.filter((c) => c.courseName.includes(keyword)) : all;

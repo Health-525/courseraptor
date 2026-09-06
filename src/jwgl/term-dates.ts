@@ -18,6 +18,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { quarantineCorruptFileSync, writeFileAtomicSync } from "../atomic-write";
+import { config } from "../config";
+// 播种表是叶子模块（只 export 数据、不 import 抓取层），不会与 config/抓取层绕成循环
+import { TERM_SEEDS } from "../schools/term-seeds";
 
 /** 来源可信度：recorded > known > estimated，只有前两者能当真值用 */
 export type TermDateSource = "recorded" | "known" | "estimated";
@@ -38,25 +41,27 @@ function dataDir(): string {
   return process.env.RAPTOR_DATA_DIR ?? path.join(PROJECT_ROOT, "data");
 }
 
-function storePath(): string {
-  return path.join(dataDir(), "term-dates.json");
+/**
+ * 按学校分文件。
+ * njtech 沿用老文件名 term-dates.json —— 存量用户实测记录过的学期一条都不丢；
+ * 第二所学校起用 term-dates.<id>.json。
+ * 分文件不是洁癖：两校的 2026 秋开学日不同（08-31 / 09-01），共用一份的话
+ * 整个学期的周次会系统性错一周，而且错得很像对的。
+ */
+function storePath(schoolId: string): string {
+  const name = schoolId === "njtech" ? "term-dates.json" : `term-dates-${schoolId}.json`;
+  return path.join(dataDir(), name);
 }
 
 /**
- * 存量学期播种值。
- * 来源说明：2025 两个学期为人工按校历校准；2026 秋依据南工教〔2026〕91号
- * 《报到注册通知》——报到 8-29～8-30、注册 8-31～9-30，第一周从 2026-08-31（周一）开始。
- * 注意这里刻意标 "known" 而非 "recorded"：有确定依据，但没有可追溯的解析链路。
+ * 各校播种值来自 src/schools/term-seeds.ts（叶子模块）。
+ * 南工大：2025 两学期人工按校历校准、2026 秋依据南工教〔2026〕91号；
+ * 河北农大：沿用 ScholarFlow 侧整理的校历表。
+ * 一律标 "known" 而非 "recorded"：有确定依据，但没有可追溯的通知解析链路。
  */
-const LEGACY_SEED: Record<string, TermStartDate> = {
-  "2025-1": { week1Monday: "2025-09-01", source: "known", evidence: "人工按校历校准" },
-  "2025-2": { week1Monday: "2026-03-02", source: "known", evidence: "人工按校历校准" },
-  "2026-1": {
-    week1Monday: "2026-08-31",
-    source: "known",
-    evidence: "南工教〔2026〕91号：报到 8-29～8-30、注册 8-31～9-30（修正此前 9-07 的估算）",
-  },
-};
+function seedFor(schoolId: string): Record<string, TermStartDate> {
+  return TERM_SEEDS[schoolId] ?? {};
+}
 
 /** 学期 key：`${学年起始年}-${1|2}` */
 export function termKey(year: number, semester: number): string {
@@ -65,30 +70,42 @@ export function termKey(year: number, semester: number): string {
 
 // ── 读写 ──────────────────────────────────────────────────────
 
-let cache: Record<string, TermStartDate> | null = null;
+/** 按学校分键缓存：同一进程内测试可以改 config.school 切校，不能读串 */
+const caches = new Map<string, Record<string, TermStartDate>>();
 
-export function loadStore(): Record<string, TermStartDate> {
-  if (cache) return cache;
+export function loadStore(schoolId: string = config.school): Record<string, TermStartDate> {
+  const hit = caches.get(schoolId);
+  if (hit) return hit;
+  let store: Record<string, TermStartDate>;
   try {
-    cache = JSON.parse(fs.readFileSync(storePath(), "utf8")) as Record<string, TermStartDate>;
+    store = JSON.parse(fs.readFileSync(storePath(schoolId), "utf8")) as Record<
+      string,
+      TermStartDate
+    >;
   } catch {
-    // 首次运行：用存量值播种并落盘，之后就以文件为准。
+    // 首次运行：用该校播种值初始化并落盘，之后就以文件为准。
     // 但如果是文件写坏了（半截 JSON），静默用种子覆盖会把已经实测记录过的学期
     // 一并冲掉——先把坏文件留个副本，别让真值无声消失。
-    quarantineCorruptFileSync(storePath());
-    cache = structuredClone(LEGACY_SEED);
-    persist(cache);
+    quarantineCorruptFileSync(storePath(schoolId));
+    store = structuredClone(seedFor(schoolId));
+    persist(store, schoolId);
   }
-  return cache;
+  caches.set(schoolId, store);
+  return store;
 }
 
-function persist(store: Record<string, TermStartDate>): void {
+function persist(store: Record<string, TermStartDate>, schoolId: string = config.school): void {
   try {
     // 原子写：这是「开学日期」的唯一真值源，写坏了整个学期的周次都会系统性算错
-    writeFileAtomicSync(storePath(), JSON.stringify(store, null, 2));
+    writeFileAtomicSync(storePath(schoolId), JSON.stringify(store, null, 2));
   } catch {
     // 只读环境（如打包后）下退化为内存存储，不影响主流程
   }
+}
+
+/** 测试用：清掉按学校分键的缓存，让改了 RAPTOR_DATA_DIR/config.school 的用例重读磁盘 */
+export function resetTermDateCache(): void {
+  caches.clear();
 }
 
 /**
@@ -102,8 +119,9 @@ export function recordWeek1Monday(
   week1Monday: string,
   source: TermDateSource,
   evidence?: string,
+  schoolId: string = config.school,
 ): TermStartDate {
-  const store = loadStore();
+  const store = loadStore(schoolId);
   const key = termKey(year, semester);
   const prev = store[key];
 
@@ -117,7 +135,7 @@ export function recordWeek1Monday(
     recordedAt: new Date().toISOString(),
   };
   store[key] = entry;
-  persist(store);
+  persist(store, schoolId);
   return entry;
 }
 
@@ -235,8 +253,12 @@ export function parseTermRef(text: string): { year: number; semester: number } |
  * 取某学期的开学日期。查不到就估算，并明确标注 estimated——
  * 调用方必须把这个标记透传出去，不能当成既定事实讲给用户。
  */
-export function resolveWeek1Monday(year: number, semester: number): TermStartDate {
-  const store = loadStore();
+export function resolveWeek1Monday(
+  year: number,
+  semester: number,
+  schoolId: string = config.school,
+): TermStartDate {
+  const store = loadStore(schoolId);
   const hit = store[termKey(year, semester)];
   if (hit) return hit;
 
@@ -255,8 +277,9 @@ export function currentWeekOf(
   year: number,
   semester: number,
   now: Date = new Date(),
+  schoolId: string = config.school,
 ): { week: number; week1Monday: string; source: TermDateSource; evidence?: string } | null {
-  const info = resolveWeek1Monday(year, semester);
+  const info = resolveWeek1Monday(year, semester, schoolId);
   const start = new Date(`${info.week1Monday}T00:00:00`).getTime();
   const week = Math.floor((now.getTime() - start) / (7 * 86400000)) + 1;
   if (week < 1 || week > 30) return null;

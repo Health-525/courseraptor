@@ -19,6 +19,8 @@ import {
   type XkSession,
   type XkTarget,
 } from "../jwgl/xk";
+import { activeSchool } from "../schools/registry";
+import { supportsCapability, unsupportedCapabilityMessage } from "../schools/types";
 import { getXkSession, invalidateXkSession, pollDelay } from "./session";
 
 function now(): string {
@@ -386,6 +388,10 @@ export const courseSelectionTools = {
       "查询南京工业大学教务系统「自主选课」模块的当前状态：选课是否开放（iskxk）、选课控制 ID（xkkzId）、以及课程查询接口是否仍返回「加密串错误」（防爬拦截）。回答任何选课相关问题前建议先调用此工具确认状态。",
     inputSchema: z.object({}),
     execute: async () => {
+      const school = activeSchool();
+      if (!supportsCapability(school, "courseSelection")) {
+        return { error: unsupportedCapabilityMessage(school, "courseSelection") };
+      }
       const result = await inspectXk(config.jwglUsername, config.jwglPassword);
       const okRounds = result.rounds.filter((r) => r.status === "ok");
       return {

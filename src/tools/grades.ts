@@ -6,11 +6,12 @@ import { tool } from "ai";
 import { z } from "zod";
 
 import { summarizeAcademics, summarizeGeneralElectives } from "../academic-summary";
-import { config } from "../config";
-import { fetchExamsSmart, parseSemesterString } from "../jwgl/academics";
-import { fetchAllGrades } from "../jwgl/grades";
+import { parseSemesterString } from "../jwgl/academics";
 import { fetchLabGradesSmart } from "../jwgl/portal";
-import { getCookie } from "./session";
+import { probeExams } from "../schools/probe";
+import { activeSchool } from "../schools/registry";
+import { supportsCapability, unsupportedCapabilityMessage } from "../schools/types";
+import { getCookie, getSession, schoolSessionFor } from "./session";
 
 export const gradesTools = {
   /** 成绩查询 */
@@ -19,10 +20,16 @@ export const gradesTools = {
       "查询全部学期的成绩与 GPA、已获学分、未通过/待确认课程及通识分类概览。重复课程取最高有效成绩；只统计已通过课程的学分，不代替培养方案或毕业审核。",
     inputSchema: z.object({}),
     execute: async () => {
-      const cookie = await getCookie();
-      const result = await fetchAllGrades(cookie, config.jwglUsername);
+      const ctx = await schoolSessionFor("grades");
+      if ("error" in ctx) return ctx;
+      const result = await ctx.school.fetchGrades(ctx.session);
 
-      const generalElectives = summarizeGeneralElectives(result.allCourses);
+      // 通识六类统计依赖成绩里的「课程归属」字段，不是每所学校都给。
+      // 缺该能力时整个字段不返回——否则模型会拿一张空表说「你六类一门都没修」，
+      // 而事实是「这所学校的接口没提供分类数据」。
+      const generalElectives = supportsCapability(ctx.school, "generalElectives")
+        ? summarizeGeneralElectives(result.allCourses)
+        : undefined;
 
       return {
         gpa: result.gpa,
@@ -62,8 +69,13 @@ export const gradesTools = {
       if (semester && !parsed) {
         return { error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
       }
-      const cookie = await getCookie();
-      const r = await fetchExamsSmart(cookie, parsed?.year, parsed?.semester);
+      const ctx = await schoolSessionFor("exams");
+      if ("error" in ctx) return ctx;
+      const r = await probeExams(ctx.school, ctx.session, {
+        year: parsed?.year,
+        semester: parsed?.semester,
+        refresh: () => getSession(true),
+      });
       if (!r.ok) {
         return { error: `考试查询失败：${r.error}（不是「暂无考试」，是没查到）` };
       }
@@ -97,6 +109,10 @@ export const gradesTools = {
       const parsed = semester ? parseSemesterString(semester) : null;
       if (semester && !parsed) {
         return { error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
+      }
+      const school = activeSchool();
+      if (!supportsCapability(school, "labGrades")) {
+        return { error: unsupportedCapabilityMessage(school, "labGrades") };
       }
       const cookie = await getCookie();
       const { label, items } = await fetchLabGradesSmart(cookie, parsed?.year, parsed?.semester);

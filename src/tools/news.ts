@@ -9,6 +9,35 @@ import { fetchAttachment } from "../attachments";
 import { config } from "../config";
 import { fetchJwcArticle, fetchJwcNews } from "../jwgl/news";
 import { loadUserGrade } from "../memory/longterm";
+import { activeSchool } from "../schools/registry";
+import {
+  type SchoolCapability,
+  supportsCapability,
+  unsupportedCapabilityMessage,
+} from "../schools/types";
+
+/** 能力门禁：本校没接这块就先直说，不白跑一次对外的抓取 */
+function gate(capability: SchoolCapability) {
+  const school = activeSchool();
+  return supportsCapability(school, capability)
+    ? null
+    : { error: unsupportedCapabilityMessage(school, capability) };
+}
+
+/**
+ * 本校官网域名（read_notice / fetch_attachment 的白名单）。
+ * 白名单必须按学校取：把 A 校域名写死，B 校用户贴出自己学校的通知链接就会被拒。
+ */
+function schoolArticleHosts(): string[] {
+  return activeSchool().newsDomains;
+}
+
+/** URL 是否属于本校官网（含子域） */
+function isSchoolArticleUrl(url: string): boolean {
+  return schoolArticleHosts().some((domain) =>
+    new RegExp(`^https?://[a-z0-9.-]*\\.?${domain.replace(/\./g, "\\.")}/`, "i").test(url),
+  );
+}
 
 // ── 通知相关性 ────────────────────────────────────────────────
 // 教务处一次发十几条，其中大半跟具体某个学生无关。过去全靠模型逐条判断，
@@ -98,6 +127,8 @@ export const newsTools = {
       limit: z.number().int().min(1).max(30).default(10).describe("返回条数（默认 10）"),
     }),
     execute: async ({ category, limit }) => {
+      const blocked = gate("news");
+      if (blocked) return blocked;
       const items = await fetchJwcNews([], 30);
       const filtered = category ? items.filter((i) => i.category === category) : items;
       const grade = await loadUserGrade();
@@ -138,8 +169,12 @@ export const newsTools = {
       url: z.string().describe("文章页 URL（jwc.njtech.edu.cn 或其他 njtech.edu.cn 子域）"),
     }),
     execute: async ({ url }) => {
-      if (!/^https?:\/\/[a-z0-9.-]*\.njtech\.edu\.cn\//.test(url)) {
-        return { error: "仅支持 njtech.edu.cn 域名下的文章 URL" };
+      const blocked = gate("notice");
+      if (blocked) return blocked;
+      if (!isSchoolArticleUrl(url)) {
+        return {
+          error: `仅支持${activeSchool().name}官网域名（${schoolArticleHosts().join(" / ")}）下的文章 URL`,
+        };
       }
       try {
         const article = await fetchJwcArticle(url);
@@ -187,10 +222,12 @@ export const newsTools = {
       refresh: z.boolean().optional().describe("忽略缓存强制重新下载（默认用缓存）"),
     }),
     execute: async ({ url, name, offset, limit, keyword, refresh }) => {
-      const isNjtech = /^https?:\/\/[a-z0-9.-]*\.njtech\.edu\.cn\//.test(url);
-      if (!isNjtech && !config.firecrawlApiKey) {
+      const fromSchoolSite = isSchoolArticleUrl(url);
+      if (!fromSchoolSite && !config.firecrawlApiKey) {
         return {
-          error: "仅支持 njtech.edu.cn 域名的附件（未配置 FIRECRAWL_API_KEY 时）",
+          error:
+            `非${activeSchool().name}官网（${schoolArticleHosts().join(" / ")}）的附件需要配置 FIRECRAWL_API_KEY 才能解析下载，` +
+            `或直接把文件内容发进对话`,
         };
       }
       try {

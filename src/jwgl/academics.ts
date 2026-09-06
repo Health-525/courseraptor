@@ -24,30 +24,18 @@ export function currentWeekOf(year: number, semester: number, now: Date = new Da
   return resolveCurrentWeek(year, semester, now);
 }
 
-// ── NJTECH 节次时间表 ──────────────────────────────────────────
-// 南京工业大学标准作息时间（每节课45分钟，课间休息10分钟）
-export const NJTECH_PERIOD_TIMES: Record<string, string> = {
-  "1": "08:10-08:55",
-  "2": "09:05-09:50",
-  "3": "10:20-11:05",
-  "4": "11:15-12:00",
-  "5": "14:00-14:45",
-  "6": "14:55-15:40",
-  "7": "16:00-16:45",
-  "8": "16:55-17:40",
-  "9": "19:00-19:45",
-  "10": "19:55-20:40",
-};
+// ── 节次时间表（真值在 src/schools/period-times.ts，按当前学校取）──────
+// 这里只重导出南工大那张表：历史引用方（含测试）仍从本文件拿得到，
+// 但所有「按当前学校换算」的路径都必须走 periodTimeRange()。
+export { NJTECH_PERIOD_TIMES } from "../schools/period-times";
+
+import { activePeriodTable, periodTimeRangeWith } from "../schools/period-times";
 
 export const WEEKDAY_NAMES = ["", "周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
-/** 节次号 -> 上课时间段，如 [7,8] -> "16:00-17:40" */
+/** 节次号 -> 上课时间段，如 [7,8] -> "16:00-17:40"。用当前生效学校的作息表 */
 export function periodTimeRange(periods: number[]): string | undefined {
-  if (!periods.length) return undefined;
-  const first = NJTECH_PERIOD_TIMES[String(periods[0])];
-  const last = NJTECH_PERIOD_TIMES[String(periods[periods.length - 1])];
-  if (!first || !last) return undefined;
-  return `${first.split("-")[0]}-${last.split("-")[1]}`;
+  return periodTimeRangeWith(activePeriodTable(), periods);
 }
 
 /**
@@ -221,8 +209,13 @@ export async function fetchScheduleSmart(
   };
 }
 
-/** 抓取指定单个学期的课表（kbList 为空时回退用考试数据反推） */
-async function fetchScheduleFor(
+/**
+ * 抓取指定单个学期的课表（kbList 为空时回退用考试数据反推）
+ *
+ * NJTECH 适配器的抓取原语。工具层不要直接调它——学期探测与按校分发在
+ * src/schools/probe.ts，绕过分发层就等于给别的学校发错了凭证。
+ */
+export async function fetchScheduleFor(
   cookie: string,
   year: number,
   semester: number,
@@ -393,8 +386,8 @@ export async function fetchExamsSmart(
   return { ok: true, data: { ...first, label: termLabel(first.year, first.semester), exams: [] } };
 }
 
-/** 抓取指定单个学期的考试安排 */
-async function fetchExamsFor(
+/** 抓取指定单个学期的考试安排（NJTECH 适配器原语，工具层走 probe 分发） */
+export async function fetchExamsFor(
   cookie: string,
   year: number,
   semester: number,

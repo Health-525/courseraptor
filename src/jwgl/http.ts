@@ -84,6 +84,16 @@ async function acquireToken(): Promise<void> {
   return acquireToken();
 }
 
+/**
+ * 令牌桶对**所有**教务客户端共享，不只是本文件的 createClient。
+ * 河北农大那条链路要跨 cas.hebau.edu.cn(https) 与 urp.hebau.edu.cn:1009(http) 两台
+ * 主机攒 Cookie，塞不进这个单主机 https 客户端，只能自带传输层——但速率必须共用一个桶，
+ * 否则「多接一所学校」等于「请求速率翻倍」，礼貌边界和防 WAF 都不成立了。
+ */
+export function acquireRequestToken(): Promise<void> {
+  return acquireToken();
+}
+
 // ── 客户端 ────────────────────────────────────────────────────
 
 function parseCookieString(cookie: string): Map<string, string> {

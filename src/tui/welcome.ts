@@ -7,7 +7,6 @@
 
 import {
   expandWeeks,
-  fetchScheduleSmart,
   periodTimeRange,
   type ScheduleResult,
   WEEKDAY_NAMES,
@@ -15,7 +14,10 @@ import {
 import { fetchJwcNews } from "../jwgl/news";
 import { currentWeekOf } from "../jwgl/term-dates";
 import { loadScheduleCache, saveScheduleCache } from "../schedule-cache";
-import { getCookie } from "../tools/session";
+import { probeSchedule } from "../schools/probe";
+import { activeSchool } from "../schools/registry";
+import { supportsCapability } from "../schools/types";
+import { getSession } from "../tools/session";
 import { startChatWeb } from "../web/chat-web";
 
 declare global {
@@ -80,6 +82,12 @@ async function refreshWebUrl() {
 }
 
 async function refreshNews() {
+  const school = activeSchool();
+  if (!supportsCapability(school, "news")) {
+    panel.newsLines = [dim(`  ${school.name}尚未接入教务通知，可直接把通知原文发给我`)];
+    render();
+    return;
+  }
   try {
     const news = await fetchJwcNews([], 3);
     panel.newsLines = news.length
@@ -99,9 +107,17 @@ async function refreshSchedule() {
     renderSchedule(cached.schedule);
     return;
   }
+  const school = activeSchool();
+  // 需要二次认证的学校（如河农大 CAS）不在启动面板里悄悄登录：
+  // 那会平白往用户手机上发一条验证码。这类学校只等用户主动问一次课表。
+  if (!supportsCapability(school, "schedule") || school.supportsSecondFactor) {
+    panel.scheduleLines = [dim("  直接问「今天课表」即可加载")];
+    render();
+    return;
+  }
   try {
-    const cookie = await getCookie();
-    const r = await fetchScheduleSmart(cookie);
+    const session = await getSession();
+    const r = await probeSchedule(school, session);
     if (!r.ok) {
       panel.scheduleLines = [dim("  课表获取失败，可直接问我查详情")];
       render();

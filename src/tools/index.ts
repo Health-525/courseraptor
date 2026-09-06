@@ -1,8 +1,9 @@
 /**
  * CourseRaptor agent 工具集（聚合层）
- * 28 个工具按领域拆分到独立模块，本文件只负责合并与抢课开关过滤。
+ * 30 个工具按领域拆分到独立模块，本文件只负责合并与抢课开关过滤。
  *
  * 模块划分：
+ * - school.ts          当前学校与能力清单 / 二次认证验证码（2）
  * - schedule.ts        课表 / 校历（2）
  * - grades.ts          成绩 / 考试 / 实验成绩（3）
  * - student.ts         学籍 / 已选 / 重修（3）
@@ -25,11 +26,13 @@ import { gradesTools } from "./grades";
 import { memoryTools } from "./memory";
 import { newsTools } from "./news";
 import { scheduleTools } from "./schedule";
+import { schoolTools } from "./school";
 import { studentTools } from "./student";
 import { timeTools } from "./time";
 import { weatherTools } from "./weather";
 
 const raptorToolsAll = {
+  ...schoolTools,
   ...courseSelectionTools,
   ...scheduleTools,
   ...gradesTools,

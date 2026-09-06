@@ -7,7 +7,6 @@ import { z } from "zod";
 import {
   buildWeekIndex,
   currentWeekOf,
-  fetchScheduleSmart,
   parseSemesterString,
   periodTimeRange,
   resolveWeek1Monday,
@@ -23,7 +22,9 @@ import {
   specialOnDate,
 } from "../jwgl/term-holidays";
 import { saveScheduleCache } from "../schedule-cache";
-import { getCookie } from "./session";
+import { probeSchedule } from "../schools/probe";
+import { supportsCapability } from "../schools/types";
+import { getSession, schoolSessionFor } from "./session";
 
 export const scheduleTools = {
   /** 课表查询 */
@@ -41,8 +42,13 @@ export const scheduleTools = {
       if (semester && !parsed) {
         return { error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
       }
-      const cookie = await getCookie();
-      const r = await fetchScheduleSmart(cookie, parsed?.year, parsed?.semester);
+      const ctx = await schoolSessionFor("schedule");
+      if ("error" in ctx) return ctx;
+      const r = await probeSchedule(ctx.school, ctx.session, {
+        year: parsed?.year,
+        semester: parsed?.semester,
+        refresh: () => getSession(true),
+      });
       // 拿不到 ≠ 没有：断网/会话失效必须如实说，不能让用户以为这学期没课
       if (!r.ok) {
         return {
@@ -98,7 +104,9 @@ export const scheduleTools = {
         // 去查通知，而不是让它拿校历或印象回答「国庆放几天」这类问题
         specialDaysNote: specialDays.length
           ? undefined
-          : "尚无放假/调休落盘记录。法定节假日（国庆/元旦/清明/五一/端午/中秋/寒暑假）的具体安排以教务处通知为准：用户问放假安排、或问的课表周临近节假日时，先 get_news 查「放假/调休」相关通知，读到就 read_notice + set_holidays 落盘；查无通知再按「按国务院文件执行、另行通知」回答。",
+          : supportsCapability(ctx.school, "news")
+            ? "尚无放假/调休落盘记录。法定节假日（国庆/元旦/清明/五一/端午/中秋/寒暑假）的具体安排以教务处通知为准：用户问放假安排、或问的课表周临近节假日时，先 get_news 查「放假/调休」相关通知，读到就 read_notice + set_holidays 落盘；查无通知再按「按国务院文件执行、另行通知」回答。"
+            : `尚无放假/调休落盘记录，且${ctx.school.name}未接入教务通知接口，查不到官方安排。用户问放假/调休时，请他直接把学校通知原文发过来（或给可访问的通知页链接），读到后用 set_holidays 落盘；没有原文就如实说「学校没开放接口，我不猜具体日期」。`,
         todaySpecial: today ? { date: todayIso, ...today } : undefined,
         note:
           term.courses.length === 0 ? "课表已查通但无排课（假期或学期未排课属正常）" : undefined,

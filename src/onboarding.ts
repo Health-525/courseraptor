@@ -7,13 +7,41 @@ import readline from "node:readline/promises";
 
 import { config, type DeepSeekApiKeySource, maskDeepSeekApiKey } from "./config";
 import { saveCredentialsStore, saveStoredCredentials } from "./credentials";
-import { loginJwgl } from "./jwgl/auth";
+import { activeSchool } from "./schools/registry";
+import type { SchoolAdapter, SchoolSession } from "./schools/types";
 import { createMutedTerminalOutput } from "./secret-input";
+import { secondFactorGate } from "./tools/session";
+
+/**
+ * 引导期的登录。需要二次认证的学校（如河农大 CAS）在这里当场用终端收验证码：
+ * 用户跳过或码错就抛错，绝不把「没验证过的账号」存进 credentials.enc——
+ * 那会让下次启动直接带着无效凭证跑，报错还看不出根因。
+ */
+async function loginWithOptionalSecondFactor(
+  school: SchoolAdapter,
+  username: string,
+  password: string,
+  rl: readline.Interface,
+): Promise<SchoolSession> {
+  try {
+    return await school.login({ username, password });
+  } catch (e) {
+    const gate = secondFactorGate(e);
+    if (!gate) throw e;
+    console.log(`\n   ${gate.error}`);
+    const code = (await rl.question("验证码（直接回车跳过）: ")).trim();
+    if (!code) {
+      throw new Error("未提供验证码，本次没有完成登录验证，账号未保存");
+    }
+    return school.login({ username, password, challengeId: gate.challenge_id, dynamicCode: code });
+  }
+}
 
 export async function ensureCredentials(): Promise<void> {
   if (config.jwglUsername && config.jwglPassword) return;
 
-  console.log("🦖 首次使用：第 1 步，共 2 步——配置教务系统账号");
+  const school = activeSchool();
+  console.log(`🦖 首次使用：第 1 步，共 2 步——配置${school.name}教务系统账号`);
   console.log("   账号和密码将 AES-256-GCM 加密保存在本机，不会明文落盘。\n");
   const out = createMutedTerminalOutput();
   // terminal: true 不能省：output 是自定义 Writable（没有 isTTY），省了它
@@ -48,7 +76,7 @@ export async function ensureCredentials(): Promise<void> {
 
       try {
         // 真实登录验证：密码错误当场重输，避免存入无效凭证
-        await loginJwgl(username, password);
+        await loginWithOptionalSecondFactor(school, username, password, rl);
         saveStoredCredentials(username, password);
         config.jwglUsername = username;
         config.jwglPassword = password;

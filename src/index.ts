@@ -16,6 +16,7 @@ import { createRaptorAgent } from "./agent";
 import { config } from "./config";
 import { flushCapturedSession } from "./memory/shortterm";
 import { ensureCredentials, runDeepSeekKeySetup } from "./onboarding";
+import { activeSchool } from "./schools/registry";
 import { SLASH_COMMANDS } from "./tui/slash-menu";
 import {
   checkForUpdate,
@@ -126,7 +127,7 @@ while (running) {
           "🦖 CourseRaptor",
           updateInfo ? formatUpdateBadge(updateInfo) : null,
           config.deepseekApiKey
-            ? "NJTECH 教务 Agent（/inline 切行内模式）"
+            ? `${activeSchool().name} 教务 Agent（/inline 切行内模式）`
             : "输入无参数 /key 安全配置后即可对话",
         ]
           .filter(Boolean)
@@ -162,7 +163,7 @@ while (running) {
       title: [
         "🦖 CourseRaptor",
         updateInfo ? formatUpdateBadge(updateInfo) : null,
-        "NJTECH 教务 Agent（/card 切卡片模式）",
+        `${activeSchool().name} 教务 Agent（/card 切卡片模式）`,
       ]
         .filter(Boolean)
         .join(" · "),
