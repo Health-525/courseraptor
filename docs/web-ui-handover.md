@@ -16,6 +16,11 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
 |---|---|
 | `src/web/chat-web.ts` | HTTP 服务 + SSE 流式接口，连接正式 Agent 与会话存储 |
 | `src/web/chat-page.ts` | 共用前端视图，HTML/CSS/JS 在 `chatPage()` 模板字符串中，正式服务和离线演示共用 |
+| `src/web/today-brief.ts` | 周课表数据组装（纯本地缓存：课表/假期/学期日期），`GET /api/today?week=N` 的数据源 |
+| `src/web/today-page.ts` | 本周课表独立页（`GET /today`），含演示模式内嵌数据 |
+| `src/exam-cache.ts` | 考试本地缓存（`data/exam-cache.json`），get_exams 自动探测时落盘 |
+| `src/web/result-cards.ts` | 把课表、成绩、考试、通知和附件工具结果压成可落盘的结构化展示卡；不让前端解析 Markdown |
+| `src/web/workspace-data.ts` | 网页上传、截止日期待办与查询变化快照的本机持久化，统一路径边界与原子写入 |
 | `src/web/demo-server.ts` | 独立离线演示，虚构数据、内存会话，不加载个人配置 |
 | `src/chat-sessions.ts` | 多会话落盘存储（`data/chat-sessions.json`，原子写 + 读坏隔离）。建档/截断/上下文窗口都在这里，网页历史重启不丢。**写入方有两个**：网页（读写）与 QQ 桥（只写，见下两行） |
 | `src/qq/session-archive.ts` | QQ 消息 → 会话档案的映射（纯函数，不引 SDK）：私聊按人、群聊按群、频道按频道，id = `qq-` + sha256 摘要 20 位，群聊提问前补 `[昵称]` |
@@ -27,7 +32,7 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
 | `tests/qq-session-archive.test.ts` | QQ 对话进历史的 10 个测试：分档粒度、昵称压平、id 落在侧栏白名单、无归属不归档、标题带渠道前缀、**端到端 `/api/sessions` 列得出来点得开**、`archiveQQRound` 接线 |
 | `package.json` | 新增运行时依赖 `marked`（前端 Markdown 渲染，通过 `/vendor/marked.min.js` 从 node_modules 静态提供） |
 
-测试命令：`npm run typecheck && npm test`（网页相关共 20 个；全量套件当前 174 个全过，含并行会话的天气与文件流水线测试）。
+测试命令：`npm run typecheck && npm test`（全量套件当前 241 个全过，含今日档案 15 个与并行会话的天气/文件流水线测试）。
 
 ## 三、架构要点
 
@@ -41,6 +46,11 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
   - `GET /api/sessions` → `{ sessions: [{id,title,updatedAt,count}] }`（按最近活跃排序）
   - `GET /api/sessions/:id` → 完整 `{id,title,messages:[{role,text,ts,think?}]}`（`think` 只挂在助手消息上，是当轮的思考过程，供界面回看）；非法/未知 id 一律 404，**不兜底成 default**（防串档）
   - `DELETE /api/sessions/:id` → 删除会话
+  - `PATCH /api/sessions/:id` → 改名或置顶会话
+  - `POST/DELETE /api/uploads` → 上传或移除网页附件；聊天请求只携带附件 id，详情接口不返回本机路径
+  - `GET/POST/PATCH/DELETE /api/reminders` → 截止日期待办；`GET /api/reminders/:id.ics` 导出日历
+  - `POST /api/diagnostics` → 分别检测教务系统与模型服务连接
+  - `GET /api/data`、`GET /api/data/export`、`POST /api/data/clear` → 本地数据概览、脱敏导出和按范围清理
   - `POST /api/reset` → 清空**全部**会话档案（UI 已不挂此按钮，留给测试与自救）
   - `GET /api/settings` → 配置状态（**只有脱敏摘要**：教务 `{configured,username,sourceLabel}`、DeepSeek `{configured,masked,sourceLabel}`、`model`），任何字段都不含密码/完整 Key
   - `POST /api/settings` → 部分更新：`{ jwglUsername, jwglPassword }` 必须成对提交（加密写 credentials.enc 并热更新 config 单例）；`{ apiKey }` 走 `setDeepSeekApiKey`（格式校验→热生效→加密落盘，与 `/key` 命令同一条路）。任一项失败整体 400，响应 `results[]` 逐项给话术
@@ -57,7 +67,7 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
 - 设计方向：**暖纸底 + 墨色字 + 单一朱砂红**的编辑部排版。侧栏与移动顶栏共用纯文字双色字标（`Course` 墨灰、`Raptor` 朱砂，侧栏右接档案细线），页面主标题使用楷体（KaiTi），数据行使用等宽小字，首屏圆形印章呼应教务红章；**无渐变、无光斑、无玻璃拟态**（最早那版「深空极光」已整体删除，别加回来）。
 - 所有颜色/字体令牌集中在 `chatPage()` CSS 的 `:root`（`--paper/--ink/--accent/--kai/--mono` 等），调色改令牌即可。
 - **项目 logo 已定稿**（2026-08-30）：`docs/courseraptor-logo.png`（1254×1254 方形，扁平三色·圆框眼镜迅猛龙头像）。三处共用同一张——README 头图、浏览器标签页 favicon（`<link rel="icon" href="/logo.png">`）、首屏那枚旋转 -7° 的朱砂双圈印章（圈内 70px 圆裁 logo，取代原先的 🦖 emoji 占位，页面里已不再出现该 emoji）。旧吉祥物 `docs/courseraptor-mascot.png` 保留在仓库但不再当门面。侧栏/顶栏徽章仍按用户要求删除，别加回来。
-- 布局：桌面为「左档头 + 右正文」两栏，正文与输入区同为 800px 最大宽度，主交互字号从 16px 起。报头下一行是**「新会话」通栏朱砂主按钮**（用户要求置顶）；中间是**会话档案列表**（标题 + 时间/条数，行尾**常驻**半透明 ✕ 删除、悬停变实——早期悬停才出现，用户找不到删除入口，别再改回去）；**「账号与模型」固定在侧栏最底部且不进入滚动区**。窄屏（≤960px）左栏隐藏，顶栏右侧为「新会话 · 设置」。侧栏无副标语、无页脚系统信息、无恐龙徽章、无学期读数卡、无导出按钮、**无今日课程卡**（均应用户要求做减法；`/api/brief` 端点随之整体下线，问课表直接问 Agent）。
+- 布局：桌面为「左档头 + 右正文」两栏，正文与输入区同为 800px 最大宽度，主交互字号从 16px 起。报头下方是「新会话」通栏朱砂主按钮；中间是**会话档案列表**（标题 + 时间/条数，行尾**常驻**半透明 ✕ 删除、悬停变实——早期悬停才出现，用户找不到删除入口，别再改回去）；**「账号与模型」固定在侧栏最底部且不进入滚动区**。窄屏（≤960px）左栏隐藏，顶栏右侧为「会话 · 新会话 · 设置」。侧栏无副标语、无页脚系统信息、无恐龙徽章、无学期读数卡、无导出按钮、无内嵌课表卡。首屏不放日程入口 chip；每次打开默认处于新对话。
 - **布局焊死**：`body` 锁 `100dvh + overflow:hidden`，`#log/aside/main/.sec/.sess` 带 `min-height:0`——整页永不滚动，正文只在 `#log` 内滚；侧栏整体不滚，只有会话列表 `.sess` 在溢出时滚动，滚动条默认隐藏、悬停或列表内聚焦时显示；输入/发送条与设置按钮分别固定在各自栏底部。
 - **设置弹窗**（`.overlay/.dlg`）：红头标题「账号与模型」+ 两节表单——教务账号（学号/登录密码，留空不改，只填学号会被拒）、AI 模型（API Key，展示当前脱敏摘要与来源、模型名）。文案面向普通使用者，只说明信息加密保存在当前电脑，不暴露实现文件名。关闭方式：✕ / 取消 / 点遮罩 / ESC。保存结果逐行打在 `.setmsg`，全部成功自动关闭。
 - **快速提问常驻在输入框上方**（「常用」小标 + 单排 chip），不再放侧栏/首屏；窄屏横向滚动，避免多行按钮挤压输入区。
@@ -65,7 +75,7 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
 - 消息不做气泡：每轮是一行等宽小字题注（`你/助手 · 时间 · 总耗时`）+ 正文。用户消息 = 左侧朱砂竖线 + 纸片底；助手回复 = 通栏 Markdown 排版。
 - **工具调用独立建模**：每次调用一张可展开的 `.tool` 卡片（原生 `details/summary`，零 JS 交互）：折叠态一行——行首**恒定的内联 SVG 描线齿轮**（`GEAR` 常量，Lucide settings 路径，`stroke="currentColor"` 取 `--ink-3`；早期用 ▸/✓/✗ 三种字形换状态，用户要求去掉勾叉）、工具名、结果摘要（`.tsum` 弹性位）、**状态文字**（`.tstat`：执行中/完成/失败）、耗时；失败时整框朱砂红边 + 红字。展开态——`参数` 与 `结果` 两个等宽 pre 块（服务端各截断 1200 字）。SSE 的 end 事件不带配对保证，按 `id` 精确配对为主、同名 FIFO 兜底。非工具错误（网络失败/中断/agent err）仍是一条等宽 `.tline.bad`。
 - **思考过程独立建模**：一段 reasoning 一张 `.think` 卡片，和工具卡片共用 `.tl` 时间线容器（所以画面是「思考 → 调工具 → 再思考 → 正文」的顺时序）。样式上刻意与正文分层：虚线框、无底色、`--kai` 楷体 14px 灰字（正文是系统黑体 16px），展开态限高 300px 内部滚。行为：流式期间当前段展开可见，段末（`think phase=end` 或后续任何工具/正文事件）自动定格为「已完成 · 耗时」并折叠；**用户手动开合过就不再抢他的选择**（`manual` 标记）。历史重绘走 `addBotMessage` 的独立路径，只显示「已完成」不显示耗时（重开时算出的耗时是假的）。
-- 功能清单：SSE 流式回复（等宽光标 ▌）、**思考过程卡片（流式可见、段末自动折叠）**、停止、失败重试、复制、智能滚动 + 回到底部、**多会话历史（落盘、跨重启、侧栏可切换/删除）**、新会话（当前会话为空时不重复建档）、中文输入法 Enter 保护（`isComposing`/keyCode 229）、textarea 自适应（Shift+Enter 换行）、快捷提问、后台完成标题提醒、移动端适配、`prefers-reduced-motion`。（导出按钮已按用户要求移除，需要存档可直接复制消息。）
+- 功能清单：SSE 流式回复（等宽光标 ▌）、**思考过程卡片（流式可见、段末自动折叠）**、停止、失败重试、复制、智能滚动 + 回到底部、**多会话历史（落盘、跨重启、搜索/改名/置顶/删除、窄屏抽屉）**、浏览器附件上传、课表/成绩/考试/通知结构化结果卡、手动刷新变化对比、截止日期待办与 `.ics`、连接检测、本地数据导出/清理、新会话、中文输入法 Enter 保护、textarea 自适应、快捷提问、后台完成标题提醒、移动端适配、`prefers-reduced-motion`。
 
 ## 五、踩过的坑（改 UI 前必读）
 
@@ -97,3 +107,22 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
 - QQ 与网页同进程时（`raptor` 一条命令全包）档案写入是串安全的（`appendRound` 全同步 + 网页侧 `turnChain` 串行）。但**分开跑两个进程**（例如一个终端 `raptor`、另一个终端 `npm run qq`）时，两边各自「读全量-改-原子写」：原子写保证文件不花，不保证不丢更新——后写的那一次会覆盖前一次。想两边都留档就统一走 `raptor`。
 - `chat-sessions` 写盘失败只 `console.error`，嵌入模式（卡片 TUI）下这条错误可能花一帧。真在意可改成走 `src/qq/logger.ts` 的文件日志。
 - `data/schedule-cache.json` 长期不更新时 TUI 启动面板显示的是最后已知课表；在对话里问一次课表即刷新（网页已不直接展示课表）。
+
+## 八、本周课表独立页（GET /today）
+
+2026-09-08 新增：路线图 P1「本周课表」落地为**独立界面**（用户明确要求不回侧栏）。同一个 web 服务上多出一条路由，与对话页互为独立页面（非 SPA，各自整页加载）。
+
+| 文件 | 作用 |
+|---|---|
+| `src/web/today-brief.ts` | 数据组装（纯函数 + 注入时钟）：按周次过滤课程，放假作废、调休按 follows 换课表；输出课程的节次、时间、地点、教师与周次，支持指定教学周。只读本地缓存，不登录教务、不调模型 |
+| `src/web/today-page.ts` | 页面本体（`todayPage({demo, demoData})`）：红头档案同套设计令牌；页头 + 「返回对话」；桌面左右布局，右侧以周一至周日 × 节次的网格完整展示课程，提供上一周、下一周与回到本周 |
+| `src/exam-cache.ts` | 考试缓存（`data/exam-cache.json`），与 schedule-cache 同一套约定；`get_exams` 自动探测学期时落盘，日程页据此展示临近考试 |
+| `src/web/demo-server.ts` | 演示模式：`/today` 内嵌虚构课表（跟真实时钟走），不发任何请求 |
+
+接口与行为要点：
+
+- `GET /today` → 页面；`GET /api/today?week=N` → `buildTodayBrief()` 的 JSON。两者都在 `chat-web.ts` 的 GET 分支里、**兜底吐聊天页的 catch-all 之前**——新页面路由必须加在 catch-all 前，否则永远渲染聊天页。
+- 无课表缓存时如实降级：「还没有课表数据」+ 引导去对话页问一次（问一次即建缓存），不装作有数据。
+- 前端无框架无 marked 依赖；页面 JS 同样是外层 TS 模板串——**不用反引号与 `${`，换行写 `\\n`**（坑 1 对它同样生效，测试里对求值产物做过 `node --check`）。
+- 测试：`tests/today-brief.test.ts`（单双周/调休/放假/无缓存/指定教学周等）+ `tests/chat-web.test.ts` 路由测试 + `tests/demo.test.ts` 演示页测试。
+- 已知取舍：调休数据只按 `specialOnDate` 的单条记录处理；可浏览周数取课表实际周次的最大值。
