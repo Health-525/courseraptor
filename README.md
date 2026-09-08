@@ -7,6 +7,8 @@
 **南京工业大学教务对话式 Agent**
 课表 · 成绩 · 考试 · 学籍 · 教务通知 · 记忆，一句话搞定。
 
+[![下载最新版](https://img.shields.io/github/v/release/Health-525/courseraptor?label=%E4%B8%8B%E8%BD%BD%E6%9C%80%E6%96%B0%E7%89%88&color=orange&style=for-the-badge)](https://github.com/Health-525/courseraptor/releases/latest)
+
 [![License: ISC](https://img.shields.io/badge/license-ISC-blue.svg)](#)
 [![Vercel AI SDK](https://img.shields.io/badge/Vercel%20AI%20SDK-v7-black.svg)](https://ai-sdk.dev)
 [![LLM](https://img.shields.io/badge/LLM-DeepSeek-4D6BFE.svg)](https://www.deepseek.com)
