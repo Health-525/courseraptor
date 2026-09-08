@@ -75,6 +75,28 @@ test("contextMessages 输出 ModelMessage 形状（user 纯串 / assistant 块�
   assert.equal((asst.content as { type: string }[])[0].type, "text");
 });
 
+test("会话支持改名与置顶，置顶档案排在普通档案之前", () => {
+  const updated = S.updateSession("aaaa1111", { title: "  我的本周安排  ", pinned: true });
+  assert.equal(updated?.title, "我的本周安排");
+  assert.equal(updated?.pinned, true);
+  assert.equal(S.listSessions()[0].id, "aaaa1111");
+  assert.equal(S.listSessions()[0].pinned, true);
+  assert.equal(S.updateSession("not-found", { pinned: true }), null);
+});
+
+test("网页附件路径只进入模型上下文，结果卡随助手消息落盘", () => {
+  S.appendRound("upload111", "看看附件", "已读取", null, {
+    attachments: [{ id: "u1", name: "课程表.xlsx", storedPath: "C:/safe/cache/u1.xlsx" }],
+    artifacts: [{ kind: "file", title: "课程表.xlsx", updatedAt: Date.now() }],
+  });
+  const session = S.getSession("upload111");
+  assert.equal(session?.messages[0].attachments?.[0].name, "课程表.xlsx");
+  assert.equal(session?.messages[1].artifacts?.[0].kind, "file");
+  const context = JSON.stringify(S.contextMessages("upload111"));
+  assert.match(context, /课程表\.xlsx/);
+  assert.match(context, /C:\/safe\/cache\/u1\.xlsx/);
+});
+
 test("长会话两级截断：显示存档 ≤ MAX_STORED_MSGS，上下文只取最后窗口", () => {
   for (let i = 0; i < 130; i++) S.appendRound("dddd4444", `问题${i}`, `回答${i}`);
   const s = S.getSession("dddd4444");

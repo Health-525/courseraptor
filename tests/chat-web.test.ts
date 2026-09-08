@@ -204,6 +204,133 @@ test("多会话历史：sessionId 隔离上下文，列表/详情/删除接口",
   assert.equal((await fetch(`${url}/api/sessions/nope!!`)).status, 404);
 });
 
+test("会话接口支持改名与置顶", async () => {
+  const url = (await startChatWeb())!;
+  await post(url, { message: "需要整理的会话", sessionId: "manage111" });
+  const patch = await fetch(`${url}/api/sessions/manage111`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ title: "本周学习安排", pinned: true }),
+  });
+  assert.equal(patch.status, 200);
+  const list = await (await fetch(`${url}/api/sessions`)).json();
+  const item = list.sessions.find((s: { id: string }) => s.id === "manage111");
+  assert.equal(item.title, "本周学习安排");
+  assert.equal(item.pinned, true);
+  assert.equal(list.sessions[0].id, "manage111", "置顶会话应排在最前");
+});
+
+test("网页上传只回附件编号，对话可读取受控路径且详情不泄露路径", async () => {
+  const calls: unknown[][] = [];
+  setChatAgent({
+    stream({ messages }: { messages?: unknown[] }) {
+      calls.push(messages ?? []);
+      async function* gen() {
+        yield { type: "text-delta", text: "附件已收到" };
+        yield { type: "finish" };
+      }
+      return Promise.resolve({ fullStream: gen() });
+    },
+  });
+  const url = (await startChatWeb())!;
+  const uploadRes = await fetch(`${url}/api/uploads`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "课程说明.txt",
+      type: "text/plain",
+      data: Buffer.from("示例附件内容").toString("base64"),
+    }),
+  });
+  assert.equal(uploadRes.status, 200);
+  const upload = (await uploadRes.json()).upload;
+  assert.deepEqual(Object.keys(upload).sort(), ["id", "name", "size", "type"]);
+
+  await post(url, {
+    message: "概括附件",
+    sessionId: "upload111",
+    attachmentIds: [upload.id],
+  });
+  const sent = JSON.stringify(calls.at(-1));
+  assert.match(sent, /课程说明\.txt/);
+  assert.match(sent, /web-uploads/);
+
+  const detailText = await (await fetch(`${url}/api/sessions/upload111`)).text();
+  assert.match(detailText, /课程说明\.txt/);
+  assert.ok(!detailText.includes("storedPath") && !detailText.includes("web-uploads"));
+});
+
+test("教务工具结果产生结构化卡片并保存变化对比", async () => {
+  let location = "仁智楼 101";
+  setChatAgent({
+    stream() {
+      async function* gen() {
+        yield { type: "tool-call", toolCallId: "e1", toolName: "get_exams" };
+        yield {
+          type: "tool-result",
+          toolCallId: "e1",
+          toolName: "get_exams",
+          output: {
+            term: "2026-2027-1",
+            total: 1,
+            exams: [{ subject: "高等数学", date: "2026-12-28", time: "09:00", location }],
+          },
+        };
+        yield { type: "text-delta", text: "考试安排如上" };
+        yield { type: "finish" };
+      }
+      return Promise.resolve({ fullStream: gen() });
+    },
+  });
+  const url = (await startChatWeb())!;
+  const first = await post(url, { message: "查考试", sessionId: "cards111" });
+  const firstCard = first.events.find((e) => e.t === "card")?.card as Record<string, unknown>;
+  assert.equal(firstCard.kind, "exams");
+  assert.equal((firstCard.change as Record<string, unknown>).status, "first");
+
+  location = "厚学楼 202";
+  const second = await post(url, { message: "再查考试", sessionId: "cards111" });
+  const secondCard = second.events.find((e) => e.t === "card")?.card as Record<string, unknown>;
+  assert.equal((secondCard.change as Record<string, unknown>).status, "changed");
+  const detail = await (await fetch(`${url}/api/sessions/cards111`)).json();
+  assert.equal(detail.messages.at(-1).artifacts[0].kind, "exams");
+});
+
+test("待办可创建、完成并导出日历，本地数据接口回脱敏概览", async () => {
+  const url = (await startChatWeb())!;
+  const create = await fetch(`${url}/api/reminders`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      title: "提交选课材料",
+      dueAt: "2026-09-10T09:00:00+08:00",
+      source: "教务通知",
+      sourceUrl: "https://jwc.njtech.edu.cn/example",
+    }),
+  });
+  assert.equal(create.status, 201);
+  const reminder = (await create.json()).reminder;
+  const patch = await fetch(`${url}/api/reminders/${reminder.id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ done: true }),
+  });
+  assert.equal(patch.status, 200);
+  const ics = await fetch(`${url}/api/reminders/${reminder.id}.ics`);
+  assert.equal(ics.status, 200);
+  assert.match(await ics.text(), /SUMMARY:提交选课材料/);
+
+  const data = await (await fetch(`${url}/api/data`)).json();
+  assert.ok(data.sessions.count >= 1);
+  assert.ok(data.uploads.count >= 1);
+  assert.ok(data.reminders.total >= 1);
+  assert.ok(!JSON.stringify(data).includes("storedPath"));
+
+  const exported = await fetch(`${url}/api/data/export`);
+  assert.match(exported.headers.get("content-disposition") ?? "", /attachment/);
+  assert.ok(!(await exported.text()).includes("storedPath"));
+});
+
 test("工具事件带 id/参数/结果预览（独立工具卡片的数据源）", async () => {
   setChatAgent({
     stream() {
@@ -477,4 +604,54 @@ test("渲染产物语法自检 + 思考卡片与齿轮图标锚点", async () =>
   assert.match(html, /<svg viewBox="0 0 24 24"/, "工具行首应为内联 SVG 图标");
   assert.match(html, /function toolDone[\s\S]{0,400}"完成"/, "完成状态用文字表达");
   assert.ok(!html.includes('"✓"') && !html.includes("'✓'"), "工具状态不再用勾号");
+});
+
+test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", async () => {
+  const url = (await startChatWeb())!;
+  const res = await fetch(`${url}/today`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get("content-type") ?? "", /text\/html/);
+  const html = await res.text();
+  assert.match(html, /本周课表/, "页面标题应为本周课表");
+  assert.match(html, /api\/today/, "页面应从 /api/today 取数据");
+  assert.match(html, /week-timetable/, "本周概览应使用节次 × 星期的周课表网格");
+  assert.match(html, /返回对话/, "应有返回对话页的链接");
+  assert.match(html, /const DEMO_DATA = null;/, "正式页不内嵌数据，运行时从 /api/today 取");
+  // todayPage 同样是外层模板串：对求值产物做语法检查（源码切片会漏判）
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  assert.ok(blocks.length >= 1, "页面应有内联脚本");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-today-page-"));
+  blocks.forEach((code, i) => {
+    const f = path.join(dir, `chunk-${i}.js`);
+    fs.writeFileSync(f, code, "utf8");
+    execFileSync(process.execPath, ["--check", f], { stdio: "pipe" });
+  });
+  // 聊天页三处入口：侧栏按钮、首屏链接、窄屏顶栏
+  const chat = await (await fetch(url)).text();
+  assert.match(chat, /href="\/today"[^>]*>今日日程</, "侧栏应有今日日程入口");
+  assert.match(chat, /href="\/today"[^>]*>今日</, "移动顶栏应有今日入口");
+  assert.ok(
+    !chat.includes("看今日日程：下一节课在哪 · 今天还有什么"),
+    "首屏不应再展示今日日程 chip",
+  );
+  assert.match(chat, /默认进入新的空会话/, "每次打开网页应默认新建空会话");
+});
+
+test("GET /api/today 纯本地组装当日档案（无缓存时如实降级）", async () => {
+  const url = (await startChatWeb())!;
+  const res = await fetch(`${url}/api/today`);
+  assert.equal(res.status, 200);
+  const data = (await res.json()) as {
+    dateLabel: string;
+    schedule: { available: boolean; note?: string };
+    next: unknown;
+    exams: { available: boolean };
+  };
+  assert.ok(data.dateLabel, "应带日期标签");
+  assert.equal(typeof data.schedule.available, "boolean");
+  // 测试的数据目录里没有课表缓存：必须是「还没有数据」而非报错
+  assert.equal(data.schedule.available, false);
+  assert.match(data.schedule.note ?? "", /还没有课表数据/);
+  assert.equal(data.next, null);
+  assert.equal(data.exams.available, false);
 });

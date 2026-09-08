@@ -36,14 +36,38 @@ export interface StoredMessage {
   role: "user" | "assistant";
   text: string;
   ts: number;
+  /** 网页上传的附件引用。路径只供本机 Agent 读取；HTTP 接口会在返回前移除。 */
+  attachments?: Array<{ id: string; name: string; storedPath: string }>;
   /** 助手消息可选：本轮模型的思考过程（reasoning）。只供界面回看，
    * contextMessages 不读它——把思考喂回去会污染上下文、白烧 token */
   think?: string;
+  /** 查询工具生成的轻量结果卡；只保存展示字段，不保存完整工具输出。 */
+  artifacts?: StoredArtifact[];
+}
+
+export interface StoredArtifact {
+  kind: "schedule" | "grades" | "exams" | "news" | "notice" | "file";
+  title: string;
+  badge?: string;
+  updatedAt: number;
+  source?: string;
+  sourceUrl?: string;
+  summary?: string;
+  metrics?: Array<{ label: string; value: string }>;
+  rows?: Array<{ label: string; value?: string; meta?: string; url?: string }>;
+  change?: { status: "first" | "same" | "changed"; text: string; details?: string[] };
+  actions?: Array<{
+    type: "prompt" | "reminder";
+    label: string;
+    prompt?: string;
+    dueAt?: string;
+  }>;
 }
 
 export interface ChatSession {
   id: string;
   title: string;
+  pinned?: boolean;
   createdAt: number;
   updatedAt: number;
   messages: StoredMessage[];
@@ -53,6 +77,7 @@ export interface ChatSession {
 export interface SessionMeta {
   id: string;
   title: string;
+  pinned: boolean;
   updatedAt: number;
   count: number;
 }
@@ -98,7 +123,8 @@ function writeSessions(list: ChatSession[]): void {
   }
 }
 
-const byRecent = (a: ChatSession, b: ChatSession): number => b.updatedAt - a.updatedAt;
+const byRecent = (a: ChatSession, b: ChatSession): number =>
+  Number(!!b.pinned) - Number(!!a.pinned) || b.updatedAt - a.updatedAt;
 
 /** 一行标题：首问压成空格并截断；渠道前缀（如「QQ」）拼在最前面 */
 function titleOf(text: string, prefix?: string): string {
@@ -121,6 +147,7 @@ export function listSessions(): SessionMeta[] {
     .map((s) => ({
       id: s.id,
       title: s.title || "新会话",
+      pinned: !!s.pinned,
       updatedAt: s.updatedAt,
       count: s.messages.length,
     }));
@@ -138,6 +165,24 @@ export function deleteSession(id: string): boolean {
   return true;
 }
 
+/** 修改会话的人工标题或置顶状态。空标题不会覆盖现有标题。 */
+export function updateSession(
+  id: string,
+  patch: { title?: string; pinned?: boolean },
+): ChatSession | null {
+  const list = readSessions();
+  const session = list.find((s) => s.id === id);
+  if (!session) return null;
+  if (typeof patch.title === "string") {
+    const title = titleOf(patch.title);
+    if (!title) return null;
+    session.title = title;
+  }
+  if (typeof patch.pinned === "boolean") session.pinned = patch.pinned;
+  writeSessions(list.sort(byRecent));
+  return session;
+}
+
 /** 完整的一轮问答入库（回答为空只存提问）；会话不存在则建档。
  *  reasoningText 是本轮模型的思考过程：挂在 assistant 消息的 think 字段上
  *  供界面回看，不单独成条、不进上下文。没有正文的半截轮次照旧不入库。
@@ -148,7 +193,11 @@ export function appendRound(
   userText: string,
   assistantText: string | null,
   reasoningText?: string | null,
-  opts: { titlePrefix?: string } = {},
+  opts: {
+    titlePrefix?: string;
+    attachments?: Array<{ id: string; name: string; storedPath: string }>;
+    artifacts?: StoredArtifact[];
+  } = {},
 ): void {
   const list = readSessions();
   let s = list.find((x) => x.id === id);
@@ -157,11 +206,17 @@ export function appendRound(
     list.push(s);
   }
   const now = Date.now();
-  s.messages.push({ role: "user", text: userText, ts: now });
+  s.messages.push({
+    role: "user",
+    text: userText,
+    ts: now,
+    ...(opts.attachments?.length ? { attachments: opts.attachments } : {}),
+  });
   if (assistantText?.trim()) {
     const msg: StoredMessage = { role: "assistant", text: assistantText.trim(), ts: now };
     const think = clampThink(reasoningText);
     if (think) msg.think = think;
+    if (opts.artifacts?.length) msg.artifacts = opts.artifacts;
     s.messages.push(msg);
   }
   if (!s.title) {
@@ -180,14 +235,21 @@ export function appendRound(
 export function contextMessages(id: string): ModelMessage[] {
   const s = getSession(id);
   if (!s) return [];
-  return s.messages
-    .slice(-CONTEXT_WINDOW)
-    .map(
-      (m): ModelMessage =>
-        m.role === "user"
-          ? { role: "user", content: m.text }
-          : { role: "assistant", content: [{ type: "text", text: m.text }] },
-    );
+  return s.messages.slice(-CONTEXT_WINDOW).map(
+    (m): ModelMessage =>
+      m.role === "user"
+        ? {
+            role: "user",
+            content:
+              m.text +
+              (m.attachments?.length
+                ? `\n\n${m.attachments
+                    .map((a) => `[网页附件：${a.name}；本机路径：${a.storedPath}]`)
+                    .join("\n")}`
+                : ""),
+          }
+        : { role: "assistant", content: [{ type: "text", text: m.text }] },
+  );
 }
 
 /** 清空全部会话档案（/api/reset 背后，UI 不挂按钮，留给自救与测试） */
