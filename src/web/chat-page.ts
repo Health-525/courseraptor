@@ -362,22 +362,22 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .upchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .upchip button { border: 0; background: none; color: var(--ink-3); cursor: pointer; padding: 0; }
   .upchip.loading { opacity: .65; }
-  .cwrap { display: flex; align-items: center; gap: 12px;
+  .cwrap { display: flex; align-items: center; gap: 10px;
            background: var(--card); border: 1px solid var(--rule-2);
-           border-radius: 6px; padding: 7px 8px 7px 17px;
+           border-radius: 6px; padding: 7px 8px;
            transition: border-color 0.15s ease, box-shadow 0.15s ease; }
   .cwrap:focus-within { border-color: var(--ink-3); box-shadow: var(--shadow-sm); }
   .cwrap.drag { border-color: var(--accent); background: var(--accent-soft); }
-  .attach-btn { flex: none; width: 36px; height: 36px; padding: 0; border: 0;
-                border-right: 1px solid var(--rule); background: none;
-                color: var(--ink-3); cursor: pointer; font-size: 18px; }
-  .attach-btn:hover { color: var(--accent); }
-  .clabel { flex: none; font-family: var(--kai); font-size: 16px;
-            letter-spacing: 2px; color: var(--ink-3);
-            border-right: 1px solid var(--rule); padding-right: 12px;
-            align-self: stretch; display: flex; align-items: center;
-            transition: color 0.15s ease; user-select: none; }
-  .cwrap:focus-within .clabel { color: var(--accent); }
+  .attach-btn { flex: none; display: inline-flex; align-items: center; justify-content: center;
+                gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--rule);
+                border-radius: 4px; background: var(--paper-deep); color: var(--ink-2);
+                font-family: var(--mono); font-size: 12px; cursor: pointer;
+                transition: border-color .15s ease, background .15s ease, color .15s ease; }
+  .attach-btn svg { width: 15px; height: 15px; fill: none; stroke: currentColor;
+                    stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.8; }
+  .attach-btn:hover:not(:disabled), .attach-btn:focus-visible { border-color: var(--accent);
+                background: var(--accent-soft); color: var(--accent-deep); outline: none; }
+  .attach-btn:disabled { cursor: default; opacity: .55; }
   textarea { flex: 1; background: none; border: 0; outline: none; resize: none;
              min-width: 0; color: var(--ink); font-size: 16px; line-height: 1.6;
              padding: 6px 0; max-height: 180px; align-self: center; }
@@ -540,8 +540,9 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .quickbar { gap: 8px; }
     .qlabel { font-size: 12px; }
     .chip { min-height: 32px; padding: 4px 10px; font-size: 12px; }
-    .cwrap { gap: 8px; padding-left: 12px; }
-    .clabel { display: none; }
+    .cwrap { gap: 8px; }
+    .attach-btn { width: 34px; padding: 0; }
+    .attach-text { display: none; }
     textarea { font-size: 16px; }
     #b { min-height: 40px; padding: 8px 14px; }
     #b .kbd { display: none; }
@@ -597,9 +598,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     <div class="composer">
       <div class="upload-tray" id="uploadTray"></div>
       <div class="cwrap">
-        <button class="attach-btn" id="attachBtn" type="button" title="上传 PDF、Word、Excel 等文件" aria-label="上传附件" ${demo ? "disabled" : ""}>＋</button>
+        <button class="attach-btn" id="attachBtn" type="button" title="上传 PDF、Word、Excel 等文件" aria-label="上传附件" ${demo ? "disabled" : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg><span class="attach-text">附件</span></button>
         <input id="fileInput" type="file" hidden multiple accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.pptx">
-        <span class="clabel" aria-hidden="true">留言</span>
         <textarea id="i" rows="1" aria-label="向 CourseRaptor 提问" placeholder="课表、成绩、考试、通知，直接问…"></textarea>
         <button id="b">发送<span class="kbd">⏎</span></button>
       </div>
