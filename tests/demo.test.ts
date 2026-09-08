@@ -11,7 +11,8 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
   try {
     const html = await (await fetch(base)).text();
     assert.match(html, /离线演示 · 全部为虚构数据/);
-    assert.match(html, /id="openSettings"[^>]+disabled/);
+    assert.match(html, /id="openSettings"/);
+    assert.match(html, /id="sUser"[^>]+disabled/);
     assert.equal((await fetch(`${base}/logo.png`)).status, 200);
     assert.equal((await fetch(`${base}/vendor/marked.min.js`)).status, 200);
     const send = (body: unknown) =>
@@ -22,6 +23,7 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
       });
     const reply = await (await send({ message: "这周课表", sessionId: "demo-a" })).text();
     assert.match(reply, /示例高等数学/);
+    assert.match(reply, /"t":"card"/);
     assert.match(reply, /"t":"end","sid":"demo-a"/);
     await send({ message: "我的成绩和 GPA", sessionId: "demo-b" });
     const first = await (await fetch(`${base}/api/sessions/demo-a`)).json();
@@ -30,9 +32,10 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
     assert.equal((await send(null)).status, 400);
     assert.equal((await send({ message: " " })).status, 400);
     assert.equal((await send({ message: "a".repeat(20000) })).status, 413);
-    for (const method of ["GET", "POST"]) {
-      assert.equal((await fetch(`${base}/api/settings`, { method })).status, 403);
-    }
+    assert.equal((await fetch(`${base}/api/settings`)).status, 200);
+    assert.equal((await fetch(`${base}/api/settings`, { method: "POST" })).status, 403);
+    assert.equal((await fetch(`${base}/api/reminders`)).status, 200);
+    assert.equal((await fetch(`${base}/api/data`)).status, 200);
     assert.equal((await fetch(`${base}/files/credentials.enc`)).status, 404);
     assert.equal((await fetch(`${base}/api/sessions/demo-a`, { method: "DELETE" })).status, 200);
     assert.equal((await fetch(`${base}/api/sessions/demo-a`)).status, 404);
@@ -49,4 +52,25 @@ test("演示不伪造实时数据、文件和任意 AI 回答", () => {
   }
   assert.match(demoReply("日历"), /没有生成文件或发布链接/);
   assert.match(demoReply("随机问题"), /不调用 AI/);
+});
+
+test("演示模式的本周课表页：内嵌虚构数据，不发请求", async () => {
+  const server = createDemoServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const base = `http://127.0.0.1:${address.port}`;
+  try {
+    const res = await fetch(`${base}/today`);
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /本周课表/);
+    assert.match(html, /离线演示 · 虚构数据/);
+    // 演示数据内嵌（DEMO_DATA 非空），页面不依赖 /api/today
+    assert.match(html, /const DEMO_DATA = \{/);
+    assert.match(html, /示例高等数学/);
+    assert.match(html, /if \(!DEMO_DATA\) \{/, "自动刷新与取数都必须被演示守卫挡住");
+  } finally {
+    server.close();
+  }
 });

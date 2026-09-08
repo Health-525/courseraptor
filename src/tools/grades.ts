@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { summarizeAcademics, summarizeGeneralElectives } from "../academic-summary";
 import { config } from "../config";
+import { saveExamCache } from "../exam-cache";
 import { fetchExamsSmart, parseSemesterString } from "../jwgl/academics";
 import { fetchAllGrades } from "../jwgl/grades";
 import { fetchLabGradesSmart } from "../jwgl/portal";
@@ -67,6 +68,9 @@ export const gradesTools = {
       if (!r.ok) {
         return { error: `考试查询失败：${r.error}（不是「暂无考试」，是没查到）` };
       }
+      // 未指定学期（自动探测的最新学期）时顺带刷新本地缓存，
+      // 「今日档案」日程页读缓存就能展示临近考试，不必登录教务系统
+      if (!semester) saveExamCache(r.data);
       const { label, exams } = r.data;
       return {
         term: label,
