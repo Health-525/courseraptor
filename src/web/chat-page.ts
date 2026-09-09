@@ -433,11 +433,11 @@ export function chatPage(options: { demo?: boolean } = {}): string {
          gap: 10px; margin: 8px 0; }
   .fld span { font-family: var(--mono); font-size: 13px; color: var(--ink-3);
               letter-spacing: .1em; }
-  .fld input { width: 100%; border: 1px solid var(--rule-2);
+  .fld input, .fld select { width: 100%; border: 1px solid var(--rule-2);
                background: var(--card); color: var(--ink);
                font-family: var(--mono); font-size: 14px; padding: 9px 10px;
                border-radius: 2px; outline: none; }
-  .fld input:focus { border-color: var(--ink-3);
+  .fld input:focus, .fld select:focus { border-color: var(--ink-3);
                      box-shadow: 0 0 0 2px rgba(90, 85, 74, .08); }
   .cur { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
          margin-left: 82px; letter-spacing: .04em; min-height: 14px; }
@@ -622,6 +622,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
       <div class="fld-l">AI 模型</div>
       <label class="fld"><span>API Key</span><input id="sKey" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}></label>
       <div class="cur" id="curKey"></div>
+      <label class="fld"><span>模型</span><select id="sModel" aria-label="选择 AI 模型" ${demo ? "disabled" : ""}></select></label>
+      <div class="cur" id="curModel"></div>
       <div class="diagrow"><button class="tbtn" id="testDeepseek" type="button" ${demo ? "disabled" : ""}>检测模型连接</button><span class="diagstate" id="diagDeepseek"></span></div>
       <div class="setnote">不需要修改的项目请留空。教务账号和 API Key 仅加密保存在当前电脑。</div>
       <div class="setmsg" id="setMsg"></div>
@@ -1245,6 +1247,8 @@ const overlay = document.getElementById("overlay");
 const sUser = document.getElementById("sUser");
 const sPass = document.getElementById("sPass");
 const sKey = document.getElementById("sKey");
+const sModel = document.getElementById("sModel");
+const curModel = document.getElementById("curModel");
 const setMsg = document.getElementById("setMsg");
 const reminderOverlay = document.getElementById("reminderOverlay");
 const reminderMsg = document.getElementById("reminderMsg");
@@ -1362,12 +1366,37 @@ function runDiagnostic(target, buttonId, stateId) {
 document.getElementById("testJwgl").addEventListener("click", () => runDiagnostic("jwgl", "testJwgl", "diagJwgl"));
 document.getElementById("testDeepseek").addEventListener("click", () => runDiagnostic("deepseek", "testDeepseek", "diagDeepseek"));
 
+/* ── 模型下拉：候选由后端给（该 Key 实际可用的型号），拉不到时是内置兜底清单 ── */
+function fillModels(options, current, message) {
+  const list = Array.isArray(options) ? options : [];
+  const keep = sModel.value;
+  sModel.textContent = "";
+  const hold = document.createElement("option");
+  hold.value = "";
+  hold.textContent = current ? "不修改（当前 " + current + "）" : "不修改";
+  sModel.appendChild(hold);
+  for (const m of list) {
+    if (!m || typeof m.id !== "string") continue;
+    const opt = document.createElement("option");
+    opt.value = m.id;
+    opt.textContent = (m.label || m.id) + "（" + m.id + "）";
+    if (m.note) opt.title = m.note;
+    sModel.appendChild(opt);
+  }
+  sModel.value = keep && list.some((m) => m && m.id === keep) ? keep : "";
+  const picked = list.filter((m) => m && m.id === current)[0];
+  let note = "当前：" + ((picked && picked.label) || current || "未设置");
+  if (picked && picked.note) note += " · " + picked.note;
+  if (message) note += " · " + message;
+  curModel.textContent = note;
+}
+
 function showSettings() {
   overlay.hidden = false;
   closeDrawer();
   setMsg.className = "setmsg";
   setMsg.textContent = "";
-  sPass.value = ""; sKey.value = "";
+  sPass.value = ""; sKey.value = ""; sModel.value = "";
   document.getElementById("diagJwgl").textContent = "";
   document.getElementById("diagDeepseek").textContent = "";
   refreshReminders(); refreshData();
@@ -1383,8 +1412,14 @@ function showSettings() {
       ? "已保存：" + (d.deepseek.masked || "API Key") + " · " + d.deepseek.sourceLabel + " · " + d.model
       : "尚未配置 API Key · 当前模型 " + d.model;
     sKey.placeholder = "sk-…；留空不修改";
+    fillModels(d.models, d.model, "");
     (d.jwgl.configured ? sPass : sUser).focus();
   }).catch(() => { setMsg.textContent = "无法读取设置，请确认本地服务正在运行。"; });
+  // 清单以该 Key 实际可用的型号为准；服务端 10 分钟内走缓存，不重复联网
+  fetch("/api/models").then((r) => r.json()).then((m) => {
+    if (!m || !Array.isArray(m.options)) return;
+    fillModels(m.options, m.current, m.source === "live" ? "" : m.message);
+  }).catch(() => {});
 }
 function hideSettings() { overlay.hidden = true; }
 document.getElementById("openSettings").addEventListener("click", showSettings);
@@ -1429,6 +1464,7 @@ document.getElementById("saveSettings").addEventListener("click", () => {
     return;
   }
   if (k) body.apiKey = k;
+  if (sModel.value) body.model = sModel.value;
   if (!Object.keys(body).length) {
     setMsg.className = "setmsg";
     setMsg.textContent = "没有需要保存的修改；可以直接使用上方连接检测。";
@@ -1454,6 +1490,8 @@ document.getElementById("saveSettings").addEventListener("click", () => {
       document.getElementById("curKey").textContent = d.status.deepseek.configured
         ? "已保存：" + (d.status.deepseek.masked || "API Key") + " · " + d.status.deepseek.sourceLabel + " · " + d.status.model
         : "尚未配置 API Key · 当前模型 " + d.status.model;
+      sModel.value = "";
+      fillModels(d.status.models, d.status.model, "");
     }
   }).catch(() => {
     saveBtn.disabled = false;

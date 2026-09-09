@@ -21,20 +21,26 @@ const deepseek = createDeepSeek({
   ...(config.deepseekBaseUrl ? { baseURL: config.deepseekBaseUrl } : {}),
 });
 
-/** 包装模型：每次调用捕获完整对话（短期记忆的数据源） */
-const model = wrapLanguageModel({
-  model: deepseek(config.model),
-  middleware: {
-    wrapGenerate: async ({ doGenerate, params }) => {
-      captureSessionPrompt(params.prompt);
-      return doGenerate();
+/**
+ * 包装模型：每次调用捕获完整对话（短期记忆的数据源）。
+ * 每次组装 agent 时重新取 config.model——设置弹窗换型号后重建的 agent 才会用新模型；
+ * Key 不需要这里处理（AI SDK 每次请求实时读 DEEPSEEK_API_KEY）。
+ */
+function buildWrappedModel() {
+  return wrapLanguageModel({
+    model: deepseek(config.model),
+    middleware: {
+      wrapGenerate: async ({ doGenerate, params }) => {
+        captureSessionPrompt(params.prompt);
+        return doGenerate();
+      },
+      wrapStream: async ({ doStream, params }) => {
+        captureSessionPrompt(params.prompt);
+        return doStream();
+      },
     },
-    wrapStream: async ({ doStream, params }) => {
-      captureSessionPrompt(params.prompt);
-      return doStream();
-    },
-  },
-});
+  });
+}
 
 function buildBasePrompt(enableGrab: boolean): string {
   const grabCapability = enableGrab
@@ -182,7 +188,7 @@ export async function createRaptorAgent(channel?: "qq") {
     .join("\n\n");
 
   return new ToolLoopAgent({
-    model,
+    model: buildWrappedModel(),
     instructions,
     tools: raptorTools,
   });

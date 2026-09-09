@@ -36,6 +36,13 @@ import {
 import { config } from "../config";
 import { saveCredentialsStore } from "../credentials";
 import { generatedDir } from "../document/save";
+import {
+  allowedModelIds,
+  cachedModelOptions,
+  invalidateModelCache,
+  listModelOptions,
+  validateModelChoice,
+} from "../models";
 import { getDeepSeekKeyStatus, setDeepSeekApiKey } from "../onboarding";
 import { getCookie } from "../tools/session";
 import { chatPage } from "./chat-page";
@@ -95,6 +102,28 @@ let agentProvider: (() => ChatStreamableAgent | null) | null = null;
 /** 主程序在 agent 就绪后注入；网页先于 agent 可用也无妨，来消息时才取 */
 export function setChatAgent(agent: ChatStreamableAgent | null): void {
   agentProvider = agent ? () => agent : null;
+}
+
+/** 换模型后重建 agent 的钩子（模型在组装时绑定，不重建就只能重启） */
+let agentRefresher: (() => Promise<void>) | null = null;
+
+export function setChatAgentRefresher(refresh: () => Promise<void>): void {
+  agentRefresher = refresh;
+}
+
+/** 重建串行链：连续保存两次模型也不会并发建两个 agent */
+let refreshChain: Promise<string> = Promise.resolve("");
+
+/** 重建对话引擎，返回给用户看的生效说明 */
+async function refreshChatAgent(): Promise<string> {
+  if (!agentRefresher) return "；本次未能即时切换，重启后生效";
+  try {
+    await agentRefresher();
+    return "；下一条消息起生效（终端界面重启后生效）";
+  } catch {
+    // 重建失败时旧 agent 仍在位，对话不会中断
+    return "；即时切换失败，旧模型继续可用，重启后生效";
+  }
 }
 
 let runningUrl: string | null = null;
@@ -340,6 +369,8 @@ function settingsPayload() {
     },
     deepseek: { ...ds, sourceLabel: SOURCE_LABEL[ds.source] ?? ds.source },
     model: config.model,
+    /** 下拉候选：只读同步缓存/兜底清单，联网刷新走 GET /api/models，别卡住弹窗 */
+    models: cachedModelOptions(),
   };
 }
 
@@ -447,6 +478,7 @@ function applySettings(body: Record<string, unknown>): {
   ok: boolean;
   results: SettingResult[];
   status: ReturnType<typeof settingsPayload>;
+  modelChanged: boolean;
 } {
   const results: SettingResult[] = [];
   const user = typeof body.jwglUsername === "string" ? body.jwglUsername.trim() : "";
@@ -466,11 +498,37 @@ function applySettings(body: Record<string, unknown>): {
   if (key) {
     const r = setDeepSeekApiKey(key);
     results.push({ field: "apiKey", ok: r.ok, message: r.message.replace(/^[✅❌]\s*/, "") });
+    // 可用型号跟 Key 走：换 Key 后旧清单作废，下次打开弹窗重新拉
+    if (r.ok) invalidateModelCache();
+  }
+  let modelChanged = false;
+  const requestedModel = typeof body.model === "string" ? body.model.trim() : "";
+  if (requestedModel) {
+    const allowed = allowedModelIds(
+      cachedModelOptions().map((m) => m.id),
+      [config.model],
+    );
+    const r = validateModelChoice({ requested: requestedModel, allowed, current: config.model });
+    if (r.ok && r.model === config.model) {
+      results.push({ field: "model", ok: true, message: "所选模型已是当前值，无需切换" });
+    } else {
+      results.push({ field: "model", ok: r.ok, message: r.message });
+      if (r.ok) {
+        config.model = r.model;
+        saveCredentialsStore({ model: r.model, modelOverride: true });
+        modelChanged = true;
+      }
+    }
   }
   if (!results.length) {
     results.push({ field: "none", ok: true, message: "没有需要保存的修改" });
   }
-  return { ok: results.every((r) => r.ok), results, status: settingsPayload() };
+  return {
+    ok: results.every((r) => r.ok),
+    results,
+    status: settingsPayload(),
+    modelChanged,
+  };
 }
 
 async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
@@ -522,6 +580,23 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     }
     if (url === "/api/settings") {
       json(res, settingsPayload());
+      return;
+    }
+    if (url === "/api/models" || url.startsWith("/api/models?")) {
+      // 弹窗打开后异步刷新：清单以该 Key 实际可用的型号为准
+      const force = new URL(url, "http://127.0.0.1").searchParams.get("refresh") === "1";
+      const list = await listModelOptions({
+        baseUrl: config.deepseekBaseUrl,
+        apiKey: config.deepseekApiKey,
+        force,
+      });
+      json(res, {
+        ok: list.source === "live",
+        current: config.model,
+        source: list.source,
+        options: list.options,
+        message: list.message ?? "",
+      });
       return;
     }
     if (url === "/api/reminders") {
@@ -616,6 +691,14 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         return;
       }
       const r = applySettings(body ?? {});
+      if (r.modelChanged) {
+        // 串行重建：并发保存时不能让两个 agent 互相覆盖
+        const note = await (refreshChain = refreshChain
+          .then(refreshChatAgent)
+          .catch(() => "；即时切换失败，旧模型继续可用，重启后生效"));
+        const line = r.results.find((item) => item.field === "model");
+        if (line) line.message += note;
+      }
       json(res, r, r.ok ? 200 : 400);
       return;
     }

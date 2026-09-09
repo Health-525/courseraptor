@@ -376,6 +376,18 @@ test("GET /api/settings 只回脱敏状态，不吐明文密钥", async () => {
   assert.ok(!("password" in s.jwgl), "不得返回教务密码");
   assert.equal(typeof s.deepseek.configured, "boolean");
   assert.ok(!("key" in s.deepseek) && !("apiKey" in s.deepseek), "不得返回完整 Key");
+  // 模型下拉候选随设置一起回：这里绝不联网（弹窗不能因为等远端而卡住），
+  // 没有实时缓存时必须是内置兜底清单
+  assert.ok(Array.isArray(s.models) && s.models.length >= 2, "models 必须是非空候选清单");
+  assert.ok(
+    s.models.every(
+      (m: { id?: unknown; label?: unknown }) =>
+        typeof m.id === "string" && typeof m.label === "string",
+    ),
+    "候选项必须同时有 id 与展示名",
+  );
+  const ids = s.models.map((m: { id: string }) => m.id);
+  assert.equal(new Set(ids).size, ids.length, "候选清单不得出现重复型号");
   const fullKey = process.env.DEEPSEEK_API_KEY;
   if (fullKey) {
     assert.ok(!JSON.stringify(s).includes(fullKey), "响应任意位置都不得出现完整 Key");
@@ -395,7 +407,7 @@ test("default 会话可被侧栏点击读取（id 白名单必须放行字母）
   assert.equal(res.status, 200, "GET default 档不得 404（曾致点击无反应）");
 });
 
-test("POST /api/settings：坏格式 Key 与半套教务凭证都被拒且不落盘", async () => {
+test("POST /api/settings：坏格式 Key、半套教务凭证、清单外模型都被拒且不落盘", async () => {
   const url = (await startChatWeb())!;
   const call = (body: unknown) =>
     fetch(`${url}/api/settings`, {
@@ -403,6 +415,7 @@ test("POST /api/settings：坏格式 Key 与半套教务凭证都被拒且不落
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
+  const readModel = async () => (await (await fetch(`${url}/api/settings`)).json()).model as string;
 
   const r1 = await call({ apiKey: "not-a-valid-key" });
   assert.equal(r1.status, 400);
@@ -418,6 +431,18 @@ test("POST /api/settings：坏格式 Key 与半套教务凭证都被拒且不落
   // 空提交视为无修改（200），同样不应产生任何写入
   const r3 = await call({});
   assert.equal(r3.status, 200);
+
+  // 模型只许从下拉清单里选：形状合法但清单外的、以及含非法字符的，一律拒绝
+  const before = await readModel();
+  const r4 = await call({ model: "gpt-not-deepseek-9x7" });
+  assert.equal(r4.status, 400);
+  const rejected = (await r4.json()).results.find((x: { field: string }) => x.field === "model");
+  assert.equal(rejected.ok, false);
+  assert.match(rejected.message, /下拉列表/);
+
+  const r5 = await call({ model: "../../etc/passwd" });
+  assert.equal(r5.status, 400);
+  assert.equal(await readModel(), before, "被拒的模型选择不得改动运行时配置");
 });
 
 /** 桩 agent 收到的 messages，供「思考不进上下文」那条测试回看 */

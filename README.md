@@ -245,7 +245,7 @@ npm run publish -- major "更新说明"          # 0.1.0 -> 1.0.0
 |---|---|
 | `DEEPSEEK_API_KEY` | DeepSeek API Key（或启动后对话里输入 `/key sk-你的Key` 配置，加密保存、立即生效） |
 | `JWGL_USERNAME` / `JWGL_PASSWORD` | 教务系统学号 / 密码（可选；留空则首次启动引导录入并 AES-256-GCM 加密保存） |
-| `RAPTOR_MODEL` | 模型，默认 `deepseek-v4-flash`，可选 `deepseek-v4-pro`（可选） |
+| `RAPTOR_MODEL` | 模型，默认 `deepseek-v4-flash`，可选 `deepseek-v4-pro`；网页「账号与模型」里选过的型号加密保存并优先于此项 |
 | `RAPTOR_ENABLE_GRAB` | 抢课模式开关：选课季设 `1` 启用抢课/盯课工具，平时留空（默认） |
 | `RAPTOR_TUI_INLINE` | 设 `1` 让终端默认走行内渲染（输出顺命令行下滚、滚轮/选中复制可用），等价对话里的 `/inline` |
 | `RAPTOR_WEB_PORT` | 网页版端口，默认 `3210`（被占用时自动选空闲端口，以终端提示为准） |

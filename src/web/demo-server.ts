@@ -318,6 +318,15 @@ export function createDemoServer(): http.Server {
           jwgl: { configured: false, username: "", sourceLabel: "演示模式" },
           deepseek: { configured: false, masked: "", sourceLabel: "演示模式" },
           model: "离线固定回答",
+          models: [],
+        });
+      } else if (req.method === "GET" && url.startsWith("/api/models")) {
+        json(res, {
+          ok: false,
+          current: "离线固定回答",
+          source: "fallback",
+          options: [],
+          message: "演示模式不联网，无可选型号",
         });
       } else if (req.method === "GET" && url === "/api/reminders") {
         json(res, { reminders: [] });
