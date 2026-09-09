@@ -175,8 +175,10 @@ npm run qq
 
 任何人均可下载安装包并自行配置所需凭证：
 
-1. 装 [Node.js](https://nodejs.org/zh-cn) LTS（装过可跳过）
-2. 解压 zip，双击里面的 **`start.bat`**（首次自动装依赖并引导配置）
+1. 到 [Releases](https://github.com/Health-525/courseraptor/releases/latest) 下载文件名带 **`portable-win-x64`** 的那个 zip（约 112MB，已内置 Node 运行时，**不用装 Node.js、也不用联网装依赖**）。别下页面最底部 GitHub 自动生成的 Source code 包，那只是源码快照。
+2. 右键 zip →「全部解压缩」，双击解压出来文件夹里的 **`start.bat`**（首次会引导录入教务账号和 DeepSeek API Key，加密存在本机，之后免填）。
+
+> 双击没反应或被拦截：包里的 `runtime\node.exe` 是 Node 官方运行时、未做代码签名，SmartScreen 弹窗选「更多信息 → 仍要运行」，或把解压出的 `CourseRaptor` 文件夹加入杀软信任区。
 
 ### 方式二：git 克隆（开发者）
 
