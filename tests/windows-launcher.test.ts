@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -67,17 +67,24 @@ test("start.bat 能被 cmd 完整解析（不被行尾/编码打断）", {
 
   const dir = path.join(os.tmpdir(), `raptor-bat-${Date.now()}`);
   mkdirSync(dir, { recursive: true });
-  const file = path.join(dir, "start.bat");
-  writeFileSync(file, stubbed, "utf8");
-  let stderr = "";
   try {
-    execFileSync("cmd.exe", ["/c", file], { stdio: ["ignore", "ignore", "pipe"], timeout: 60_000 });
-  } catch (error) {
-    stderr = String((error as { stderr?: Buffer }).stderr ?? "");
+    const file = path.join(dir, "start.bat");
+    writeFileSync(file, stubbed, "utf8");
+    let stderr = "";
+    try {
+      execFileSync("cmd.exe", ["/c", file], {
+        stdio: ["ignore", "ignore", "pipe"],
+        timeout: 60_000,
+      });
+    } catch (error) {
+      stderr = String((error as { stderr?: Buffer }).stderr ?? "");
+    }
+    assert.doesNotMatch(
+      stderr,
+      /is not recognized|不是内部或外部命令|命令语法不正确/,
+      `cmd 解析被打断：${stderr}`,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true }); // 断言失败也不把临时目录留给下一次
   }
-  assert.doesNotMatch(
-    stderr,
-    /is not recognized|不是内部或外部命令|命令语法不正确/,
-    `cmd 解析被打断：${stderr}`,
-  );
 });
