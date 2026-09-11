@@ -33,7 +33,7 @@ npm test
 
 ## 评审说明
 
-说明原问题、最终行为、验证方式和已知限制。网页变化附虚构数据截图；学校接口变化附脱敏后的最小样例。新能力同时更新[能力参考](docs/capabilities.md)和[路线图](docs/roadmap.md)，不要将规划标为已上线。
+说明原问题、最终行为、验证方式和已知限制。网页变化附虚构数据截图；学校接口变化附脱敏后的最小样例。新能力同时更新[功能参考](docs/features.md)和[路线图](docs/roadmap.md)，不要将规划标为已上线。
 
 CI 配置位于 `.github/workflows/ci.yml`。远程检查是否通过，以实际 GitHub Actions 运行结果为准。
 

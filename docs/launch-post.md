@@ -1,44 +1,44 @@
-# 🦖 CourseRaptor：教务琐事，一句话。
+# 我给大学教务系统做了一个 AI Agent
 
-欢迎来到 CourseRaptor！这是面向南京工业大学同学的开源教务 AI 助手。
+查课表、查成绩、找考试安排、翻教务通知、把课表导进手机日历——这些事每一件都不难，但它们分散在不同页面、不同文件和不同时间点。
 
-早八在哪上、最近什么时候考试、通识修了哪些类别、教务通知要做什么——可以直接在浏览器或终端里提问。
+我最开始只是想少点几次教务系统菜单。后来它慢慢变成了一个能对话的工具：问一句“明天有什么课”“最近有什么和我有关的通知”“帮我导出到手机日历”，它会调用相应能力，把结果组织回来。
 
-![CourseRaptor](https://raw.githubusercontent.com/Health-525/courseraptor/master/docs/social-preview.jpg)
+这就是我开源的 [CourseRaptor](https://github.com/Health-525/courseraptor)。
 
-## 先体验，再配置
+![CourseRaptor 15 秒演示](demo.gif)
 
-准备 Node.js 24 或更高版本，下载项目后，在项目目录运行：
+## 它目前能做什么
 
-```bash
-npm ci
-npm run demo
+- 查询课表、成绩/GPA、考试、学籍和选课状态。
+- 阅读教务通知与附件，筛选 Excel/CSV，整理文档内容。
+- 生成课表或考试 `.ics`，再导入手机日历。
+- 生成 Word、Excel、PPT、PDF 等学生常用交付物。
+- 通过短期会话和长期记忆记住偏好；可从 Web、CLI 或可选 QQ 入口使用。
+
+完整功能和边界在仓库的 [功能参考](features.md) 中。演示里的数据全部是虚构的，没有使用任何学生账号、成绩或通知。
+
+## 我发现了一个更大的问题
+
+现在 CourseRaptor 的教务集成只支持南京工业大学（NJTECH）。但“课表、成绩、考试、通知散落在校园系统里”的问题，几乎每所学校都有。
+
+因此下一步不是马上宣称“支持全校”，而是把现有学校实现提炼为 **Campus Agent + University Adapter**：通用层负责对话、记忆、日历、文件和界面；学校层只处理认证与各自的课表、成绩、考试、通知数据。
+
+```text
+CourseRaptor Agent
+       │
+University Adapter
+  ┌────┴─────┐
+NJTECH     Your university
+  ✅             🧩
 ```
 
-演示默认打开 `http://127.0.0.1:3211`，无需教务账号或 API Key。全部为虚构数据和固定示例回答，不调用模型或学校接口。
+我把目标接口、测试原则和隐私边界写在了 [Bring CourseRaptor to Your University](writing-an-adapter.md) 里。第一版只关注 3～5 个只读能力，不做替用户提交选课或其他教务申请。
 
-正式使用运行 `npm start`，Windows 也可以双击 `start.bat`，按提示配置自己的教务账号和 DeepSeek API Key。
+## 如果你也想接入自己的学校
 
-## 这次完善了什么
+欢迎提一个 [University Adapter Issue](https://github.com/Health-525/courseraptor/issues/new?template=university_adapter.yml)，说说你的学校、系统类型（如果已知）和最想先解决的学生场景。
 
-- 学业概览：已获学分、未通过课程、待确认课程。
-- 修正未知成绩、未通过通识课程与重修记录的统计问题。
-- 免账号离线演示、启动自检和更清晰的学生使用指南。
-- 安装包排除本地个人数据，更新时保护聊天、附件和个人校历。
-- 更直观的中英文 README、功能路线图和反馈表单。
+请不要提供账号、密码、Cookie、成绩单或只在登录后可访问的材料。我们会先用公开资料和脱敏 fixture 建立可测试边界，再讨论具体实现。
 
-正式对话会把提问与所需查询结果发送到模型服务，可能产生 API 费用。项目为非官方个人工具，当前仅适配南京工业大学。学分要求、考试安排和通知截止日期请以本人教务记录和学校原文为准。
-
-## 想听听你最需要什么
-
-欢迎在这条讨论下面分享：
-
-1. 你最想让它帮忙解决的教务琐事是什么？
-2. 安装、配置或第一次提问，哪一步最不顺手？
-3. 今日日程、截止提醒、变更提示、学分核对，你更想先用到哪个？
-
-请勿上传学号、成绩单、密码、Key 或完整日志。可复现错误请使用 [Issue 表单](https://github.com/Health-525/courseraptor/issues/new/choose)。
-
-[开始使用](https://github.com/Health-525/courseraptor#readme) · [同学指南](https://github.com/Health-525/courseraptor/blob/master/docs/student-guide.md) · [路线图](https://github.com/Health-525/courseraptor/blob/master/docs/roadmap.md) · [参与贡献](https://github.com/Health-525/courseraptor/blob/master/CONTRIBUTING.md)
-
-如果确实帮到了你，欢迎 Star，或者把仓库地址分享给同学，让对方配置自己的账号。
+我很好奇这条 Adapter 路线能不能让 CourseRaptor 从“某个学校的工具”，逐渐变成一个别人也愿意参与的开源校园 Agent。

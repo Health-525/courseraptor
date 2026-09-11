@@ -144,12 +144,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             border-bottom: 1px solid var(--rule); background: var(--paper-deep); }
   .topbar .tb-title { margin-right: auto; font-size: 18px; }
   .topbar .tbtn { min-height: 34px; padding: 5px 11px; font-size: 13px; }
-  .demo-banner { display: flex; align-items: baseline; gap: 12px;
-                 padding: 12px 32px; border-bottom: 1px solid var(--rule);
-                 background: var(--accent-soft); color: var(--accent-deep);
-                 font-size: 14px; line-height: 1.55; }
-  .demo-banner strong { flex: none; font-size: 14px; }
-  .demo-banner span { color: var(--ink-2); }
   #log { flex: 1; min-height: 0; overflow-y: auto; padding: 44px 40px 36px; }
   .inner { width: min(100%, 800px); min-height: 100%; margin: 0 auto; }
 
@@ -514,7 +508,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     body.drawer-open aside { transform: translateX(0); }
     body.drawer-open .drawer-backdrop { display: block; }
     .topbar { display: flex; }
-    .demo-banner { padding: 10px 16px; }
     #log { padding: 28px 20px 24px; }
     form { padding: 11px 16px 10px; }
     .quickbar { margin-bottom: 8px; }
@@ -525,8 +518,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .topbar { min-height: 54px; padding: 8px 12px; gap: 7px; }
     .topbar .tb-title { font-size: 17px; }
     .topbar .tbtn { min-height: 32px; padding: 4px 9px; font-size: 12px; }
-    .demo-banner { display: block; padding: 9px 14px; font-size: 12px; }
-    .demo-banner strong { display: block; margin-bottom: 2px; font-size: 13px; }
     #log { padding: 22px 15px 18px; }
     .hero { justify-content: center; padding: 32px 4px 48px; }
     .hero .seal { width: 92px; height: 92px; margin-bottom: 22px; }
@@ -574,7 +565,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   <button class="tbtn foot-btn" id="openSettings" title="管理教务账号与 AI 模型">账号与模型</button>
 </aside>
 <main>
-  ${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 全部为虚构数据</strong><span>不连接教务或 AI，不保存到磁盘。请勿输入个人信息。正式使用请在终端运行 npm start。</span></div>' : ""}
   <div class="topbar">
     <span class="tb-title wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></span>
     <a class="tbtn" href="/today">今日</a>

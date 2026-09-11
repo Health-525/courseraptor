@@ -6,8 +6,8 @@ const ROOT_FILES = new Set([
 ]);
 const CODE_DIRS = new Set(["src", "bin", "scripts", "tests", "server"]);
 const DOC_FILES = new Set([
-  "courseraptor-logo.png", "courseraptor-mascot.png", "screenshot-demo.jpg",
-  "student-guide.md", "configuration.md", "capabilities.md", "roadmap.md", "promotion.md",
+  "courseraptor-logo.png", "courseraptor-mascot.png", "demo.gif",
+  "student-guide.md", "configuration.md", "features.md", "roadmap.md", "promotion.md", "writing-an-adapter.md",
   "maintainers.md", "hero-banner.png", "social-preview.jpg", "brand-prompt.md", "github-best-practices.md", "launch-post.md",
 ]);
 
