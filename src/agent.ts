@@ -46,12 +46,14 @@ function buildBasePrompt(enableGrab: boolean): string {
   const grabCapability = enableGrab
     ? `- watch_courses：盯课（限时监控余量变化，不提交）
 - grab_course：抢课（单目标，自动提交选课，真实操作！）
-- grab_plan：分类抢课计划（每类抢到一门即停、绝不重复抢同类学分、满员自动切备选）`
+- grab_plan：分类抢课计划（每类抢到一门即停、绝不重复抢同类学分、满员自动切备选）
+- drop_course：退课（真实退课操作！用户明确点名才可退，绝不批量）`
     : "";
   const grabRule = enableGrab
     ? `## 抢课注意（仅选课季生效）
 
 - grab_course / grab_plan 是真实选课操作：调用前必须复述目标课程让用户确认，除非本轮已明确指示。
+- drop_course 是真实退课操作：必须用户明确点名要退的课程才可调用。工具匹配到多门或多教学班时会拒绝提交并返回明细，原样转述让用户指认，绝不替用户猜。
 - 盯课/抢课耗时较长（默认 60-120 秒），调用前告知用户预计耗时。`
     : "";
 
@@ -63,6 +65,7 @@ function buildBasePrompt(enableGrab: boolean): string {
 - check_selection_status：查选课模块状态（是否开放、接口是否被拦截）
 - search_courses：按关键词搜课程、查余量
 - search_classes：查某门课所有教学班明细（各班教师/时间/地点/余量对比）
+- list_choosed_courses：查本轮已选课程（选课模块维度；抢课成功后核对选没选上、退课前看现状）
 ${grabCapability}
 
 教务查询：

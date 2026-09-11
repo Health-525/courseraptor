@@ -1,12 +1,12 @@
 /**
  * CourseRaptor agent 工具集（聚合层）
- * 28 个工具按领域拆分到独立模块，本文件只负责合并与抢课开关过滤。
+ * 30 个工具按领域拆分到独立模块，本文件只负责合并与抢课开关过滤。
  *
  * 模块划分：
  * - schedule.ts        课表 / 校历（2）
  * - grades.ts          成绩 / 考试 / 实验成绩（3）
  * - student.ts         学籍 / 已选 / 重修（3）
- * - course-selection.ts 选课查询 / 盯课 / 抢课（6，含抢课循环）
+ * - course-selection.ts 选课查询 / 盯课 / 抢课 / 退课（8，含抢课循环）
  * - news.ts            通知列表 / 正文 / 附件（3，含相关性评分）
  * - files.ts           本地文件 / 表格查询 / 沙箱 JS / 附件管理（4）
  * - document.ts        文档生成 / 格式转换（2）
@@ -45,7 +45,7 @@ const raptorToolsAll = {
 
 // 抢课相关工具按开关条件构建，而不是全建好再 delete——
 // 之前 raptorTools 的类型内容和运行时内容不一致，TS 完全帮不上忙。
-const GRAB_TOOLS = ["watch_courses", "grab_course", "grab_plan"] as const;
+const GRAB_TOOLS = ["watch_courses", "grab_course", "grab_plan", "drop_course"] as const;
 
 export const raptorTools: typeof raptorToolsAll = config.enableGrab
   ? raptorToolsAll
