@@ -10,7 +10,7 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
   const base = `http://127.0.0.1:${address.port}`;
   try {
     const html = await (await fetch(base)).text();
-    assert.doesNotMatch(html, /class="demo-banner"/);
+    assert.match(html, /离线演示 · 全部为虚构数据/);
     assert.match(html, /id="openSettings"/);
     assert.match(html, /id="sUser"[^>]+disabled/);
     assert.match(html, /id="sModel"[^>]+disabled/);
@@ -66,7 +66,7 @@ test("演示模式的本周课表页：内嵌虚构数据，不发请求", async
     assert.equal(res.status, 200);
     const html = await res.text();
     assert.match(html, /本周课表/);
-    assert.doesNotMatch(html, /class="demo-banner"/);
+    assert.match(html, /离线演示 · 虚构数据/);
     // 演示数据内嵌（DEMO_DATA 非空），页面不依赖 /api/today
     assert.match(html, /const DEMO_DATA = \{/);
     assert.match(html, /示例高等数学/);

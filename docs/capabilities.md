@@ -1,4 +1,4 @@
-# 功能参考
+# 能力参考
 
 [返回 README](../README.md) · [学生使用指南](student-guide.md)
 

@@ -1,94 +1,84 @@
 <div align="center">
 
-<img src="docs/courseraptor-logo.png" width="150" alt="CourseRaptor logo" />
+<img src="docs/courseraptor-logo.png" width="160" alt="CourseRaptor logo: a flat three-color raptor with round glasses" />
 
-# 🦖 CourseRaptor
+# CourseRaptor
 
-### An open-source Campus Agent for university life.
+### Less time navigating academic portals. More time for student life.
 
-Schedules · grades · exams · notices · calendars · files · long-term memory — in one conversation.
+**An open-source academic AI assistant for Nanjing Tech University students.**
 
-> **Currently supports NJTECH.** We're building an adapter architecture for more universities.
+[简体中文](README.md) · **English**
 
-**English** · [简体中文](README.md) · [Features](docs/features.md) · [Contributing](CONTRIBUTING.md)
+[![Checks](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml) [![ISC License](https://img.shields.io/badge/License-ISC-8f2b21)](LICENSE) [![Node 24+](https://img.shields.io/badge/Node.js-24%2B-8f2b21?logo=nodedotjs&logoColor=white)](https://nodejs.org/en/download)
 
-[![ISC License](https://img.shields.io/badge/License-ISC-8f2b21)](LICENSE)
-[![Node 24+](https://img.shields.io/badge/Node.js-24%2B-8f2b21?logo=nodedotjs&logoColor=white)](https://nodejs.org/en/download)
+[Try the demo](#try-it-without-credentials) · [Discuss](https://github.com/Health-525/courseraptor/discussions) · [Contribute](CONTRIBUTING.md)
 
 </div>
 
-## Demo
+CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Use the browser or terminal, with an optional QQ bot connection.
 
-![15-second demo: ask about a schedule, relevant notices, and calendar export](docs/demo.gif)
+**The current academic-system integration supports Nanjing Tech University only.** This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project.
 
-*Every course and notice in this recording is fictional. It contains no student credentials, API keys, or real academic data.*
+## What it does
 
-## Why CourseRaptor?
-
-Campus information is scattered across academic portals, announcement pages, files, and calendars. CourseRaptor connects those tasks to a local conversational Agent: ask what is on tomorrow's schedule, which notices need action, or export an academic calendar without navigating a maze of menus.
-
-It is broader than a timetable lookup script. The project combines academic queries, notice and file handling, document generation, calendar exports, and durable preferences across Web, CLI, and an optional QQ bot.
-
-## Features
-
-| Need | Available capability |
+| Student question | Available capability |
 |---|---|
-| Academic information | Schedules, grades/GPA, exams, student profile, enrolled courses, and enrollment status |
-| Notices and files | University notices and attachments; paged documents and structured Excel/CSV queries |
-| Time and calendar | Teaching weeks, recorded holidays and make-up days, weather, `.ics` schedules and exams |
-| Student deliverables | Generate or convert Word, Excel, PowerPoint, and PDF files locally |
-| Personalization | Short-term conversations and long-term memory; optional QQ bot entry point |
+| Where are my classes this week? | Timetables by semester and teaching week, including odd/even weeks and recorded schedule adjustments |
+| How am I doing academically? | GPA, earned credits, failed courses, and grades requiring confirmation |
+| Which general elective categories have I covered? | Passed-course category summaries to help check your own curriculum requirements |
+| When are my exams? | Exam subjects, dates, times, rooms, and seat information |
+| What does this announcement require me to do? | Announcement lists, full text, and supported attachments |
+| Can I use my phone calendar? | Local `.ics` export; optional publication to a public GitHub/Gitee subscription source |
+| Can I turn this material into a document? | Local document/table reading and Word, Excel, PowerPoint, and PDF generation |
 
-See the [feature reference](docs/features.md) for the complete tool catalog, limitations, and configuration details.
+![Real browser UI displaying a fictional timetable in offline demo mode](docs/screenshot-demo.jpg)
 
-## Architecture
+## Try it without credentials
 
-```text
-Web / CLI / QQ
-      │
-CourseRaptor Agent ── tools · memory · files · calendars
-      │
-University integration
-      ├── NJTECH  ✅ supported today
-      └── Your university  🧩 adapter architecture in progress
-```
-
-The current university integration is in [`src/jwgl/`](src/jwgl/). The intended Adapter boundary isolates university login, schedules, grades, exams, and notices so each integration can be implemented and tested independently. Read [Bring CourseRaptor to Your University](docs/writing-an-adapter.md) for the design direction.
-
-## Quick Start
-
-### Windows portable package
-
-Download the **`portable-win-x64`** zip from [Releases](https://github.com/Health-525/courseraptor/releases/latest), extract it, and run `start.bat`. It includes the Node.js runtime. Configure your own academic account and model API key only when you begin live queries.
-
-### Development
+Install Node.js 24 or later, then:
 
 ```bash
 git clone https://github.com/Health-525/courseraptor.git
 cd courseraptor
 npm ci
 npm run doctor
-npm start
+npm run demo
 ```
 
-Node.js 24+ is required. Live mode sends prompts and relevant query results to your configured model provider and may incur API charges. Credentials stay with your own local instance. See [configuration](docs/configuration.md).
+Open the URL printed in the terminal, normally `http://127.0.0.1:3211`.
 
-## University Support
+The demo uses **fictional data and scripted responses**. It does not read personal credentials, contact the university or an AI provider, or persist conversations to disk. It demonstrates the interface, not live AI performance. Press `Ctrl+C` to stop.
 
-| University | Status | Notes |
-|---|---|---|
-| Nanjing Tech University (NJTECH) | ✅ Supported | The currently available academic-system integration |
-| Other universities | 🧩 Adapter architecture in progress | Please start by sharing the system type, public interface clues, and test scenarios |
+## Use your own academic account
 
-Two universities using the same vendor are not automatically compatible. Never share real accounts, cookies, grade reports, or private notice attachments. Each future university integration needs redacted fixtures and independent tests before it is listed as supported.
+Run `npm start`, or double-click `start.bat` on Windows. Follow the prompts to configure your own university credentials and DeepSeek API key. Provider API usage may incur charges.
 
-## Contributing
+The browser UI usually runs at `http://localhost:3210`; follow the actual startup address if that port is busy. Keep the terminal running. To change your API key securely, enter `/key` without arguments in the terminal.
 
-Want to bring CourseRaptor to your university, improve the student experience, or make the docs clearer? Begin with the [contribution guide](CONTRIBUTING.md), then open a reproducible issue, describe a student use case, or send a focused documentation improvement.
+## Boundaries that matter
 
-- [Feature reference](docs/features.md)
-- [Roadmap](docs/roadmap.md)
-- [Adapter design](docs/writing-an-adapter.md)
-- [Student guide](docs/student-guide.md)
+- Local hosting does **not** mean fully offline processing: prompts and relevant query results are sent to the configured model provider.
+- Category coverage is not a graduation audit. Check requirements for your own program and enrollment year.
+- Local calendar export does not require publication. The current subscription implementation publishes to a **public repository**, so confirm the disclosure of course locations and times.
+- QQ users share the configured university identity; the allowlist is not multi-student account isolation.
+- Real course-enrollment submission is disabled by default. Follow university rules and confirm actions before enabling it.
+- Planned reminders, schedule-change notifications, curriculum audits, and additional university integrations are **not yet implemented**.
 
-Released under the [ISC License](LICENSE). CourseRaptor is independent and is not officially affiliated with or endorsed by any university.
+Share the repository URL or an inspected clean installation package, never your used project directory. See [privacy and security](SECURITY.md).
+
+## Build with us
+
+TypeScript, Vercel AI SDK, DeepSeek, and a Node HTTP browser interface. University adapters live in `src/jwgl/`, tool schemas in `src/tools/`, and the production/demo shared view in `src/web/chat-page.ts`.
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+```
+
+[Contributing](CONTRIBUTING.md) · [Roadmap](docs/roadmap.md) · [Capabilities](docs/capabilities.md) · [Student guide](docs/student-guide.md)
+
+Found it useful? A star, a reproducible issue, or a concrete student use case helps the project improve.
+
+Released under the [ISC License](LICENSE). No official affiliation with or endorsement by Nanjing Tech University.

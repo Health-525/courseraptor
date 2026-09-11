@@ -84,6 +84,10 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
   .ph-week { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
   .ph-week .warn { color: var(--accent-deep); }
 
+  .demo-banner { padding: 10px 28px; border-bottom: 1px solid var(--rule);
+                 background: var(--accent-soft); color: var(--accent-deep); font-size: 14px; }
+  .demo-banner span { color: var(--ink-2); }
+
   /* ── 正文 ── */
   main { max-width: 1240px; margin: 0 auto; padding: 30px 22px 64px;
          display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 24px; align-items: start; }
@@ -181,6 +185,7 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
     <a class="tbtn" href="/">返回对话</a>
   </div>
 </header>
+${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 虚构数据</strong><span>不连接教务或 AI。正式使用请在终端运行 npm start。</span></div>' : ""}
 <main>
   <aside class="schedule-rail" aria-label="课表信息">
     <p class="rail-kicker">COURSE SCHEDULE</p>

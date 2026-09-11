@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const assets = ["index.html", "landing.css", "landing.js", "courseraptor-logo.png", "demo.gif", "social-preview.jpg", ".nojekyll"];
+const assets = ["index.html", "landing.css", "landing.js", "courseraptor-logo.png", "screenshot-demo.jpg", "social-preview.jpg", ".nojekyll"];
 const output = path.join(root, "dist");
 mkdirSync(output, { recursive: true });
 const html = readFileSync(path.join(root, "docs/index.html"), "utf8");

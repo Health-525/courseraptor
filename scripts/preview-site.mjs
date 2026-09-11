@@ -8,7 +8,7 @@ const files = new Map([
   ["/landing.css", ["landing.css", "text/css; charset=utf-8"]],
   ["/landing.js", ["landing.js", "text/javascript; charset=utf-8"]],
   ["/courseraptor-logo.png", ["courseraptor-logo.png", "image/png"]],
-  ["/demo.gif", ["demo.gif", "image/gif"]],
+  ["/screenshot-demo.jpg", ["screenshot-demo.jpg", "image/jpeg"]],
   ["/social-preview.jpg", ["social-preview.jpg", "image/jpeg"]],
 ]);
 http.createServer(async (req, res) => {
