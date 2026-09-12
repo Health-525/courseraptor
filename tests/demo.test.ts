@@ -13,7 +13,9 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
     assert.match(html, /离线演示 · 全部为虚构数据/);
     assert.match(html, /id="openSettings"/);
     assert.match(html, /id="sUser"[^>]+disabled/);
-    assert.match(html, /id="sModel"[^>]+disabled/);
+    // 型号改用卡片单选：hidden input 载值，无 disabled 属性可挂，演示拦截由脚本守卫实现
+    assert.match(html, /id="sModel"/);
+    assert.match(html, /dataset\.demo === "true"\) return;/);
     assert.equal((await fetch(`${base}/logo.png`)).status, 200);
     assert.equal((await fetch(`${base}/vendor/marked.min.js`)).status, 200);
     const send = (body: unknown) =>

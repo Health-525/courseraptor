@@ -378,46 +378,85 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .dlg { width: min(480px, 100%); background: var(--paper);
          border: 1px solid var(--rule-2); border-radius: 6px; overflow: hidden;
          box-shadow: 0 18px 60px rgba(38, 35, 29, 0.28); }
-  .dlg.wide { width: min(660px, 100%); max-height: min(820px, calc(100dvh - 40px));
+  .dlg.wide { width: min(680px, 100%); max-height: min(840px, calc(100dvh - 40px));
               display: flex; flex-direction: column; }
   .dlg.wide .dlg-body { overflow-y: auto; }
   .dlg-head { display: flex; align-items: center; justify-content: space-between;
-              padding: 14px 18px 8px; }
-  .dlg-head span { font-family: var(--kai); font-size: 21px;
-                   color: var(--accent); letter-spacing: 2px; }
-  .dclose { border: 0; background: none; color: var(--ink-3);
-            cursor: pointer; font-size: 15px; }
+              padding: 16px 22px 9px; }
+  .dlg-head span { font-family: var(--kai); font-size: 22px;
+                   color: var(--accent); letter-spacing: 3px; }
+  .dclose { border: 0; background: none; color: var(--ink-3); cursor: pointer;
+            font-size: 15px; padding: 2px 5px; border-radius: 3px; }
   .dclose:hover { color: var(--accent); }
-  .dlg-rule { border-bottom: 2px solid var(--accent); margin: 0 18px; }
-  .dlg-body { padding: 16px 18px 6px; }
+  .dlg-rule { border-bottom: 2px solid var(--accent); margin: 0 22px; }
+  .dlg-body { padding: 18px 22px 12px; }
   .dlg-intro { margin: 0 0 16px; color: var(--ink-2); font-size: 14px;
                line-height: 1.75; }
-  .fld-l { font-family: var(--mono); font-size: 12px; letter-spacing: .16em;
-           color: var(--ink-3); padding-bottom: 5px; margin: 16px 0 10px;
-           border-bottom: 1px solid var(--rule); }
-  .fld-l:first-child { margin-top: 0; }
-  .fld { display: grid; grid-template-columns: 72px 1fr; align-items: center;
-         gap: 10px; margin: 8px 0; }
-  .fld span { font-family: var(--mono); font-size: 13px; color: var(--ink-3);
-              letter-spacing: .1em; }
+
+  /* 办理区块：一张单子上的并列栏目，细线分格；栏目名用等宽小字，
+     栏目级动作（如“＋ 添加待办”）挂在头行右侧，与侧栏会话栏目的做法同构 */
+  .panel { border: 1px solid var(--rule); border-radius: 4px;
+           padding: 13px 15px 12px; margin: 0 0 14px; }
+  .panel-head { display: flex; align-items: baseline; justify-content: space-between;
+                gap: 10px; margin: 0 0 11px; padding-bottom: 7px;
+                border-bottom: 1px solid var(--rule); }
+  .panel-name { font-family: var(--mono); font-size: 12px; font-weight: 600;
+                letter-spacing: .18em; color: var(--ink-2); }
+  .panel-act { border: 0; background: none; padding: 0; cursor: pointer;
+               font-family: var(--mono); font-size: 12px; letter-spacing: .06em;
+               color: var(--accent); }
+  .panel-act:hover { color: var(--accent-deep); text-decoration: underline; }
+
+  /* 字段：标签在上、输入在下，全宽对齐；不再用 72px 边栏配 82px 缩进魔数 */
+  .fld { display: grid; gap: 5px; margin: 0 0 10px; }
+  .fld span { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
+              letter-spacing: .12em; }
   .fld input, .fld select { width: 100%; border: 1px solid var(--rule-2);
                background: var(--card); color: var(--ink);
                font-family: var(--mono); font-size: 14px; padding: 9px 10px;
                border-radius: 2px; outline: none; }
-  .fld input:focus, .fld select:focus { border-color: var(--ink-3);
-                     box-shadow: 0 0 0 2px rgba(90, 85, 74, .08); }
+  .fld input:focus, .fld select:focus { border-color: var(--accent);
+               box-shadow: 0 0 0 3px rgba(173, 57, 44, .09); }
+  .fld input::placeholder { color: var(--ink-3); opacity: .75; }
+
   .cur { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
-         margin-left: 82px; letter-spacing: .04em; min-height: 14px; }
-  .setnote { font-size: 13px; color: var(--ink-3); margin: 14px 0 2px;
-             line-height: 1.8; }
-  .setmsg { font-family: var(--mono); font-size: 12px; min-height: 16px;
-            margin-top: 6px; white-space: pre-wrap; color: var(--accent-deep); }
-  .setmsg.good { color: var(--ink-2); }
-  .diagrow { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px 82px; }
+         letter-spacing: .04em; min-height: 15px; margin: -4px 0 10px; }
+  .cur:not(:empty)::before { content: "· "; color: var(--rule-2); }
+
+  /* 连接检测行：虚线签收线——落章处，也隔开“填写”与“提交” */
+  .diagrow { display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+             margin: 4px 0 0; padding-top: 10px;
+             border-top: 1px dashed var(--rule); }
   .diagrow .tbtn { min-height: 32px; padding: 4px 10px; font-size: 12px; }
   .diagstate { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+
+  /* 型号卡片：取代原生下拉。选中态用朱砂竖线——与会话列表 .on 同一语言；
+     “当前”徽标标的是服务端在用型号，“选中”标的是这次要保存的型号 */
+  .model-cards { display: grid; gap: 8px; margin: 2px 0 10px; }
+  .model-card { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px;
+                padding: 9px 12px 8px; cursor: pointer;
+                border: 1px solid var(--rule); border-left: 3px solid var(--rule-2);
+                background: var(--card); border-radius: 3px;
+                transition: border-color .15s ease, box-shadow .15s ease; }
+  .model-card:hover { border-color: var(--rule-2); }
+  .model-card.picked { border-left-color: var(--accent); box-shadow: var(--shadow-sm); }
+  .model-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .mc-name { font-size: 14px; font-weight: 600; color: var(--ink); align-self: baseline; }
+  .mc-badge { justify-self: end; align-self: baseline;
+              font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+              color: var(--accent-deep); background: var(--accent-soft);
+              padding: 2px 7px; border-radius: 2px; }
+  .mc-id { grid-column: 1 / -1; font-family: var(--mono); font-size: 12px;
+           color: var(--ink-3); letter-spacing: .03em; }
+  .mc-note { grid-column: 1 / -1; font-size: 12px; color: var(--ink-2); line-height: 1.65; }
+  .model-empty { border: 1px dashed var(--rule-2); border-radius: 3px;
+                 background: var(--card); color: var(--ink-3);
+                 font-size: 13px; text-align: center; padding: 16px 10px; }
+
   .rem-list { display: grid; gap: 6px; }
-  .rem-empty { color: var(--ink-3); font-size: 13px; }
+  .rem-empty { border: 1px dashed var(--rule-2); border-radius: 3px;
+               background: var(--card); color: var(--ink-3);
+               font-size: 13px; text-align: center; padding: 16px 10px; }
   .rem-item { display: grid; grid-template-columns: auto 1fr auto; gap: 8px;
               align-items: start; border: 1px solid var(--rule); background: var(--card);
               padding: 8px 9px; }
@@ -429,13 +468,18 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                                    cursor: pointer; font-size: 12px; text-decoration: none; }
   .rem-tools a:hover, .rem-tools button:hover { color: var(--accent); }
   .data-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
-  .data-cell { border: 1px solid var(--rule); background: var(--card); padding: 8px; }
+  .data-cell { border: 1px solid var(--rule); background: var(--card); padding: 8px 9px; }
   .data-cell span { display: block; font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
-  .data-cell strong { font-size: 15px; font-weight: 600; }
-  .data-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+  .data-cell strong { font-size: 14px; font-weight: 600; }
+  .data-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
   .data-actions .danger { color: var(--accent-deep); }
-  .dlg-foot { display: flex; justify-content: flex-end; gap: 8px;
-              padding: 12px 18px 16px; }
+  .setnote { font-size: 12.5px; color: var(--ink-3); margin: 2px 2px 6px; line-height: 1.8; }
+  .setmsg { font-family: var(--mono); font-size: 12px; min-height: 16px;
+            margin: 0 2px 2px; white-space: pre-wrap; color: var(--accent-deep); }
+  .setmsg.good { color: var(--ink-2); }
+  .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; flex: none;
+              padding: 13px 22px 15px; border-top: 1px solid var(--rule);
+              background: var(--card); }
   .dlg-foot .tbtn.primary { background: var(--accent);
                             border-color: var(--accent); color: var(--card);
                             font-weight: 600; }
@@ -513,9 +557,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     textarea { font-size: 16px; }
     #b { min-height: 40px; padding: 8px 14px; }
     #b .kbd { display: none; }
-    .fld { grid-template-columns: 64px 1fr; }
-    .cur { margin-left: 74px; }
-    .diagrow { margin-left: 74px; }
     .data-grid { grid-template-columns: repeat(2, 1fr); }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -580,30 +621,38 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     <div class="dlg-head"><span id="dlgTitle">账号与模型</span><button class="dclose" id="closeSettings" aria-label="关闭账号与模型设置">✕</button></div>
     <div class="dlg-rule"></div>
     <div class="dlg-body">
-      <p class="dlg-intro">正式查询前，请配置自己的教务账号与模型服务。已保存的信息不会在页面中完整显示。</p>
-      <div class="fld-l">教务账号</div>
-      <label class="fld"><span>学号</span><input id="sUser" type="text" autocomplete="off" ${demo ? "disabled" : ""}></label>
-      <label class="fld"><span>登录密码</span><input id="sPass" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}></label>
-      <div class="cur" id="curJwgl"></div>
-      <div class="diagrow"><button class="tbtn" id="testJwgl" type="button" ${demo ? "disabled" : ""}>检测教务连接</button><span class="diagstate" id="diagJwgl"></span></div>
-      <div class="fld-l">AI 模型</div>
-      <label class="fld"><span>API Key</span><input id="sKey" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}></label>
-      <div class="cur" id="curKey"></div>
-      <label class="fld"><span>模型</span><select id="sModel" aria-label="选择 AI 模型" ${demo ? "disabled" : ""}></select></label>
-      <div class="cur" id="curModel"></div>
-      <div class="diagrow"><button class="tbtn" id="testDeepseek" type="button" ${demo ? "disabled" : ""}>检测模型连接</button><span class="diagstate" id="diagDeepseek"></span></div>
+      <p class="dlg-intro">正式查询前，请配置自己的教务账号与模型服务。已保存的信息不会在页面中完整显示，留空即保持不变。</p>
+      <section class="panel">
+        <header class="panel-head"><span class="panel-name">教务账号</span></header>
+        <label class="fld"><span>学号</span><input id="sUser" type="text" autocomplete="off" ${demo ? "disabled" : ""}></label>
+        <label class="fld"><span>登录密码</span><input id="sPass" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}></label>
+        <div class="cur" id="curJwgl"></div>
+        <div class="diagrow"><button class="tbtn" id="testJwgl" type="button" ${demo ? "disabled" : ""}>检测教务连接</button><span class="diagstate" id="diagJwgl"></span></div>
+      </section>
+      <section class="panel">
+        <header class="panel-head"><span class="panel-name">AI 模型</span></header>
+        <label class="fld"><span>API Key</span><input id="sKey" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}></label>
+        <div class="cur" id="curKey"></div>
+        <div class="model-cards" id="modelCards" role="radiogroup" aria-label="选择 AI 模型"></div>
+        <input type="hidden" id="sModel" value="">
+        <div class="cur" id="curModel"></div>
+        <div class="diagrow"><button class="tbtn" id="testDeepseek" type="button" ${demo ? "disabled" : ""}>检测模型连接</button><span class="diagstate" id="diagDeepseek"></span></div>
+      </section>
+      <section class="panel">
+        <header class="panel-head"><span class="panel-name">截止日期待办</span><button class="panel-act" id="addReminderManual" type="button" ${demo ? "disabled" : ""}>＋ 添加待办</button></header>
+        <div class="rem-list" id="reminderList"><div class="rem-empty">暂无待办提醒</div></div>
+      </section>
+      <section class="panel">
+        <header class="panel-head"><span class="panel-name">本地数据</span></header>
+        <div class="data-grid" id="dataGrid"></div>
+        <div class="data-actions">
+          ${demo ? '<span class="tbtn" aria-disabled="true">导出本人数据</span>' : '<a class="tbtn" href="/api/data/export" download>导出本人数据</a>'}
+          <button class="tbtn" id="clearFiles" type="button" ${demo ? "disabled" : ""}>清理附件与生成文件</button>
+          <button class="tbtn danger" id="clearAllData" type="button" ${demo ? "disabled" : ""}>清空全部本地数据</button>
+        </div>
+      </section>
       <div class="setnote">不需要修改的项目请留空。教务账号和 API Key 仅加密保存在当前电脑。</div>
       <div class="setmsg" id="setMsg"></div>
-      <div class="fld-l">截止日期待办</div>
-      <div class="rem-list" id="reminderList"><div class="rem-empty">暂无待办提醒</div></div>
-      <div class="data-actions"><button class="tbtn" id="addReminderManual" type="button" ${demo ? "disabled" : ""}>添加待办</button></div>
-      <div class="fld-l">本地数据</div>
-      <div class="data-grid" id="dataGrid"></div>
-      <div class="data-actions">
-        ${demo ? '<span class="tbtn" aria-disabled="true">导出本人数据</span>' : '<a class="tbtn" href="/api/data/export" download>导出本人数据</a>'}
-        <button class="tbtn" id="clearFiles" type="button" ${demo ? "disabled" : ""}>清理附件与生成文件</button>
-        <button class="tbtn danger" id="clearAllData" type="button" ${demo ? "disabled" : ""}>清空全部本地数据</button>
-      </div>
     </div>
     <div class="dlg-foot">
       <button class="tbtn" id="cancelSettings">取消</button>
@@ -1251,37 +1300,68 @@ function runDiagnostic(target, buttonId, stateId) {
 document.getElementById("testJwgl").addEventListener("click", () => runDiagnostic("jwgl", "testJwgl", "diagJwgl"));
 document.getElementById("testDeepseek").addEventListener("click", () => runDiagnostic("deepseek", "testDeepseek", "diagDeepseek"));
 
-/* ── 模型下拉：候选由后端给（该 Key 实际可用的型号），拉不到时是内置兜底清单 ── */
+/* ── 型号卡片：候选由后端给（该 Key 实际可用的型号），拉不到时是内置兜底清单。
+   sModel 仍是值的唯一载体（hidden input），保存逻辑读 sModel.value 不变 ── */
+function pickModel(id) {
+  sModel.value = id || "";
+  for (const card of document.querySelectorAll("#modelCards .model-card")) {
+    const on = card.dataset.modelId === id;
+    card.classList.toggle("picked", on);
+    card.setAttribute("aria-checked", on ? "true" : "false");
+  }
+}
 function fillModels(options, current, message) {
   const list = Array.isArray(options) ? options : [];
   const keep = sModel.value;
-  sModel.textContent = "";
-  const hold = document.createElement("option");
-  hold.value = "";
-  hold.textContent = current ? "不修改（当前 " + current + "）" : "不修改";
-  sModel.appendChild(hold);
-  for (const m of list) {
-    if (!m || typeof m.id !== "string") continue;
-    const opt = document.createElement("option");
-    opt.value = m.id;
-    opt.textContent = (m.label || m.id) + "（" + m.id + "）";
-    if (m.note) opt.title = m.note;
-    sModel.appendChild(opt);
+  const host = document.getElementById("modelCards");
+  host.textContent = "";
+  if (!list.length) {
+    host.appendChild(el2("model-empty", message || "型号清单读取中…"));
+  } else {
+    for (const m of list) {
+      if (!m || typeof m.id !== "string") continue;
+      const card = el("model-card");
+      card.dataset.modelId = m.id;
+      card.setAttribute("role", "radio");
+      card.tabIndex = 0;
+      card.appendChild(el2("mc-name", m.label || m.id));
+      if (m.id === current) card.appendChild(el2("mc-badge", "当前"));
+      card.appendChild(el2("mc-id", m.id));
+      if (m.note) card.appendChild(el2("mc-note", m.note));
+      card.addEventListener("click", () => {
+        if (document.body.dataset.demo === "true") return;
+        /* 再点一次已选卡片＝取消更换，回到「不修改」 */
+        pickModel(card.dataset.modelId === sModel.value ? "" : card.dataset.modelId);
+      });
+      card.addEventListener("keydown", (e) => {
+        if (e.key === " " || e.key === "Enter") { e.preventDefault(); card.click(); }
+      });
+      host.appendChild(card);
+    }
   }
-  sModel.value = keep && list.some((m) => m && m.id === keep) ? keep : "";
+  pickModel(keep && list.some((m) => m && m.id === keep) ? keep : "");
   const picked = list.filter((m) => m && m.id === current)[0];
   let note = "当前：" + ((picked && picked.label) || current || "未设置");
   if (picked && picked.note) note += " · " + picked.note;
-  if (message) note += " · " + message;
+  if (message && list.length) note += " · " + message;
   curModel.textContent = note;
 }
+/* 方向键在卡片间移动焦点（承接原生下拉的键盘习惯）；空格/回车才做选择 */
+document.getElementById("modelCards").addEventListener("keydown", (e) => {
+  if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) return;
+  const cards = [...document.querySelectorAll("#modelCards .model-card")];
+  if (cards.length < 2) return;
+  const step = e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 1;
+  const next = cards[(cards.indexOf(document.activeElement) + step + cards.length) % cards.length];
+  if (next) { e.preventDefault(); next.focus(); }
+});
 
 function showSettings() {
   overlay.hidden = false;
   closeDrawer();
   setMsg.className = "setmsg";
   setMsg.textContent = "";
-  sPass.value = ""; sKey.value = ""; sModel.value = "";
+  sPass.value = ""; sKey.value = ""; pickModel("");
   document.getElementById("diagJwgl").textContent = "";
   document.getElementById("diagDeepseek").textContent = "";
   refreshReminders(); refreshData();
@@ -1375,7 +1455,7 @@ document.getElementById("saveSettings").addEventListener("click", () => {
       document.getElementById("curKey").textContent = d.status.deepseek.configured
         ? "已保存：" + (d.status.deepseek.masked || "API Key") + " · " + d.status.deepseek.sourceLabel + " · " + d.status.model
         : "尚未配置 API Key · 当前模型 " + d.status.model;
-      sModel.value = "";
+      pickModel("");
       fillModels(d.status.models, d.status.model, "");
     }
   }).catch(() => {
