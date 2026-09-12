@@ -84,14 +84,12 @@ test("会话支持改名与置顶，置顶档案排在普通档案之前", () =>
   assert.equal(S.updateSession("not-found", { pinned: true }), null);
 });
 
-test("网页附件路径只进入模型上下文，结果卡随助手消息落盘", () => {
+test("网页附件路径只进入模型上下文", () => {
   S.appendRound("upload111", "看看附件", "已读取", null, {
     attachments: [{ id: "u1", name: "课程表.xlsx", storedPath: "C:/safe/cache/u1.xlsx" }],
-    artifacts: [{ kind: "file", title: "课程表.xlsx", updatedAt: Date.now() }],
   });
   const session = S.getSession("upload111");
   assert.equal(session?.messages[0].attachments?.[0].name, "课程表.xlsx");
-  assert.equal(session?.messages[1].artifacts?.[0].kind, "file");
   const context = JSON.stringify(S.contextMessages("upload111"));
   assert.match(context, /课程表\.xlsx/);
   assert.match(context, /C:\/safe\/cache\/u1\.xlsx/);

@@ -41,27 +41,6 @@ export interface StoredMessage {
   /** 助手消息可选：本轮模型的思考过程（reasoning）。只供界面回看，
    * contextMessages 不读它——把思考喂回去会污染上下文、白烧 token */
   think?: string;
-  /** 查询工具生成的轻量结果卡；只保存展示字段，不保存完整工具输出。 */
-  artifacts?: StoredArtifact[];
-}
-
-export interface StoredArtifact {
-  kind: "grades" | "exams" | "news" | "notice" | "file";
-  title: string;
-  badge?: string;
-  updatedAt: number;
-  source?: string;
-  sourceUrl?: string;
-  summary?: string;
-  metrics?: Array<{ label: string; value: string }>;
-  rows?: Array<{ label: string; value?: string; meta?: string; url?: string }>;
-  change?: { status: "first" | "same" | "changed"; text: string; details?: string[] };
-  actions?: Array<{
-    type: "prompt" | "reminder";
-    label: string;
-    prompt?: string;
-    dueAt?: string;
-  }>;
 }
 
 export interface ChatSession {
@@ -196,7 +175,6 @@ export function appendRound(
   opts: {
     titlePrefix?: string;
     attachments?: Array<{ id: string; name: string; storedPath: string }>;
-    artifacts?: StoredArtifact[];
   } = {},
 ): void {
   const list = readSessions();
@@ -216,7 +194,6 @@ export function appendRound(
     const msg: StoredMessage = { role: "assistant", text: assistantText.trim(), ts: now };
     const think = clampThink(reasoningText);
     if (think) msg.think = think;
-    if (opts.artifacts?.length) msg.artifacts = opts.artifacts;
     s.messages.push(msg);
   }
   if (!s.title) {

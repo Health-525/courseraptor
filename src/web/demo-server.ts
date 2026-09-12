@@ -1,7 +1,6 @@
 /** 独立演示服务：不导入 config/agent，不读取凭证、真实会话或教务数据。 */
 import { readFileSync } from "node:fs";
 import http from "node:http";
-import type { StoredArtifact } from "../chat-sessions";
 import { chatPage } from "./chat-page";
 import type { BriefCourse, BriefDay, TodayBrief } from "./today-brief";
 import { todayPage } from "./today-page";
@@ -10,47 +9,8 @@ interface DemoMessage {
   role: "user" | "assistant";
   text: string;
   ts: number;
-  artifacts?: StoredArtifact[];
 }
 
-function demoCard(message: string): StoredArtifact | null {
-  const base = {
-    badge: "虚构示例",
-    updatedAt: Date.now(),
-    source: "离线演示",
-    change: { status: "first" as const, text: "正式查询后会保存为变化对比基准" },
-  };
-  if (/成绩|GPA|绩点|学业/i.test(message))
-    return {
-      ...base,
-      kind: "grades",
-      title: "成绩与学业概览",
-      metrics: [
-        { label: "GPA", value: "3.30" },
-        { label: "已获学分", value: "42" },
-        { label: "未通过", value: "1 门" },
-      ],
-    };
-  if (/考试/.test(message))
-    return {
-      ...base,
-      kind: "exams",
-      title: "考试安排",
-      rows: [
-        { label: "示例课程 A", value: "12月28日 · 09:00", meta: "示例教学楼 101" },
-        { label: "示例课程 B", value: "12月30日 · 14:00", meta: "示例教学楼 202" },
-      ],
-    };
-  if (/通知|公告/.test(message))
-    return {
-      ...base,
-      kind: "news",
-      title: "教务通知",
-      badge: "1 条需要关注 · 虚构示例",
-      rows: [{ label: "示例：选修课调整通知", value: "9月6日", meta: "需要关注" }],
-    };
-  return null;
-}
 interface DemoSession {
   id: string;
   title: string;
@@ -327,7 +287,6 @@ export function createDemoServer(): http.Server {
           uploads: { count: 0, bytes: 0 },
           generated: { count: 0, bytes: 0 },
           reminders: { total: 0, open: 0 },
-          snapshots: 0,
         });
       } else if (
         ["/api/settings", "/api/diagnostics", "/api/reminders", "/api/data/clear"].includes(url)
@@ -389,10 +348,9 @@ export function createDemoServer(): http.Server {
           messages: [],
         };
         const reply = demoReply(message);
-        const card = demoCard(message);
         session.messages.push(
           { role: "user", text: message, ts: now },
-          { role: "assistant", text: reply, ts: now, ...(card ? { artifacts: [card] } : {}) },
+          { role: "assistant", text: reply, ts: now },
         );
         session.messages = session.messages.slice(-40);
         session.updatedAt = now;
@@ -403,7 +361,7 @@ export function createDemoServer(): http.Server {
           "cache-control": "no-cache",
         });
         res.end(
-          `data: ${JSON.stringify({ t: "text", v: reply })}\n\n${card ? `data: ${JSON.stringify({ t: "card", card })}\n\n` : ""}data: ${JSON.stringify({ t: "end", sid: id })}\n\n`,
+          `data: ${JSON.stringify({ t: "text", v: reply })}\n\ndata: ${JSON.stringify({ t: "end", sid: id })}\n\n`,
         );
       } else json(res, { error: "演示模式不支持此操作" }, 404);
     } catch (error) {

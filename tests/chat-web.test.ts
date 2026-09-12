@@ -260,8 +260,7 @@ test("网页上传只回附件编号，对话可读取受控路径且详情不�
   assert.ok(!detailText.includes("storedPath") && !detailText.includes("web-uploads"));
 });
 
-test("教务工具结果产生结构化卡片并保存变化对比", async () => {
-  let location = "仁智楼 101";
+test("教务工具结果不再产生结果卡，工具状态与文本照常下发", async () => {
   setChatAgent({
     stream() {
       async function* gen() {
@@ -273,7 +272,9 @@ test("教务工具结果产生结构化卡片并保存变化对比", async () =>
           output: {
             term: "2026-2027-1",
             total: 1,
-            exams: [{ subject: "高等数学", date: "2026-12-28", time: "09:00", location }],
+            exams: [
+              { subject: "高等数学", date: "2026-12-28", time: "09:00", location: "仁智楼 101" },
+            ],
           },
         };
         yield { type: "text-delta", text: "考试安排如上" };
@@ -284,16 +285,11 @@ test("教务工具结果产生结构化卡片并保存变化对比", async () =>
   });
   const url = (await startChatWeb())!;
   const first = await post(url, { message: "查考试", sessionId: "cards111" });
-  const firstCard = first.events.find((e) => e.t === "card")?.card as Record<string, unknown>;
-  assert.equal(firstCard.kind, "exams");
-  assert.equal((firstCard.change as Record<string, unknown>).status, "first");
-
-  location = "厚学楼 202";
-  const second = await post(url, { message: "再查考试", sessionId: "cards111" });
-  const secondCard = second.events.find((e) => e.t === "card")?.card as Record<string, unknown>;
-  assert.equal((secondCard.change as Record<string, unknown>).status, "changed");
+  assert.ok(!first.events.some((e) => e.t === "card"), "不再下发结果卡事件");
+  assert.ok(first.events.some((e) => e.t === "tool" && e.phase === "end"));
   const detail = await (await fetch(`${url}/api/sessions/cards111`)).json();
-  assert.equal(detail.messages.at(-1).artifacts[0].kind, "exams");
+  assert.equal(detail.messages.at(-1).role, "assistant");
+  assert.equal(detail.messages.at(-1).artifacts, undefined, "历史消息不再保存结果卡");
 });
 
 test("待办可创建、完成并导出日历，本地数据接口回脱敏概览", async () => {

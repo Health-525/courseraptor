@@ -217,39 +217,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                  font-size: 12px; }
   .frow a.tbtn:hover { background: var(--accent-soft); }
 
-  /* 结构化结果卡：仍在对话流里，不占侧栏和首屏。 */
-  .result-card { margin: 10px 0 14px; border: 1px solid var(--rule-2);
-                 border-top: 2px solid var(--accent); background: var(--card);
-                 box-shadow: var(--shadow-sm); }
-  .rc-head { display: flex; align-items: baseline; gap: 10px; padding: 11px 14px 9px;
-             border-bottom: 1px solid var(--rule); }
-  .rc-title { flex: 1; font-family: var(--kai); font-size: 18px; letter-spacing: .04em; }
-  .rc-badge { font-family: var(--mono); font-size: 12px; color: var(--accent-deep);
-              background: var(--accent-soft); padding: 2px 7px; }
-  .rc-time { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
-  .rc-body { padding: 11px 14px 12px; }
-  .rc-summary { margin: 0 0 10px; font-size: 14px; color: var(--ink-2); }
-  .rc-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-                gap: 8px; margin-bottom: 10px; }
-  .rc-metric { border-left: 2px solid var(--rule-2); padding-left: 9px; }
-  .rc-metric span { display: block; font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
-  .rc-metric strong { display: block; margin-top: 1px; font-size: 16px; font-weight: 600; }
-  .rc-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto;
-            gap: 2px 12px; padding: 7px 0; border-top: 1px dashed var(--rule);
-            font-size: 14px; }
-  .rc-row a { color: var(--ink); text-decoration: none; }
-  .rc-row a:hover { color: var(--accent); }
-  .rc-value { color: var(--ink-2); text-align: right; }
-  .rc-meta { grid-column: 1 / -1; font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
-  .rc-change { margin-top: 9px; padding: 7px 9px; background: var(--paper);
-               font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
-  .rc-change.changed { border-left: 2px solid var(--accent); color: var(--accent-deep); }
-  .rc-change ul { margin: 4px 0 0; padding-left: 18px; }
-  .rc-source { margin-top: 8px; font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
-  .rc-source a { color: var(--accent); }
-  .rc-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
-  .rc-actions .tbtn { min-height: 31px; padding: 3px 10px; font-size: 12px; }
-
   /* 思考过程：独立建模成草稿卡片。与工具卡片同族但更轻（虚线框、无底色），
      内容用楷体灰字小一号——正文是系统黑体 15px，这里是 --kai 13px，两级层次
      一眼可分；长思考限高内部滚，不把屏幕撑满。 */
@@ -826,16 +793,14 @@ function addBotShell() {
   const { sec, tm, dur } = addTurn("bot");
   const tl = el("tl");
   const msg = el("msg md");
-  const cards = el("cards");
   const acts = el("acts");
   sec.appendChild(tl);
-  sec.appendChild(cards);
   sec.appendChild(msg);
   sec.appendChild(acts);
   inner.appendChild(sec);
   scroll(true);
   /* 工具卡片索引：id 精确配对为主，同名排队兜底；think 是当前展开中的思考卡片 */
-  return { sec, tm, dur, tl, cards, msg, acts, tools: new Map(), queue: {}, think: null, savedCards: [] };
+  return { sec, tm, dur, tl, msg, acts, tools: new Map(), queue: {}, think: null };
 }
 
 function addCopyButton(acts, raw) {
@@ -855,7 +820,7 @@ function addCopyButton(acts, raw) {
 }
 
 /** 定格一条完整助手消息（openSession 重绘历史用）；thinkText 是历史里的思考 */
-function addBotMessage(raw, ts, thinkText, artifacts) {
+function addBotMessage(raw, ts, thinkText) {
   const shell = addBotShell();
   shell.tm.textContent = clock(ts);
   if (thinkText) {
@@ -869,7 +834,6 @@ function addBotMessage(raw, ts, thinkText, artifacts) {
   if (html != null) shell.msg.innerHTML = html;
   else shell.msg.textContent = raw;
   addCopyButton(shell.acts, raw);
-  (artifacts || []).forEach((card) => renderResultCard(shell.cards, card));
   scroll(false);
   return shell;
 }
@@ -1001,84 +965,6 @@ function fileRows(tl, files) {
   scroll(false);
 }
 
-/* ── 结构化结果卡：服务端只给展示字段，前端不解析模型 Markdown ── */
-function renderResultCard(host, card) {
-  if (!card || !card.title) return;
-  const box = el("result-card");
-  const head = el("rc-head");
-  head.appendChild(el2("rc-title", card.title));
-  if (card.badge) head.appendChild(el2("rc-badge", card.badge));
-  head.appendChild(el2("rc-time", fmtWhen(card.updatedAt)));
-  box.appendChild(head);
-  const body = el("rc-body");
-  if (card.summary) body.appendChild(el2("rc-summary", card.summary));
-  if (card.metrics && card.metrics.length) {
-    const metrics = el("rc-metrics");
-    card.metrics.forEach((m) => {
-      const item = el("rc-metric");
-      item.appendChild(el2("", m.label));
-      const strong = document.createElement("strong");
-      strong.textContent = m.value; item.appendChild(strong);
-      metrics.appendChild(item);
-    });
-    body.appendChild(metrics);
-  }
-  (card.rows || []).forEach((row) => {
-    const line = el("rc-row");
-    if (row.url) {
-      const a = document.createElement("a");
-      a.href = row.url; a.target = "_blank"; a.rel = "noreferrer"; a.textContent = row.label;
-      line.appendChild(a);
-    } else line.appendChild(el2("", row.label));
-    line.appendChild(el2("rc-value", row.value || ""));
-    if (row.meta) line.appendChild(el2("rc-meta", row.meta));
-    body.appendChild(line);
-  });
-  if (card.change) {
-    const change = el("rc-change " + card.change.status);
-    change.appendChild(el2("", card.change.text));
-    if (card.change.details && card.change.details.length) {
-      const ul = document.createElement("ul");
-      card.change.details.forEach((text) => {
-        const li = document.createElement("li"); li.textContent = text; ul.appendChild(li);
-      });
-      change.appendChild(ul);
-    }
-    body.appendChild(change);
-  }
-  if (card.source || card.sourceUrl) {
-    const source = el("rc-source");
-    source.appendChild(document.createTextNode("来源 · "));
-    if (card.sourceUrl) {
-      const a = document.createElement("a");
-      a.href = card.sourceUrl; a.target = "_blank"; a.rel = "noreferrer";
-      a.textContent = card.source || "查看原文"; source.appendChild(a);
-    } else source.appendChild(document.createTextNode(card.source));
-    body.appendChild(source);
-  }
-  if (card.actions && card.actions.length) {
-    const actions = el("rc-actions");
-    card.actions.forEach((action) => {
-      const button = document.createElement("button");
-      button.type = "button"; button.className = "tbtn"; button.textContent = action.label;
-      button.addEventListener("click", () => {
-        if (action.type === "prompt" && action.prompt && !busy) send(action.prompt);
-        if (action.type === "reminder") openReminder({
-          title: card.title,
-          dueAt: action.dueAt,
-          source: card.source || card.title,
-          sourceUrl: card.sourceUrl || "",
-        });
-      });
-      actions.appendChild(button);
-    });
-    body.appendChild(actions);
-  }
-  box.appendChild(body);
-  host.appendChild(box);
-  scroll(false);
-}
-
 /* ── 会话档案：列表 / 打开 / 删除 / 新会话 ── */
 const sessList = document.getElementById("sessList");
 function renderSessList() {
@@ -1171,7 +1057,7 @@ function openSession(id) {
       /* 重绘历史：渲染函数不写 msgs（它已是服务端数据的镜像） */
       msgs.forEach((m) => {
         if (m.role === "user") addUser(m.text, m.ts, m.attachments);
-        else addBotMessage(m.text, m.ts, m.think, m.artifacts);
+        else addBotMessage(m.text, m.ts, m.think);
       });
       scroll(true);
       renderSessList();
@@ -1308,7 +1194,6 @@ function refreshData() {
       ["网页上传", d.uploads.count + " 个 · " + fmtSize(d.uploads.bytes)],
       ["生成文件", d.generated.count + " 个 · " + fmtSize(d.generated.bytes)],
       ["未完成待办", d.reminders.open + " 条"],
-      ["对比基准", d.snapshots + " 组"],
     ];
     const host = document.getElementById("dataGrid"); host.innerHTML = "";
     cells.forEach(([label, value]) => {
@@ -1448,8 +1333,8 @@ document.getElementById("clearFiles").addEventListener("click", () => clearData(
   "清理已读附件副本、网页上传和生成文件？聊天记录与待办会保留。",
 ));
 document.getElementById("clearAllData").addEventListener("click", () => clearData(
-  ["sessions", "attachments", "uploads", "generated", "reminders", "snapshots"],
-  "清空全部本地会话、附件、生成文件、待办和变化对比基准？此操作不可恢复。",
+  ["sessions", "attachments", "uploads", "generated", "reminders"],
+  "清空全部本地会话、附件、生成文件和待办？此操作不可恢复。",
 ));
 document.getElementById("saveSettings").addEventListener("click", () => {
   const body = {};
@@ -1629,9 +1514,6 @@ async function send(text) {
             toolDone(shell, ev, ev.phase === "end");
             if (ev.files && ev.files.length) fileRows(shell.tl, ev.files);
           }
-        } else if (ev.t === "card") {
-          thinkClose(shell);
-          if (ev.card) { shell.savedCards.push(ev.card); renderResultCard(shell.cards, ev.card); }
         } else if (ev.t === "err") {
           thinkClose(shell);
           lineBad(shell.tl, ev.v);
@@ -1650,7 +1532,7 @@ async function send(text) {
       if (html != null) shell.msg.innerHTML = html;
       else shell.msg.textContent = raw;
       addCopyButton(shell.acts, raw);
-      msgs.push({ role: "bot", text: raw, think: thinkRaw.trim() || undefined, ts: Date.now(), artifacts: shell.savedCards || [] });
+      msgs.push({ role: "bot", text: raw, think: thinkRaw.trim() || undefined, ts: Date.now() });
     } else {
       shell.msg.textContent = "这轮没有输出，再问一次试试";
     }

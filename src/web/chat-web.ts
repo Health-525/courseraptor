@@ -30,7 +30,6 @@ import {
   listSessions,
   readSessions,
   resetAll,
-  type StoredArtifact,
   updateSession,
 } from "../chat-sessions";
 import { config } from "../config";
@@ -46,15 +45,12 @@ import {
 import { getDeepSeekKeyStatus, setDeepSeekApiKey } from "../onboarding";
 import { getCookie } from "../tools/session";
 import { chatPage } from "./chat-page";
-import { resultCard, snapshotEntries } from "./result-cards";
 import { buildTodayBrief } from "./today-brief";
 import { todayPage } from "./today-page";
 import {
   addReminder,
   clearReminders,
-  clearSnapshots,
   clearUploads,
-  compareAndSaveSnapshot,
   deleteReminder,
   deleteUpload,
   getUploads,
@@ -464,7 +460,6 @@ function dataPayload() {
     uploads: workspace.uploads,
     generated: generatedStats(),
     reminders: workspace.reminders,
-    snapshots: workspace.snapshots,
   };
 }
 
@@ -756,7 +751,6 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         if (scopes.includes("uploads")) result.uploads = clearUploads();
         if (scopes.includes("generated")) result.generated = clearGenerated();
         if (scopes.includes("reminders")) result.reminders = clearReminders();
-        if (scopes.includes("snapshots")) result.snapshots = clearSnapshots();
         json(res, { ok: true, result, summary: dataPayload() });
       } catch {
         json(res, { error: "清理请求无效" }, 400);
@@ -899,7 +893,6 @@ async function runTurn(
   ];
   const startedAt = Date.now();
   const toolStart = new Map<string, { name: string; at: number; input?: unknown }>();
-  const artifacts: StoredArtifact[] = [];
   let text = "";
   let think = "";
   let failure: string | null = null;
@@ -961,28 +954,6 @@ async function runTurn(
             // 有成品文件时前端在工具卡下方渲染下载行
             ...(files.length ? { files } : {}),
           });
-          const outputForCard =
-            p.toolName === "read_notice" && t0?.input && typeof t0.input === "object"
-              ? {
-                  ...(p.output as Record<string, unknown>),
-                  ...(t0.input as Record<string, unknown>),
-                }
-              : p.output;
-          const entries = snapshotEntries(p.toolName ?? "", outputForCard);
-          const change = entries
-            ? compareAndSaveSnapshot(
-                `${p.toolName}:${oneLine(
-                  String((outputForCard as Record<string, unknown>)?.term ?? "current"),
-                  40,
-                )}`,
-                entries,
-              )
-            : undefined;
-          const card = resultCard(p.toolName ?? "", outputForCard, change);
-          if (card) {
-            artifacts.push(card);
-            send({ t: "card", card });
-          }
           break;
         }
         case "tool-error": {
@@ -1017,7 +988,6 @@ async function runTurn(
   if (!signal.aborted) {
     appendRound(sessionId, message, text.trim() ? text : null, think.trim() || null, {
       attachments: uploads.map(({ id, name, storedPath }) => ({ id, name, storedPath })),
-      artifacts,
     });
   }
 }

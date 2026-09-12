@@ -1,7 +1,7 @@
 /**
- * 网页侧本地工作区数据：上传文件、查询快照与截止日期待办。
+ * 网页侧本地工作区数据：上传文件与截止日期待办。
  *
- * 这三类数据都只服务当前电脑，统一放在 RAPTOR_DATA_DIR 下。所有写入使用
+ * 这两类数据都只服务当前电脑，统一放在 RAPTOR_DATA_DIR 下。所有写入使用
  * 原子替换，上传文件名只保留安全扩展名，删除操作只允许落在自己的目录内。
  */
 
@@ -44,24 +44,12 @@ export interface Reminder {
   updatedAt: number;
 }
 
-export interface ChangeSummary {
-  status: "first" | "same" | "changed";
-  text: string;
-  details?: string[];
-}
-
-interface Snapshot {
-  at: number;
-  entries: Record<string, string>;
-}
-
 interface WorkspaceState {
   uploads: WebUpload[];
   reminders: Reminder[];
-  snapshots: Record<string, Snapshot>;
 }
 
-const emptyState = (): WorkspaceState => ({ uploads: [], reminders: [], snapshots: {} });
+const emptyState = (): WorkspaceState => ({ uploads: [], reminders: [] });
 
 function readState(): WorkspaceState {
   try {
@@ -69,7 +57,6 @@ function readState(): WorkspaceState {
     return {
       uploads: Array.isArray(value.uploads) ? value.uploads : [],
       reminders: Array.isArray(value.reminders) ? value.reminders : [],
-      snapshots: value.snapshots && typeof value.snapshots === "object" ? value.snapshots : {},
     };
   } catch {
     return emptyState();
@@ -220,43 +207,9 @@ export function clearReminders(): number {
   return count;
 }
 
-export function compareAndSaveSnapshot(
-  key: string,
-  entries: Record<string, string>,
-): ChangeSummary {
-  const state = readState();
-  const previous = state.snapshots[key];
-  state.snapshots[key] = { at: Date.now(), entries };
-  writeState(state);
-  if (!previous) return { status: "first", text: "已保存为首次对比基准" };
-  const details: string[] = [];
-  for (const [id, value] of Object.entries(entries)) {
-    if (!(id in previous.entries)) details.push(`新增：${id}`);
-    else if (previous.entries[id] !== value) details.push(`变化：${id}`);
-  }
-  for (const id of Object.keys(previous.entries)) {
-    if (!(id in entries)) details.push(`不再出现：${id}`);
-  }
-  if (!details.length) return { status: "same", text: "与上一次成功查询一致" };
-  return {
-    status: "changed",
-    text: `与上一次相比发现 ${details.length} 项变化`,
-    details: details.slice(0, 5),
-  };
-}
-
-export function clearSnapshots(): number {
-  const state = readState();
-  const count = Object.keys(state.snapshots).length;
-  state.snapshots = {};
-  writeState(state);
-  return count;
-}
-
 export function workspaceStats(): {
   uploads: { count: number; bytes: number };
   reminders: { total: number; open: number };
-  snapshots: number;
 } {
   const state = readState();
   const uploads = state.uploads.filter((u) => fs.existsSync(u.storedPath));
@@ -266,7 +219,6 @@ export function workspaceStats(): {
       total: state.reminders.length,
       open: state.reminders.filter((r) => !r.done).length,
     },
-    snapshots: Object.keys(state.snapshots).length,
   };
 }
 
