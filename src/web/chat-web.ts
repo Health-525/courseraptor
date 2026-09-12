@@ -20,6 +20,7 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ModelMessage } from "ai";
+import { attachmentStats, clearAttachments } from "../attachment-store";
 import {
   appendRound,
   contextMessages,
@@ -27,13 +28,44 @@ import {
   deleteSession,
   getSession,
   listSessions,
+  readSessions,
   resetAll,
+  type StoredArtifact,
+  updateSession,
 } from "../chat-sessions";
 import { config } from "../config";
 import { saveCredentialsStore } from "../credentials";
 import { generatedDir } from "../document/save";
+import {
+  allowedModelIds,
+  cachedModelOptions,
+  invalidateModelCache,
+  listModelOptions,
+  validateModelChoice,
+} from "../models";
 import { getDeepSeekKeyStatus, setDeepSeekApiKey } from "../onboarding";
+import { getCookie } from "../tools/session";
 import { chatPage } from "./chat-page";
+import { resultCard, snapshotEntries } from "./result-cards";
+import { buildTodayBrief } from "./today-brief";
+import { todayPage } from "./today-page";
+import {
+  addReminder,
+  clearReminders,
+  clearSnapshots,
+  clearUploads,
+  compareAndSaveSnapshot,
+  deleteReminder,
+  deleteUpload,
+  getUploads,
+  listReminders,
+  MAX_UPLOAD_BYTES,
+  reminderIcs,
+  saveUpload,
+  updateReminder,
+  type WebUpload,
+  workspaceStats,
+} from "./workspace-data";
 
 /** 前端 Markdown 渲染器（marked 的 UMD 构建，静态吐给浏览器） */
 const MARKED_UMD = path.resolve(
@@ -70,6 +102,28 @@ let agentProvider: (() => ChatStreamableAgent | null) | null = null;
 /** 主程序在 agent 就绪后注入；网页先于 agent 可用也无妨，来消息时才取 */
 export function setChatAgent(agent: ChatStreamableAgent | null): void {
   agentProvider = agent ? () => agent : null;
+}
+
+/** 换模型后重建 agent 的钩子（模型在组装时绑定，不重建就只能重启） */
+let agentRefresher: (() => Promise<void>) | null = null;
+
+export function setChatAgentRefresher(refresh: () => Promise<void>): void {
+  agentRefresher = refresh;
+}
+
+/** 重建串行链：连续保存两次模型也不会并发建两个 agent */
+let refreshChain: Promise<string> = Promise.resolve("");
+
+/** 重建对话引擎，返回给用户看的生效说明 */
+async function refreshChatAgent(): Promise<string> {
+  if (!agentRefresher) return "；本次未能即时切换，重启后生效";
+  try {
+    await agentRefresher();
+    return "；下一条消息起生效（终端界面重启后生效）";
+  } catch {
+    // 重建失败时旧 agent 仍在位，对话不会中断
+    return "；即时切换失败，旧模型继续可用，重启后生效";
+  }
 }
 
 let runningUrl: string | null = null;
@@ -118,6 +172,28 @@ interface StreamEvent {
   input?: unknown;
   output?: unknown;
   error?: unknown;
+}
+
+async function jsonBody(
+  req: http.IncomingMessage,
+  maxBytes = 1024 * 1024,
+): Promise<Record<string, unknown>> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    size += buf.length;
+    if (size > maxBytes) throw new Error("PAYLOAD_TOO_LARGE");
+    chunks.push(buf);
+  }
+  try {
+    const parsed = JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    throw new Error("INVALID_JSON");
+  }
 }
 
 const deltaOf = (p: StreamEvent): string => p.text ?? p.delta ?? "";
@@ -293,6 +369,102 @@ function settingsPayload() {
     },
     deepseek: { ...ds, sourceLabel: SOURCE_LABEL[ds.source] ?? ds.source },
     model: config.model,
+    /** 下拉候选：只读同步缓存/兜底清单，联网刷新走 GET /api/models，别卡住弹窗 */
+    models: cachedModelOptions(),
+  };
+}
+
+async function runDiagnostic(target: unknown): Promise<SettingResult> {
+  if (target === "jwgl") {
+    if (!config.jwglUsername || !config.jwglPassword) {
+      return { field: "jwgl", ok: false, message: "请先保存完整的教务账号" };
+    }
+    try {
+      await getCookie(true);
+      return { field: "jwgl", ok: true, message: "教务系统连接正常，账号可以使用" };
+    } catch (error) {
+      return {
+        field: "jwgl",
+        ok: false,
+        message: `教务连接失败：${oneLine(error instanceof Error ? error.message : String(error), 120)}`,
+      };
+    }
+  }
+  if (target === "deepseek") {
+    if (!config.deepseekApiKey) {
+      return { field: "deepseek", ok: false, message: "请先保存 API Key" };
+    }
+    const base = (config.deepseekBaseUrl || "https://api.deepseek.com/v1").replace(/\/+$/, "");
+    try {
+      const response = await fetch(`${base}/models`, {
+        headers: { Authorization: `Bearer ${config.deepseekApiKey}` },
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (!response.ok) {
+        return {
+          field: "deepseek",
+          ok: false,
+          message:
+            response.status === 401 || response.status === 403
+              ? "模型连接失败：API Key 无效或没有权限"
+              : `模型连接失败：服务返回 HTTP ${response.status}`,
+        };
+      }
+      return { field: "deepseek", ok: true, message: `模型服务连接正常 · ${config.model}` };
+    } catch (error) {
+      return {
+        field: "deepseek",
+        ok: false,
+        message: `模型连接失败：${oneLine(error instanceof Error ? error.message : String(error), 100)}`,
+      };
+    }
+  }
+  return { field: "unknown", ok: false, message: "未知的检测项目" };
+}
+
+function generatedStats(): { count: number; bytes: number } {
+  let count = 0;
+  let bytes = 0;
+  try {
+    for (const entry of fs.readdirSync(generatedDir(), { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      count++;
+      bytes += fs.statSync(path.join(generatedDir(), entry.name)).size;
+    }
+  } catch {
+    // 目录尚未创建就是零占用
+  }
+  return { count, bytes };
+}
+
+function clearGenerated(): number {
+  let removed = 0;
+  const root = path.resolve(generatedDir());
+  try {
+    for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      const target = path.resolve(root, entry.name);
+      if (!target.startsWith(root + path.sep)) continue;
+      fs.rmSync(target, { force: true });
+      removed++;
+    }
+  } catch {
+    // 目录不存在或文件正被占用：保留未删项目
+  }
+  return removed;
+}
+
+function dataPayload() {
+  const sessions = listSessions();
+  const attachments = attachmentStats();
+  const workspace = workspaceStats();
+  return {
+    sessions: { count: sessions.length, messages: sessions.reduce((n, s) => n + s.count, 0) },
+    attachments: { count: attachments.count, bytes: attachments.totalBytes },
+    uploads: workspace.uploads,
+    generated: generatedStats(),
+    reminders: workspace.reminders,
+    snapshots: workspace.snapshots,
   };
 }
 
@@ -306,6 +478,7 @@ function applySettings(body: Record<string, unknown>): {
   ok: boolean;
   results: SettingResult[];
   status: ReturnType<typeof settingsPayload>;
+  modelChanged: boolean;
 } {
   const results: SettingResult[] = [];
   const user = typeof body.jwglUsername === "string" ? body.jwglUsername.trim() : "";
@@ -325,11 +498,37 @@ function applySettings(body: Record<string, unknown>): {
   if (key) {
     const r = setDeepSeekApiKey(key);
     results.push({ field: "apiKey", ok: r.ok, message: r.message.replace(/^[✅❌]\s*/, "") });
+    // 可用型号跟 Key 走：换 Key 后旧清单作废，下次打开弹窗重新拉
+    if (r.ok) invalidateModelCache();
+  }
+  let modelChanged = false;
+  const requestedModel = typeof body.model === "string" ? body.model.trim() : "";
+  if (requestedModel) {
+    const allowed = allowedModelIds(
+      cachedModelOptions().map((m) => m.id),
+      [config.model],
+    );
+    const r = validateModelChoice({ requested: requestedModel, allowed, current: config.model });
+    if (r.ok && r.model === config.model) {
+      results.push({ field: "model", ok: true, message: "所选模型已是当前值，无需切换" });
+    } else {
+      results.push({ field: "model", ok: r.ok, message: r.message });
+      if (r.ok) {
+        config.model = r.model;
+        saveCredentialsStore({ model: r.model, modelOverride: true });
+        modelChanged = true;
+      }
+    }
   }
   if (!results.length) {
     results.push({ field: "none", ok: true, message: "没有需要保存的修改" });
   }
-  return { ok: results.every((r) => r.ok), results, status: settingsPayload() };
+  return {
+    ok: results.every((r) => r.ok),
+    results,
+    status: settingsPayload(),
+    modelChanged,
+  };
 }
 
 async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
@@ -363,12 +562,92 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       }
       return;
     }
+    if (url === "/today" || url === "/today/") {
+      // 独立日程页：下一节课/今日/本周/考试，纯本地缓存渲染
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(todayPage());
+      return;
+    }
+    if (url === "/api/today" || url.startsWith("/api/today?")) {
+      // 只读本地缓存（课表/考试/假期/学期日期），不登录教务、不调模型
+      const week = Number(new URL(url, "http://127.0.0.1").searchParams.get("week"));
+      json(res, buildTodayBrief(undefined, Number.isInteger(week) ? week : undefined));
+      return;
+    }
     if (url === "/api/sessions") {
       json(res, { sessions: listSessions() });
       return;
     }
     if (url === "/api/settings") {
       json(res, settingsPayload());
+      return;
+    }
+    if (url === "/api/models" || url.startsWith("/api/models?")) {
+      // 弹窗打开后异步刷新：清单以该 Key 实际可用的型号为准
+      const force = new URL(url, "http://127.0.0.1").searchParams.get("refresh") === "1";
+      const list = await listModelOptions({
+        baseUrl: config.deepseekBaseUrl,
+        apiKey: config.deepseekApiKey,
+        force,
+      });
+      json(res, {
+        ok: list.source === "live",
+        current: config.model,
+        source: list.source,
+        options: list.options,
+        message: list.message ?? "",
+      });
+      return;
+    }
+    if (url === "/api/reminders") {
+      json(res, { reminders: listReminders() });
+      return;
+    }
+    if (url.startsWith("/api/reminders/") && url.endsWith(".ics")) {
+      const id = url.slice("/api/reminders/".length, -4);
+      const reminder = listReminders().find((r) => r.id === id);
+      if (!reminder) {
+        fileNotFound(res);
+        return;
+      }
+      const body = reminderIcs(reminder);
+      res.writeHead(200, {
+        "content-type": "text/calendar; charset=utf-8",
+        "content-disposition": `attachment; filename="courseraptor-${id}.ics"`,
+        "cache-control": "no-store",
+      });
+      res.end(body);
+      return;
+    }
+    if (url === "/api/data") {
+      json(res, dataPayload());
+      return;
+    }
+    if (url === "/api/data/export") {
+      const body = JSON.stringify(
+        {
+          exportedAt: new Date().toISOString(),
+          sessions: readSessions().map((s) => ({
+            ...s,
+            messages: s.messages.map(({ attachments, ...m }) => ({
+              ...m,
+              ...(attachments?.length
+                ? { attachments: attachments.map(({ id, name }) => ({ id, name })) }
+                : {}),
+            })),
+          })),
+          reminders: listReminders(),
+          summary: dataPayload(),
+        },
+        null,
+        2,
+      );
+      res.writeHead(200, {
+        "content-type": "application/json; charset=utf-8",
+        "content-disposition": `attachment; filename="courseraptor-data-${new Date().toISOString().slice(0, 10)}.json"`,
+        "cache-control": "no-store",
+      });
+      res.end(body);
       return;
     }
     if (url.startsWith(SESSIONS_PREFIX)) {
@@ -383,7 +662,12 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         title: s.title || "新会话",
         createdAt: s.createdAt,
         updatedAt: s.updatedAt,
-        messages: s.messages,
+        messages: s.messages.map(({ attachments, ...message }) => ({
+          ...message,
+          ...(attachments?.length
+            ? { attachments: attachments.map(({ id, name }) => ({ id, name })) }
+            : {}),
+        })),
       });
       return;
     }
@@ -399,17 +683,84 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return;
     }
     if (url === "/api/settings") {
-      let raw = "";
-      for await (const chunk of req) raw += chunk;
       let body: Record<string, unknown>;
       try {
-        body = JSON.parse(raw) as Record<string, unknown>;
+        body = await jsonBody(req);
       } catch {
         json(res, { error: "请求体需要是 JSON" }, 400);
         return;
       }
       const r = applySettings(body ?? {});
+      if (r.modelChanged) {
+        // 串行重建：并发保存时不能让两个 agent 互相覆盖
+        const note = await (refreshChain = refreshChain
+          .then(refreshChatAgent)
+          .catch(() => "；即时切换失败，旧模型继续可用，重启后生效"));
+        const line = r.results.find((item) => item.field === "model");
+        if (line) line.message += note;
+      }
       json(res, r, r.ok ? 200 : 400);
+      return;
+    }
+    if (url === "/api/diagnostics") {
+      try {
+        const body = await jsonBody(req, 16_384);
+        const result = await runDiagnostic(body.target);
+        json(res, { ok: result.ok, result, checkedAt: Date.now() }, result.ok ? 200 : 400);
+      } catch {
+        json(res, { error: "请求体需要是 JSON" }, 400);
+      }
+      return;
+    }
+    if (url === "/api/uploads") {
+      try {
+        const body = await jsonBody(req, Math.ceil((MAX_UPLOAD_BYTES * 4) / 3) + 64_000);
+        const data = typeof body.data === "string" ? body.data : "";
+        const name = typeof body.name === "string" ? body.name : "";
+        const type = typeof body.type === "string" ? body.type : "";
+        const buf = Buffer.from(data, "base64");
+        if (!data || !buf.length) throw new Error("文件内容无效");
+        const upload = saveUpload(name, type, buf);
+        json(res, {
+          upload: { id: upload.id, name: upload.name, size: upload.size, type: upload.type },
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "上传失败";
+        json(
+          res,
+          { error: message === "PAYLOAD_TOO_LARGE" ? "单个文件不能超过 25 MB" : message },
+          400,
+        );
+      }
+      return;
+    }
+    if (url === "/api/reminders") {
+      try {
+        const reminder = addReminder(await jsonBody(req, 32_768));
+        json(res, { reminder }, 201);
+      } catch (error) {
+        json(res, { error: error instanceof Error ? error.message : "创建提醒失败" }, 400);
+      }
+      return;
+    }
+    if (url === "/api/data/clear") {
+      try {
+        const body = await jsonBody(req, 16_384);
+        const scopes = Array.isArray(body.scopes) ? body.scopes.map(String) : [];
+        const result: Record<string, number> = {};
+        if (scopes.includes("sessions")) {
+          result.sessions = listSessions().length;
+          resetAll();
+        }
+        if (scopes.includes("attachments")) result.attachments = await clearAttachments();
+        if (scopes.includes("uploads")) result.uploads = clearUploads();
+        if (scopes.includes("generated")) result.generated = clearGenerated();
+        if (scopes.includes("reminders")) result.reminders = clearReminders();
+        if (scopes.includes("snapshots")) result.snapshots = clearSnapshots();
+        json(res, { ok: true, result, summary: dataPayload() });
+      } catch {
+        json(res, { error: "清理请求无效" }, 400);
+      }
       return;
     }
     if (url === "/api/chat") {
@@ -417,10 +768,57 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return;
     }
   }
+  if (req.method === "PATCH" && url.startsWith(SESSIONS_PREFIX)) {
+    const raw = decodeURIComponent(url.slice(SESSIONS_PREFIX.length));
+    if (!SESSION_ID_RE.test(raw)) {
+      json(res, { error: "会话不存在" }, 404);
+      return;
+    }
+    try {
+      const body = await jsonBody(req, 16_384);
+      const updated = updateSession(raw, {
+        ...(typeof body.title === "string" ? { title: body.title } : {}),
+        ...(typeof body.pinned === "boolean" ? { pinned: body.pinned } : {}),
+      });
+      json(
+        res,
+        updated
+          ? {
+              ok: true,
+              session: { id: updated.id, title: updated.title, pinned: !!updated.pinned },
+            }
+          : { error: "会话不存在或标题无效" },
+        updated ? 200 : 404,
+      );
+    } catch {
+      json(res, { error: "请求体需要是 JSON" }, 400);
+    }
+    return;
+  }
+  if (req.method === "PATCH" && url.startsWith("/api/reminders/")) {
+    const id = url.slice("/api/reminders/".length);
+    try {
+      const reminder = updateReminder(id, await jsonBody(req, 32_768));
+      json(res, reminder ? { reminder } : { error: "提醒不存在" }, reminder ? 200 : 404);
+    } catch (error) {
+      json(res, { error: error instanceof Error ? error.message : "更新提醒失败" }, 400);
+    }
+    return;
+  }
   if (req.method === "DELETE" && url.startsWith(SESSIONS_PREFIX)) {
     const raw = decodeURIComponent(url.slice(SESSIONS_PREFIX.length));
     const ok = SESSION_ID_RE.test(raw) && deleteSession(raw);
     json(res, ok ? { ok: true } : { error: "会话不存在" }, ok ? 200 : 404);
+    return;
+  }
+  if (req.method === "DELETE" && url.startsWith("/api/uploads/")) {
+    const ok = deleteUpload(url.slice("/api/uploads/".length));
+    json(res, ok ? { ok: true } : { error: "附件不存在" }, ok ? 200 : 404);
+    return;
+  }
+  if (req.method === "DELETE" && url.startsWith("/api/reminders/")) {
+    const ok = deleteReminder(url.slice("/api/reminders/".length));
+    json(res, ok ? { ok: true } : { error: "提醒不存在" }, ok ? 200 : 404);
     return;
   }
   res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
@@ -435,12 +833,14 @@ async function handleChat(req: http.IncomingMessage, res: http.ServerResponse) {
   }
 
   let message = "";
-  for await (const chunk of req) message += chunk;
   let sessionId = DEFAULT_ID;
+  let uploads: WebUpload[] = [];
   try {
-    const body = JSON.parse(message) as { message?: unknown; sessionId?: unknown };
+    const body = await jsonBody(req);
     message = typeof body.message === "string" ? body.message.trim() : "";
     sessionId = sidOf(body.sessionId);
+    const ids = Array.isArray(body.attachmentIds) ? body.attachmentIds.map(String).slice(0, 8) : [];
+    uploads = getUploads(ids);
   } catch {
     message = "";
   }
@@ -472,7 +872,7 @@ async function handleChat(req: http.IncomingMessage, res: http.ServerResponse) {
   // 关闭 SSE——不关的话浏览器/测试的 reader 永远等不到流结束
   const prev = turnChain;
   turnChain = prev
-    .then(() => runTurn(agent, sessionId, message, send, abort.signal))
+    .then(() => runTurn(agent, sessionId, message, uploads, send, abort.signal))
     .catch(() => {})
     .finally(() => {
       if (!res.writableEnded) res.end();
@@ -484,15 +884,22 @@ async function runTurn(
   agent: ChatStreamableAgent,
   sessionId: string,
   message: string,
+  uploads: WebUpload[],
   send: (obj: unknown) => void,
   signal: AbortSignal,
 ): Promise<void> {
+  const attachmentContext = uploads.length
+    ? `\n\n${uploads
+        .map((upload) => `[用户通过网页上传附件：${upload.name}；本机路径：${upload.storedPath}]`)
+        .join("\n")}\n请按用户问题读取所需附件，不要假设附件内容。`
+    : "";
   const messages: ModelMessage[] = [
     ...contextMessages(sessionId),
-    { role: "user", content: message },
+    { role: "user", content: message + attachmentContext },
   ];
   const startedAt = Date.now();
-  const toolStart = new Map<string, { name: string; at: number }>();
+  const toolStart = new Map<string, { name: string; at: number; input?: unknown }>();
+  const artifacts: StoredArtifact[] = [];
   let text = "";
   let think = "";
   let failure: string | null = null;
@@ -526,7 +933,11 @@ async function runTurn(
         }
         case "tool-call": {
           if (p.toolCallId)
-            toolStart.set(p.toolCallId, { name: p.toolName ?? "tool", at: Date.now() });
+            toolStart.set(p.toolCallId, {
+              name: p.toolName ?? "tool",
+              at: Date.now(),
+              input: p.input,
+            });
           send({
             t: "tool",
             phase: "start",
@@ -550,6 +961,28 @@ async function runTurn(
             // 有成品文件时前端在工具卡下方渲染下载行
             ...(files.length ? { files } : {}),
           });
+          const outputForCard =
+            p.toolName === "read_notice" && t0?.input && typeof t0.input === "object"
+              ? {
+                  ...(p.output as Record<string, unknown>),
+                  ...(t0.input as Record<string, unknown>),
+                }
+              : p.output;
+          const entries = snapshotEntries(p.toolName ?? "", outputForCard);
+          const change = entries
+            ? compareAndSaveSnapshot(
+                `${p.toolName}:${oneLine(
+                  String((outputForCard as Record<string, unknown>)?.term ?? "current"),
+                  40,
+                )}`,
+                entries,
+              )
+            : undefined;
+          const card = resultCard(p.toolName ?? "", outputForCard, change);
+          if (card) {
+            artifacts.push(card);
+            send({ t: "card", card });
+          }
           break;
         }
         case "tool-error": {
@@ -582,7 +1015,10 @@ async function runTurn(
   // 落盘在 chat-sessions 里做，重启后历史仍在。思考跟着同一轮的助手消息
   // 存成 think 字段，只给界面回看，不会再被喂回模型
   if (!signal.aborted) {
-    appendRound(sessionId, message, text.trim() ? text : null, think.trim() || null);
+    appendRound(sessionId, message, text.trim() ? text : null, think.trim() || null, {
+      attachments: uploads.map(({ id, name, storedPath }) => ({ id, name, storedPath })),
+      artifacts,
+    });
   }
 }
 

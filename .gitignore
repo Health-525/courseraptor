@@ -13,3 +13,4 @@ data/
 credentials.enc
 update-data/
 .spec-workflow/
+.tmp-banner/

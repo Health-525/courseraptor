@@ -68,8 +68,12 @@ if (config.qqBotAppId && config.qqBotAppSecret) {
 const agent = await createRaptorAgent();
 
 // 网页对话窗口：浏览器打开即聊（地址显示在欢迎卡片下方），起不来不影响终端
-const { setChatAgent, startChatWeb } = await import("./web/chat-web");
+const { setChatAgent, setChatAgentRefresher, startChatWeb } = await import("./web/chat-web");
 setChatAgent(agent);
+// 换模型即重建 agent 给网页用；终端 TUI 持有的是上面这个实例，重启后才用新模型
+setChatAgentRefresher(async () => {
+  setChatAgent(await createRaptorAgent());
+});
 startChatWeb().catch(() => {});
 
 /**

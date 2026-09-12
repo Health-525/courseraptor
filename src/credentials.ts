@@ -37,6 +37,10 @@ export interface CredentialsStore {
   deepseekApiKey?: string;
   /** 经 /key 明确确认的本机覆盖值；启动时优先于 .env。 */
   deepseekApiKeyOverride?: boolean;
+  /** 设置弹窗里选定的 DeepSeek 型号 */
+  model?: string;
+  /** 用户在界面上明确选过型号；启动时优先于 .env 的 RAPTOR_MODEL。 */
+  modelOverride?: boolean;
   savedAt: string;
 }
 

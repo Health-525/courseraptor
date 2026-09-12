@@ -1,6 +1,7 @@
 /**
  * 选课与抢课工具：check_selection_status / search_courses / search_classes
  *               watch_courses / grab_course / grab_plan
+ *               list_choosed_courses / drop_course
  * 包含抢课循环（watchLoop / grabPlanLoop）与课程摘要辅助。
  */
 
@@ -9,9 +10,12 @@ import { z } from "zod";
 
 import { config } from "../config";
 import {
+  type ChoosedCourse,
+  fetchChoosedList,
   fetchJxbList,
   inspectXk,
   matchTargets,
+  quitCourse,
   roundRefOf,
   searchCourses,
   submitCourse,
@@ -309,9 +313,7 @@ async function grabPlanLoop(
       // 通识选修轮上线新 tab），刷新后重新解析轮次列表
       await loop.maybeRefresh(courses, true);
 
-      const matched = courses.filter(
-        (c) => c.courseName.includes(name) || name.includes(c.courseName),
-      );
+      const matched = courses.filter((c) => matchByName(name, c));
       const available = matched.filter((c) => c.remain > 0);
 
       if (available.length > 0) {
@@ -374,6 +376,67 @@ async function grabPlanLoop(
     })),
     events,
     submitAttempts,
+  };
+}
+
+// ── 退课辅助 ─────────────────────────────────────────────────
+
+/** 名称双向包含匹配：候选列表项名包含关键词，或关键词包含候选名 */
+function matchByName(name: string, c: { courseName: string }): boolean {
+  return c.courseName.includes(name) || name.includes(c.courseName);
+}
+
+/**
+ * 退课目标定位：已选行自带教学班 ID 直接用；缺失时按轮次扫教学班列表补齐。
+ * 多个教学班无法唯一确定时返回 error——宁可让用户再指认一次，不能退错班。
+ */
+async function resolveQuitJxbId(
+  session: XkSession,
+  target: ChoosedCourse,
+  teacher?: string,
+): Promise<{ jxbId: string; classBrief?: string } | { error: string; classes?: unknown[] }> {
+  if (target.jxbId) return { jxbId: target.jxbId };
+
+  if (!target.courseCode) {
+    return { error: `已选行缺少课程号与教学班 ID，无法定位退课目标：${target.courseName}` };
+  }
+
+  // 已选课程所在轮次未知，逐轮次查询教学班列表（每轮凭证独立）
+  const byId = new Map<string, XkCourse>();
+  for (const r of session.rounds) {
+    try {
+      const list = await fetchJxbList(session, {
+        kklxdm: r.kklxdm,
+        xkkzId: r.xkkzId,
+        xkkzXh: r.xh,
+        courseCode: target.courseCode,
+      });
+      for (const c of list) if (c.jxbId) byId.set(c.jxbId, c);
+    } catch {
+      // 单轮次查询失败跳过，其他轮次仍可能命中
+    }
+  }
+
+  let picked = [...byId.values()];
+  if (teacher) {
+    const filtered = picked.filter((c) => c.teacher.includes(teacher));
+    // 教师过滤有命中才收窄；全军覆没则保留全量，走下面的多班报错路径让用户看清
+    if (filtered.length > 0) picked = filtered;
+  }
+
+  if (picked.length === 1) {
+    const c = picked[0];
+    return {
+      jxbId: c.jxbId,
+      classBrief: [c.teacher || "教师未知", String(c.raw?.sksj ?? "")].filter(Boolean).join(" "),
+    };
+  }
+  if (picked.length === 0) {
+    return { error: `未查到「${target.courseName}」的教学班明细，未提交退课` };
+  }
+  return {
+    error: `「${target.courseName}」有 ${picked.length} 个教学班，无法确定用户选的是哪个，未提交退课`,
+    classes: picked.map((c) => ({ teacher: c.teacher, schedule: String(c.raw?.sksj ?? "") })),
   };
 }
 
@@ -596,6 +659,121 @@ export const courseSelectionTools = {
         summary:
           `抢到 ${okCount}/${groups.length} 类：` +
           result.results.map((r) => `${r.category}=${r.grabbed ?? "未抢到"}`).join("；"),
+      };
+    },
+  }),
+
+  /** 本轮已选课程查询 */
+  list_choosed_courses: tool({
+    description:
+      "查询本轮选课已选中的课程列表（选课模块维度，含课程号）。抢课成功后想确认是否真的选上、退课前看现状时用。与 get_enrolled_courses（选课名单维度，含时间地点学分）互补；本工具只在选课轮次内有数据。",
+    inputSchema: z.object({}),
+    execute: async () => {
+      let session = await getXkSession();
+      let list: ChoosedCourse[];
+      try {
+        list = await fetchChoosedList(session);
+      } catch (e) {
+        if ((e as Error).message !== "SESSION_EXPIRED") throw e;
+        invalidateXkSession();
+        session = await getXkSession(true);
+        list = await fetchChoosedList(session);
+      }
+      return {
+        isXkOpen: session.isXkOpen,
+        total: list.length,
+        courses: list.map((c) => ({
+          courseName: c.courseName || c.courseCode,
+          courseCode: c.courseCode,
+          ...(c.teacher ? { teacher: c.teacher } : {}),
+        })),
+        note:
+          list.length === 0
+            ? "本轮已选为空。非选课阶段该接口无数据属正常；若刚抢课成功仍为空，可能是轮次未同步，稍后再查。"
+            : undefined,
+      };
+    },
+  }),
+
+  /** 退课（真实提交退课操作！） */
+  drop_course: tool({
+    description:
+      "退课（真实提交退课操作！）：从本轮已选课程中退掉一门。必须由用户明确点名要退的课程后才可调用，绝不批量退课。课程名匹配到多门、或教学班无法唯一定位时不会提交，会返回明细让用户指认。",
+    inputSchema: z.object({
+      courseName: z.string().describe("要退的课程名关键词（与用户点名的课程一致）"),
+      teacher: z.string().optional().describe("教师名（可选，同门课多个教学班时用于定位）"),
+    }),
+    execute: async ({ courseName, teacher }) => {
+      let session = await getXkSession();
+
+      const choosedOnce = async (): Promise<ChoosedCourse[]> => {
+        try {
+          return await fetchChoosedList(session);
+        } catch (e) {
+          if ((e as Error).message !== "SESSION_EXPIRED") throw e;
+          invalidateXkSession();
+          session = await getXkSession(true);
+          return await fetchChoosedList(session);
+        }
+      };
+
+      const choosed = await choosedOnce();
+      if (choosed.length === 0) {
+        return {
+          dropped: false,
+          error: "本轮已选课程为空，无可退课程（非选课阶段该接口无数据属正常）",
+        };
+      }
+
+      const matches = choosed.filter((c) => matchByName(courseName, c));
+      if (matches.length === 0) {
+        return {
+          dropped: false,
+          error: `已选课程中没有匹配「${courseName}」的，未提交退课。当前已选：`,
+          choosed: choosed.map((c) => c.courseName || c.courseCode),
+        };
+      }
+      // 多门命中绝不猜——退错课的代价是用户想要的课没了，让用户指名
+      if (matches.length > 1) {
+        return {
+          dropped: false,
+          error: `「${courseName}」匹配到 ${matches.length} 门已选课程，未提交退课。请让用户指明其中一门：`,
+          matches: matches.map((c) => c.courseName || c.courseCode),
+        };
+      }
+      const target = matches[0];
+
+      const resolved = await resolveQuitJxbId(session, target, teacher);
+      if ("error" in resolved) {
+        return { dropped: false, ...resolved };
+      }
+
+      let result = await quitCourse(session, resolved.jxbId);
+      if (result.message === "SESSION_EXPIRED") {
+        invalidateXkSession();
+        session = await getXkSession(true);
+        result = await quitCourse(session, resolved.jxbId);
+      }
+
+      // 成功后复查已选列表确认真退掉了（best-effort，失败不影响结论）
+      let remaining: string[] | undefined;
+      if (result.ok) {
+        try {
+          remaining = (await fetchChoosedList(session)).map((c) => c.courseName || c.courseCode);
+        } catch {
+          remaining = undefined;
+        }
+      }
+
+      return {
+        dropped: result.ok,
+        courseName: target.courseName || target.courseCode,
+        ...(resolved.classBrief ? { classBrief: resolved.classBrief } : {}),
+        message: result.message,
+        ...(remaining !== undefined ? { remainingChoosed: remaining } : {}),
+        summary: result.ok
+          ? `✅ 已退掉「${target.courseName}」${resolved.classBrief ? `（${resolved.classBrief}）` : ""}：${result.message}`
+          : `❌ 退课未成功：${result.message}`,
       };
     },
   }),

@@ -3,6 +3,13 @@
 # 每个文件报格式差异，Windows CI 长期红。
 * text=auto eol=lf
 
+# .bat 例外：必须把 CRLF 原样存进 blob，而不是靠检出时转换。
+# cmd.exe 读批处理是按字节偏移回扫的，遇到「多字节中文 + 裸 LF」会算错行位置、
+# 把下一行从中间截断执行（表现为双击 start.bat 黑窗口一闪而过）；而 GitHub 的
+# Source code zip 直接打包 blob 原文、不做 checkout 转换，光有 eol=lf 就会把
+# 坏脚本发给每个从网页下源码包的人。
+*.bat -text
+
 # 二进制文件不参与行尾转换
 *.png binary
 *.jpg binary

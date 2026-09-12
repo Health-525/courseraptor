@@ -5,6 +5,7 @@
 
 import path from "node:path";
 import { loadCredentialsStore } from "./credentials";
+import { resolveStoredModel } from "./models";
 
 // 项目根目录解析独立成 paths.ts，避免与 credentials.ts 循环依赖
 import { PROJECT_ROOT as ROOT } from "./paths";
@@ -93,7 +94,11 @@ function loadConfig(): RaptorConfig {
     deepseekApiKey: resolvedKey.key,
     deepseekApiKeySource: resolvedKey.source,
     deepseekBaseUrl: env("DEEPSEEK_BASE_URL"),
-    model: env("RAPTOR_MODEL") ?? "deepseek-v4-flash",
+    model: resolveStoredModel({
+      environmentModel: env("RAPTOR_MODEL"),
+      storedModel: stored?.model,
+      storedOverride: stored?.modelOverride,
+    }),
     jwglUsername: env("JWGL_USERNAME") ?? "",
     jwglPassword: env("JWGL_PASSWORD") ?? "",
     credentialsSource: "env",
