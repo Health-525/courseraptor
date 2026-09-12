@@ -14,7 +14,9 @@
 
 import { createRaptorAgent } from "./agent";
 import { config } from "./config";
+import { saveCredentialsStore } from "./credentials";
 import { flushCapturedSession } from "./memory/shortterm";
+import { ensureModelAvailable } from "./models";
 import { ensureCredentials, runDeepSeekKeySetup } from "./onboarding";
 import { SLASH_COMMANDS } from "./tui/slash-menu";
 import {
@@ -54,6 +56,23 @@ const updateInfo: UpdateInfo | null = await updatePromise;
 if (updateInfo) {
   // 行内模式可见；卡片模式每帧清屏，靠下面 title 里的徽标常驻
   console.log(formatUpdateBanner(updateInfo));
+}
+
+// 模型退役检测：DeepSeek 上下架型号后，本地存着的旧 id 会让每次对话直接
+// 报错。启动时强制拉一次实时清单，已退役的自动迁到当前默认型号并落盘；
+// 断网/Key 失效时检测不动配置（ensureModelAvailable 只认 live 清单）。
+// 必须赶在 agent / QQ 桥 / 网页构建之前，三个渠道才都拿到迁移后的模型。
+if (config.deepseekApiKey) {
+  const drift = await ensureModelAvailable({
+    current: config.model,
+    baseUrl: config.deepseekBaseUrl,
+    apiKey: config.deepseekApiKey,
+  });
+  if (drift.migrated) {
+    config.model = drift.model;
+    saveCredentialsStore({ model: drift.model, modelOverride: true });
+    console.log(`🔄 ${drift.message}\n`);
+  }
 }
 
 // QQ 渠道：日志写 qq-bridge.log，不干扰终端渲染

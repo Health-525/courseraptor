@@ -8,7 +8,7 @@
 |---|---|
 | `DEEPSEEK_API_KEY` | 正式对话需要；可通过首次引导或无参数 `/key` 配置 |
 | `JWGL_USERNAME` / `JWGL_PASSWORD` | 本人的教务凭证；留空时按启动引导配置 |
-| `RAPTOR_MODEL` | 源码默认 `deepseek-v4-flash`；网页「账号与模型」里选过的型号会加密记在本机并优先于本项。须确认自己的服务账户支持所选模型 |
+| `RAPTOR_MODEL` | 源码默认 `deepseek-flash`（V4.1-Flash）；官方已停用 `deepseek-chat` / `deepseek-reasoner` 别名、退役 `deepseek-v4-flash` 系列，本地存有旧型号时启动自动迁移到当前默认。网页「账号与模型」里选过的型号会加密记在本机并优先于本项。须确认自己的服务账户支持所选模型 |
 | `DEEPSEEK_BASE_URL` | 可选，自定义模型服务地址；对话内容会发往这个服务 |
 | `RAPTOR_WEB_PORT` | 正式网页首选端口，默认 3210，占用后自动选择空闲端口 |
 | `RAPTOR_TUI_INLINE` | `1` 使用终端行内模式；默认全屏卡片模式 |
