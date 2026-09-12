@@ -24,7 +24,8 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
       });
     const reply = await (await send({ message: "这周课表", sessionId: "demo-a" })).text();
     assert.match(reply, /示例高等数学/);
-    assert.match(reply, /"t":"card"/);
+    // 课表结果卡已移除：演示只回 Markdown 示例课表，不再有 "t":"card"
+    assert.doesNotMatch(reply, /"t":"card"/);
     assert.match(reply, /"t":"end","sid":"demo-a"/);
     await send({ message: "我的成绩和 GPA", sessionId: "demo-b" });
     const first = await (await fetch(`${base}/api/sessions/demo-a`)).json();
