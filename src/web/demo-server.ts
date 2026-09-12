@@ -20,20 +20,6 @@ function demoCard(message: string): StoredArtifact | null {
     source: "离线演示",
     change: { status: "first" as const, text: "正式查询后会保存为变化对比基准" },
   };
-  if (/课表|上课|这周|今天|明天/.test(message))
-    return {
-      ...base,
-      kind: "schedule",
-      title: "本周课表",
-      metrics: [
-        { label: "教学周", value: "第 1 周" },
-        { label: "课程", value: "3 门" },
-      ],
-      rows: [
-        { label: "示例高等数学", value: "周一 · 08:00–09:35", meta: "示例教学楼 101" },
-        { label: "示例大学英语", value: "周三 · 10:15–11:50", meta: "示例教学楼 202" },
-      ],
-    };
   if (/成绩|GPA|绩点|学业/i.test(message))
     return {
       ...base,

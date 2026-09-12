@@ -46,7 +46,7 @@ export interface StoredMessage {
 }
 
 export interface StoredArtifact {
-  kind: "schedule" | "grades" | "exams" | "news" | "notice" | "file";
+  kind: "grades" | "exams" | "news" | "notice" | "file";
   title: string;
   badge?: string;
   updatedAt: number;

@@ -19,12 +19,7 @@ export function snapshotEntries(toolName: string, output: unknown): Record<strin
   const o = obj(output);
   if (!o || typeof o.error === "string") return null;
   const entries: Record<string, string> = {};
-  if (toolName === "get_schedule") {
-    for (const row of arr(o.courses)) {
-      const id = [row.title, row.weekday, row.periods].map(str).join("｜");
-      entries[id] = [row.time, row.weeks, row.location, row.teacher].map(str).join("｜");
-    }
-  } else if (toolName === "get_grades") {
+  if (toolName === "get_grades") {
     for (const row of arr(o.courses)) {
       const id = `${take(row.courseCode || row.course, 60)}｜${take(row.semester, 30)}`;
       entries[id] = [row.score, row.credit, row.type].map(str).join("｜");
@@ -64,36 +59,6 @@ export function resultCard(
   const o = obj(output);
   if (!o || typeof o.error === "string") return null;
   const now = Date.now();
-  if (toolName === "get_schedule") {
-    const rows = arr(o.courses)
-      .slice(0, 7)
-      .map((r) => ({
-        label: take(r.title),
-        value: [take(r.weekday, 8), take(r.time || r.periods, 18)].filter(Boolean).join(" · "),
-        meta: [take(r.location, 22), take(r.teacher, 14)].filter(Boolean).join(" · "),
-      }));
-    return {
-      kind: "schedule",
-      title: "课表查询",
-      badge: take(o.currentWeek || o.term, 20),
-      updatedAt: now,
-      summary: take(o.weekNote || o.note, 100),
-      metrics: [
-        { label: "学期", value: take(o.term, 28) || "当前学期" },
-        { label: "课程", value: `${Number(o.total) || rows.length} 门` },
-      ],
-      rows,
-      change,
-      actions: [
-        {
-          type: "prompt",
-          label: "重新查询",
-          prompt: "重新查询这周课表，并告诉我与上次相比有什么变化",
-        },
-        { type: "prompt", label: "导出日历", prompt: "把本学期课表导出为手机可以导入的日历文件" },
-      ],
-    };
-  }
   if (toolName === "get_grades") {
     const summary = obj(o.academicSummary);
     const failed = arr(summary?.failedCourses);
