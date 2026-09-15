@@ -95,6 +95,12 @@ setChatAgentRefresher(async () => {
 });
 startChatWeb().catch(() => {});
 
+// 待办到期提醒：每小时扫描「距到期 ≤ 7 天」的未完成待办（每天最多一次，
+// 桌面通知 + QQ 推送）。QQ 桥在线时进程在 TUI 退出后仍存活，提醒也随之持续
+void import("./todo-reminders").then(({ startTodoReminderScheduler }) =>
+  startTodoReminderScheduler(),
+);
+
 /**
  * UI 切换外层循环：全屏卡片（@ai-sdk/tui）和行内渲染器可运行时互切。
  * /key 与 /inline 同样先退出当前 UI；外层独占 stdin 执行静音本地设置后，

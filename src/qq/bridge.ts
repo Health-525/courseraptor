@@ -34,6 +34,7 @@ import { drainGeneratedRound, runInDocumentRound } from "../document/save";
 import { ensureCredentials } from "../onboarding";
 import { localOnlyCommandMessage } from "../tui/slash-menu";
 import { mdToPlain, splitMessage } from "./format";
+import { registerQQPush } from "./push";
 import { type QqArchiveInput, qqArchiveSlot } from "./session-archive";
 
 type BridgeLogger = Pick<Console, "log" | "info" | "warn" | "error" | "debug">;
@@ -272,6 +273,16 @@ export async function startQQBridge(opts: { logger?: BridgeLogger } = {}): Promi
   await bot.start();
   log.log("🦖 CourseRaptor QQ 桥已启动（官方机器人 · WebSocket）");
   log.log(`已授权用户：${allowedOpenids.size} 个（暗号激活：发送 QQBOT_PASSCODE）`);
+
+  // 主动推送通道：白名单用户收系统提醒（待办到期等）。target 省略 msgId
+  // 即主动消息；平台对主动推送有频率限制，失败只记日志、不影响桥本体
+  registerQQPush(async (text) => {
+    for (const openid of allowedOpenids) {
+      await bot.sendText({ scope: "c2c", targetId: openid }, text).catch((e) => {
+        log.warn(`[qq] 主动推送失败（openid=${openid}）：${(e as Error)?.message ?? e}`);
+      });
+    }
+  });
 }
 
 // 独立入口（npm run qq）时自动启动；被 raptor 嵌入引用时不执行
@@ -304,4 +315,7 @@ export async function startStandaloneQQ(
 
 if (isEntry) {
   await startStandaloneQQ();
+  // 独立跑桥时待办提醒照常工作（主入口 index.ts 里另有启动）
+  const { startTodoReminderScheduler } = await import("../todo-reminders");
+  startTodoReminderScheduler();
 }

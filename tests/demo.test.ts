@@ -74,6 +74,10 @@ test("演示模式的本周课表页：内嵌虚构数据，不发请求", async
     assert.match(html, /const DEMO_DATA = \{/);
     assert.match(html, /示例高等数学/);
     assert.match(html, /if \(!DEMO_DATA\) \{/, "自动刷新与取数都必须被演示守卫挡住");
+    // 待办卡：虚构待办内嵌展示，交互被演示守卫挡住
+    assert.match(html, /id="todoCard"/);
+    assert.match(html, /交示例实验报告/);
+    assert.match(html, /chk\.disabled = true/, "演示模式不勾选完成");
   } finally {
     server.close();
   }

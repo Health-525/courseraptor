@@ -20,6 +20,7 @@ const { saveScheduleCache } = await import("../src/schedule-cache");
 const { saveExamCache } = await import("../src/exam-cache");
 const { recordWeek1Monday } = await import("../src/jwgl/term-dates");
 const { recordSpecialDays, removeSpecialDays } = await import("../src/jwgl/term-holidays");
+const { addReminder, listReminders, updateReminder } = await import("../src/web/workspace-data");
 
 // 校准 2026 秋学期：第 1 周从 2026-08-31（周一）开始
 recordWeek1Monday(2026, 3, "2026-08-31", "known", "测试校历");
@@ -69,6 +70,7 @@ test("无缓存：如实降级，不装作有数据", () => {
   assert.equal(b.week, null);
   assert.match(b.schedule.note ?? "", /还没有课表数据/);
   assert.equal(b.exams.available, false);
+  assert.deepEqual(b.todos.items, [], "降级分支也带待办字段");
 });
 
 test("普通教学日：今日课程按周次过滤、状态与下一节课正确", () => {
@@ -244,4 +246,27 @@ test("假期/未开学：周概览歇档，下一节课为空", () => {
   assert.equal(b.week, null);
   assert.equal(b.next, null);
   assert.match(b.schedule.note ?? "", /不在教学周内/);
+});
+
+test("待办：未完成按截止升序进简报，逾期/今天标注与标签正确", () => {
+  saveScheduleCache({ ...term, courses });
+  addReminder({ title: "已完成的旧待办", dueAt: "2026-08-29T10:00:00" });
+  const doneId = listReminders().find((r) => r.title === "已完成的旧待办")!.id;
+  updateReminder(doneId, { done: true });
+  addReminder({ title: "逾期的实验报告", dueAt: "2026-08-30T23:59:00" });
+  addReminder({ title: "今天交高数作业", dueAt: "2026-09-01T22:00:00" });
+  addReminder({ title: "后天英语复习", dueAt: "2026-09-03T14:00:00" });
+
+  const b = buildTodayBrief(new Date("2026-09-01T10:00:00"));
+  assert.deepEqual(
+    b.todos.items.map((t) => t.title),
+    ["逾期的实验报告", "今天交高数作业", "后天英语复习"],
+    "只列未完成，已完成的进不来",
+  );
+  assert.equal(b.todos.items[0].overdue, true);
+  assert.equal(b.todos.items[1].overdue, false);
+  assert.equal(b.todos.items[1].isToday, true);
+  assert.equal(b.todos.items[1].dueLabel, "今天 22:00");
+  assert.equal(b.todos.items[2].dueLabel, "9月3日 周四 14:00");
+  assert.equal(b.todos.items[2].isToday, false);
 });

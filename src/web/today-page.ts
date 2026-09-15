@@ -107,6 +107,8 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
   .card { border: 1px solid var(--rule-2); border-top: 2px solid var(--accent);
           background: var(--card); box-shadow: var(--shadow-sm);
           margin-bottom: 26px; }
+  /* 主区是 190px + 1fr 两列网格：课表后的卡片必须钉在右列，否则会被自动排进左栏 */
+  #todoCard { grid-column: 2; }
   .card > h2 { display: flex; justify-content: space-between; align-items: baseline;
                margin: 0; padding: 13px 18px 10px; border-bottom: 1px solid var(--rule);
                font-family: var(--mono); font-size: 13px; font-weight: 600;
@@ -152,6 +154,22 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
                 font-size: 15px; writing-mode: vertical-rl; letter-spacing: .12em; }
   .week-unscheduled { margin: 12px 0 0; padding-top: 10px; border-top: 1px dashed var(--rule);
                       font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+
+  /* 待办卡：纸质清单行，逾期用朱砂红提示 */
+  .todo-list { display: grid; gap: 6px; }
+  .todo-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px;
+               align-items: center; padding: 9px 12px; border: 1px solid var(--rule);
+               background: var(--paper); }
+  .todo-chk { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+  .todo-chk:disabled { cursor: default; }
+  .todo-title { font-size: 15px; overflow-wrap: anywhere; }
+  .todo-due { font-family: var(--mono); font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+  .todo-item.overdue .todo-due { color: var(--accent-deep); }
+  .todo-del { background: none; border: none; padding: 2px 4px; color: var(--ink-3);
+              font-family: var(--mono); font-size: 12px; cursor: pointer; }
+  .todo-del:hover { color: var(--accent); text-decoration: underline; }
+  .todo-empty { margin: 0; padding: 18px 8px; border: 1px dashed var(--rule-2); text-align: center;
+                color: var(--ink-3); font-size: 14px; }
 
   .skel { color: var(--ink-3); font-size: 15px; padding: 8px 2px; }
 
@@ -199,6 +217,10 @@ ${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 虚构�
   </aside>
   <section class="card" id="weekCard" aria-label="本周课表">
     <h2>课表<span class="cnote" id="weekNote"></span></h2>
+    <div class="cbody"><p class="skel">…</p></div>
+  </section>
+  <section class="card" id="todoCard" aria-label="待办事项">
+    <h2>待办<span class="cnote" id="todoNote"></span></h2>
     <div class="cbody"><p class="skel">…</p></div>
   </section>
 </main>
@@ -326,6 +348,54 @@ function renderSrc(b) {
   }
 }
 
+function renderTodos(b) {
+  const body = $("todoCard").querySelector(".cbody");
+  const note = $("todoNote");
+  body.textContent = "";
+  const items = (b.todos && b.todos.items) || [];
+  note.textContent = items.length ? items.length + " 项未完成" : "";
+  if (!items.length) {
+    body.appendChild(el("p", "todo-empty", "没有未完成的待办。在对话页对我说「我这周要……」即可记录。"));
+    return;
+  }
+  const list = el("div", "todo-list");
+  for (const t of items) {
+    const row = el("div", "todo-item" + (t.overdue ? " overdue" : ""));
+    const chk = el("input", "todo-chk");
+    chk.type = "checkbox";
+    chk.setAttribute("aria-label", "完成待办：" + t.title);
+    if (!DEMO_DATA) {
+      chk.addEventListener("change", () => {
+        fetch("/api/reminders/" + t.id, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ done: true }),
+        }).then(() => load()).catch(() => load());
+      });
+    } else {
+      chk.disabled = true;
+    }
+    row.appendChild(chk);
+    const title = el("span", "todo-title", t.title);
+    if (t.notes) title.title = t.notes;
+    row.appendChild(title);
+    row.appendChild(el("span", "todo-due", (t.overdue ? "⚠ " : "") + t.dueLabel));
+    if (!DEMO_DATA) {
+      const del = el("button", "todo-del", "删除");
+      del.type = "button";
+      del.addEventListener("click", () => {
+        if (!window.confirm("删除待办「" + t.title + "」？")) return;
+        fetch("/api/reminders/" + t.id, { method: "DELETE" })
+          .then(() => load())
+          .catch(() => load());
+      });
+      row.appendChild(del);
+    }
+    list.appendChild(row);
+  }
+  body.appendChild(list);
+}
+
 function render(b) {
   $("phDate").textContent = b.dateLabel;
   $("railWeek").textContent = b.term.weekLabel || "本周";
@@ -340,6 +410,7 @@ function render(b) {
     week.appendChild(el("span", "warn", "（周次为估算）"));
   }
   renderWeek(b);
+  renderTodos(b);
   renderSrc(b);
   document.title = "本周课表 · " + b.dateLabel;
 }
@@ -354,6 +425,9 @@ function load() {
       const body = $("weekCard").querySelector(".cbody");
       body.textContent = "";
       body.appendChild(el("p", "daynote", "课表暂时取不出来，请稍候刷新。"));
+      const todoBody = $("todoCard").querySelector(".cbody");
+      todoBody.textContent = "";
+      todoBody.appendChild(el("p", "daynote", "待办暂时取不出来，请稍候刷新。"));
     });
 }
 $("prevWeek").addEventListener("click", () => {
