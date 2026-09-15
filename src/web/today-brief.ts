@@ -21,6 +21,7 @@ import { resolveWeek1Monday } from "../jwgl/term-dates";
 import { type SpecialDay, specialOnDate } from "../jwgl/term-holidays";
 import type { CourseData } from "../jwgl/types";
 import { loadScheduleCache } from "../schedule-cache";
+import { listReminders } from "./workspace-data";
 
 export interface BriefCourse {
   title: string;
@@ -70,6 +71,19 @@ export interface BriefDay {
   }>;
 }
 
+export interface BriefTodo {
+  id: string;
+  title: string;
+  /** 截止时刻（ISO） */
+  dueAt: string;
+  /** "今天 23:59" / "明天 14:00" / "9月20日 周日 14:00" */
+  dueLabel: string;
+  overdue: boolean;
+  isToday: boolean;
+  notes?: string;
+  source?: string;
+}
+
 export interface TodayBrief {
   /** 服务端算这份档案用的时刻（ISO），前端只做展示 */
   now: string;
@@ -117,6 +131,10 @@ export interface TodayBrief {
     /** 14 天内的考试，按日期升序，至多 4 场 */
     upcoming: BriefExam[];
     note?: string;
+  };
+  todos: {
+    /** 未完成待办，按截止时间升序（逾期自然排最前），至多 50 条 */
+    items: BriefTodo[];
   };
 }
 
@@ -331,6 +349,38 @@ function buildExams(todayIso: string, scheduleTerm: { year: number; semester: nu
   };
 }
 
+/** 未完成待办按截止时间升序（逾期自然在最前），标签带相对日期 */
+function buildTodos(now: Date): TodayBrief["todos"] {
+  const open = listReminders().filter((r) => !r.done);
+  open.sort((a, b) => a.dueAt.localeCompare(b.dueAt));
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const items = open.slice(0, 50).map((r) => {
+    const due = new Date(r.dueAt);
+    const dayDiff = Math.round(
+      (new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime() - today.getTime()) /
+        DAY_MS,
+    );
+    const hm = `${pad(due.getHours())}:${pad(due.getMinutes())}`;
+    let dueLabel: string;
+    if (dayDiff === 0) dueLabel = `今天 ${hm}`;
+    else if (dayDiff === 1) dueLabel = `明天 ${hm}`;
+    else
+      dueLabel =
+        `${due.getMonth() + 1}月${due.getDate()}日 ${WEEKDAY_NAMES[weekdayOf(due)] ?? ""} ${hm}`.trim();
+    return {
+      id: r.id,
+      title: r.title,
+      dueAt: r.dueAt,
+      dueLabel,
+      overdue: due.getTime() < now.getTime(),
+      isToday: dayDiff === 0,
+      ...(r.notes ? { notes: r.notes } : {}),
+      ...(r.source ? { source: r.source } : {}),
+    };
+  });
+  return { items };
+}
+
 /** 组装今日档案。now 可注入（测试用），默认当前时刻 */
 export function buildTodayBrief(now: Date = new Date(), requestedWeek?: number): TodayBrief {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -362,6 +412,7 @@ export function buildTodayBrief(now: Date = new Date(), requestedWeek?: number):
       next: null,
       week: null,
       exams,
+      todos: buildTodos(now),
     };
   }
 
@@ -410,5 +461,6 @@ export function buildTodayBrief(now: Date = new Date(), requestedWeek?: number):
     next: findNextClass(schedule.courses, today, week1Monday, nowMin),
     week: week ? buildWeekOverview(schedule.courses, week.week, week1Monday, today) : null,
     exams,
+    todos: buildTodos(now),
   };
 }

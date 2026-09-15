@@ -148,6 +148,49 @@ function demoTodayBrief(): TodayBrief {
 
   const examDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 5);
 
+  // 演示待办：跟真实时钟走，覆盖逾期/今天/数天后三种形态
+  const dueAt = (offset: number, h: number, m: number) =>
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset, h, m);
+  const todoLabel = (d: Date) => {
+    const diff = Math.round(
+      (new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() -
+        new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) /
+        86400000,
+    );
+    const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    if (diff === 0) return `今天 ${hm}`;
+    if (diff === 1) return `明天 ${hm}`;
+    return `${d.getMonth() + 1}月${d.getDate()}日 ${names[(d.getDay() + 6) % 7]} ${hm}`;
+  };
+  const demoTodos: TodayBrief["todos"]["items"] = [
+    {
+      id: "demo-todo-1",
+      title: "交示例实验报告",
+      dueAt: dueAt(-1, 23, 59).toISOString(),
+      dueLabel: todoLabel(dueAt(-1, 23, 59)),
+      overdue: true,
+      isToday: false,
+      source: "对话",
+    },
+    {
+      id: "demo-todo-2",
+      title: "复习示例高等数学第 3 章",
+      dueAt: dueAt(0, 22, 0).toISOString(),
+      dueLabel: todoLabel(dueAt(0, 22, 0)),
+      overdue: false,
+      isToday: true,
+      notes: "重点看极限与连续（虚构示例）",
+    },
+    {
+      id: "demo-todo-3",
+      title: "示例英语 quiz 备考",
+      dueAt: dueAt(4, 14, 0).toISOString(),
+      dueLabel: todoLabel(dueAt(4, 14, 0)),
+      overdue: false,
+      isToday: false,
+    },
+  ];
+
   return {
     now: now.toISOString(),
     dateLabel: `${now.getMonth() + 1}月${now.getDate()}日 ${names[weekday - 1]}`,
@@ -185,6 +228,7 @@ function demoTodayBrief(): TodayBrief {
       ],
       note: "演示只展示一场虚构考试",
     },
+    todos: { items: demoTodos },
   };
 }
 
@@ -216,6 +260,11 @@ export function demoReply(message: string): string {
       prefix +
       "### 考试安排示例\n\n| 科目 | 日期 | 时间 | 考场 |\n|---|---|---|---|\n| 示例课程 A | 2026-12-28 | 09:00–11:00 | 示例教学楼 101 |\n| 示例课程 B | 2026-12-30 | 14:00–16:00 | 示例教学楼 202 |\n\n正式模式可以把考试导出到手机日历。考试安排变更时请核对教务系统。"
     );
+  if (/待办/.test(message))
+    return (
+      prefix +
+      "### 待办功能示例\n\n正式模式直接说出你的安排即可，例如：**我这周要交高数作业，周五交实验报告**。我会先调时间工具把「明天/下周五」换算成具体日期，再把待办存到本地。\n\n待办会显示在课表页（/today）下方的「待办」卡片和对话页「设置 → 截止日期待办」里，可勾选完成或删除。演示模式的 /today 页展示的是虚构待办。"
+    );
   if (/课表|上课|这周|今天|明天/.test(message))
     return (
       prefix +
@@ -223,7 +272,7 @@ export function demoReply(message: string): string {
     );
   return (
     prefix +
-    "这个演示使用固定示例回答，不调用 AI。试试输入“这周课表”“我的成绩和 GPA”“通识学分还缺哪些”“最近的考试安排”“教务处最近有什么通知”或“导出课表到手机日历”。正式对话请运行 `npm start` 并配置自己的账号。"
+    "这个演示使用固定示例回答，不调用 AI。试试输入“这周课表”“我的成绩和 GPA”“通识学分还缺哪些”“最近的考试安排”“我有哪些待办”“教务处最近有什么通知”或“导出课表到手机日历”。正式对话请运行 `npm start` 并配置自己的账号。"
   );
 }
 
