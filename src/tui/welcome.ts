@@ -17,6 +17,7 @@ import { currentWeekOf } from "../jwgl/term-dates";
 import { loadScheduleCache, saveScheduleCache } from "../schedule-cache";
 import { getCookie } from "../tools/session";
 import { startChatWeb } from "../web/chat-web";
+import { listReminders } from "../web/workspace-data";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -26,6 +27,7 @@ declare global {
 const CYAN = "\x1b[36m";
 const DIM = "\x1b[2m";
 const RESET = "\x1b[0m";
+const DAY_MS = 86_400_000;
 
 const header = (s: string) => `${CYAN}【${s}】${RESET}`;
 const dim = (s: string) => `${DIM}${s}${RESET}`;
@@ -40,6 +42,7 @@ const panel = {
   week: undefined as number | undefined,
   webUrl: null as string | null,
   scheduleLines: [dim("  正在登录教务系统…")],
+  todoLines: [dim("  正在获取…")],
   newsLines: [dim("  正在获取…")],
 };
 
@@ -52,6 +55,9 @@ function render() {
     "",
     header("今日课表"),
     ...panel.scheduleLines,
+    "",
+    header("一周内待办"),
+    ...panel.todoLines,
     "",
     header("最新通知"),
     ...panel.newsLines,
@@ -70,7 +76,40 @@ async function bootstrap() {
   render();
   void refreshNews(); // 通知不依赖教务登录，并行先刷
   void refreshWebUrl(); // 网页版地址随本地服务起好后补进面板
+  refreshTodos(); // 待办是本地数据，同步读
   await refreshSchedule();
+}
+
+/** 一周内到期的未完成待办（含已逾期），给空屏面板一段速览 */
+function refreshTodos() {
+  try {
+    const now = new Date();
+    const due = listReminders().filter((r) => {
+      if (r.done) return false;
+      const t = Date.parse(r.dueAt);
+      return Number.isFinite(t) && t <= now.getTime() + 7 * DAY_MS;
+    });
+    if (!due.length) {
+      panel.todoLines = [dim("  暂无一周内到期待办")];
+      return;
+    }
+    panel.todoLines = due.slice(0, 5).map((r) => {
+      const d = new Date(r.dueAt);
+      const days = Math.round(
+        (new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() -
+          new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) /
+          DAY_MS,
+      );
+      const when = days < 0 ? "⚠ 已逾期" : days === 0 ? "今天" : `还有 ${days} 天`;
+      return `• ${r.title} ${dim(`· ${when}`)}`;
+    });
+    if (due.length > 5) {
+      panel.todoLines.push(dim(`  …还有 ${due.length - 5} 条，问我看全部`));
+    }
+  } catch {
+    panel.todoLines = [dim("  待办读取失败（不影响使用）")];
+  }
+  render();
 }
 
 /** 网页服务在 index.ts 已并行启动，这里只等它的地址；起不来就不显示这一行 */

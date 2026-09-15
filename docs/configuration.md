@@ -20,6 +20,7 @@
 | `QQBOT_APP_ID` / `QQBOT_APP_SECRET` / `QQBOT_PASSCODE` | 可选，QQ 官方机器人凭证与准入暗号；仍共用本机教务身份 |
 | `GITHUB_TOKEN` / `GITEE_TOKEN` | 可选，将课表日历发布到公开仓库；分享范围需本人确认 |
 | `RAPTOR_NO_UPDATE_CHECK` | `1` 关闭启动时版本检查 |
+| `RAPTOR_NO_TODO_REMINDERS` | `1` 关闭待办到期自动提醒（默认开启：距到期 ≤ 7 天每天一次，Windows 桌面通知 + QQ 推送） |
 | `RAPTOR_UPDATE_SERVER` | 维护者本地覆盖 HTTPS 更新服务地址；分发包可内置地址 |
 | `UPDATE_SERVER_URL` / `UPDATE_ADMIN_TOKEN` | 仅维护者发版需要，见[维护指南](maintainers.md) |
 
