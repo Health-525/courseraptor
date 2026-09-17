@@ -327,6 +327,45 @@ test("待办可创建、完成并导出日历，本地数据接口回脱敏概�
   assert.ok(!(await exported.text()).includes("storedPath"));
 });
 
+test("知识库：页面可打开、接口可列表删除、数据概览与导出携带", async () => {
+  const url = (await startChatWeb())!;
+  const { addKnowledge } = await import("../src/knowledge");
+  const { entry } = addKnowledge({ title: "接口测试知识", content: "正文内容" });
+
+  const page = await fetch(`${url}/knowledge`);
+  assert.equal(page.status, 200);
+  const html = await page.text();
+  assert.match(html, /知识库/);
+  assert.match(html, /api\/knowledge/, "页面应从 /api/knowledge 取数据");
+  assert.match(html, /const DEMO_DATA = null;/, "正式页不内嵌数据");
+  // knowledgePage 同样是外层模板串：对求值产物做语法检查
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  assert.ok(blocks.length >= 1);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-knowledge-page-"));
+  for (const [i, code] of blocks.entries()) {
+    const f = path.join(dir, `chunk-${i}.js`);
+    fs.writeFileSync(f, code, "utf8");
+    execFileSync(process.execPath, ["--check", f], { stdio: "pipe" });
+  }
+
+  const list = (await (await fetch(`${url}/api/knowledge`)).json()) as {
+    entries: Array<{ id: string; title: string }>;
+  };
+  assert.ok(list.entries.some((e) => e.id === entry.id && e.title === "接口测试知识"));
+
+  const data = (await (await fetch(`${url}/api/data`)).json()) as {
+    knowledge: { total: number };
+  };
+  assert.ok(data.knowledge.total >= 1, "数据概览应带知识统计");
+  const exported = await (await fetch(`${url}/api/data/export`)).text();
+  assert.ok(exported.includes("接口测试知识"), "数据导出应携带知识条目");
+
+  const del = await fetch(`${url}/api/knowledge/${entry.id}`, { method: "DELETE" });
+  assert.equal(del.status, 200);
+  const miss = await fetch(`${url}/api/knowledge/${entry.id}`, { method: "DELETE" });
+  assert.equal(miss.status, 404);
+});
+
 test("工具事件带 id/参数/结果预览（独立工具卡片的数据源）", async () => {
   setChatAgent({
     stream() {
@@ -638,6 +677,8 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
   assert.match(html, /week-timetable/, "本周概览应使用节次 × 星期的周课表网格");
   assert.match(html, /返回对话/, "应有返回对话页的链接");
   assert.match(html, /const DEMO_DATA = null;/, "正式页不内嵌数据，运行时从 /api/today 取");
+  assert.match(html, /id="knowledgeCard"/, "课表页应有知识卡片");
+  assert.match(html, /more\.href = "\/knowledge"/, "知识卡片应链到 /knowledge 页");
   // todayPage 同样是外层模板串：对求值产物做语法检查（源码切片会漏判）
   const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
   assert.ok(blocks.length >= 1, "页面应有内联脚本");

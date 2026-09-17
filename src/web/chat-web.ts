@@ -35,6 +35,7 @@ import {
 import { config } from "../config";
 import { saveCredentialsStore } from "../credentials";
 import { generatedDir } from "../document/save";
+import { clearKnowledge, deleteKnowledge, knowledgeStats, listKnowledge } from "../knowledge";
 import {
   allowedModelIds,
   cachedModelOptions,
@@ -45,6 +46,7 @@ import {
 import { getDeepSeekKeyStatus, setDeepSeekApiKey } from "../onboarding";
 import { getCookie } from "../tools/session";
 import { chatPage } from "./chat-page";
+import { knowledgePage } from "./knowledge-page";
 import { buildTodayBrief } from "./today-brief";
 import { todayPage } from "./today-page";
 import {
@@ -460,6 +462,7 @@ function dataPayload() {
     uploads: workspace.uploads,
     generated: generatedStats(),
     reminders: workspace.reminders,
+    knowledge: knowledgeStats(),
   };
 }
 
@@ -563,6 +566,16 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       res.end(todayPage());
       return;
     }
+    if (url === "/knowledge" || url === "/knowledge/") {
+      // 独立知识库页：对话中沉淀的知识条目，纯本地存储渲染
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(knowledgePage());
+      return;
+    }
+    if (url === "/api/knowledge") {
+      json(res, { entries: listKnowledge() });
+      return;
+    }
     if (url === "/api/today" || url.startsWith("/api/today?")) {
       // 只读本地缓存（课表/考试/假期/学期日期），不登录教务、不调模型
       const week = Number(new URL(url, "http://127.0.0.1").searchParams.get("week"));
@@ -632,6 +645,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
             })),
           })),
           reminders: listReminders(),
+          knowledge: listKnowledge(),
           summary: dataPayload(),
         },
         null,
@@ -751,6 +765,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         if (scopes.includes("uploads")) result.uploads = clearUploads();
         if (scopes.includes("generated")) result.generated = clearGenerated();
         if (scopes.includes("reminders")) result.reminders = clearReminders();
+        if (scopes.includes("knowledge")) result.knowledge = clearKnowledge();
         json(res, { ok: true, result, summary: dataPayload() });
       } catch {
         json(res, { error: "清理请求无效" }, 400);
@@ -813,6 +828,11 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   if (req.method === "DELETE" && url.startsWith("/api/reminders/")) {
     const ok = deleteReminder(url.slice("/api/reminders/".length));
     json(res, ok ? { ok: true } : { error: "提醒不存在" }, ok ? 200 : 404);
+    return;
+  }
+  if (req.method === "DELETE" && url.startsWith("/api/knowledge/")) {
+    const ok = deleteKnowledge(url.slice("/api/knowledge/".length));
+    json(res, ok ? { ok: true } : { error: "知识条目不存在" }, ok ? 200 : 404);
     return;
   }
   res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });

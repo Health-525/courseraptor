@@ -20,6 +20,7 @@ import {
 import { resolveWeek1Monday } from "../jwgl/term-dates";
 import { type SpecialDay, specialOnDate } from "../jwgl/term-holidays";
 import type { CourseData } from "../jwgl/types";
+import { listKnowledge } from "../knowledge";
 import { loadScheduleCache } from "../schedule-cache";
 import { listReminders } from "./workspace-data";
 
@@ -84,6 +85,15 @@ export interface BriefTodo {
   source?: string;
 }
 
+export interface BriefKnowledge {
+  id: string;
+  title: string;
+  content: string;
+  /** 归属课程（规范名）；未分类为 null */
+  category: string | null;
+  updatedAt: number;
+}
+
 export interface TodayBrief {
   /** 服务端算这份档案用的时刻（ISO），前端只做展示 */
   now: string;
@@ -135,6 +145,12 @@ export interface TodayBrief {
   todos: {
     /** 未完成待办，按截止时间升序（逾期自然排最前），至多 50 条 */
     items: BriefTodo[];
+  };
+  knowledge: {
+    /** 知识库总数 */
+    total: number;
+    /** 最近更新的知识条目（至多 5 条），知识卡速览用 */
+    recent: BriefKnowledge[];
   };
 }
 
@@ -381,6 +397,21 @@ function buildTodos(now: Date): TodayBrief["todos"] {
   return { items };
 }
 
+/** 知识速览：最近更新的至多 5 条（listKnowledge 已按 updatedAt 降序） */
+function buildKnowledge(): TodayBrief["knowledge"] {
+  const all = listKnowledge();
+  return {
+    total: all.length,
+    recent: all.slice(0, 5).map((e) => ({
+      id: e.id,
+      title: e.title,
+      content: e.content,
+      category: e.category,
+      updatedAt: e.updatedAt,
+    })),
+  };
+}
+
 /** 组装今日档案。now 可注入（测试用），默认当前时刻 */
 export function buildTodayBrief(now: Date = new Date(), requestedWeek?: number): TodayBrief {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -413,6 +444,7 @@ export function buildTodayBrief(now: Date = new Date(), requestedWeek?: number):
       week: null,
       exams,
       todos: buildTodos(now),
+      knowledge: buildKnowledge(),
     };
   }
 
@@ -462,5 +494,6 @@ export function buildTodayBrief(now: Date = new Date(), requestedWeek?: number):
     week: week ? buildWeekOverview(schedule.courses, week.week, week1Monday, today) : null,
     exams,
     todos: buildTodos(now),
+    knowledge: buildKnowledge(),
   };
 }

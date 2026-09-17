@@ -73,7 +73,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                  background: rgba(252, 251, 247, .55); color: var(--ink);
                  font-size: 13px; outline: none; }
   .sess-search:focus { border-color: var(--ink-3); }
-  /* 竖排两行：新会话主按钮在上，今日日程入口单独一行在其下 */
+  /* 竖排：新会话主按钮在上，今日日程 / 知识库入口各占一行在其下 */
   .mastbtns { display: flex; flex-direction: column; gap: 8px; }
   /* 竖排 flex 会把子项块化：链接里的文字水平居中要用 text-align，不是 justify-content */
   .mastbtns .tbtn { text-align: center; }
@@ -573,6 +573,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   <div class="mastbtns">
     <button class="tbtn primary" id="newSession" title="另起一个会话（旧会话保留在档案里）">新会话</button>
     <a class="tbtn" href="/today" title="下一节课、今日安排、本周概览与临近考试">今日日程</a>
+    <a class="tbtn" href="/knowledge" title="对话中沉淀的知识，按课程自动归类">知识库</a>
   </div>
   <section class="sec">
     <h2>会话档案<span id="sessCount"></span></h2>
@@ -586,6 +587,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   <div class="topbar">
     <span class="tb-title wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></span>
     <a class="tbtn" href="/today">今日</a>
+    <a class="tbtn" href="/knowledge">知识</a>
     <button class="tbtn" id="openDrawerM">会话</button>
     <button class="tbtn" id="newSessionM">新会话</button>
     <button class="tbtn" id="openSettingsM">设置</button>
