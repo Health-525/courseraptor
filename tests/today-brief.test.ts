@@ -18,6 +18,7 @@ process.env.RAPTOR_DATA_DIR = tmpData;
 const { buildTodayBrief } = await import("../src/web/today-brief");
 const { saveScheduleCache } = await import("../src/schedule-cache");
 const { saveExamCache } = await import("../src/exam-cache");
+const { addKnowledge } = await import("../src/knowledge");
 const { recordWeek1Monday } = await import("../src/jwgl/term-dates");
 const { recordSpecialDays, removeSpecialDays } = await import("../src/jwgl/term-holidays");
 const { addReminder, listReminders, updateReminder } = await import("../src/web/workspace-data");
@@ -71,6 +72,7 @@ test("无缓存：如实降级，不装作有数据", () => {
   assert.match(b.schedule.note ?? "", /还没有课表数据/);
   assert.equal(b.exams.available, false);
   assert.deepEqual(b.todos.items, [], "降级分支也带待办字段");
+  assert.deepEqual(b.knowledge, { total: 0, recent: [] }, "降级分支也带知识字段");
 });
 
 test("普通教学日：今日课程按周次过滤、状态与下一节课正确", () => {
@@ -269,4 +271,21 @@ test("待办：未完成按截止升序进简报，逾期/今天标注与标签�
   assert.equal(b.todos.items[1].dueLabel, "今天 22:00");
   assert.equal(b.todos.items[2].dueLabel, "9月3日 周四 14:00");
   assert.equal(b.todos.items[2].isToday, false);
+});
+
+test("知识库：速览带总数与最近条目，课程归类随缓存课程走", () => {
+  saveScheduleCache({ ...term, courses });
+  addKnowledge({
+    title: "洛必达法则",
+    content: "0/0 型极限可对分子分母分别求导",
+    subject: "高等数学",
+  });
+  addKnowledge({ title: "番茄工作法", content: "25 分钟专注加 5 分钟休息" });
+  const b = buildTodayBrief(new Date("2026-09-01T10:00:00"));
+  assert.equal(b.knowledge.total, 2);
+  assert.equal(b.knowledge.recent.length, 2);
+  assert.equal(b.knowledge.recent[0].title, "番茄工作法", "最近更新的排最前");
+  assert.equal(b.knowledge.recent[0].category, null, "对不上课程保持未分类");
+  assert.equal(b.knowledge.recent[1].title, "洛必达法则");
+  assert.equal(b.knowledge.recent[1].category, "高等数学", "subject 提示归入课表课程");
 });

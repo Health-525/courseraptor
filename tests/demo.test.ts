@@ -51,10 +51,11 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
 });
 
 test("演示不伪造实时数据、文件和任意 AI 回答", () => {
-  for (const message of ["课表", "成绩", "学分", "通知", "考试", "日历", "随机问题"]) {
+  for (const message of ["课表", "成绩", "学分", "通知", "考试", "日历", "知识", "随机问题"]) {
     assert.match(demoReply(message), /虚构示例/);
   }
   assert.match(demoReply("日历"), /没有生成文件或发布链接/);
+  assert.match(demoReply("知识库"), /自动归类/);
   assert.match(demoReply("随机问题"), /不调用 AI/);
 });
 
@@ -78,6 +79,35 @@ test("演示模式的本周课表页：内嵌虚构数据，不发请求", async
     assert.match(html, /id="todoCard"/);
     assert.match(html, /交示例实验报告/);
     assert.match(html, /chk\.disabled = true/, "演示模式不勾选完成");
+    // 知识卡：虚构知识内嵌展示，「查看全部」链去 /knowledge 演示页
+    assert.match(html, /id="knowledgeCard"/);
+    assert.match(html, /洛必达法则/);
+    assert.match(html, /more\.href = "\/knowledge"/);
+  } finally {
+    server.close();
+  }
+});
+
+test("演示模式的知识库页：内嵌虚构数据，不发请求", async () => {
+  const server = createDemoServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const base = `http://127.0.0.1:${address.port}`;
+  try {
+    const res = await fetch(`${base}/knowledge`);
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /知识库/);
+    assert.match(html, /离线演示 · 虚构数据/);
+    // 演示数据内嵌（DEMO_DATA 非空），页面不依赖 /api/knowledge
+    assert.match(html, /const DEMO_DATA = \[/);
+    assert.match(html, /洛必达法则/);
+    assert.match(html, /未分类/);
+    assert.match(html, /if \(!DEMO_DATA\) \{/, "自动刷新与取数都必须被演示守卫挡住");
+    // 删除按钮的创建包在演示守卫里：演示页只读
+    assert.match(html, /if \(!DEMO_DATA\) \{[\s\S]{0,120}k-del/);
+    assert.match(html, /示例高等数学/);
   } finally {
     server.close();
   }

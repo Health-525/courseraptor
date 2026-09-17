@@ -1,7 +1,9 @@
 /** 独立演示服务：不导入 config/agent，不读取凭证、真实会话或教务数据。 */
 import { readFileSync } from "node:fs";
 import http from "node:http";
+import type { KnowledgeEntry } from "../knowledge";
 import { chatPage } from "./chat-page";
+import { knowledgePage } from "./knowledge-page";
 import type { BriefCourse, BriefDay, TodayBrief } from "./today-brief";
 import { todayPage } from "./today-page";
 
@@ -43,6 +45,54 @@ const DEMO_CLASS_TIMES: Record<string, string> = {
 };
 
 const pad = (n: number) => String(n).padStart(2, "0");
+
+/** 演示知识库：覆盖「归入课程 / 未分类」两种形态，条目全为虚构 */
+function demoKnowledge(now: Date): KnowledgeEntry[] {
+  const at = (daysAgo: number) =>
+    new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo, 20, 30).getTime();
+  return [
+    {
+      id: "demo-kn-1",
+      title: "洛必达法则",
+      content:
+        "求 0/0 或 ∞/∞ 型未定式极限时，若分子分母均可导，可分别求导后再取极限：lim f(x)/g(x) = lim f'(x)/g'(x)。条件不满足（如导数比值的极限不存在）时不能用它。（虚构示例）",
+      category: "示例高等数学",
+      source: "对话",
+      createdAt: at(6),
+      updatedAt: at(2),
+    },
+    {
+      id: "demo-kn-2",
+      title: "现在完成时",
+      content:
+        "have/has + 过去分词：表示过去发生的动作对现在的影响，或从过去持续到现在的状态。常见信号词：already、yet、just、since、for。（虚构示例）",
+      category: "示例大学英语",
+      source: "对话",
+      createdAt: at(5),
+      updatedAt: at(5),
+    },
+    {
+      id: "demo-kn-3",
+      title: "二分查找",
+      content:
+        "有序数组中查找目标：每次与中点比较，排除一半区间，时间复杂度 O(log n)。注意边界：左闭右开区间用 left < right 循环。（虚构示例）",
+      category: "示例程序设计",
+      source: "对话",
+      createdAt: at(4),
+      updatedAt: at(4),
+    },
+    {
+      id: "demo-kn-4",
+      title: "番茄工作法",
+      content:
+        "25 分钟专注 + 5 分钟休息为一个番茄钟，每 4 个番茄钟多休一会儿；期间被打断就重新计。（虚构示例）",
+      category: null,
+      source: "对话",
+      createdAt: at(1),
+      updatedAt: at(1),
+    },
+  ].sort((a, b) => b.updatedAt - a.updatedAt); // 与真实 listKnowledge 一致：最近更新在前
+}
 
 function demoTodayBrief(): TodayBrief {
   const now = new Date();
@@ -229,6 +279,7 @@ function demoTodayBrief(): TodayBrief {
       note: "演示只展示一场虚构考试",
     },
     todos: { items: demoTodos },
+    knowledge: { total: demoKnowledge(now).length, recent: demoKnowledge(now).slice(0, 5) },
   };
 }
 
@@ -265,6 +316,11 @@ export function demoReply(message: string): string {
       prefix +
       "### 待办功能示例\n\n正式模式直接说出你的安排即可，例如：**我这周要交高数作业，周五交实验报告**。我会先调时间工具把「明天/下周五」换算成具体日期，再把待办存到本地。\n\n待办会显示在课表页（/today）下方的「待办」卡片和对话页「设置 → 截止日期待办」里，可勾选完成或删除。演示模式的 /today 页展示的是虚构待办。"
     );
+  if (/知识|记住|笔记/.test(message))
+    return (
+      prefix +
+      "### 知识库功能示例\n\n正式模式里可以把我当笔记本：**「记住：洛必达法则用来求 0/0 型极限」**。我会判断这是值得沉淀的知识并存入本地知识库；能对应上课表里的课程会自动归类（如归入「高等数学」），对应不上就留在「未分类」，不会硬塞。\n\n知识在课表页（/today）下方的「知识」卡片和独立的 /knowledge 页都能看到，可按课程筛选、搜索、删除。演示模式展示的是虚构知识。"
+    );
   if (/课表|上课|这周|今天|明天/.test(message))
     return (
       prefix +
@@ -292,6 +348,10 @@ export function createDemoServer(): http.Server {
         // 独立日程页的演示版：数据内嵌虚构课表，不发任何请求
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(todayPage({ demo: true, demoData: demoTodayBrief() }));
+      } else if (req.method === "GET" && (url === "/knowledge" || url === "/knowledge/")) {
+        // 独立知识库页的演示版：数据内嵌虚构知识，不发任何请求
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(knowledgePage({ demo: true, demoData: demoKnowledge(new Date()) }));
       } else if (
         req.method === "GET" &&
         ["/logo.png", "/favicon.ico", "/vendor/marked.min.js"].includes(url)
@@ -327,6 +387,7 @@ export function createDemoServer(): http.Server {
         json(res, { reminders: [] });
       } else if (req.method === "GET" && url === "/api/data") {
         const sessionValues = [...sessions.values()];
+        const demoEntries = demoKnowledge(new Date());
         json(res, {
           sessions: {
             count: sessionValues.length,
@@ -336,6 +397,11 @@ export function createDemoServer(): http.Server {
           uploads: { count: 0, bytes: 0 },
           generated: { count: 0, bytes: 0 },
           reminders: { total: 0, open: 0 },
+          knowledge: {
+            total: demoEntries.length,
+            categorized: demoEntries.filter((e) => e.category).length,
+            courses: new Set(demoEntries.filter((e) => e.category).map((e) => e.category)).size,
+          },
         });
       } else if (
         ["/api/settings", "/api/diagnostics", "/api/reminders", "/api/data/clear"].includes(url)

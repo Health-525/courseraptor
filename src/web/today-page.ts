@@ -108,7 +108,7 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
           background: var(--card); box-shadow: var(--shadow-sm);
           margin-bottom: 26px; }
   /* 主区是 190px + 1fr 两列网格：课表后的卡片必须钉在右列，否则会被自动排进左栏 */
-  #todoCard { grid-column: 2; }
+  #todoCard, #knowledgeCard { grid-column: 2; }
   .card > h2 { display: flex; justify-content: space-between; align-items: baseline;
                margin: 0; padding: 13px 18px 10px; border-bottom: 1px solid var(--rule);
                font-family: var(--mono); font-size: 13px; font-weight: 600;
@@ -171,6 +171,23 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
   .todo-empty { margin: 0; padding: 18px 8px; border: 1px dashed var(--rule-2); text-align: center;
                 color: var(--ink-3); font-size: 14px; }
 
+  /* 知识卡：最近沉淀的知识点速览，全量在 /knowledge 页 */
+  .knowledge-list { display: grid; gap: 8px; }
+  .knowledge-item { padding: 9px 12px; border: 1px solid var(--rule); background: var(--paper); }
+  .knowledge-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+  .knowledge-title { font-family: var(--kai); font-size: 15px; font-weight: 600;
+                     overflow-wrap: anywhere; }
+  .knowledge-cat { flex: none; padding: 1px 6px; background: var(--accent-soft);
+                   color: var(--accent-deep); font-family: var(--mono); font-size: 10.5px;
+                   letter-spacing: .04em; white-space: nowrap; }
+  .knowledge-cat.none { background: var(--shade); color: var(--ink-3); }
+  .knowledge-date { margin-left: auto; flex: none; font-family: var(--mono); font-size: 11px;
+                    color: var(--ink-3); white-space: nowrap; }
+  .knowledge-content { margin: 4px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--ink-2);
+                       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+                       overflow: hidden; }
+  .knowledge-more { margin-top: 10px; min-height: 30px; padding: 3px 12px; font-size: 12px; }
+
   .skel { color: var(--ink-3); font-size: 15px; padding: 8px 2px; }
 
   @media (max-width: 720px) {
@@ -223,6 +240,10 @@ ${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 虚构�
     <h2>待办<span class="cnote" id="todoNote"></span></h2>
     <div class="cbody"><p class="skel">…</p></div>
   </section>
+  <section class="card" id="knowledgeCard" aria-label="知识库">
+    <h2>知识<span class="cnote" id="knowledgeNote"></span></h2>
+    <div class="cbody"><p class="skel">…</p></div>
+  </section>
 </main>
 <script>
 ${demo && demoData ? `const DEMO_DATA = ${JSON.stringify(demoData)};` : "const DEMO_DATA = null;"}
@@ -240,6 +261,10 @@ function pad(x) { return (x < 10 ? "0" : "") + x; }
 function fmtStamp(ts) {
   const d = new Date(ts);
   return (d.getMonth() + 1) + "月" + d.getDate() + "日 " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+}
+function fmtDay(ts) {
+  const d = new Date(ts);
+  return (d.getMonth() + 1) + "月" + d.getDate() + "日";
 }
 function renderWeek(b) {
   const body = $("weekCard").querySelector(".cbody");
@@ -396,6 +421,35 @@ function renderTodos(b) {
   body.appendChild(list);
 }
 
+function renderKnowledge(b) {
+  const body = $("knowledgeCard").querySelector(".cbody");
+  const note = $("knowledgeNote");
+  body.textContent = "";
+  const k = b.knowledge || { total: 0, recent: [] };
+  note.textContent = k.total ? "共 " + k.total + " 条" : "";
+  if (!k.recent.length) {
+    body.appendChild(el("p", "todo-empty", "还没有沉淀知识。在对话页分享你学到的知识点（或说「记住：……」），我会记进知识库并按课程归类。"));
+    return;
+  }
+  const list = el("div", "knowledge-list");
+  for (const item of k.recent) {
+    const row = el("div", "knowledge-item");
+    const head = el("div", "knowledge-head");
+    head.appendChild(el("span", "knowledge-title", item.title));
+    head.appendChild(el("span", "knowledge-cat" + (item.category ? "" : " none"), item.category || "未分类"));
+    head.appendChild(el("span", "knowledge-date", fmtDay(item.updatedAt)));
+    row.appendChild(head);
+    const content = el("p", "knowledge-content", item.content);
+    content.title = item.content;
+    row.appendChild(content);
+    list.appendChild(row);
+  }
+  body.appendChild(list);
+  const more = el("a", "tbtn knowledge-more", "查看全部 →");
+  more.href = "/knowledge";
+  body.appendChild(more);
+}
+
 function render(b) {
   $("phDate").textContent = b.dateLabel;
   $("railWeek").textContent = b.term.weekLabel || "本周";
@@ -411,6 +465,7 @@ function render(b) {
   }
   renderWeek(b);
   renderTodos(b);
+  renderKnowledge(b);
   renderSrc(b);
   document.title = "本周课表 · " + b.dateLabel;
 }
@@ -428,6 +483,9 @@ function load() {
       const todoBody = $("todoCard").querySelector(".cbody");
       todoBody.textContent = "";
       todoBody.appendChild(el("p", "daynote", "待办暂时取不出来，请稍候刷新。"));
+      const knowledgeBody = $("knowledgeCard").querySelector(".cbody");
+      knowledgeBody.textContent = "";
+      knowledgeBody.appendChild(el("p", "daynote", "知识暂时取不出来，请稍候刷新。"));
     });
 }
 $("prevWeek").addEventListener("click", () => {
