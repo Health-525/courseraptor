@@ -32,7 +32,7 @@ CourseRaptor brings timetables, grades, exams, academic announcements, and calen
 | Can I use my phone calendar? | Local `.ics` export; optional publication to a public GitHub/Gitee subscription source |
 | Can I turn this material into a document? | Local document/table reading and Word, Excel, PowerPoint, and PDF generation |
 
-![Real browser UI displaying a fictional timetable in offline demo mode](docs/screenshot-demo.jpg)
+![Latest web UI: weekly timetable with todo and knowledge cards (fictional demo data)](docs/screenshot-demo.jpg)
 
 ## Try it without credentials
 
