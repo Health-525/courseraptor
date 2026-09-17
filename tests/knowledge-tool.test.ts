@@ -1,6 +1,6 @@
 /**
  * manage_knowledge 工具测试：对话里说的知识落进 data/knowledge.json，
- * 课程归类只认课表缓存里的真实课程，对不上保持未分类。
+ * 归类优先认课表缓存里的真实课程，subject 对不上课程时成为自定义分类。
  */
 
 import assert from "node:assert/strict";
@@ -158,9 +158,9 @@ test("update 改内容与归属、delete 按 id 删除、错误路径", async ()
   const changed = (moved as { updated: { category: string | null } }).updated;
   assert.equal(changed.category, "线性代数");
 
-  // 对不上课表课程的 subject：落回未分类，不编造课程名
+  // 对不上课表课程的 subject：以其为自定义分类
   const miss = await manage.execute({ action: "update", id: taylor.id, subject: "美食烹饪" });
-  assert.equal((miss as { updated: { category: string | null } }).updated.category, null);
+  assert.equal((miss as { updated: { category: string | null } }).updated.category, "美食烹饪");
 
   const del = await manage.execute({ action: "delete", id: taylor.id });
   assert.equal(del.ok, true);
@@ -173,4 +173,51 @@ test("update 改内容与归属、delete 按 id 删除、错误路径", async ()
     String((await manage.execute({ action: "update", id: "ghost", content: "x" })).error),
     /未找到/,
   );
+});
+
+test("自定义分类：subject 对不上课表课程时以其为分类", async () => {
+  const r = await manage.execute({
+    action: "add",
+    items: [
+      // subject 对不上课表任何课程：成为自定义分类，不再落「未分类」
+      { title: "TypeScript 基础语法", content: "TS = JS + 静态类型", subject: "TypeScript" },
+      // 没给 subject 且正文对不上课程：仍保持未分类
+      { title: "手冲咖啡参数", content: "粉水比 1:15，水温 92 度" },
+    ],
+  });
+  assert.equal(r.ok, true);
+  assert.match(String(r.summary), /TypeScript ×1/);
+  const saved = r.saved as Array<{ title: string; category: string | null }>;
+  assert.equal(saved.find((e) => e.title === "TypeScript 基础语法")?.category, "TypeScript");
+  assert.equal(saved.find((e) => e.title === "手冲咖啡参数")?.category, null);
+
+  // list 能按自定义分类筛，分类统计里也看得到
+  const ts = await manage.execute({ action: "list", category: "TypeScript" });
+  assert.equal((ts.knowledge as Array<{ title: string }>).length, 1);
+  const cats = (await manage.execute({ action: "list" })).categories as Array<{
+    category: string;
+    count: number;
+  }>;
+  assert.ok(cats.some((c) => c.category === "TypeScript" && c.count === 1));
+});
+
+test("无课表缓存：subject 仍可作自定义分类，正文匹配保持未分类", async () => {
+  // 挪走课表缓存模拟「还没查过课表」，结束后原样恢复
+  const cacheFile = path.join(tmpData, "schedule-cache.json");
+  const backup = fs.readFileSync(cacheFile, "utf8");
+  fs.rmSync(cacheFile);
+  try {
+    const r = await manage.execute({
+      action: "add",
+      items: [
+        { title: "Vite 构建", content: "dev server 基于 esbuild", subject: "前端工程" },
+        { title: "无归属知识", content: "正文里没有课程名" },
+      ],
+    });
+    const saved = r.saved as Array<{ title: string; category: string | null }>;
+    assert.equal(saved.find((e) => e.title === "Vite 构建")?.category, "前端工程");
+    assert.equal(saved.find((e) => e.title === "无归属知识")?.category, null);
+  } finally {
+    fs.writeFileSync(cacheFile, backup, "utf8");
+  }
 });

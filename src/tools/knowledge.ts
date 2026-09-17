@@ -3,8 +3,9 @@
  *
  * 把对话里值得沉淀的知识写进本地知识库（src/knowledge.ts 落盘
  * data/knowledge.json），课表页 /today 的「知识」卡片与 /knowledge 页
- * 都能看到。课程归属由 matchKnowledgeCategory 统一裁决：只认课表真实
- * 课程，对不上保持未分类。
+ * 都能看到。归属由 matchKnowledgeCategory 统一裁决：优先归入课表真实
+ * 课程，subject 对不上课程时以其为自定义分类，没给 subject 且正文
+ * 对不上才落「未分类」。
  */
 
 import { tool } from "ai";
@@ -29,7 +30,7 @@ export const knowledgeTools = {
   /** 知识库维护 */
   manage_knowledge: tool({
     description:
-      "知识库维护（本地持久，课表页 /today 的「知识」卡片与 /knowledge 页都能看到）。用户说出值得长期保留的知识（课程概念、公式、解题方法、结论、经验总结——用户自己讲出的，或明确说「记住这个」）时主动调 add：title 一句话概括、content 写知识本身；能看出属于哪门课就传 subject（优先用课表课程名如「高等数学」，俗称「高数」也能自动对应），看不出来就省略 subject 落「未分类」，不要编造课程名；问「我记过哪些知识」用 list；改内容/归属用 update；删用 delete。闲聊、提问、查询指令、待办安排不要记进知识库；拿不准要不要记时先问用户一句。",
+      "知识库维护（本地持久，课表页 /today 的「知识」卡片与 /knowledge 页都能看到）。用户说出值得长期保留的知识（课程概念、公式、解题方法、结论、经验总结——用户自己讲出的，或明确说「记住这个」）时主动调 add：title 一句话概括、content 写知识本身；能看出归属就传 subject：优先用课表课程名如「高等数学」（俗称「高数」也能自动对应），对不上课表课程的 subject 会成为自定义分类（如「TypeScript」「编程技术」），传简短主题名即可；完全看不出归属才省略 subject 落「未分类」；问「我记过哪些知识」用 list；改内容/归属用 update；删用 delete。闲聊、提问、查询指令、待办安排不要记进知识库；拿不准要不要记时先问用户一句。",
     inputSchema: z.object({
       action: z
         .enum(["add", "list", "update", "delete"])
@@ -44,7 +45,9 @@ export const knowledgeTools = {
             subject: z
               .string()
               .optional()
-              .describe("所属课程（优先用课表课程名，如「高等数学」；不属于任何课程就省略）"),
+              .describe(
+                "归属提示：优先用课表课程名（如「高等数学」）；对不上课表的简短主题（如「TypeScript」）会成为自定义分类；无归属就省略",
+              ),
           }),
         )
         .optional()
@@ -57,7 +60,7 @@ export const knowledgeTools = {
       subject: z
         .string()
         .optional()
-        .describe("update 时重新归属课程（对得上课表课程就归类，对不上落回未分类）"),
+        .describe("update 时重新归属：对得上课表课程就归入该课程，对不上以 subject 为自定义分类"),
     }),
     execute: async ({ action, items, category, keyword, id, title, content, subject }) => {
       if (action === "add") {

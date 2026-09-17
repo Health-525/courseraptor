@@ -5,9 +5,10 @@
  * 落进 data/knowledge.json，课表页 /today 的「知识」卡片与 /knowledge
  * 页共用同一份存储。
  *
- * 分类只认课表里真实存在的课程（schedule-cache）：条目对得上某门课就
- * 归入该课程（存去掉「(上)」这类补充后的规范名），对不上保持 null
- * （未分类）——绝不编造课程名。课程清单以课表缓存为准，每次写入时重算。
+ * 分类优先认课表里真实存在的课程（schedule-cache）：条目对得上某门课
+ * 就归入该课程（存去掉「(上)」这类补充后的规范名）；模型给了 subject
+ * 但对不上任何课程时，subject 本身就是自定义分类（如「编程技术」）。
+ * 课程清单以课表缓存为准，每次写入时重算。
  */
 
 import crypto from "node:crypto";
@@ -31,7 +32,7 @@ export interface KnowledgeEntry {
   id: string;
   title: string;
   content: string;
-  /** 归属课程（课表课程的规范名）；不属于任何课程为 null（未分类） */
+  /** 归属分类：课表课程的规范名，或 subject 指定的自定义主题；无归属为 null（未分类） */
   category: string | null;
   source?: string;
   createdAt: number;
@@ -106,15 +107,20 @@ export function courseTitles(): string[] {
   return titles;
 }
 
+/** 自定义分类名：subject 原文收敛空白并限长，超长截断保展示 */
+function customCategory(subject: string): string {
+  return subject.replace(/\s+/g, " ").trim().slice(0, 30);
+}
+
 /**
- * 把一条知识归到课表课程：subject 是模型给的课程名提示（可选）。
- * 只认课表里真实存在的课程——subject 与某课程核心名相等或互相包含即
- * 命中；没有提示就按课程名出现在标题/正文里匹配（长名优先）。
- * 都对不上返回 null（未分类），绝不编造课程名。
+ * 把一条知识归类：subject 是模型给的归属提示（可选）。
+ * 优先认课表里真实存在的课程——subject 与某课程核心名相等或互相包含
+ * 即命中（存规范名）；subject 对不上任何课程时以其为自定义分类（用户
+ * 明确给了归属，不再落「未分类」）。没给 subject 才按课程名出现在
+ * 标题/正文里匹配（长名优先），都对不上返回 null（未分类）。
  */
 export function matchKnowledgeCategory(text: string, subject?: string): string | null {
   const courses = courseTitles().map((title) => ({ title, core: coreOf(title) }));
-  if (!courses.length) return null;
   // 长名优先：「大学英语」不该被更短的「英语」抢走
   courses.sort((a, b) => b.core.length - a.core.length);
 
@@ -127,6 +133,8 @@ export function matchKnowledgeCategory(text: string, subject?: string): string |
       if (exact) return exact.title;
       const loose = courses.find((c) => c.core.includes(hint) || hint.includes(c.core));
       if (loose) return loose.title;
+      // 对不上课表课程：subject 本身就是自定义分类（如「TypeScript」「编程技术」）
+      return customCategory(hintRaw);
     }
   }
   const haystack = coreOf(text);
@@ -206,7 +214,7 @@ export function updateKnowledge(
     entry.content = content;
   }
   if (patch.subject !== undefined) {
-    // 传了 subject 就重算归属：对得上课表课程就归类，对不上落回未分类
+    // 传了 subject 就重算归属：对得上课表课程就归入该课程，对不上以 subject 为自定义分类
     entry.category = matchKnowledgeCategory(`${entry.title}\n${entry.content}`, patch.subject);
   }
   entry.updatedAt = Date.now();
