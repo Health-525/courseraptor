@@ -18,8 +18,8 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
 | `src/web/chat-page.ts` | 共用前端视图，HTML/CSS/JS 在 `chatPage()` 模板字符串中，正式服务和离线演示共用 |
 | `src/web/today-brief.ts` | 周课表数据组装（纯本地缓存：课表/假期/学期日期），`GET /api/today?week=N` 的数据源 |
 | `src/web/today-page.ts` | 本周课表独立页（`GET /today`），含演示模式内嵌数据 |
-| `src/web/knowledge-page.ts` | 知识库独立页（`GET /knowledge`）：课程分类导航 + 关键词搜索 + 删除，含演示模式内嵌数据 |
-| `src/knowledge.ts` | 知识库本机持久化（`data/knowledge.json`）：条目 CRUD、同名去重、按课表缓存课程自动归类（对不上落未分类，绝不编造课程名） |
+| `src/web/knowledge-page.ts` | 知识库独立页（`GET /knowledge`）：分类导航 + 关键词搜索 + 删除，含演示模式内嵌数据 |
+| `src/knowledge.ts` | 知识库本机持久化（`data/knowledge.json`）：条目 CRUD、同名去重、归类（优先课表课程，subject 对不上时为自定义分类，无归属落未分类） |
 | `src/exam-cache.ts` | 考试本地缓存（`data/exam-cache.json`），get_exams 自动探测时落盘 |
 | `src/web/result-cards.ts` | 把课表、成绩、考试、通知和附件工具结果压成可落盘的结构化展示卡；不让前端解析 Markdown |
 | `src/web/workspace-data.ts` | 网页上传、截止日期待办与查询变化快照的本机持久化，统一路径边界与原子写入 |

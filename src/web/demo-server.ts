@@ -46,7 +46,7 @@ const DEMO_CLASS_TIMES: Record<string, string> = {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** 演示知识库：覆盖「归入课程 / 未分类」两种形态，条目全为虚构 */
+/** 演示知识库：覆盖「归入课程 / 自定义分类 / 未分类」三种形态，条目全为虚构 */
 function demoKnowledge(now: Date): KnowledgeEntry[] {
   const at = (daysAgo: number) =>
     new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo, 20, 30).getTime();
@@ -90,6 +90,16 @@ function demoKnowledge(now: Date): KnowledgeEntry[] {
       source: "对话",
       createdAt: at(1),
       updatedAt: at(1),
+    },
+    {
+      id: "demo-kn-5",
+      title: "TypeScript 类型收窄",
+      content:
+        "typeof / instanceof / in 判断后变量类型自动收窄；只需约束取值时，字面量联合（'ok' | 'error'）比 enum 更轻量。（虚构示例）",
+      category: "编程技术",
+      source: "对话",
+      createdAt: at(3),
+      updatedAt: at(3),
     },
   ].sort((a, b) => b.updatedAt - a.updatedAt); // 与真实 listKnowledge 一致：最近更新在前
 }
@@ -319,7 +329,7 @@ export function demoReply(message: string): string {
   if (/知识|记住|笔记/.test(message))
     return (
       prefix +
-      "### 知识库功能示例\n\n正式模式里可以把我当笔记本：**「记住：洛必达法则用来求 0/0 型极限」**。我会判断这是值得沉淀的知识并存入本地知识库；能对应上课表里的课程会自动归类（如归入「高等数学」），对应不上就留在「未分类」，不会硬塞。\n\n知识在课表页（/today）下方的「知识」卡片和独立的 /knowledge 页都能看到，可按课程筛选、搜索、删除。演示模式展示的是虚构知识。"
+      "### 知识库功能示例\n\n正式模式里可以把我当笔记本：**「记住：洛必达法则用来求 0/0 型极限」**。我会判断这是值得沉淀的知识并存入本地知识库；能对应上课表里的课程会自动归类（如归入「高等数学」），对不上课程的会按 subject 建自定义分类（如「编程技术」），完全无归属才留在「未分类」。\n\n知识在课表页（/today）下方的「知识」卡片和独立的 /knowledge 页都能看到，可按分类筛选、搜索、删除。演示模式展示的是虚构知识。"
     );
   if (/课表|上课|这周|今天|明天/.test(message))
     return (
