@@ -281,6 +281,14 @@ test("知识库：速览带总数与最近条目，课程归类随缓存课程�
     subject: "高等数学",
   });
   addKnowledge({ title: "番茄工作法", content: "25 分钟专注加 5 分钟休息" });
+  // 两条可能落在同一毫秒：稳定排序会保持插入顺序，「最近在前」就断言不了。
+  // 显式错开时间戳，让排序在快慢机器上都确定
+  const stateFile = path.join(tmpData, "knowledge.json");
+  const state = JSON.parse(fs.readFileSync(stateFile, "utf8")) as {
+    entries: Array<{ title: string; updatedAt: number }>;
+  };
+  state.entries.find((e) => e.title === "洛必达法则")!.updatedAt -= 60_000;
+  fs.writeFileSync(stateFile, JSON.stringify(state));
   const b = buildTodayBrief(new Date("2026-09-01T10:00:00"));
   assert.equal(b.knowledge.total, 2);
   assert.equal(b.knowledge.recent.length, 2);
