@@ -58,10 +58,6 @@ $ raptor
 
 <img src="docs/screenshot-web.png" width="880" alt="CourseRaptor 网页对话界面：思考草稿卡片 + 工具调用 + 教务通知回答" />
 
-**课表页 · 日程 / 待办 / 知识**
-
-<img src="docs/screenshot-demo.jpg" width="620" alt="CourseRaptor 课表页（/today）：本周课表、待办与知识卡片，演示数据" />
-
 **终端版 · TUI 欢迎面板**
 
 <img src="docs/screenshot-tui.png" width="880" alt="CourseRaptor 终端对话界面：启动即展示今日课表与最新通知" />
