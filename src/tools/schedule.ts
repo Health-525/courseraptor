@@ -13,6 +13,7 @@ import {
   resolveWeek1Monday,
   WEEKDAY_NAMES,
 } from "../jwgl/academics";
+import { getCookie } from "../jwgl/session";
 import {
   annotateWeekGroups,
   listSpecialDays,
@@ -23,7 +24,6 @@ import {
   specialOnDate,
 } from "../jwgl/term-holidays";
 import { saveScheduleCache } from "../schedule-cache";
-import { getCookie } from "../jwgl/session";
 
 export const scheduleTools = {
   /** 课表查询 */

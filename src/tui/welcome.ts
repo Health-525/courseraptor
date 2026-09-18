@@ -14,9 +14,9 @@ import {
   WEEKDAY_NAMES,
 } from "../jwgl/academics";
 import { fetchJwcNews } from "../jwgl/news";
+import { getCookie } from "../jwgl/session";
 import { currentWeekOf } from "../jwgl/term-dates";
 import { loadScheduleCache, saveScheduleCache } from "../schedule-cache";
-import { getCookie } from "../jwgl/session";
 import { startChatWeb } from "../web/chat-web";
 import { listReminders } from "../workspace-data";
 

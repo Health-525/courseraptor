@@ -45,6 +45,7 @@ import {
 import { config } from "../config";
 import { saveCredentialsStore } from "../credentials";
 import { generatedDir } from "../document/save";
+import { getCookie } from "../jwgl/session";
 import { clearKnowledge, deleteKnowledge, knowledgeStats, listKnowledge } from "../knowledge";
 import {
   allowedModelIds,
@@ -60,12 +61,6 @@ import {
   setQQBotCredentials,
 } from "../onboarding";
 import { isInsideDir } from "../paths";
-import { getCookie } from "../jwgl/session";
-import { chatPage } from "./chat-page";
-import { knowledgePage } from "./knowledge-page";
-import { cleanTitle, type TitleMaker } from "./session-titles";
-import { buildTodayBrief } from "./today-brief";
-import { todayPage } from "./today-page";
 import {
   addReminder,
   clearReminders,
@@ -81,6 +76,11 @@ import {
   type WebUpload,
   workspaceStats,
 } from "../workspace-data";
+import { chatPage } from "./chat-page";
+import { knowledgePage } from "./knowledge-page";
+import { cleanTitle, type TitleMaker } from "./session-titles";
+import { buildTodayBrief } from "./today-brief";
+import { todayPage } from "./today-page";
 
 /** 前端 Markdown 渲染器（marked 的 UMD 构建，静态吐给浏览器） */
 const MARKED_UMD = path.resolve(
