@@ -126,10 +126,13 @@ async function extractPptxText(buf: Buffer): Promise<string> {
   for (const name of names) {
     const xml = await zip.file(name)?.async("string");
     if (!xml) continue;
-    // 一个 <a:p> 是一个段落：段内文本段直接拼接，段落间换行
+    // 一个 <a:p> 是一个段落：段内文本段直接拼接，段落间换行。
+    // <a:t> 可能带 xml:space 等属性，正则不锁死尖括号内的写法
     const text = xml
       .split(/<\/a:p>/)
-      .map((p) => [...p.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => unescapeXml(m[1])).join(""))
+      .map((p) =>
+        [...p.matchAll(/<a:t(?:\s[^>]*)?>([^<]*)<\/a:t>/g)].map((m) => unescapeXml(m[1])).join(""),
+      )
       .filter((t) => t.trim())
       .join("\n");
     if (text) slides.push(text);

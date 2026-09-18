@@ -191,3 +191,84 @@ test("manage_attachments 工具：列缓存、删副本、用户原文件无恙"
   const again = await m.execute({ action: "delete", id: victim.id });
   assert.match(String(again.error), /未找到/);
 });
+
+test("GBK 编码的 txt/csv 不再乱码（教务处 Windows 导出的常态）", async () => {
+  // 「学院,课程\n信息学院,高等数学」的 GBK 字节：手工固化，不依赖 iconv
+  const gbkBytes = Buffer.from("d1a7d4ba2cbfceb3cc0ad0c5cfa2d1a7d4ba2cb8dfb5c8cafdd1a70a", "hex");
+  assert.notEqual(
+    gbkBytes.toString("utf8"),
+    "学院,课程\n信息学院,高等数学",
+    "前件：utf8 强解确实乱",
+  );
+
+  const txt = path.join(tmpFiles, "教务通知GBK.txt");
+  fs.writeFileSync(txt, gbkBytes);
+  const r = await openLocalFile(txt);
+  assert.equal(r.mode, "text");
+  if (r.mode !== "text") return;
+  assert.ok(r.text.includes("信息学院"), `GBK txt 应正确解码，实际得到：${r.text.slice(0, 50)}`);
+
+  // utf8 合法文件必须原样走 utf8（不能被 GBK 分支误伤）
+  const utf8Txt = path.join(tmpFiles, "utf8正常.txt");
+  fs.writeFileSync(utf8Txt, "信息学院，高等数学");
+  const r2 = await openLocalFile(utf8Txt);
+  assert.equal(r2.mode, "text");
+  if (r2.mode !== "text") return;
+  assert.ok(r2.text.includes("信息学院"), "合法 UTF-8 不能被 GBK 兜底改变");
+
+  // GBK 的 csv 也要能进表格引擎（decodeTextBuffer 在 loadWorkbook 前面）
+  const { loadWorkbook } = await import("../src/spreadsheet");
+  const csvFile = path.join(tmpFiles, "成绩单GBK.csv");
+  fs.writeFileSync(csvFile, gbkBytes);
+  const sheets = loadWorkbook(fs.readFileSync(csvFile), "成绩单GBK.csv");
+  assert.ok(sheets, "GBK csv 应解析成表格");
+  assert.deepEqual(sheets![0].headers, ["学院", "课程"]);
+  assert.equal(sheets![0].rows[0][1], "高等数学", "GBK csv 单元格内容正确");
+});
+
+test("pptx 附件可抽出幻灯片文本（此前上传白名单收、解析端不认）", async () => {
+  const PptxGenJS = require("pptxgenjs") as {
+    new (): {
+      addSlide: () => { addText: (t: string, o: unknown) => void };
+      write: (o: { outputType: "nodebuffer" }) => Promise<Buffer>;
+    };
+  };
+  const pptx = new PptxGenJS();
+  pptx.addSlide().addText("评教通知现已开放", { x: 1, y: 1 });
+  pptx.addSlide().addText("截止日期 9 月 30 日", { x: 1, y: 1 });
+  const buf = await pptx.write({ outputType: "nodebuffer" });
+  const file = path.join(tmpFiles, "评教说明.pptx");
+  fs.writeFileSync(file, buf);
+
+  const r = await openLocalFile(file);
+  assert.equal(r.mode, "text", "pptx 现在应解析成文本而非落 file 模式");
+  if (r.mode !== "text") return;
+  assert.ok(r.text.includes("评教通知现已开放"), "第一页文本");
+  assert.ok(r.text.includes("截止日期"), "第二页文本");
+
+  // XML 实体：pptxgenjs 会把 < > & 写成实体，抽出的必须是还原后的字符
+  const p2 = new PptxGenJS();
+  p2.addSlide().addText("要求：<60 分需补考 & 重修", { x: 1, y: 1 });
+  const entityFile = path.join(tmpFiles, "实体测试.pptx");
+  fs.writeFileSync(entityFile, await p2.write({ outputType: "nodebuffer" }));
+  const r2 = await openLocalFile(entityFile);
+  assert.equal(r2.mode, "text");
+  if (r2.mode !== "text") return;
+  assert.ok(r2.text.includes("<60 分需补考 & 重修"), "XML 实体应被还原");
+});
+
+test("缓存失效：同体积改内容（mtime 变化）不再读到旧缓存", async () => {
+  const file = path.join(tmpFiles, "会更新的.txt");
+  fs.writeFileSync(file, "第一版内容，长度固定十个字");
+  const first = await openLocalFile(file);
+  assert.equal(first.mode, "text");
+  if (first.mode !== "text") return;
+  assert.ok(first.text.includes("第一版"));
+
+  // 同长度改内容：体积判断骗得过，mtime 骗不过
+  fs.writeFileSync(file, "第二版内容，长度固定十个字");
+  const second = await openLocalFile(file);
+  assert.equal(second.mode, "text");
+  if (second.mode !== "text") return;
+  assert.ok(second.text.includes("第二版"), "mtime 变化必须触发重新入缓存，否则永远读旧内容");
+});
