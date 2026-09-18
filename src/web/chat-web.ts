@@ -62,6 +62,13 @@ import {
 } from "../onboarding";
 import { isInsideDir } from "../paths";
 import {
+  activePomodoro,
+  cancelPomodoro,
+  listPomodoros,
+  type PomodoroView,
+  toView,
+} from "../pomodoro";
+import {
   addReminder,
   clearReminders,
   clearUploads,
@@ -500,6 +507,24 @@ function filesOfToolOutput(output: unknown): Array<{ name: string; size: number 
   return out;
 }
 
+/**
+ * 从工具结果里提取新建的番茄钟（前端渲染实时倒计时卡片的数据源）。
+ * 只有 start 带 fresh 标记的才透出——status/cancel 的同名 payload
+ * 只给模型组话用，不画卡，避免查一次时间就多一张卡。
+ */
+function pomodoroOfToolOutput(output: unknown): PomodoroView | null {
+  if (typeof output !== "object" || output == null || Array.isArray(output)) return null;
+  const o = output as Record<string, unknown>;
+  if (o.fresh !== true) return null;
+  const p = o.pomodoro;
+  if (typeof p !== "object" || p == null || Array.isArray(p)) return null;
+  const v = p as Record<string, unknown>;
+  if (typeof v.id !== "string" || typeof v.endsAt !== "number" || typeof v.totalSec !== "number") {
+    return null;
+  }
+  return v as unknown as PomodoroView;
+}
+
 const SESSIONS_PREFIX = "/api/sessions/";
 /** 会话 id 白名单：uuid/十六进制/default。注意必须放行字母——无 sessionId
  * 的对话落 default 档，只收十六进制会让侧栏点击默认档被误判非法而 404 */
@@ -784,6 +809,15 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       json(res, { reminders: listReminders() });
       return;
     }
+    if (url === "/api/pomodoro") {
+      // 番茄钟现状：卡片取消按钮与重开页面后的状态都走这里，不经过 agent
+      const active = activePomodoro();
+      json(res, {
+        active: active ? toView(active) : null,
+        recent: listPomodoros(10).map((p) => toView(p)),
+      });
+      return;
+    }
     if (url.startsWith("/api/reminders/") && url.endsWith(".ics")) {
       const id = url.slice("/api/reminders/".length, -4);
       const reminder = listReminders().find((r) => r.id === id);
@@ -934,6 +968,21 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         json(res, { reminder }, 201);
       } catch (error) {
         json(res, { error: error instanceof Error ? error.message : "创建提醒失败" }, 400);
+      }
+      return;
+    }
+    if (url === "/api/pomodoro/cancel") {
+      // 倒计时卡片上的「取消」按钮直调这里：不打扰 agent 那轮对话
+      try {
+        const body = await jsonBody(req, 16_384);
+        const target = cancelPomodoro(typeof body.id === "string" ? body.id : undefined);
+        if (!target) {
+          json(res, { error: "当前没有在走的番茄钟" }, 404);
+          return;
+        }
+        json(res, { ok: true, pomodoro: toView(target) });
+      } catch {
+        json(res, { error: "请求体需要是 JSON" }, 400);
       }
       return;
     }
@@ -1191,6 +1240,7 @@ async function runTurn(
         case "tool-result": {
           const t0 = p.toolCallId ? toolStart.get(p.toolCallId) : undefined;
           const files = filesOfToolOutput(p.output);
+          const pomodoro = pomodoroOfToolOutput(p.output);
           send({
             t: "tool",
             phase: "end",
@@ -1201,6 +1251,8 @@ async function runTurn(
             out: previewJson(p.output),
             // 有成品文件时前端在工具卡下方渲染下载行
             ...(files.length ? { files } : {}),
+            // 新建番茄钟时前端在工具卡下方渲染实时倒计时卡片
+            ...(pomodoro ? { pomodoro } : {}),
           });
           break;
         }
