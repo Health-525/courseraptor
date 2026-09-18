@@ -2,14 +2,21 @@
  * 「知识库」独立页 — GET /knowledge 的页面本体
  *
  * 展示对话中沉淀的全部知识条目：按课程分类导航（对不上课程的落
- * 「未分类」）、关键词搜索、删除。数据来自 GET /api/knowledge（纯本地
- * 存储，不登录教务、不调模型），页面每 60 秒与切回标签页时自行刷新。
+ * 「未分类」）、关键词搜索（命中高亮 + 按 / 快捷聚焦）、排序切换
+ * （最近更新 / 按标题）、长内容折叠展开、两步删除防误删、分批渲染。
+ * 数据来自 GET /api/knowledge（纯本地存储，不登录教务、不调模型），
+ * 页面每 60 秒与切回标签页时自行刷新。
  *
  * 视觉与课表页 /today 同一套红头档案令牌（暖纸底 + 墨字 + 单一朱砂红）。
  * 演示模式：demo=true 时内嵌虚构数据（demoData），不发任何请求。
  */
 
 import type { KnowledgeEntry } from "../knowledge";
+
+/** 正文超过该长度视为长文，默认折叠、展开收起由用户决定 */
+const CLAMP_LEN = 160;
+/** 首屏渲染条数，超出部分「显示更多」分批追加 */
+const BATCH = 50;
 
 export function knowledgePage(
   options: { demo?: boolean; demoData?: KnowledgeEntry[] } = {},
@@ -33,7 +40,8 @@ export function knowledgePage(
     --shade: #ECE8DD;
     --ink: #25221C;
     --ink-2: #5A554A;
-    --ink-3: #898274;
+    /* 旧值 #898274 在纸底上仅 ~3.5:1，调深以满足 WCAG AA（小字 ≥4.5:1） */
+    --ink-3: #6E6656;
     --rule: #E1DCCF;
     --rule-2: #C9C1AF;
     --accent: #AD392C;
@@ -51,6 +59,7 @@ export function knowledgePage(
          -webkit-font-smoothing: antialiased; }
   ::selection { background: var(--accent-soft); }
   a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .tbtn { background: none; border: 1px solid var(--rule-2); color: var(--ink-2);
           min-height: 38px; font-size: 14px; padding: 7px 14px; border-radius: 4px;
           cursor: pointer; text-decoration: none; display: inline-flex;
@@ -92,6 +101,15 @@ export function knowledgePage(
             border-radius: 4px; background: var(--card); color: var(--ink); font-size: 14px;
             font-family: inherit; }
   .kw-box:focus { outline: none; border-color: var(--accent); }
+  .kw-hint { margin: 5px 2px 0; font-family: var(--mono); font-size: 11px;
+             color: var(--ink-3); letter-spacing: .04em; }
+  .sort-row { display: flex; gap: 6px; margin-top: 12px; }
+  .sort-btn { flex: 1; background: none; border: 1px solid var(--rule-2); padding: 4px 8px;
+              border-radius: 4px; color: var(--ink-2); font-size: 12px; cursor: pointer;
+              font-family: var(--mono); letter-spacing: .04em; }
+  .sort-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .sort-btn.active { border-color: var(--accent); background: var(--accent-soft);
+                     color: var(--accent-deep); }
   .cat-nav { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
   .cat-btn { display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
              background: none; border: 1px solid transparent; padding: 6px 8px; border-radius: 4px;
@@ -118,8 +136,9 @@ export function knowledgePage(
   .empty { margin: 0; padding: 24px 8px; border: 1px dashed var(--rule-2); text-align: center;
            color: var(--ink-3); font-size: 14px; }
 
-  /* 知识条目：标题行 + 正文，纸质卡片 */
-  .k-entry { padding: 12px 14px; border: 1px solid var(--rule); background: var(--paper); }
+  /* 知识条目：标题行 + 正文，纸质卡片；长文默认折叠可展开 */
+  .k-entry { padding: 12px 14px; border: 1px solid var(--rule); background: var(--paper);
+             display: grid; gap: 0; }
   .k-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
   .k-title { margin: 0; font-family: var(--kai); font-size: 17px; font-weight: 600;
              overflow-wrap: anywhere; }
@@ -131,8 +150,18 @@ export function knowledgePage(
   .k-del { background: none; border: none; padding: 2px 4px; color: var(--ink-3); flex: none;
            font-family: var(--mono); font-size: 12px; cursor: pointer; }
   .k-del:hover { color: var(--accent); text-decoration: underline; }
+  .k-del.armed { color: var(--card); background: var(--accent); border-radius: 3px;
+                 padding: 2px 8px; }
   .k-content { margin: 6px 0 0; font-size: 14px; line-height: 1.7; color: var(--ink-2);
                white-space: pre-wrap; overflow-wrap: anywhere; }
+  .k-content.clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+                     overflow: hidden; }
+  .k-toggle { justify-self: start; background: none; border: none; padding: 3px 0;
+              color: var(--accent-deep); font-family: var(--mono); font-size: 12px;
+              cursor: pointer; }
+  .k-toggle:hover { text-decoration: underline; }
+  mark { background: var(--accent-soft); color: var(--accent-deep); padding: 0 1px; }
+  .k-more { justify-self: center; min-height: 32px; padding: 4px 16px; font-size: 12.5px; }
 
   @media (max-width: 720px) {
     .pagehead { flex-wrap: wrap; padding: 14px 16px; gap: 10px 12px; }
@@ -145,6 +174,16 @@ export function knowledgePage(
     .cat-nav { flex-direction: row; flex-wrap: wrap; }
     .cat-btn { border: 1px solid var(--rule-2); background: var(--card); }
     .rail-meta { margin-top: 10px; padding-top: 10px; }
+  }
+  @media print {
+    body { background: #fff; }
+    .ph-right, .demo-banner, .kw-box, .kw-hint, .sort-row, .rail-meta,
+    .k-del, .k-toggle, .k-more { display: none !important; }
+    .cat-nav { flex-direction: row; flex-wrap: wrap; }
+    .k-content.clamp { display: block; -webkit-line-clamp: unset; }
+    main { display: block; max-width: none; padding: 0; }
+    .card { box-shadow: none; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
@@ -159,7 +198,7 @@ export function knowledgePage(
     <span class="ph-stamp">COURSERAPTOR · KNOWLEDGE BASE</span>
   </div>
   <div class="ph-right">
-    <a class="tbtn" href="/today">本周课表</a>
+    <a class="tbtn" href="/today">今日日程</a>
     <a class="tbtn" href="/">返回对话</a>
   </div>
 </header>
@@ -169,6 +208,11 @@ ${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 虚构�
     <p class="rail-kicker">KNOWLEDGE BASE</p>
     <h2 class="rail-title">我的知识</h2>
     <input class="kw-box" id="kwBox" type="search" placeholder="搜索标题 / 内容…" aria-label="搜索知识">
+    <p class="kw-hint">按 / 聚焦 · Esc 清空</p>
+    <div class="sort-row" id="sortRow" role="group" aria-label="排序方式">
+      <button type="button" class="sort-btn active" data-sort="updated">最近更新</button>
+      <button type="button" class="sort-btn" data-sort="title">按标题</button>
+    </div>
     <div class="cat-nav" id="catNav"></div>
     <div class="rail-meta" id="knMeta"></div>
   </aside>
@@ -178,11 +222,16 @@ ${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 虚构�
   </section>
 </main>
 <script>
+const CLAMP_LEN = ${CLAMP_LEN};
+const BATCH = ${BATCH};
 ${demo && demoData ? `const DEMO_DATA = ${JSON.stringify(demoData)};` : "const DEMO_DATA = null;"}
 const $ = (id) => document.getElementById(id);
 let entries = [];
 let activeCat = "ALL"; // "ALL" | "NONE"（未分类）| 具体课程名
 let keyword = "";
+let sortMode = "updated"; // "updated" | "title"
+let visibleCount = BATCH;
+const expandedIds = new Set();
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -193,6 +242,49 @@ function el(tag, cls, text) {
 function fmtDay(ts) {
   const d = new Date(ts);
   return (d.getMonth() + 1) + "月" + d.getDate() + "日";
+}
+/* 命中高亮：纯 DOM 拼接（不走 innerHTML），把关键词片段包进 <mark> */
+function appendMarked(parent, text, kw) {
+  if (!kw) { parent.appendChild(document.createTextNode(text)); return; }
+  const lower = text.toLowerCase();
+  const k = kw.toLowerCase();
+  let i = 0;
+  let at = lower.indexOf(k);
+  while (at >= 0) {
+    if (at > i) parent.appendChild(document.createTextNode(text.slice(i, at)));
+    parent.appendChild(el("mark", null, text.slice(at, at + k.length)));
+    i = at + k.length;
+    at = lower.indexOf(k, i);
+  }
+  parent.appendChild(document.createTextNode(text.slice(i)));
+}
+/* 两步删除：第一次点变身「确认删除」，3 秒内再点才执行，超时还原 */
+function armDelete(btn, onConfirm) {
+  if (btn.dataset.armed === "1") { onConfirm(); return; }
+  btn.dataset.armed = "1";
+  const label = btn.textContent;
+  btn.textContent = "确认删除";
+  btn.classList.add("armed");
+  setTimeout(() => {
+    btn.dataset.armed = "";
+    btn.textContent = label;
+    btn.classList.remove("armed");
+  }, 3000);
+}
+
+function filtered() {
+  let list = entries;
+  if (activeCat === "NONE") list = list.filter((e) => !e.category);
+  else if (activeCat !== "ALL") list = list.filter((e) => e.category === activeCat);
+  if (keyword) {
+    const kw = keyword.toLowerCase();
+    list = list.filter((e) =>
+      (e.title + "\\n" + e.content + "\\n" + (e.category || "未分类")).toLowerCase().includes(kw));
+  }
+  const sorted = [...list];
+  if (sortMode === "title") sorted.sort((a, b) => a.title.localeCompare(b.title, "zh"));
+  else sorted.sort((a, b) => b.updatedAt - a.updatedAt);
+  return sorted;
 }
 
 function renderNav() {
@@ -226,27 +318,66 @@ function catBtn(key, label, count) {
   const btn = el("button", "cat-btn" + (activeCat === key ? " active" : ""), label);
   btn.type = "button";
   btn.appendChild(el("span", "cat-count", String(count)));
-  btn.addEventListener("click", () => { activeCat = key; renderNav(); renderList(); });
+  btn.addEventListener("click", () => {
+    activeCat = key;
+    visibleCount = BATCH;
+    renderNav();
+    renderList();
+  });
   return btn;
+}
+
+function renderSort() {
+  for (const btn of $("sortRow").querySelectorAll("button")) {
+    btn.classList.toggle("active", btn.dataset.sort === sortMode);
+  }
 }
 
 function entryEl(item) {
   const card = el("article", "k-entry");
   const head = el("div", "k-head");
-  head.appendChild(el("h3", "k-title", item.title));
+  const title = el("h3", "k-title");
+  appendMarked(title, item.title, keyword);
+  head.appendChild(title);
   head.appendChild(el("span", "k-cat" + (item.category ? "" : " none"), item.category || "未分类"));
   head.appendChild(el("span", "k-date", fmtDay(item.updatedAt)));
   if (!DEMO_DATA) {
     const del = el("button", "k-del", "删除");
     del.type = "button";
     del.addEventListener("click", () => {
-      if (!window.confirm("删除知识「" + item.title + "」？")) return;
-      fetch("/api/knowledge/" + item.id, { method: "DELETE" }).then(load).catch(load);
+      armDelete(del, () => {
+        fetch("/api/knowledge/" + item.id, { method: "DELETE" }).then(load).catch(load);
+      });
     });
     head.appendChild(del);
   }
   card.appendChild(head);
-  card.appendChild(el("p", "k-content", item.content));
+
+  const content = el("p", "k-content");
+  appendMarked(content, item.content, keyword);
+  if (item.content.length > CLAMP_LEN) {
+    if (!expandedIds.has(item.id)) content.classList.add("clamp");
+    card.appendChild(content);
+    const toggle = el("button", "k-toggle", expandedIds.has(item.id) ? "收起" : "展开全文");
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", expandedIds.has(item.id) ? "true" : "false");
+    toggle.addEventListener("click", () => {
+      if (expandedIds.has(item.id)) {
+        expandedIds.delete(item.id);
+        content.classList.add("clamp");
+        toggle.textContent = "展开全文";
+        toggle.setAttribute("aria-expanded", "false");
+      } else {
+        expandedIds.add(item.id);
+        content.classList.remove("clamp");
+        toggle.textContent = "收起";
+        toggle.setAttribute("aria-expanded", "true");
+      }
+    });
+    card.appendChild(toggle);
+  } else {
+    card.appendChild(content);
+  }
   return card;
 }
 
@@ -254,24 +385,25 @@ function renderList() {
   const body = $("listCard").querySelector(".cbody");
   const note = $("listNote");
   body.textContent = "";
-  let list = entries;
-  if (activeCat === "NONE") list = list.filter((e) => !e.category);
-  else if (activeCat !== "ALL") list = list.filter((e) => e.category === activeCat);
-  if (keyword) {
-    const kw = keyword.toLowerCase();
-    list = list.filter((e) =>
-      (e.title + "\\n" + e.content + "\\n" + (e.category || "未分类")).toLowerCase().includes(kw));
-  }
-  note.textContent = list.length ? list.length + " 条" : "";
   if (!entries.length) {
+    note.textContent = "";
     body.appendChild(el("p", "empty", "知识库还是空的。在对话页分享你学到的知识点（或说「记住：……」），我会自动记进知识库并按课程归类。"));
     return;
   }
+  const list = filtered();
+  note.textContent = list.length ? list.length + " 条" : "";
   if (!list.length) {
     body.appendChild(el("p", "empty", "没有匹配的知识条目，换个关键词或分类试试。"));
     return;
   }
-  for (const item of list) body.appendChild(entryEl(item));
+  const shown = list.slice(0, visibleCount);
+  for (const item of shown) body.appendChild(entryEl(item));
+  if (list.length > shown.length) {
+    const more = el("button", "tbtn k-more", "显示更多（还有 " + (list.length - shown.length) + " 条）");
+    more.type = "button";
+    more.addEventListener("click", () => { visibleCount += BATCH; renderList(); });
+    body.appendChild(more);
+  }
 }
 
 function load() {
@@ -287,7 +419,32 @@ function load() {
 }
 $("kwBox").addEventListener("input", (ev) => {
   keyword = ev.target.value.trim();
+  visibleCount = BATCH;
   renderList();
+});
+$("kwBox").addEventListener("keydown", (ev) => {
+  if (ev.key === "Escape" && ev.target.value) {
+    ev.target.value = "";
+    keyword = "";
+    visibleCount = BATCH;
+    renderList();
+  }
+});
+$("sortRow").addEventListener("click", (ev) => {
+  const btn = ev.target.closest("button");
+  if (!btn || !btn.dataset.sort || btn.dataset.sort === sortMode) return;
+  sortMode = btn.dataset.sort;
+  visibleCount = BATCH;
+  renderSort();
+  renderList();
+});
+// / 快捷聚焦搜索（正在输入时忽略）
+document.addEventListener("keydown", (ev) => {
+  if (ev.key !== "/") return;
+  const t = ev.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+  ev.preventDefault();
+  $("kwBox").focus();
 });
 load();
 if (!DEMO_DATA) {

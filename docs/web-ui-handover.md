@@ -17,8 +17,8 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
 | `src/web/chat-web.ts` | HTTP 服务 + SSE 流式接口，连接正式 Agent 与会话存储 |
 | `src/web/chat-page.ts` | 共用前端视图，HTML/CSS/JS 在 `chatPage()` 模板字符串中，正式服务和离线演示共用 |
 | `src/web/today-brief.ts` | 周课表数据组装（纯本地缓存：课表/假期/学期日期），`GET /api/today?week=N` 的数据源 |
-| `src/web/today-page.ts` | 本周课表独立页（`GET /today`），含演示模式内嵌数据 |
-| `src/web/knowledge-page.ts` | 知识库独立页（`GET /knowledge`）：分类导航 + 关键词搜索 + 删除，含演示模式内嵌数据 |
+| `src/web/today-page.ts` | 今日日程独立页（`GET /today`）：今日头条（正在上/下一节课倒计时）+ 周课表网格 + 临近考试 + 待办分组 + 知识速览，含演示模式内嵌数据 |
+| `src/web/knowledge-page.ts` | 知识库独立页（`GET /knowledge`）：分类导航 + 搜索高亮 + 排序切换 + 长文折叠 + 两步删除 + 分批渲染，含演示模式内嵌数据 |
 | `src/knowledge.ts` | 知识库本机持久化（`data/knowledge.json`）：条目 CRUD、同名去重、归类（优先课表课程，subject 对不上时为自定义分类，无归属落未分类） |
 | `src/exam-cache.ts` | 考试本地缓存（`data/exam-cache.json`），get_exams 自动探测时落盘 |
 | `src/web/result-cards.ts` | 把课表、成绩、考试、通知和附件工具结果压成可落盘的结构化展示卡；不让前端解析 Markdown |
@@ -111,21 +111,31 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
 - `chat-sessions` 写盘失败只 `console.error`，嵌入模式（卡片 TUI）下这条错误可能花一帧。真在意可改成走 `src/qq/logger.ts` 的文件日志。
 - `data/schedule-cache.json` 长期不更新时 TUI 启动面板显示的是最后已知课表；在对话里问一次课表即刷新（网页已不直接展示课表）。
 
-## 八、本周课表独立页（GET /today）
+## 八、今日日程独立页（GET /today）与知识库独立页（GET /knowledge）
 
-2026-09-08 新增：路线图 P1「本周课表」落地为**独立界面**（用户明确要求不回侧栏）。同一个 web 服务上多出一条路由，与对话页互为独立页面（非 SPA，各自整页加载）。
+2026-09-08 新增 /today：路线图 P1「本周课表」落地为**独立界面**（用户明确要求不回侧栏）。2026-09-18 UI/UX 重构为「今日日程」：编辑部头版结构，与对话页侧栏入口的名字终于一致。
 
 | 文件 | 作用 |
 |---|---|
-| `src/web/today-brief.ts` | 数据组装（纯函数 + 注入时钟）：按周次过滤课程，放假作废、调休按 follows 换课表；输出课程的节次、时间、地点、教师与周次，支持指定教学周。只读本地缓存，不登录教务、不调模型 |
-| `src/web/today-page.ts` | 页面本体（`todayPage({demo, demoData})`）：红头档案同套设计令牌；页头 + 「返回对话」；桌面左右布局，右侧以周一至周日 × 节次的网格完整展示课程，提供上一周、下一周与回到本周 |
+| `src/web/today-brief.ts` | 数据组装（纯函数 + 注入时钟）：按周次过滤课程，放假作废、调休按 follows 换课表；输出今天的课（含 done/current/upcoming 状态）、下一节课（含倒计时分钟）、临近考试（14 天窗）、待办与知识速览，支持指定教学周。只读本地缓存，不登录教务、不调模型 |
+| `src/web/today-page.ts` | 页面本体（`todayPage({demo, demoData})`）：红头档案同套设计令牌；今日头条 → 周课表 → 临近考试 → 待办 → 知识速览 |
+| `src/web/knowledge-page.ts` | 知识库页本体（`knowledgePage({demo, demoData})`）：左栏分类/搜索/排序，右栏条目列表 |
 | `src/exam-cache.ts` | 考试缓存（`data/exam-cache.json`），与 schedule-cache 同一套约定；`get_exams` 自动探测学期时落盘，日程页据此展示临近考试 |
-| `src/web/demo-server.ts` | 演示模式：`/today` 内嵌虚构课表（跟真实时钟走），不发任何请求 |
+| `src/web/demo-server.ts` | 演示模式：`/today` `/knowledge` 内嵌虚构数据（跟真实时钟走），不发任何请求 |
 
 接口与行为要点：
 
 - `GET /today` → 页面；`GET /api/today?week=N` → `buildTodayBrief()` 的 JSON。两者都在 `chat-web.ts` 的 GET 分支里、**兜底吐聊天页的 catch-all 之前**——新页面路由必须加在 catch-all 前，否则永远渲染聊天页。
+- **今日头条**（数据全部现成，零后端改动）：有 `status=current` 的课显示「正在上课」（含下课时间）；否则显示 `next`（下一节课 + 「还有 N 分钟/N 小时 N 分/N 天后开讲」倒计时）；今天完课显示「已结束」；无课如实显示 `schedule.note`（放假/调休/没课）。下方「今天课程速览条」按状态着色（done 灰淡、current 朱砂）。
+- **周课表网格**：课格只留课名 + 地点两行（教师/周次/节次进 `title` 悬停提示，删掉节次黑话行）；今天列 `accent-soft` 铺色；正在上的节次行与课格加朱砂「现在」标记（由 `b.now` + `periodTimes` 对出，仅当今天在所看周内）。
+- **周次导航**：上一周/下一周 + 直达下拉（1..maxWeek）；所选周用 `history.replaceState` 写进 `?week=N`，刷新/分享不丢，加载时读回；请求的周次无效时服务端回落到当前周、前端跟着对齐。
+- **移动端（≤720px）**：整周网格压进屏宽——节次列只留数字（时间段隐藏）、日表头竖排堆叠且允许换行（40px 出头的日列放不下「周六 补课」横排，踩过）、周卡内边距收窄；极窄屏保留横向滚动兜底。
+- **临近考试卡**：`exams.upcoming`（至多 4 场）带「今天/明天/N 天后」倒计时徽标、时间地点座位；`exams.note` 如实降级。
+- **待办分组**：逾期 / 今天 / 明天 / 以后 四组（mono 小标 + 计数，逾期组朱砂深色），勾选完成流程不变。
+- **两步删除**（/today 待办与 /knowledge 条目同款，替代原生 `confirm`）：点「删除」→ 3 秒内变身朱砂「确认删除」，再点才执行，超时还原。演示守卫 `!DEMO_DATA` 原样包住全部交互。
+- **知识库页**：搜索命中高亮（`<mark>` 朱砂底，纯 DOM 拼接不走 innerHTML）；`/` 快捷聚焦、Esc 清空；排序切换（最近更新默认 / 按标题 zh locale）；长文（>160 字）默认折叠 4 行 + 展开/收起；分批渲染（首屏 50 条 + 「显示更多」每次追加 50，搜索仍对全量生效）。
+- **无障碍与打印**：`--ink-3` 由 `#898274`（纸底 ~3.5:1 不达标）调深为 `#6E6656`（≥4.85:1 过 WCAG AA），两页同改；全局 `:focus-visible` 朱砂外框；`@media print` 隐去导航/操作只留内容并保留朱砂标记。
 - 无课表缓存时如实降级：「还没有课表数据」+ 引导去对话页问一次（问一次即建缓存），不装作有数据。
 - 前端无框架无 marked 依赖；页面 JS 同样是外层 TS 模板串——**不用反引号与 `${`，换行写 `\\n`**（坑 1 对它同样生效，测试里对求值产物做过 `node --check`）。
-- 测试：`tests/today-brief.test.ts`（单双周/调休/放假/无缓存/指定教学周等）+ `tests/chat-web.test.ts` 路由测试 + `tests/demo.test.ts` 演示页测试。
-- 已知取舍：调休数据只按 `specialOnDate` 的单条记录处理；可浏览周数取课表实际周次的最大值。
+- 测试：`tests/today-brief.test.ts`（单双周/调休/放假/无缓存/指定教学周等）+ `tests/chat-web.test.ts` 路由测试 + `tests/demo.test.ts` 演示页测试。注意 demo 测试钉了几个锚点：`chk.disabled = true`、`if (!DEMO_DATA) {` 后 120 字内必须出现 `k-del`（删除按钮留在演示守卫里）、`more.href = "/knowledge"`。
+- 已知取舍：调休数据只按 `specialOnDate` 的单条记录处理；可浏览周数取课表实际周次的最大值；演示模式的周次导航整体禁用（虚构数据只有一周）。
