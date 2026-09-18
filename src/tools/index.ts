@@ -13,6 +13,7 @@
  * - memory.ts          长期记忆（1）
  * - reminders.ts       待办（1）
  * - knowledge.ts       知识库（1）
+ * - pomodoro.ts        番茄钟（1）
  * - weather.ts         天气（1）
  * - time.ts            时间（1，模型的唯一时钟）
  * - calendar.ts        日历导出与发布（2，本机 .ics + GitHub 订阅源）
@@ -27,6 +28,7 @@ import { gradesTools } from "./grades";
 import { knowledgeTools } from "./knowledge";
 import { memoryTools } from "./memory";
 import { newsTools } from "./news";
+import { pomodoroTools } from "./pomodoro";
 import { reminderTools } from "./reminders";
 import { scheduleTools } from "./schedule";
 import { studentTools } from "./student";
@@ -44,6 +46,7 @@ const raptorToolsAll = {
   ...memoryTools,
   ...reminderTools,
   ...knowledgeTools,
+  ...pomodoroTools,
   ...weatherTools,
   ...timeTools,
   ...calendarTools,

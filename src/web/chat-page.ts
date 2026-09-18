@@ -226,6 +226,31 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                  font-size: 12px; }
   .frow a.tbtn:hover { background: var(--accent-soft); }
 
+  /* 番茄钟卡片：工具卡下方一条实时倒计时，时间到翻成朱砂底 */
+  .pomo { border: 1px solid var(--rule-2); background: var(--card);
+          padding: 12px 14px; margin-bottom: 9px; }
+  .pomo .prow { display: flex; align-items: baseline; gap: 10px; }
+  .pomo .pmark { flex: none; font-size: 15px; }
+  .pomo .plabel { flex: 1; min-width: 0; overflow: hidden;
+                 text-overflow: ellipsis; white-space: nowrap;
+                 font-size: 14px; font-weight: 600; }
+  .pomo .pmeta { flex: none; font-family: var(--mono); font-size: 12px;
+                color: var(--ink-3); }
+  .pomo .pclock { font-family: var(--mono); font-size: 34px; font-weight: 600;
+                 letter-spacing: .04em; margin: 4px 0 8px;
+                 font-variant-numeric: tabular-nums; }
+  .pomo .pbar { height: 6px; background: var(--shade);
+               border-radius: 3px; overflow: hidden; }
+  .pomo .pbar i { display: block; height: 100%; width: 0;
+                 background: var(--accent); border-radius: 3px; }
+  .pomo .pfoot { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+  .pomo .pstate { flex: 1; font-family: var(--mono); font-size: 12px;
+                 color: var(--ink-3); }
+  .pomo .pfoot .tbtn { min-height: 30px; padding: 2px 12px; font-size: 12px; }
+  .pomo.done { border-color: var(--accent); background: var(--accent-soft); }
+  .pomo.done .pclock, .pomo.done .pstate { color: var(--accent-deep); }
+  .pomo.cancelled { opacity: .6; }
+
   /* 思考过程：独立建模成草稿卡片。与工具卡片同族但更轻（虚线框、无底色），
      内容用楷体灰字小一号——正文是系统黑体 15px，这里是 --kai 13px，两级层次
      一眼可分；长思考限高内部滚，不把屏幕撑满。 */
@@ -486,10 +511,12 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .rem-tools a, .rem-tools button { border: 0; background: none; padding: 0; color: var(--ink-3);
                                    cursor: pointer; font-size: 12px; text-decoration: none; }
   .rem-tools a:hover, .rem-tools button:hover { color: var(--accent); }
-  .data-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
-  .data-cell { border: 1px solid var(--rule); background: var(--card); padding: 8px 9px; }
+  .data-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; align-items: stretch; }
+  .data-cell { border: 1px solid var(--rule); background: var(--card); padding: 10px 8px;
+               min-height: 72px; display: flex; flex-direction: column;
+               align-items: center; justify-content: center; gap: 4px; text-align: center; }
   .data-cell span { display: block; font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
-  .data-cell strong { font-size: 14px; font-weight: 600; }
+  .data-cell strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
   .data-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
   .data-actions .danger { color: var(--accent-deep); }
   .setmsg { font-family: var(--mono); font-size: 12px; min-height: 16px;
@@ -1061,6 +1088,101 @@ function fileRows(tl, files) {
   });
   scroll(false);
 }
+
+/* ── 番茄钟卡片：新建计时随工具事件落到时间线里，每秒自跳 ── */
+function pomoFmt(sec) {
+  sec = Math.max(0, Math.ceil(sec));
+  const m = Math.floor(sec / 60), s = sec % 60;
+  return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+}
+/* 到点三声提示音：WebAudio 现场合成，不依赖任何音频文件 */
+function pomoBeep() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const ctx = new AC();
+    [0, 0.35, 0.7].forEach((off, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = i === 2 ? 660 : 880;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + off);
+      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + off + 0.03);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + off + 0.3);
+      o.start(ctx.currentTime + off); o.stop(ctx.currentTime + off + 0.32);
+    });
+    setTimeout(() => ctx.close(), 1500);
+  } catch { /* 没声音就只靠视觉 */ }
+}
+function pomoCard(tl, p) {
+  if (!p || !p.endsAt) return;
+  const total = p.totalSec || Math.max(1, Math.round((p.endsAt - (p.startsAt || Date.now())) / 1000));
+  const card = el("pomo");
+  card.dataset.ends = String(p.endsAt);
+  card.dataset.total = String(total);
+  card.dataset.id = String(p.id || "");
+  card.dataset.label = String(p.label || "专注");
+  const row = el("prow");
+  row.appendChild(el2("pmark", "🍅"));
+  row.appendChild(el2("plabel", (p.label || "专注") + " · " + (p.focusMinutes || Math.round(total / 60)) + "分钟"));
+  row.appendChild(el2("pmeta", "至 " + clock(p.endsAt) + " 结束"));
+  card.appendChild(row);
+  card.appendChild(el2("pclock", pomoFmt((p.endsAt - Date.now()) / 1000)));
+  const bar = el("pbar");
+  bar.appendChild(document.createElement("i"));
+  card.appendChild(bar);
+  const foot = el("pfoot");
+  foot.appendChild(el2("pstate", "专注进行中"));
+  if (p.status === "running") {
+    const cancel = document.createElement("button");
+    cancel.type = "button"; cancel.className = "tbtn"; cancel.textContent = "取消";
+    cancel.addEventListener("click", () => {
+      fetch("/api/pomodoro/cancel", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: card.dataset.id }),
+      }).catch(() => {});
+      card.classList.add("cancelled");
+      card.querySelector(".pstate").textContent = "已取消";
+      const btn = card.querySelector(".pfoot .tbtn");
+      if (btn) btn.remove();
+    });
+    foot.appendChild(cancel);
+  }
+  card.appendChild(foot);
+  tl.appendChild(card);
+  pomoTick();
+  scroll(false);
+}
+/* 每秒刷全页进行中的卡片；到点翻成「时间到」+提示音+标题闪灯（切回页面自动复位） */
+function pomoTick() {
+  const now = Date.now();
+  document.querySelectorAll(".pomo").forEach((card) => {
+    if (card.dataset.finished || card.classList.contains("cancelled")) return;
+    const ends = Number(card.dataset.ends), total = Number(card.dataset.total) || 1;
+    const left = Math.max(0, Math.ceil((ends - now) / 1000));
+    const clockEl = card.querySelector(".pclock"), fill = card.querySelector(".pbar i");
+    if (left > 0) {
+      if (clockEl) clockEl.textContent = pomoFmt(left);
+      if (fill) fill.style.width = (100 * (total - left) / total).toFixed(1) + "%";
+      return;
+    }
+    card.dataset.finished = "1";
+    card.classList.add("done");
+    if (clockEl) clockEl.textContent = "00:00";
+    if (fill) fill.style.width = "100%";
+    const st = card.querySelector(".pstate");
+    if (st) st.textContent = "⏰ 时间到！休息一下吧";
+    const btn = card.querySelector(".pfoot .tbtn");
+    if (btn) btn.remove();
+    pomoBeep();
+    document.title = "⏰ 番茄钟时间到 · CourseRaptor";
+    try {
+      if (window.Notification && Notification.permission === "granted") {
+        new Notification("⏰ 番茄钟时间到", { body: (card.dataset.label || "专注") + "结束，休息一下吧" });
+      }
+    } catch { /* 通知发不出就只靠页面 */ }
+  });
+}
+setInterval(pomoTick, 1000);
 
 /* ── 会话档案：列表 / 打开 / 删除 / 新会话 ── */
 const sessList = document.getElementById("sessList");
@@ -1713,6 +1835,7 @@ async function send(text) {
           else {
             toolDone(shell, ev, ev.phase === "end");
             if (ev.files && ev.files.length) fileRows(shell.tl, ev.files);
+            if (ev.pomodoro) pomoCard(shell.tl, ev.pomodoro);
           }
         } else if (ev.t === "err") {
           thinkClose(shell);

@@ -822,7 +822,7 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
   assert.equal(res.status, 200);
   assert.match(res.headers.get("content-type") ?? "", /text\/html/);
   const html = await res.text();
-  assert.match(html, /本周课表/, "页面标题应为本周课表");
+  assert.match(html, /今日日程/, "页面标题应为今日日程");
   assert.match(html, /api\/today/, "页面应从 /api/today 取数据");
   assert.match(html, /week-timetable/, "本周概览应使用节次 × 星期的周课表网格");
   assert.match(html, /返回对话/, "应有返回对话页的链接");

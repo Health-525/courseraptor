@@ -15,6 +15,27 @@ npm run demo
 
 用虚构数据验证首次进入、快捷提问、会话切换与小屏布局。学校查询另用自己的账号人工抽查；离线测试通过不能证明校方接口和模型服务实时可用。
 
+## 代码结构导览
+
+依赖方向自上而下：入口/UI → agent → tools → jwgl，UI 层不穿透工具层直连基础设施。
+
+| 目录/模块 | 职责 |
+|---|---|
+| `src/index.ts` | 主入口：凭证引导、拉起 QQ 桥 / 网页服务 / 待办调度、TUI 循环 |
+| `src/agent.ts` | agent 组装；提示词文案在 `src/prompt.ts`（校历段运行时渲染自 `data/term-dates.json`，不在代码里硬编码） |
+| `src/tools/` | agent 工具层（`index.ts` 聚合清单） |
+| `src/jwgl/` | 教务系统客户端；`session.ts` 是登录 cookie / 选课会话缓存（UI 层也可直接用） |
+| `src/web/` | 网页服务与页面 |
+| `src/qq/` | QQ 官方机器人桥 |
+| `src/memory/` | 两层记忆（短期 session.json / 长期 memory.json） |
+| `src/paths.ts` | 项目根、`dataDir()`、`isInsideDir()` 路径护栏、`migratedDataPath()` 状态文件归位——**全项目唯一实现，不要在别处重写** |
+| `src/json-cache.ts` | 免登录 JSON 缓存骨架（schedule/exam-cache 的公共约定） |
+| `src/repo-publish.ts` | Gitee/GitHub 日历发布三步流程骨架，平台差异在各自 publish 模块 |
+| `src/fetch-result.ts` | 统一抓取结果类型（jwgl 与 weather 共用） |
+| `src/workspace-data.ts` | 待办 / 上传文件的跨层共享存储 |
+
+状态文件（session.json、memory.json、qq-allowlist.json、qq-bridge.log）统一放 `data/` 下；旧版本散在项目根的文件会在首次运行时自动搬过去。`credentials.enc` 仍留在项目根（安全考量，支持 `RAPTOR_CREDENTIALS_FILE` 重定向）。
+
 ## 安装包内容
 
 `scripts/package-policy.mjs` 定义包内容：应用源码、入口、脚本、测试、依赖锁文件与选定的公开文档/素材。新增需要随包分发的文档时同步更新该清单。

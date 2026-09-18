@@ -59,7 +59,7 @@ test("演示不伪造实时数据、文件和任意 AI 回答", () => {
   assert.match(demoReply("随机问题"), /不调用 AI/);
 });
 
-test("演示模式的本周课表页：内嵌虚构数据，不发请求", async () => {
+test("演示模式的今日日程页：内嵌虚构数据，不发请求", async () => {
   const server = createDemoServer();
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const address = server.address();
@@ -69,7 +69,7 @@ test("演示模式的本周课表页：内嵌虚构数据，不发请求", async
     const res = await fetch(`${base}/today`);
     assert.equal(res.status, 200);
     const html = await res.text();
-    assert.match(html, /本周课表/);
+    assert.match(html, /今日日程/);
     assert.match(html, /离线演示 · 虚构数据/);
     // 演示数据内嵌（DEMO_DATA 非空），页面不依赖 /api/today
     assert.match(html, /const DEMO_DATA = \{/);
