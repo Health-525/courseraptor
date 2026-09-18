@@ -7,8 +7,8 @@
  * 考试安排一学期变动很少，缓存由用户在对话里问考试安排自然刷新。
  */
 
-import type { ExamResult } from "./jwgl/academics";
 import { readJsonCache, writeJsonCache } from "./json-cache";
+import type { ExamResult } from "./jwgl/academics";
 
 export interface CachedExams {
   /** 落盘时间戳（ms），仅展示用，不做过期判断 */

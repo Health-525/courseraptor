@@ -10,8 +10,8 @@
  *   读写与坏文件隔离的公共约定见 json-cache.ts
  */
 
-import type { ScheduleResult } from "./jwgl/academics";
 import { readJsonCache, writeJsonCache } from "./json-cache";
+import type { ScheduleResult } from "./jwgl/academics";
 
 export interface CachedSchedule {
   /** 落盘时间戳（ms），仅调试用，不做过期判断 */
