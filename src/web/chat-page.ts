@@ -511,10 +511,12 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .rem-tools a, .rem-tools button { border: 0; background: none; padding: 0; color: var(--ink-3);
                                    cursor: pointer; font-size: 12px; text-decoration: none; }
   .rem-tools a:hover, .rem-tools button:hover { color: var(--accent); }
-  .data-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
-  .data-cell { border: 1px solid var(--rule); background: var(--card); padding: 8px 9px; }
+  .data-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; align-items: stretch; }
+  .data-cell { border: 1px solid var(--rule); background: var(--card); padding: 10px 8px;
+               min-height: 72px; display: flex; flex-direction: column;
+               align-items: center; justify-content: center; gap: 4px; text-align: center; }
   .data-cell span { display: block; font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
-  .data-cell strong { font-size: 14px; font-weight: 600; }
+  .data-cell strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
   .data-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
   .data-actions .danger { color: var(--accent-deep); }
   .setmsg { font-family: var(--mono); font-size: 12px; min-height: 16px;
