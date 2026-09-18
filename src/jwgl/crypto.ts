@@ -18,25 +18,26 @@ export function encryptJwglPassword(pwd: string, modulusB64: string, exponentB64
   const mb = Buffer.from(modulusB64, "base64");
   const eb = Buffer.from(exponentB64, "base64");
 
+  // DER 长度：短格式 <0x80；否则 0x81/0x82 + 大端长度。2048 位密钥的
+  // modulus 有 256 字节，长度本身要两个字节——以前只写 0x81 一个字节，
+  // 256 截断成 0，整个结构作废（服务器升 2048 位密钥时登录会全挂）
+  function derLength(len: number): Buffer {
+    if (len < 0x80) return Buffer.from([len]);
+    if (len < 0x100) return Buffer.from([0x81, len]);
+    return Buffer.from([0x82, len >> 8, len & 0xff]);
+  }
+
   function derInt(buf: Buffer): Buffer {
     let b = buf;
     // Remove leading zeros
     while (b.length > 1 && b[0] === 0) b = b.slice(1);
     // Add leading zero if high bit set
     if (b[0] & 0x80) b = Buffer.concat([Buffer.from([0]), b]);
-    const len = b.length;
-    if (len < 128) {
-      return Buffer.concat([Buffer.from([0x02, len]), b]);
-    }
-    return Buffer.concat([Buffer.from([0x02, 0x81, len]), b]);
+    return Buffer.concat([Buffer.from([0x02]), derLength(b.length), b]);
   }
 
   const seq = Buffer.concat([derInt(mb), derInt(eb)]);
-  const sl = seq.length;
-  const der =
-    sl < 128
-      ? Buffer.concat([Buffer.from([0x30, sl]), seq])
-      : Buffer.concat([Buffer.from([0x30, 0x81, sl]), seq]);
+  const der = Buffer.concat([Buffer.from([0x30]), derLength(seq.length), seq]);
 
   const pem =
     "-----BEGIN RSA PUBLIC KEY-----\n" +
