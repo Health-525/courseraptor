@@ -13,8 +13,16 @@
  * 消费的是同一个 agent.fullStream。
  * 多会话历史由 chat-sessions.ts 落盘（data/chat-sessions.json），重启不丢；
  * 每轮把该会话最后 40 条转成 ModelMessage 传给 agent，多轮上下文完整。
+ *
+ * 本机防线（防「恶意网页借用户浏览器之手」的 CSRF/DNS rebinding）：
+ * 1) Host 必须是本机地址——挡域名解析到 127.0.0.1 冒充同源；
+ * 2) 带 Origin 的请求必须是本服务自己——挡跨站 fetch（text/plain 等
+ *    「简单请求」不经预检直达，浏览器只拦读不拦发）；
+ * 3) 写请求必须带 CSRF token——token 只嵌在本服务渲染的页面 meta 里，
+ *    外站跨域读不到，伪造不出合法写请求（jsonBody 另拒非 JSON 类型）。
  */
 
+import crypto from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -176,6 +184,10 @@ async function jsonBody(
   req: http.IncomingMessage,
   maxBytes = 1024 * 1024,
 ): Promise<Record<string, unknown>> {
+  // 只认 application/json：text/plain 是 CORS「简单请求」的免预检类型，
+  // 恶意网页能不经浏览器询问直接 POST 过来——统一在门口拒掉
+  const contentType = String(req.headers["content-type"] ?? "").toLowerCase();
+  if (!contentType.startsWith("application/json")) throw new Error("CONTENT_TYPE");
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of req) {
@@ -231,6 +243,7 @@ function previewJson(v: unknown, max = 1200): string {
 function listen(port: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
+      if (requestForbidden(req, res)) return;
       void handle(req, res);
     });
     // unref：不让网页服务拖住进程退出——终端 UI 退出时主程序该走就走
@@ -239,12 +252,87 @@ function listen(port: number): Promise<string> {
     server.listen(port, "127.0.0.1", () => {
       const addr = server.address();
       if (addr && typeof addr === "object") {
+        listenPort = addr.port;
         resolve(`http://localhost:${addr.port}`);
       } else {
         reject(new Error("server address unavailable"));
       }
     });
   });
+}
+
+// ── 本机请求防线：Host / Origin / CSRF token 三道门 ───────────
+
+/** 每次进程启动随机生成，只嵌进本实例渲染的页面 meta——外站跨域读不到 */
+const CSRF_TOKEN = crypto.randomBytes(32).toString("hex");
+
+/** 实际监听端口（Host 校验要知道本服务到底跑在哪个口上） */
+let listenPort = 0;
+
+/**
+ * 恶意网页借浏览器发请求的几条路逐一堵死：
+ * 1) Host 不是本机地址 → 403（DNS rebinding：外站域名解析到 127.0.0.1 冒充同源）；
+ * 2) 带 Origin 且不是本服务 → 403（跨站 fetch：text/plain 免预检直达，浏览器只拦读不拦发）；
+ * 3) 写请求（POST/PATCH/PUT/DELETE）必须携带本服务页面签发的 CSRF token → 403。
+ * 返回 true 表示已写完拒绝响应，调用方直接 return。
+ */
+function requestForbidden(req: http.IncomingMessage, res: http.ServerResponse): boolean {
+  const method = (req.method ?? "GET").toUpperCase();
+  const host = String(req.headers.host ?? "").toLowerCase();
+  const localHosts = new Set([`127.0.0.1:${listenPort}`, `localhost:${listenPort}`]);
+  if (!localHosts.has(host)) {
+    json(res, { error: "拒绝访问：请求目标不是本机服务" }, 403);
+    return true;
+  }
+  const origin = req.headers.origin;
+  if (origin !== undefined) {
+    const localOrigins = new Set([
+      `http://127.0.0.1:${listenPort}`,
+      `http://localhost:${listenPort}`,
+    ]);
+    if (!localOrigins.has(origin)) {
+      json(res, { error: "拒绝访问：请求不是来自本服务页面" }, 403);
+      return true;
+    }
+  }
+  if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
+    if (req.headers["x-csrf-token"] !== CSRF_TOKEN) {
+      json(res, { error: "拒绝访问：缺少有效令牌，请从本服务页面操作" }, 403);
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * 给页面注入 CSRF 引导：meta 携带 token + 包一层 window.fetch，
+ * 页面自身的写请求自动带上 x-csrf-token（三个页面共用，页面代码零改动）。
+ * 演示服务不注入：那边没有敏感状态，页面拿不到 meta 就不带头。
+ */
+function withCsrf(html: string): string {
+  const bootstrap = [
+    `<meta name="csrf-token" content="${CSRF_TOKEN}">`,
+    "<script>",
+    "(function () {",
+    "  'use strict';",
+    "  var meta = document.querySelector('meta[name=\"csrf-token\"]');",
+    "  var token = meta && meta.content;",
+    "  if (!token) return;",
+    "  var raw = window.fetch.bind(window);",
+    "  window.fetch = function (input, init) {",
+    "    init = init ? Object.assign({}, init) : {};",
+    "    var method = String(init.method || (input && input.method) || 'GET').toUpperCase();",
+    "    if (method === 'GET' || method === 'HEAD') return raw(input, init);",
+    "    var headers = new Headers(init.headers || (input && input.headers) || {});",
+    "    if (!headers.has('x-csrf-token')) headers.set('x-csrf-token', token);",
+    "    init.headers = headers;",
+    "    return raw(input, init);",
+    "  };",
+    "})();",
+    "</script>",
+  ].join("\n");
+  // 函数替换避免 token/脚本内容里出现 $ 序列被误当替换模式
+  return html.replace("</head>", () => `${bootstrap}\n</head>`);
 }
 
 function json(res: http.ServerResponse, obj: unknown, status = 200): void {
@@ -563,13 +651,13 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     if (url === "/today" || url === "/today/") {
       // 独立日程页：下一节课/今日/本周/考试，纯本地缓存渲染
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(todayPage());
+      res.end(withCsrf(todayPage()));
       return;
     }
     if (url === "/knowledge" || url === "/knowledge/") {
       // 独立知识库页：对话中沉淀的知识条目，纯本地存储渲染
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(knowledgePage());
+      res.end(withCsrf(knowledgePage()));
       return;
     }
     if (url === "/api/knowledge") {
@@ -681,7 +769,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return;
     }
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    res.end(chatPage());
+    res.end(withCsrf(chatPage()));
     return;
   }
   if (req.method === "POST") {
@@ -737,7 +825,14 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         const message = error instanceof Error ? error.message : "上传失败";
         json(
           res,
-          { error: message === "PAYLOAD_TOO_LARGE" ? "单个文件不能超过 25 MB" : message },
+          {
+            error:
+              message === "PAYLOAD_TOO_LARGE"
+                ? "单个文件不能超过 25 MB"
+                : message === "CONTENT_TYPE"
+                  ? "请求体需要是 JSON"
+                  : message,
+          },
           400,
         );
       }
