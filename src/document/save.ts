@@ -10,13 +10,9 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 
-import { PROJECT_ROOT } from "../config";
+import { dataDir } from "../paths";
 import { renderDocument, suggestBaseName } from "./render";
 import { type DocFormat, type DocumentSpec, FORMAT_EXT } from "./types";
-
-function dataDir(): string {
-  return process.env.RAPTOR_DATA_DIR ?? path.join(PROJECT_ROOT, "data");
-}
 
 export function generatedDir(): string {
   return path.join(dataDir(), "generated");

@@ -9,11 +9,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { writeFileAtomicSync } from "../atomic-write";
-import { PROJECT_ROOT } from "../config";
-
-function dataDir(): string {
-  return process.env.RAPTOR_DATA_DIR ?? path.join(PROJECT_ROOT, "data");
-}
+import { dataDir } from "../paths";
 
 function statePath(): string {
   return path.join(dataDir(), "web-workspace.json");

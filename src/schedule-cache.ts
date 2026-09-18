@@ -12,16 +12,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
 import type { ScheduleResult } from "./jwgl/academics";
-
-const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-
-/** 数据目录（测试可用 RAPTOR_DATA_DIR 指到临时目录） */
-function dataDir(): string {
-  return process.env.RAPTOR_DATA_DIR ?? path.join(PROJECT_ROOT, "data");
-}
+import { dataDir } from "./paths";
 
 function cachePath(): string {
   return path.join(dataDir(), "schedule-cache.json");

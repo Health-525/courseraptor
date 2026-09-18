@@ -14,15 +14,9 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { writeFileAtomicSync } from "./atomic-write";
+import { dataDir } from "./paths";
 import { loadScheduleCache } from "./schedule-cache";
-
-const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-
-function dataDir(): string {
-  return process.env.RAPTOR_DATA_DIR ?? path.join(PROJECT_ROOT, "data");
-}
 
 function knowledgePath(): string {
   return path.join(dataDir(), "knowledge.json");

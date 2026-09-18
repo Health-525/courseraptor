@@ -16,9 +16,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { writeFileAtomicSync } from "../atomic-write";
+import { dataDir } from "../paths";
 import { courseLineBody, expandWeeks, WEEKDAY_NAMES, type WeekGroup } from "./academics";
 import type { CourseData } from "./types";
 
@@ -48,12 +48,6 @@ interface HolidayStore {
   /** 依据：通知标题/文号 */
   source?: string;
   recordedAt?: string;
-}
-
-const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-
-function dataDir(): string {
-  return process.env.RAPTOR_DATA_DIR ?? path.join(PROJECT_ROOT, "data");
 }
 
 function storePath(): string {
