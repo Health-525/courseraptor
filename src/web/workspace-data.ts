@@ -9,7 +9,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { writeFileAtomicSync } from "../atomic-write";
-import { dataDir } from "../paths";
+import { dataDir, isInsideDir } from "../paths";
 
 function statePath(): string {
   return path.join(dataDir(), "web-workspace.json");
@@ -108,7 +108,7 @@ export function listUploads(): WebUpload[] {
 function safeUnlink(target: string): boolean {
   const root = path.resolve(uploadsDir());
   const resolved = path.resolve(target);
-  if (resolved !== root && !resolved.startsWith(root + path.sep)) return false;
+  if (!isInsideDir(root, resolved)) return false;
   try {
     fs.rmSync(resolved, { force: true });
     return true;

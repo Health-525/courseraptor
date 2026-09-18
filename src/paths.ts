@@ -11,3 +11,11 @@ export const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.
 export function dataDir(): string {
   return process.env.RAPTOR_DATA_DIR ?? path.join(PROJECT_ROOT, "data");
 }
+
+/**
+ * 路径越界护栏：target 解析后必须落在 root 目录内部（根目录本身不算）。
+ * 全项目统一的「只准碰自己目录里的东西」判断，供缓存删除/文件下载/落盘校验共用。
+ */
+export function isInsideDir(root: string, target: string): boolean {
+  return path.resolve(target).startsWith(path.resolve(root) + path.sep);
+}

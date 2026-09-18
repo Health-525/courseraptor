@@ -10,7 +10,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 
-import { dataDir } from "../paths";
+import { dataDir, isInsideDir } from "../paths";
 import { renderDocument, suggestBaseName } from "./render";
 import { type DocFormat, type DocumentSpec, FORMAT_EXT } from "./types";
 
@@ -81,7 +81,7 @@ export function drainGeneratedRound(roundId: string): DeliverableFile[] {
   const keep: GeneratedStamp[] = [];
   const out: DeliverableFile[] = [];
   for (const item of recentGenerated) {
-    const inDir = path.resolve(item.filePath).startsWith(root + path.sep);
+    const inDir = isInsideDir(root, item.filePath);
     if (item.roundId === roundId && inDir) out.push(item);
     else keep.push(item);
   }
