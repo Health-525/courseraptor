@@ -26,7 +26,7 @@
 |---|---|---|
 | `get_news` | 教务处官网（jwc.njtech.edu.cn）最新通知列表：公告通知 / 教学动态 / 考试排课；**按你的年级自动标相关度**（high=需本人行动 / low=其他年级或行政公示），不再平铺十几条让你自己挑 | ~5s |
 | `read_notice` | 读通知**正文全文**（选课时间表、截止日期都在正文里）；也支持直接读用户贴的校园网链接 | ~3s |
-| `fetch_attachment` | 通知附件获取：**下载一次即缓存**（再查免下载，jwc 验证码只过一次）。表格（xlsx/xls/csv）回概览（表头+行数+前 15 行），明细用 `query_table` 筛；文档（docx/pdf/txt）全文**分页续读**，或直接 `keyword` 定位拿上下文。本地离线解析，`RAPTOR_DISABLE_CAPTCHA_OCR=1` 可停用验证码自动识别 | ~10-20s（缓存后 <1s） |
+| `fetch_attachment` | 通知附件获取：**下载一次即缓存**（再查免下载，jwc 验证码只过一次）。表格（xlsx/xls/csv）回概览（表头+行数+前 15 行），明细用 `query_table` 筛；文档（docx/pdf/pptx/txt/md）全文**分页续读**，或直接 `keyword` 定位拿上下文。本地离线解析，`RAPTOR_DISABLE_CAPTCHA_OCR=1` 可停用验证码自动识别 | ~10-20s（缓存后 <1s） |
 
 ### 📁 文件与数据
 
