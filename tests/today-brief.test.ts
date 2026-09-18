@@ -21,7 +21,7 @@ const { saveExamCache } = await import("../src/exam-cache");
 const { addKnowledge } = await import("../src/knowledge");
 const { recordWeek1Monday } = await import("../src/jwgl/term-dates");
 const { recordSpecialDays, removeSpecialDays } = await import("../src/jwgl/term-holidays");
-const { addReminder, listReminders, updateReminder } = await import("../src/web/workspace-data");
+const { addReminder, listReminders, updateReminder } = await import("../src/workspace-data");
 
 // 校准 2026 秋学期：第 1 周从 2026-08-31（周一）开始
 recordWeek1Monday(2026, 3, "2026-08-31", "known", "测试校历");

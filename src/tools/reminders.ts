@@ -8,7 +8,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 
-import { addReminder, deleteReminder, listReminders, updateReminder } from "../web/workspace-data";
+import { addReminder, deleteReminder, listReminders, updateReminder } from "../workspace-data";
 
 /** 纯日期（2026-09-16）按当天 23:59 本地截止，避免被当成 UTC 零点偏移 8 小时 */
 function normalizeDueAt(raw: string): string | null {

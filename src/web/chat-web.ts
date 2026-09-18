@@ -80,7 +80,7 @@ import {
   updateReminder,
   type WebUpload,
   workspaceStats,
-} from "./workspace-data";
+} from "../workspace-data";
 
 /** 前端 Markdown 渲染器（marked 的 UMD 构建，静态吐给浏览器） */
 const MARKED_UMD = path.resolve(
