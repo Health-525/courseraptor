@@ -60,7 +60,7 @@ import {
   setQQBotCredentials,
 } from "../onboarding";
 import { isInsideDir } from "../paths";
-import { getCookie } from "../tools/session";
+import { getCookie } from "../jwgl/session";
 import { chatPage } from "./chat-page";
 import { knowledgePage } from "./knowledge-page";
 import { cleanTitle, type TitleMaker } from "./session-titles";

@@ -23,7 +23,7 @@ import {
   specialOnDate,
 } from "../jwgl/term-holidays";
 import { saveScheduleCache } from "../schedule-cache";
-import { getCookie } from "./session";
+import { getCookie } from "../jwgl/session";
 
 export const scheduleTools = {
   /** 课表查询 */

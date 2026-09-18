@@ -16,7 +16,7 @@ import {
 import { fetchJwcNews } from "../jwgl/news";
 import { currentWeekOf } from "../jwgl/term-dates";
 import { loadScheduleCache, saveScheduleCache } from "../schedule-cache";
-import { getCookie } from "../tools/session";
+import { getCookie } from "../jwgl/session";
 import { startChatWeb } from "../web/chat-web";
 import { listReminders } from "../web/workspace-data";
 

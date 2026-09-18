@@ -5,7 +5,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { fetchEnrolledClasses, fetchProfile, fetchRetakeCourses } from "../jwgl/portal";
-import { getCookie } from "./session";
+import { getCookie } from "../jwgl/session";
 
 export const studentTools = {
   /** 学籍个人信息 */

@@ -23,7 +23,7 @@ import {
   type XkSession,
   type XkTarget,
 } from "../jwgl/xk";
-import { getXkSession, invalidateXkSession, pollDelay } from "./session";
+import { getXkSession, invalidateXkSession, pollDelay } from "../jwgl/session";
 
 function now(): string {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
