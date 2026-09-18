@@ -12,12 +12,12 @@
  */
 
 import {
+  type ApiClient,
   ensurePublicRepo,
+  type FetchLike,
   putFileWithSha,
   requestJson,
   resolveOwner,
-  type ApiClient,
-  type FetchLike,
 } from "./repo-publish";
 
 export interface GiteePublishResult {
@@ -44,7 +44,11 @@ export const DEFAULT_CALENDAR_REPO = "courseraptor-calendar";
 function gitee(fetchImpl: FetchLike, token: string): ApiClient {
   return (path, init) => {
     const sep = path.includes("?") ? "&" : "?";
-    return requestJson(fetchImpl, `${API}${path}${sep}access_token=${encodeURIComponent(token)}`, init);
+    return requestJson(
+      fetchImpl,
+      `${API}${path}${sep}access_token=${encodeURIComponent(token)}`,
+      init,
+    );
   };
 }
 

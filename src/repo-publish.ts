@@ -13,9 +13,10 @@ export interface ApiResp {
   body: unknown;
 }
 
-export interface ApiClient {
-  (path: string, init: { method?: string; body?: unknown }): Promise<ApiResp>;
-}
+export type ApiClient = (
+  path: string,
+  init: { method?: string; body?: unknown },
+) => Promise<ApiResp>;
 
 /** 发请求并把响应体宽容解析（JSON 优先，退化保留原文） */
 export async function requestJson(
@@ -63,7 +64,10 @@ export async function resolveOwner(
     return { ok: false, error: msgs.invalidToken, needSetup: true };
   }
   if (me.status !== 200) {
-    return { ok: false, error: `${msgs.accountFailPrefix}：${messageOf(me.body, `${platform} 接口返回异常`)}` };
+    return {
+      ok: false,
+      error: `${msgs.accountFailPrefix}：${messageOf(me.body, `${platform} 接口返回异常`)}`,
+    };
   }
   const owner = (me.body as Record<string, unknown>)?.login;
   if (typeof owner !== "string" || !owner) {
@@ -91,7 +95,10 @@ export async function ensurePublicRepo(
   if (repoResp.status === 404) {
     const createResp = await api("/user/repos", { method: "POST", body: createBody });
     if (createResp.status !== 201 && createResp.status !== 200) {
-      return { ok: false, error: `${msgs.createFailPrefix}：${messageOf(createResp.body, "接口返回异常")}` };
+      return {
+        ok: false,
+        error: `${msgs.createFailPrefix}：${messageOf(createResp.body, "接口返回异常")}`,
+      };
     }
     created = true;
   } else if (repoResp.status === 200) {
@@ -102,7 +109,10 @@ export async function ensurePublicRepo(
       return { ok: false, error: msgs.privateRepo };
     }
   } else {
-    return { ok: false, error: `${msgs.getFailPrefix}：${messageOf(repoResp.body, "接口返回异常")}` };
+    return {
+      ok: false,
+      error: `${msgs.getFailPrefix}：${messageOf(repoResp.body, "接口返回异常")}`,
+    };
   }
   return { ok: true, branch, created };
 }

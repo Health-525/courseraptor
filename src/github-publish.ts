@@ -13,12 +13,12 @@
  */
 
 import {
+  type ApiClient,
   ensurePublicRepo,
+  type FetchLike,
   putFileWithSha,
   requestJson,
   resolveOwner,
-  type ApiClient,
-  type FetchLike,
 } from "./repo-publish";
 
 export interface PublishResult {

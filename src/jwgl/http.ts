@@ -211,6 +211,7 @@ export function httpFailure(resp: HttpResponse): string | null {
 
 /** 统一的抓取结果：ok=false 时必须把 error 如实上报给模型，不许降级成空列表 */
 import type { FetchResult } from "../fetch-result";
+
 export type { FetchResult };
 
 /**
