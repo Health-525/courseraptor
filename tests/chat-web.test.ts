@@ -12,6 +12,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import vm from "node:vm";
 
 // 课表工具内部读写 data/，指向临时目录避免污染真实数据
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-chat-"));
@@ -19,32 +20,53 @@ process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-chat
 const { setChatAgent, startChatWeb } = await import("../src/web/chat-web");
 const { generatedDir } = await import("../src/document/save");
 
+/** 页面签发的 CSRF token（写请求必须带上；浏览器里由注入的 fetch 包装自动完成） */
+let pageToken: string | null = null;
+async function csrfToken(): Promise<string> {
+  pageToken ??=
+    (await (await fetch((await startChatWeb())!)).text()).match(
+      /<meta name="csrf-token" content="([0-9a-f]{64})">/,
+    )?.[1] ?? null;
+  assert.ok(pageToken, "页面必须注入 csrf-token meta");
+  return pageToken;
+}
+
+/** 模拟正常页面的写请求：JSON 类型 + CSRF token 齐全 */
+async function wfetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers ?? {});
+  headers.set("content-type", "application/json");
+  headers.set("x-csrf-token", await csrfToken());
+  return fetch(url, { ...init, headers });
+}
+
 /** SSE 客户端：收集整条流的 data 事件 */
 function post(
   url: string,
   body: unknown,
 ): Promise<{ status: number; body: string; events: Record<string, unknown>[] }> {
   return new Promise((resolve, reject) => {
-    const req = http.request(
-      `${url}/api/chat`,
-      { method: "POST", headers: { "content-type": "application/json" } },
-      (res) => {
-        let raw = "";
-        res.on("data", (d) => (raw += d));
-        res.on("end", () =>
-          resolve({
-            status: res.statusCode ?? 0,
-            body: raw,
-            events: raw
-              .split("\n")
-              .filter((l) => l.startsWith("data: "))
-              .map((l) => JSON.parse(l.slice(6))),
-          }),
-        );
-      },
-    );
-    req.on("error", reject);
-    req.end(JSON.stringify(body));
+    void csrfToken().then((token) => {
+      const req = http.request(
+        `${url}/api/chat`,
+        { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": token } },
+        (res) => {
+          let raw = "";
+          res.on("data", (d) => (raw += d));
+          res.on("end", () =>
+            resolve({
+              status: res.statusCode ?? 0,
+              body: raw,
+              events: raw
+                .split("\n")
+                .filter((l) => l.startsWith("data: "))
+                .map((l) => JSON.parse(l.slice(6))),
+            }),
+          );
+        },
+      );
+      req.on("error", reject);
+      req.end(JSON.stringify(body));
+    });
   });
 }
 
@@ -89,9 +111,8 @@ test("GET /logo.png 返回项目 logo，favicon 与首屏印章都指向它", as
 test("agent 未就绪时返回 503 与明确错误", async () => {
   setChatAgent(null);
   const url = (await startChatWeb())!;
-  const res = await fetch(`${url}/api/chat`, {
+  const res = await wfetch(`${url}/api/chat`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
     body: JSON.stringify({ message: "你好" }),
   });
   assert.equal(res.status, 503);
@@ -145,9 +166,8 @@ test("SSE 流式回传文本与工具状态，历史逐轮累积", async () => {
 
 test("空消息返回 400", async () => {
   const url = (await startChatWeb())!;
-  const res = await fetch(`${url}/api/chat`, {
+  const res = await wfetch(`${url}/api/chat`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
     body: JSON.stringify({ message: "   " }),
   });
   assert.equal(res.status, 400);
@@ -160,7 +180,7 @@ test("POST /api/reset 清空服务端会话上下文", async () => {
   let list = await (await fetch(`${url}/api/sessions`)).json();
   assert.ok(list.sessions.length > 0, "对话后服务端应有会话档案");
 
-  const res = await fetch(`${url}/api/reset`, { method: "POST" });
+  const res = await wfetch(`${url}/api/reset`, { method: "POST" });
   assert.equal(res.status, 200);
   list = await (await fetch(`${url}/api/sessions`)).json();
   assert.equal(list.sessions.length, 0, "reset 后会话档案应清空");
@@ -196,7 +216,7 @@ test("多会话历史：sessionId 隔离上下文，列表/详情/删除接口",
   const detail = await (await fetch(`${url}/api/sessions/aaaa1111`)).json();
   assert.equal(detail.messages[0].text, "甲会话的问题");
   assert.equal(detail.messages[0].role, "user");
-  const del = await fetch(`${url}/api/sessions/aaaa1111`, { method: "DELETE" });
+  const del = await wfetch(`${url}/api/sessions/aaaa1111`, { method: "DELETE" });
   assert.equal(del.status, 200);
   const list2 = await (await fetch(`${url}/api/sessions`)).json();
   assert.ok(!list2.sessions.some((s: { id: string }) => s.id === "aaaa1111"));
@@ -207,9 +227,8 @@ test("多会话历史：sessionId 隔离上下文，列表/详情/删除接口",
 test("会话接口支持改名与置顶", async () => {
   const url = (await startChatWeb())!;
   await post(url, { message: "需要整理的会话", sessionId: "manage111" });
-  const patch = await fetch(`${url}/api/sessions/manage111`, {
+  const patch = await wfetch(`${url}/api/sessions/manage111`, {
     method: "PATCH",
-    headers: { "content-type": "application/json" },
     body: JSON.stringify({ title: "本周学习安排", pinned: true }),
   });
   assert.equal(patch.status, 200);
@@ -233,9 +252,8 @@ test("网页上传只回附件编号，对话可读取受控路径且详情不�
     },
   });
   const url = (await startChatWeb())!;
-  const uploadRes = await fetch(`${url}/api/uploads`, {
+  const uploadRes = await wfetch(`${url}/api/uploads`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
     body: JSON.stringify({
       name: "课程说明.txt",
       type: "text/plain",
@@ -294,9 +312,8 @@ test("教务工具结果不再产生结果卡，工具状态与文本照常下�
 
 test("待办可创建、完成并导出日历，本地数据接口回脱敏概览", async () => {
   const url = (await startChatWeb())!;
-  const create = await fetch(`${url}/api/reminders`, {
+  const create = await wfetch(`${url}/api/reminders`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
     body: JSON.stringify({
       title: "提交选课材料",
       dueAt: "2026-09-10T09:00:00+08:00",
@@ -306,9 +323,8 @@ test("待办可创建、完成并导出日历，本地数据接口回脱敏概�
   });
   assert.equal(create.status, 201);
   const reminder = (await create.json()).reminder;
-  const patch = await fetch(`${url}/api/reminders/${reminder.id}`, {
+  const patch = await wfetch(`${url}/api/reminders/${reminder.id}`, {
     method: "PATCH",
-    headers: { "content-type": "application/json" },
     body: JSON.stringify({ done: true }),
   });
   assert.equal(patch.status, 200);
@@ -360,9 +376,9 @@ test("知识库：页面可打开、接口可列表删除、数据概览与导�
   const exported = await (await fetch(`${url}/api/data/export`)).text();
   assert.ok(exported.includes("接口测试知识"), "数据导出应携带知识条目");
 
-  const del = await fetch(`${url}/api/knowledge/${entry.id}`, { method: "DELETE" });
+  const del = await wfetch(`${url}/api/knowledge/${entry.id}`, { method: "DELETE" });
   assert.equal(del.status, 200);
-  const miss = await fetch(`${url}/api/knowledge/${entry.id}`, { method: "DELETE" });
+  const miss = await wfetch(`${url}/api/knowledge/${entry.id}`, { method: "DELETE" });
   assert.equal(miss.status, 404);
 });
 
@@ -445,9 +461,8 @@ test("default 会话可被侧栏点击读取（id 白名单必须放行字母）
 test("POST /api/settings：坏格式 Key、半套教务凭证、清单外模型都被拒且不落盘", async () => {
   const url = (await startChatWeb())!;
   const call = (body: unknown) =>
-    fetch(`${url}/api/settings`, {
+    wfetch(`${url}/api/settings`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
   const readModel = async () => (await (await fetch(`${url}/api/settings`)).json()).model as string;
@@ -716,4 +731,127 @@ test("GET /api/today 纯本地组装当日档案（无缓存时如实降级）",
   assert.match(data.schedule.note ?? "", /还没有课表数据/);
   assert.equal(data.next, null);
   assert.equal(data.exams.available, false);
+});
+
+// ── CSRF 防线：恶意网页借浏览器之手的每条路都要堵死 ───────────
+
+test("写请求不带 CSRF token 一律 403（跨站页面拿不到 token）", async () => {
+  const url = (await startChatWeb())!;
+  // 恶意网页用 text/plain 免预检 POST 覆写教务凭证：无 token 直接被拒
+  const noToken = await fetch(`${url}/api/settings`, {
+    method: "POST",
+    headers: { "content-type": "text/plain" },
+    body: JSON.stringify({ jwglUsername: "2026000001", jwglPassword: "evil-pass" }),
+  });
+  assert.equal(noToken.status, 403);
+  // token 值错误同样被拒，且不产生数据
+  const wrongToken = await fetch(`${url}/api/reminders`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-csrf-token": "deadbeef" },
+    body: JSON.stringify({ title: "伪造待办", dueAt: "2026-09-10T09:00:00Z" }),
+  });
+  assert.equal(wrongToken.status, 403);
+  const reminders = await (await fetch(`${url}/api/reminders`)).json();
+  assert.ok(
+    !reminders.reminders.some((r: { title: string }) => r.title === "伪造待办"),
+    "被拒请求不得留下数据",
+  );
+});
+
+test("伪造 Host（DNS rebinding 姿势）与跨站 Origin 一律 403", async () => {
+  const url = (await startChatWeb())!;
+  const port = Number(new URL(url).port);
+  const status = (headers: Record<string, string>, method = "GET", path = "/api/data") =>
+    new Promise<number>((resolve) => {
+      const r = http.request({ host: "127.0.0.1", port, path, method, headers }, (res) => {
+        res.resume();
+        res.on("end", () => resolve(res.statusCode ?? 0));
+      });
+      r.on("error", () => resolve(0));
+      r.end();
+    });
+  // DNS rebinding：恶意域名解析到 127.0.0.1，Host 头是它的域名 → 拒
+  assert.equal(await status({ host: "evil.example" }), 403);
+  // 跨站页面的 fetch：Origin 是它的站点（浏览器只拦读不拦发）→ 拒
+  assert.equal(await status({ origin: "http://evil.example" }), 403);
+  // 正常本机 Host 的 GET 导航请求：放行
+  assert.equal(await status({ host: `127.0.0.1:${port}` }), 200);
+});
+
+test("Content-Type 不是 application/json 的写请求被拒（堵 text/plain 免预检绕道）", async () => {
+  const url = (await startChatWeb())!;
+  // token 齐全但类型不对：过得了第一道门，也要在 jsonBody 处被拒
+  const res = await fetch(`${url}/api/reminders`, {
+    method: "POST",
+    headers: { "content-type": "text/plain", "x-csrf-token": await csrfToken() },
+    body: JSON.stringify({ title: "绕道待办", dueAt: "2026-09-10T09:00:00Z" }),
+  });
+  assert.equal(res.status, 400);
+  const reminders = await (await fetch(`${url}/api/reminders`)).json();
+  assert.ok(
+    !reminders.reminders.some((r: { title: string }) => r.title === "绕道待办"),
+    "text/plain 请求不得创建数据",
+  );
+});
+
+test("页面注入 CSRF 引导：meta 携带 token 且 fetch 包装脚本语法有效", async () => {
+  const url = (await startChatWeb())!;
+  for (const path of ["/", "/today", "/knowledge"]) {
+    const html = await (await fetch(`${url}${path}`)).text();
+    assert.match(html, /meta name="csrf-token"/, `${path} 页面应注入 token meta`);
+    assert.match(html, /x-csrf-token/, `${path} 页面应注入 fetch 包装脚本`);
+  }
+  // 包装脚本是合法 JS（与其他内联脚本一起过 node --check）
+  const html = await (await fetch(url)).text();
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-csrf-page-"));
+  blocks.forEach((code, i) => {
+    const f = path.join(dir, `chunk-${i}.js`);
+    fs.writeFileSync(f, code, "utf8");
+    execFileSync(process.execPath, ["--check", f], { stdio: "pipe" });
+  });
+});
+
+test("注入的 fetch 包装：写请求自动带 token，GET 不带且保留原 headers", async () => {
+  const url = (await startChatWeb())!;
+  const html = await (await fetch(url)).text();
+  const block = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
+    .map((m) => m[1])
+    .find((code) => code.includes("x-csrf-token"));
+  assert.ok(block, "应能找到注入的包装脚本");
+
+  // 用 vm 搭一个最小浏览器环境：window.fetch 先装记录器，脚本再包一层
+  const calls: Array<{ input: unknown; init: RequestInit | undefined }> = [];
+  const rec = (input: unknown, init?: RequestInit) => {
+    calls.push({ input, init });
+    return Promise.resolve(new Response("{}"));
+  };
+  const token = await csrfToken();
+  const sandbox: Record<string, unknown> = {
+    document: { querySelector: () => ({ content: token }) },
+    Headers,
+    window: { fetch: rec },
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(block, sandbox);
+  const wrapped = (sandbox.window as { fetch: typeof rec }).fetch;
+
+  await wrapped("/api/reminders", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+  });
+  await wrapped("/api/reminders", { method: "DELETE" });
+  await wrapped("/api/sessions");
+
+  assert.equal(calls.length, 3);
+  const postInit = calls[0].init ?? {};
+  const delInit = calls[1].init ?? {};
+  assert.equal((postInit.headers as Headers).get("x-csrf-token"), token, "POST 自动带上 token");
+  assert.equal(
+    (postInit.headers as Headers).get("content-type"),
+    "application/json",
+    "原有 headers 必须保留",
+  );
+  assert.equal((delInit.headers as Headers).get("x-csrf-token"), token, "DELETE 自动带上 token");
+  assert.equal(calls[2].init?.headers, undefined, "GET 不应被改写");
 });
