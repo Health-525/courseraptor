@@ -16,8 +16,8 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { quarantineCorruptFileSync, writeFileAtomicSync } from "../atomic-write";
+import { dataDir } from "../paths";
 
 /** 来源可信度：recorded > known > estimated，只有前两者能当真值用 */
 export type TermDateSource = "recorded" | "known" | "estimated";
@@ -29,13 +29,6 @@ export interface TermStartDate {
   /** 依据：通知文号/标题片段；estimated 时写估算规则 */
   evidence?: string;
   recordedAt?: string;
-}
-
-const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-
-/** 数据目录（测试可用 RAPTOR_DATA_DIR 指到临时目录） */
-function dataDir(): string {
-  return process.env.RAPTOR_DATA_DIR ?? path.join(PROJECT_ROOT, "data");
 }
 
 function storePath(): string {

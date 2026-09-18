@@ -10,13 +10,9 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 
-import { PROJECT_ROOT } from "../config";
+import { dataDir, isInsideDir } from "../paths";
 import { renderDocument, suggestBaseName } from "./render";
 import { type DocFormat, type DocumentSpec, FORMAT_EXT } from "./types";
-
-function dataDir(): string {
-  return process.env.RAPTOR_DATA_DIR ?? path.join(PROJECT_ROOT, "data");
-}
 
 export function generatedDir(): string {
   return path.join(dataDir(), "generated");
@@ -85,7 +81,7 @@ export function drainGeneratedRound(roundId: string): DeliverableFile[] {
   const keep: GeneratedStamp[] = [];
   const out: DeliverableFile[] = [];
   for (const item of recentGenerated) {
-    const inDir = path.resolve(item.filePath).startsWith(root + path.sep);
+    const inDir = isInsideDir(root, item.filePath);
     if (item.roundId === roundId && inDir) out.push(item);
     else keep.push(item);
   }

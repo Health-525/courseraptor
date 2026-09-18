@@ -59,10 +59,11 @@ import {
   setDeepSeekApiKey,
   setQQBotCredentials,
 } from "../onboarding";
+import { isInsideDir } from "../paths";
 import { getCookie } from "../tools/session";
 import { chatPage } from "./chat-page";
 import { knowledgePage } from "./knowledge-page";
-import { buildTitlePrompt, cleanTitle, type TitleMaker } from "./session-titles";
+import { cleanTitle, type TitleMaker } from "./session-titles";
 import { buildTodayBrief } from "./today-brief";
 import { todayPage } from "./today-page";
 import {
@@ -427,9 +428,7 @@ const FILE_MIME: Record<string, string> = {
 
 /** 工具产物路径是否确实落在 generated 目录内（与 QQ 桥 sendFile 同一道护栏） */
 function insideGenerated(filePath: string): boolean {
-  const root = path.resolve(generatedDir());
-  const target = path.resolve(filePath);
-  return target.startsWith(root + path.sep);
+  return isInsideDir(generatedDir(), filePath);
 }
 
 /** GET /files/ 的统一 404：明确 text/plain，绝不兜底吐 HTML 页面骗 200 */
@@ -455,7 +454,7 @@ async function serveGeneratedFile(rawName: string, res: http.ServerResponse): Pr
   }
   const root = path.resolve(generatedDir());
   const target = path.resolve(root, name);
-  if (!target.startsWith(root + path.sep)) {
+  if (!isInsideDir(root, target)) {
     fileNotFound(res);
     return;
   }
@@ -604,7 +603,7 @@ function clearGenerated(): number {
     for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
       if (!entry.isFile()) continue;
       const target = path.resolve(root, entry.name);
-      if (!target.startsWith(root + path.sep)) continue;
+      if (!isInsideDir(root, target)) continue;
       fs.rmSync(target, { force: true });
       removed++;
     }

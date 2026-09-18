@@ -15,12 +15,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { writeFileAtomic } from "./atomic-write";
-import { PROJECT_ROOT } from "./config";
-
-/** 数据目录（测试可用 RAPTOR_DATA_DIR 指到临时目录，与 chat-sessions 同款） */
-function dataDir(): string {
-  return process.env.RAPTOR_DATA_DIR ?? path.join(PROJECT_ROOT, "data");
-}
+import { dataDir, isInsideDir } from "./paths";
 
 export function attachmentDir(): string {
   return path.join(dataDir(), "attachments");
@@ -203,7 +198,7 @@ export async function deleteAttachment(id: string): Promise<boolean> {
   if (!meta) return false;
   const filesRoot = path.resolve(filesDir());
   const target = path.resolve(meta.storedPath);
-  if (target !== filesRoot && !target.startsWith(filesRoot + path.sep)) {
+  if (!isInsideDir(filesRoot, target)) {
     // 索引指向缓存目录之外：宁可删不掉，也绝不越界
     delete idx[id];
     await saveIndex(idx);
