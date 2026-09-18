@@ -29,9 +29,10 @@ import type { ModelMessage } from "ai";
 import { createRaptorAgent } from "../agent";
 import { quarantineCorruptFile, writeFileAtomic } from "../atomic-write";
 import { appendRound } from "../chat-sessions";
-import { config, PROJECT_ROOT } from "../config";
+import { config } from "../config";
 import { drainGeneratedRound, runInDocumentRound } from "../document/save";
 import { ensureCredentials } from "../onboarding";
+import { migratedDataPath } from "../paths";
 import { localOnlyCommandMessage } from "../tui/slash-menu";
 import { mdToPlain, splitMessage } from "./format";
 import { registerQQPush } from "./push";
@@ -68,7 +69,7 @@ async function deliverGeneratedFiles(
 
 // ── 授权：白名单 + 暗号激活 ────────────────────────────────────
 
-const ALLOWLIST_FILE = path.join(PROJECT_ROOT, "qq-allowlist.json");
+const ALLOWLIST_FILE = migratedDataPath("qq-allowlist.json");
 const allowedOpenids = new Set<string>();
 
 async function loadAllowlist(): Promise<void> {
@@ -93,7 +94,28 @@ async function saveAllowlist(): Promise<void> {
 // 粒度），只写不读——网页里删改 QQ 档不会反过来影响这里的上下文。
 
 const MAX_HISTORY_TURNS = 20;
+/** 上下文窗口的发送者数量上限：陌生人刷屏不会让 Map 无界膨胀 */
+const MAX_HISTORY_SENDERS = 500;
 const histories = new Map<string, ModelMessage[]>();
+
+/** LRU 触碰：活跃用户的窗口不会被后来者挤掉 */
+function touchHistory(senderId: string): ModelMessage[] {
+  const history = histories.get(senderId) ?? [];
+  if (histories.has(senderId)) {
+    histories.delete(senderId);
+    histories.set(senderId, history);
+  }
+  return history;
+}
+
+function rememberHistory(senderId: string, turns: ModelMessage[]): void {
+  while (histories.size >= MAX_HISTORY_SENDERS) {
+    const oldest = histories.keys().next().value;
+    if (oldest === undefined) break;
+    histories.delete(oldest);
+  }
+  histories.set(senderId, turns);
+}
 
 /**
  * QQ 官方机器人是被动回复，窗口约 5 分钟。而抢课类工具默认要跑 600 秒——
@@ -207,8 +229,20 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
   // 白名单不用 accessPolicy 中间件：它会拦截未授权消息，导致
   // 「首条消息发暗号激活」永远走不到；处理器内自带校验 + 激活流程
 
-  // 拒绝回复防刷：每个陌生人只提示一次，避免被刷被动回复额度
+  // 拒绝回复防刷：每个陌生人只提示一次，避免被刷被动回复额度。
+  // FIFO 上限防 Map 被海量陌生 openid 撑大（挤出最老的，被挤出者会再收到
+  // 一次提示——量级在正常使用中不可感知）
   const rejectedNotified = new Set<string>();
+  const MAX_REJECTED_NOTIFIED = 5000;
+  const noteRejection = (senderId: string): void => {
+    if (rejectedNotified.has(senderId)) return;
+    while (rejectedNotified.size >= MAX_REJECTED_NOTIFIED) {
+      const oldest = rejectedNotified.values().next().value;
+      if (oldest === undefined) break;
+      rejectedNotified.delete(oldest);
+    }
+    rejectedNotified.add(senderId);
+  };
 
   bot.on("message", async (_ctx, msg) => {
     const senderId = msg.senderId;
@@ -224,7 +258,7 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
           "✅ 已授权，迅猛龙上线！直接说需求即可：查课表 / 盯课 / 抢课 / 读教务通知。",
         );
       } else if (!rejectedNotified.has(senderId)) {
-        rejectedNotified.add(senderId);
+        noteRejection(senderId);
         await bot.sendText(
           msg.replyTarget,
           "⛔ 未授权。首次使用请发送激活暗号（管理员在 .env 或网页「设置」里设置）。",
@@ -242,7 +276,7 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
       return;
     }
 
-    const history = histories.get(senderId) ?? [];
+    const history = touchHistory(senderId);
     const userMsg: ModelMessage = { role: "user", content: text };
 
     // 网页侧栏的历史记录：私聊每人一档、群聊每群一档（粒度见 session-archive.ts）。
@@ -277,7 +311,7 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
         role: "assistant",
         content: result.text,
       };
-      histories.set(senderId, [...history, userMsg, assistantMsg].slice(-MAX_HISTORY_TURNS));
+      rememberHistory(senderId, [...history, userMsg, assistantMsg].slice(-MAX_HISTORY_TURNS));
     } catch (e) {
       stopNotices();
       // 答砸了也把「他在 QQ 里问过这句」留下：只有提问，跟网页侧同一口径
@@ -285,6 +319,20 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
       log.error(`[qq] 处理失败（openid=${senderId}）：${(e as Error)?.message ?? e}`);
       await bot.sendText(msg.replyTarget, `❌ ${humanizeError(e)}`);
     }
+  });
+
+  // 在线状态跟随连接生命周期：SDK 自带断线重连（error→离线，
+  // ready/resumed→恢复在线）。重试耗尽时 SDK 只记日志不发事件，
+  // 状态会停在离线——设置面板如实显示，热拉起也能重新建连
+  bot.on("ready", () => {
+    bridgeOnline = true;
+  });
+  bot.on("resumed", () => {
+    bridgeOnline = true;
+  });
+  bot.on("error", (err) => {
+    bridgeOnline = false;
+    log.warn(`[qq] 连接异常（SDK 自动重连中）：${err.message}`);
   });
 
   await bot.start();

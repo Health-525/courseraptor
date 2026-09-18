@@ -22,7 +22,7 @@ import { type SpecialDay, specialOnDate } from "../jwgl/term-holidays";
 import type { CourseData } from "../jwgl/types";
 import { listKnowledge } from "../knowledge";
 import { loadScheduleCache } from "../schedule-cache";
-import { listReminders } from "./workspace-data";
+import { listReminders } from "../workspace-data";
 
 export interface BriefCourse {
   title: string;

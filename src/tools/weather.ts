@@ -5,6 +5,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 
+import { BASE as JWGL_BASE } from "../jwgl/auth";
 import { defaultWeatherCity, fetchWeather } from "../weather";
 
 export const weatherTools = {
@@ -18,7 +19,7 @@ export const weatherTools = {
     }),
     execute: async ({ city, days }) => {
       const wanted = city?.trim();
-      const r = await fetchWeather(wanted || defaultWeatherCity(), days);
+      const r = await fetchWeather(wanted || defaultWeatherCity(JWGL_BASE), days);
       if (!r.ok) {
         // 与课表同一套契约：查不到 ≠ 天气好，别让模型拿空数据编一个晴天
         return {

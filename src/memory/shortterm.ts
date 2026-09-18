@@ -8,11 +8,10 @@
  */
 
 import fs from "node:fs/promises";
-import path from "node:path";
 import { writeFileAtomic } from "../atomic-write";
-import { PROJECT_ROOT } from "../config";
+import { migratedDataPath } from "../paths";
 
-const SESSION_FILE = path.join(PROJECT_ROOT, "session.json");
+const SESSION_FILE = migratedDataPath("session.json");
 const MAX_PERSIST_MESSAGES = 200;
 const MAX_TRANSCRIPT_CHARS = 3000;
 /**

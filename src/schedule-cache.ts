@@ -7,18 +7,11 @@
  * - get_schedule 查通一次就落盘（data/schedule-cache.json）
  * - 之后启动面板直接读缓存，完全不登录、不请求教务系统
  * - 缓存是「最后已知课表」：学期切换后由用户问一次课表自然刷新，
- *   读坏了按 .corrupt-<时间戳> 备份后当无缓存处理
+ *   读写与坏文件隔离的公共约定见 json-cache.ts
  */
 
-import fs from "node:fs";
-import path from "node:path";
-import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
+import { readJsonCache, writeJsonCache } from "./json-cache";
 import type { ScheduleResult } from "./jwgl/academics";
-import { dataDir } from "./paths";
-
-function cachePath(): string {
-  return path.join(dataDir(), "schedule-cache.json");
-}
 
 export interface CachedSchedule {
   /** 落盘时间戳（ms），仅调试用，不做过期判断 */
@@ -26,30 +19,17 @@ export interface CachedSchedule {
   schedule: ScheduleResult;
 }
 
+function isCachedSchedule(parsed: unknown): parsed is CachedSchedule {
+  const c = parsed as CachedSchedule;
+  return Boolean(c?.schedule?.year) && Array.isArray(c.schedule.courses);
+}
+
 /** 读缓存；没有或读坏了都返回 null，调用方自行回退到在线拉取 */
 export function loadScheduleCache(): CachedSchedule | null {
-  let parsed: CachedSchedule;
-  try {
-    parsed = JSON.parse(fs.readFileSync(cachePath(), "utf8"));
-  } catch {
-    // 文件在却读不出来 = 写坏了。留个 .corrupt 副本再当无缓存处理，
-    // 免得下次 saveScheduleCache 以空为基回写，用户连救回来的机会都没有
-    quarantineCorruptFileSync(cachePath());
-    return null;
-  }
-  if (!parsed?.schedule?.year || !Array.isArray(parsed.schedule.courses)) {
-    quarantineCorruptFileSync(cachePath());
-    return null;
-  }
-  return parsed;
+  return readJsonCache("schedule-cache.json", isCachedSchedule);
 }
 
 /** 保存失败只打日志不影响主流程：缓存挂了顶多下次启动多查一次 */
 export function saveScheduleCache(schedule: ScheduleResult): void {
-  const payload: CachedSchedule = { savedAt: Date.now(), schedule };
-  try {
-    writeFileAtomicSync(cachePath(), JSON.stringify(payload, null, 2));
-  } catch (e) {
-    console.error("[schedule-cache] 保存失败:", e);
-  }
+  writeJsonCache("schedule-cache.json", { savedAt: Date.now(), schedule }, "schedule-cache");
 }

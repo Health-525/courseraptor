@@ -14,11 +14,11 @@ import {
   WEEKDAY_NAMES,
 } from "../jwgl/academics";
 import { fetchJwcNews } from "../jwgl/news";
+import { getCookie } from "../jwgl/session";
 import { currentWeekOf } from "../jwgl/term-dates";
 import { loadScheduleCache, saveScheduleCache } from "../schedule-cache";
-import { getCookie } from "../tools/session";
 import { startChatWeb } from "../web/chat-web";
-import { listReminders } from "../web/workspace-data";
+import { listReminders } from "../workspace-data";
 
 declare global {
   // eslint-disable-next-line no-var

@@ -6,11 +6,19 @@
  * REST 几乎同构（建仓 / contents 覆盖 / raw 链接），raw 地址国内直连，
  * 手机日历订阅它就稳了。
  *
- * 与 github-publish 的差异：
- * - 鉴权走 URL 参数 access_token（Gitee v5 的标准姿势）
- * - 不开 Pages（需实名+手动部署）：订阅直接用 raw 链接
- * - 默认分支是 master 而非 main，以 GET /repos 返回的 default_branch 为准
+ * 流程骨架见 repo-publish.ts，本模块只保留 Gitee 特有部分：
+ * 鉴权走 URL 参数 access_token（Gitee v5 的标准姿势）、不开 Pages
+ * （需实名+手动部署）：订阅直接用 raw 链接。
  */
+
+import {
+  type ApiClient,
+  ensurePublicRepo,
+  type FetchLike,
+  putFileWithSha,
+  requestJson,
+  resolveOwner,
+} from "./repo-publish";
 
 export interface GiteePublishResult {
   owner: string;
@@ -33,42 +41,15 @@ const CALENDAR_PATH = "calendar.ics";
 /** 与 GitHub 共用同一个默认仓库名，两边一致方便对照 */
 export const DEFAULT_CALENDAR_REPO = "courseraptor-calendar";
 
-type FetchLike = typeof fetch;
-
-interface GiteeResp {
-  status: number;
-  body: unknown;
-}
-
-async function gitee(
-  path: string,
-  token: string,
-  init: { method?: string; body?: unknown } = {},
-  fetchImpl: FetchLike = fetch,
-): Promise<GiteeResp> {
-  const sep = path.includes("?") ? "&" : "?";
-  const resp = await fetchImpl(`${API}${path}${sep}access_token=${encodeURIComponent(token)}`, {
-    method: init.method ?? "GET",
-    headers: { "content-type": "application/json", "user-agent": "CourseRaptor" },
-    ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
-  });
-  const text = await resp.text();
-  let body: unknown = null;
-  try {
-    body = text ? JSON.parse(text) : null;
-  } catch {
-    body = text;
-  }
-  return { status: resp.status, body };
-}
-
-function messageOf(body: unknown): string {
-  if (typeof body === "object" && body !== null) {
-    const o = body as Record<string, unknown>;
-    const m = o.message ?? o.error;
-    if (typeof m === "string") return m;
-  }
-  return typeof body === "string" && body ? body.slice(0, 120) : "Gitee 接口返回异常";
+function gitee(fetchImpl: FetchLike, token: string): ApiClient {
+  return (path, init) => {
+    const sep = path.includes("?") ? "&" : "?";
+    return requestJson(
+      fetchImpl,
+      `${API}${path}${sep}access_token=${encodeURIComponent(token)}`,
+      init,
+    );
+  };
 }
 
 /**
@@ -81,120 +62,59 @@ export async function publishCalendarToGitee(
 ): Promise<GiteePublishOutcome> {
   const { token, ics } = opts;
   const repo = opts.repoName?.trim() || DEFAULT_CALENDAR_REPO;
+  const api = gitee(fetchImpl, token);
 
   // 1. 验证令牌并拿登录名
-  const me = await gitee("/user", token, {}, fetchImpl);
-  if (me.status === 401 || me.status === 403) {
-    return {
-      ok: false,
-      error: "Gitee 私人令牌无效或已过期，请到 Gitee → 设置 → 私人令牌重新生成",
-      needSetup: true,
-    };
-  }
-  if (me.status !== 200) {
-    return { ok: false, error: `Gitee 账号信息获取失败：${messageOf(me.body)}` };
-  }
-  const owner = (me.body as Record<string, unknown>)?.login;
-  if (typeof owner !== "string" || !owner) {
-    return { ok: false, error: "Gitee 接口没返回登录名（响应结构可能已改版）" };
-  }
+  const me = await resolveOwner(api, "Gitee", {
+    invalidToken: "Gitee 私人令牌无效或已过期，请到 Gitee → 设置 → 私人令牌重新生成",
+    accountFailPrefix: "Gitee 账号信息获取失败",
+  });
+  if (!me.ok) return me;
 
   // 2. 仓库存在性：404 才建
-  let branch = "master";
-  let created = false;
-  const repoResp = await gitee(`/repos/${owner}/${repo}`, token, {}, fetchImpl);
-  if (repoResp.status === 404) {
-    const createResp = await gitee(
-      "/user/repos",
-      token,
-      {
-        method: "POST",
-        body: {
-          name: repo,
-          description: "CourseRaptor 课表日历（agent 自动同步）",
-          private: false,
-          auto_init: true,
-        },
-      },
-      fetchImpl,
-    );
-    if (createResp.status !== 201 && createResp.status !== 200) {
-      return { ok: false, error: `公开仓库创建失败：${messageOf(createResp.body)}` };
-    }
-    created = true;
-  } else if (repoResp.status === 200) {
-    const rb = repoResp.body as Record<string, unknown>;
-    const b = rb?.default_branch;
-    if (typeof b === "string" && b) branch = b;
-    if (rb?.private === true) {
-      return {
-        ok: false,
-        error: `仓库 ${owner}/${repo} 已存在且是私有的——手机匿名订阅要求公开仓库。请到 Gitee 把它设为开源后重试，或换个仓库名。`,
-      };
-    }
-  } else {
-    return { ok: false, error: `仓库信息获取失败：${messageOf(repoResp.body)}` };
-  }
+  const ensured = await ensurePublicRepo(
+    api,
+    me.owner,
+    repo,
+    {
+      createFailPrefix: "公开仓库创建失败",
+      getFailPrefix: "仓库信息获取失败",
+      privateRepo: `仓库 ${me.owner}/${repo} 已存在且是私有的——手机匿名订阅要求公开仓库。请到 Gitee 把它设为开源后重试，或换个仓库名。`,
+    },
+    {
+      name: repo,
+      description: "CourseRaptor 课表日历（agent 自动同步）",
+      private: false,
+      auto_init: true,
+    },
+    "master",
+  );
+  if (!ensured.ok) return ensured;
+  const { branch, created } = ensured;
 
   // 3. 覆盖上传 calendar.ics（更新必须带既有文件的 sha）
   const content = Buffer.from(ics, "utf8").toString("base64");
-  const putError = await putFile(
-    owner,
+  const putError = await putFileWithSha(
+    api,
+    me.owner,
     repo,
     branch,
     CALENDAR_PATH,
     content,
     "CourseRaptor：更新课表日历",
-    token,
-    fetchImpl,
   );
   if (putError) return { ok: false, error: `课表日历上传失败：${putError}` };
 
-  const host = `gitee.com/${owner}/${repo}/raw/${branch}/${CALENDAR_PATH}`;
+  const host = `gitee.com/${me.owner}/${repo}/raw/${branch}/${CALENDAR_PATH}`;
   return {
     ok: true,
     data: {
-      owner,
+      owner: me.owner,
       repo,
-      repoUrl: `https://gitee.com/${owner}/${repo}`,
+      repoUrl: `https://gitee.com/${me.owner}/${repo}`,
       subscribeUrl: `https://${host}`,
       webcalUrl: `webcal://${host}`,
       created,
     },
   };
-}
-
-/** PUT 单个文件；返回 null 表示成功，否则是错误消息 */
-async function putFile(
-  owner: string,
-  repo: string,
-  branch: string,
-  path: string,
-  contentBase64: string,
-  message: string,
-  token: string,
-  fetchImpl: FetchLike,
-): Promise<string | null> {
-  const cur = await gitee(
-    `/repos/${owner}/${repo}/contents/${path}?ref=${branch}`,
-    token,
-    {},
-    fetchImpl,
-  );
-  let sha: string | undefined;
-  if (cur.status === 200) {
-    const s = (cur.body as Record<string, unknown>)?.sha;
-    if (typeof s === "string") sha = s;
-  }
-  const put = await gitee(
-    `/repos/${owner}/${repo}/contents/${path}`,
-    token,
-    {
-      method: "PUT",
-      body: { message, content: contentBase64, branch, ...(sha ? { sha } : {}) },
-    },
-    fetchImpl,
-  );
-  if (put.status !== 200 && put.status !== 201) return messageOf(put.body);
-  return null;
 }

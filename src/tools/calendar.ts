@@ -18,8 +18,8 @@ import {
   parseSemesterString,
   resolveWeek1Monday,
 } from "../jwgl/academics";
+import { getCookie } from "../jwgl/session";
 import type { CourseData, ExamData } from "../jwgl/types";
-import { getCookie } from "./session";
 
 /** 课表+考试的抓取与对齐（两个日历工具共用）：学期解析、渠道握手、交界期不串台 */
 async function gatherCalendar(

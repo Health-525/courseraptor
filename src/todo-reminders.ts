@@ -13,7 +13,7 @@ import path from "node:path";
 import { writeFileAtomicSync } from "./atomic-write";
 import { PROJECT_ROOT } from "./config";
 import { pushQQText } from "./qq/push";
-import { listReminders, type Reminder } from "./web/workspace-data";
+import { listReminders, type Reminder } from "./workspace-data";
 
 const DAY_MS = 86_400_000;
 /** 提前提醒窗口：距到期 ≤ 7 天 */

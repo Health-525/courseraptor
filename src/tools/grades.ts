@@ -11,7 +11,7 @@ import { saveExamCache } from "../exam-cache";
 import { fetchExamsSmart, parseSemesterString } from "../jwgl/academics";
 import { fetchAllGrades } from "../jwgl/grades";
 import { fetchLabGradesSmart } from "../jwgl/portal";
-import { getCookie } from "./session";
+import { getCookie } from "../jwgl/session";
 
 export const gradesTools = {
   /** 成绩查询 */

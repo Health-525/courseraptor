@@ -4,8 +4,8 @@
  */
 
 import { config } from "../config";
-import { loginJwgl } from "../jwgl/auth";
-import { openXkSession, type XkSession } from "../jwgl/xk";
+import { loginJwgl } from "./auth";
+import { openXkSession, type XkSession } from "./xk";
 
 const RETRY_MAX = 5;
 
