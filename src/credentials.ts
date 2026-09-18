@@ -16,7 +16,8 @@ import path from "node:path";
 import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
 import { PROJECT_ROOT } from "./paths";
 
-const CRED_FILE = path.join(PROJECT_ROOT, "credentials.enc");
+// RAPTOR_CREDENTIALS_FILE 可把凭证文件指到别处（测试隔离用），默认项目根
+const CRED_FILE = process.env.RAPTOR_CREDENTIALS_FILE || path.join(PROJECT_ROOT, "credentials.enc");
 
 export interface StoredCredentials {
   username: string;
@@ -41,6 +42,11 @@ export interface CredentialsStore {
   model?: string;
   /** 用户在界面上明确选过型号；启动时优先于 .env 的 RAPTOR_MODEL。 */
   modelOverride?: boolean;
+  /** QQ 官方机器人（q.qq.com）：设置面板保存，AppID 与 Secret 成对 */
+  qqBotAppId?: string;
+  qqBotAppSecret?: string;
+  /** QQ 授权暗号：首次给机器人发它即完成白名单激活 */
+  qqBotPasscode?: string;
   savedAt: string;
 }
 

@@ -118,11 +118,20 @@ export function chatPage(options: { demo?: boolean } = {}): string {
               background: none; color: var(--ink-3); opacity: .65;
               font-size: 16px; cursor: pointer; padding: 0 4px;
               transition: opacity .15s ease, color .15s ease; }
-  .sess .sx:hover { opacity: 1; color: var(--accent); }
-  .sess .sactions { display: flex; grid-column: 1 / -1; gap: 10px; margin-top: 5px; }
-  .sess .sactions button { padding: 0; border: 0; background: none; cursor: pointer;
-                           font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
-  .sess .sactions button:hover { color: var(--accent); }
+  .sess .sx:hover, .sess .sx[aria-expanded="true"] { opacity: 1; color: var(--accent); }
+  /* 会话操作菜单：浮在条目右上方的纸片卡片，不再撑开列表行 */
+  .sess li { position: relative; }
+  .smenu { position: absolute; right: 6px; top: calc(100% - 4px); z-index: 30;
+           min-width: 128px; border: 1px solid var(--rule-2); border-radius: 4px;
+           background: var(--card); box-shadow: 0 10px 34px rgba(50, 42, 31, .16);
+           padding: 4px; }
+  .smenu button { display: flex; width: 100%; align-items: center; gap: 8px;
+                  border: 0; background: none; cursor: pointer; text-align: left;
+                  padding: 7px 10px; font-size: 13px; color: var(--ink-2);
+                  border-radius: 2px; }
+  .smenu button:hover { background: var(--accent-soft); color: var(--accent-deep); }
+  .smenu button.danger:hover { background: var(--accent); color: #fff; }
+  .smenu .ssep { height: 1px; margin: 4px 6px; background: var(--rule); }
   .sess .snone { display: block; color: var(--ink-3); font-size: 14px;
                  padding: 6px 2px; cursor: default; }
 
@@ -378,9 +387,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .dlg { width: min(480px, 100%); background: var(--paper);
          border: 1px solid var(--rule-2); border-radius: 6px; overflow: hidden;
          box-shadow: 0 18px 60px rgba(38, 35, 29, 0.28); }
-  .dlg.wide { width: min(680px, 100%); max-height: min(840px, calc(100dvh - 40px));
+  .dlg.wide { width: min(720px, 100%); max-height: min(840px, calc(100dvh - 40px));
               display: flex; flex-direction: column; }
-  .dlg.wide .dlg-body { overflow-y: auto; }
+  /* 弹窗本体不再整体滚动：左目录钉住，只有右侧内容区滚 */
+  .dlg.wide .dlg-body { flex: 1; min-height: 0; }
   .dlg-head { display: flex; align-items: center; justify-content: space-between;
               padding: 16px 22px 9px; }
   .dlg-head span { font-family: var(--kai); font-size: 22px;
@@ -393,19 +403,28 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .dlg-intro { margin: 0 0 16px; color: var(--ink-2); font-size: 14px;
                line-height: 1.75; }
 
-  /* 办理区块：一张单子上的并列栏目，细线分格；栏目名用等宽小字，
-     栏目级动作（如“＋ 添加待办”）挂在头行右侧，与侧栏会话栏目的做法同构 */
-  .panel { border: 1px solid var(--rule); border-radius: 4px;
-           padding: 13px 15px 12px; margin: 0 0 14px; }
-  .panel-head { display: flex; align-items: baseline; justify-content: space-between;
-                gap: 10px; margin: 0 0 11px; padding-bottom: 7px;
-                border-bottom: 1px solid var(--rule); }
-  .panel-name { font-family: var(--mono); font-size: 12px; font-weight: 600;
-                letter-spacing: .18em; color: var(--ink-2); }
-  .panel-act { border: 0; background: none; padding: 0; cursor: pointer;
-               font-family: var(--mono); font-size: 12px; letter-spacing: .06em;
-               color: var(--accent); }
-  .panel-act:hover { color: var(--accent-deep); text-decoration: underline; }
+  /* ── 设置栏目：左侧目录 + 右侧办理内容。选中栏目与会话列表同一语言：
+     朱砂竖线 + 浮起纸片；目录不滚动，滚的永远是右侧内容 ── */
+  .set-body { display: flex; flex-direction: column; }
+  .set-frame { display: flex; flex: 1; min-height: 0; gap: 22px; }
+  .set-tabs { flex: none; width: 138px; display: flex; flex-direction: column; gap: 2px;
+              overflow-y: auto; }
+  .set-tab { display: block; text-align: left; border: 0;
+             border-left: 2px solid transparent; border-radius: 0 4px 4px 0;
+             background: none; cursor: pointer; padding: 8px 8px 8px 12px;
+             font-family: var(--mono); font-size: 12.5px; letter-spacing: .06em;
+             color: var(--ink-3);
+             transition: color .15s ease, background .15s ease, border-color .15s ease; }
+  .set-tab:hover { color: var(--ink-2); background: var(--card); }
+  .set-tab.on { border-left-color: var(--accent); background: var(--card);
+                color: var(--ink); font-weight: 600; box-shadow: var(--shadow-sm); }
+  .set-main { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding-right: 6px; }
+  .set-pane { display: none; }
+  .set-pane.on { display: block; }
+  /* 栏目内动作行：替代原 panel 头行右侧挂动作的做法 */
+  .pane-act { margin: 0 0 12px; }
+  .pane-act .tbtn { min-height: 34px; padding: 5px 12px; font-size: 13px; }
+  .set-body .setmsg { flex: none; margin-top: 10px; }
 
   /* 字段：标签在上、输入在下，全宽对齐；不再用 72px 边栏配 82px 缩进魔数 */
   .fld { display: grid; gap: 5px; margin: 0 0 10px; }
@@ -473,7 +492,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .data-cell strong { font-size: 14px; font-weight: 600; }
   .data-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
   .data-actions .danger { color: var(--accent-deep); }
-  .setnote { font-size: 12.5px; color: var(--ink-3); margin: 2px 2px 6px; line-height: 1.8; }
   .setmsg { font-family: var(--mono); font-size: 12px; min-height: 16px;
             margin: 0 2px 2px; white-space: pre-wrap; color: var(--accent-deep); }
   .setmsg.good { color: var(--ink-2); }
@@ -558,6 +576,17 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     #b { min-height: 40px; padding: 8px 14px; }
     #b .kbd { display: none; }
     .data-grid { grid-template-columns: repeat(2, 1fr); }
+    /* 窄屏设置弹窗：目录改横排在内容上方，选中态换用下划朱砂线 */
+    .set-frame { flex-direction: column; gap: 0; }
+    .set-tabs { flex-direction: row; width: auto; gap: 6px;
+                overflow-x: auto; overflow-y: hidden;
+                border-bottom: 1px solid var(--rule);
+                padding: 0 0 10px; margin: 0 0 12px; }
+    .set-tab { white-space: nowrap; border-left: 0;
+               border-bottom: 2px solid transparent; border-radius: 4px 4px 0 0;
+               padding: 6px 10px; }
+    .set-tab.on { border-bottom-color: var(--accent); box-shadow: none; }
+    .set-main { padding-right: 0; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important;
@@ -580,7 +609,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     <input class="sess-search" id="sessSearch" type="search" placeholder="搜索会话" aria-label="搜索会话">
     <ul class="sess" id="sessList"></ul>
   </section>
-  <button class="tbtn foot-btn" id="openSettings" title="管理教务账号与 AI 模型">账号与模型</button>
+  <button class="tbtn foot-btn" id="openSettings" title="教务账号、AI 模型、QQ 机器人、待办与本地数据">设置</button>
 </aside>
 <main>
   ${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 全部为虚构数据</strong><span>不连接教务或 AI，不保存到磁盘。请勿输入个人信息。正式使用请在终端运行 npm start。</span></div>' : ""}
@@ -620,40 +649,57 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 <div class="drawer-backdrop" id="drawerBackdrop"></div>
 <div class="overlay" id="overlay" hidden>
   <div class="dlg wide" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
-    <div class="dlg-head"><span id="dlgTitle">账号与模型</span><button class="dclose" id="closeSettings" aria-label="关闭账号与模型设置">✕</button></div>
+    <div class="dlg-head"><span id="dlgTitle">设置</span><button class="dclose" id="closeSettings" aria-label="关闭设置">✕</button></div>
     <div class="dlg-rule"></div>
-    <div class="dlg-body">
-      <p class="dlg-intro">正式查询前，请配置自己的教务账号与模型服务。已保存的信息不会在页面中完整显示，留空即保持不变。</p>
-      <section class="panel">
-        <header class="panel-head"><span class="panel-name">教务账号</span></header>
-        <label class="fld"><span>学号</span><input id="sUser" type="text" autocomplete="off" ${demo ? "disabled" : ""}></label>
-        <label class="fld"><span>登录密码</span><input id="sPass" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}></label>
-        <div class="cur" id="curJwgl"></div>
-        <div class="diagrow"><button class="tbtn" id="testJwgl" type="button" ${demo ? "disabled" : ""}>检测教务连接</button><span class="diagstate" id="diagJwgl"></span></div>
-      </section>
-      <section class="panel">
-        <header class="panel-head"><span class="panel-name">AI 模型</span></header>
-        <label class="fld"><span>API Key</span><input id="sKey" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}></label>
-        <div class="cur" id="curKey"></div>
-        <div class="model-cards" id="modelCards" role="radiogroup" aria-label="选择 AI 模型"></div>
-        <input type="hidden" id="sModel" value="">
-        <div class="cur" id="curModel"></div>
-        <div class="diagrow"><button class="tbtn" id="testDeepseek" type="button" ${demo ? "disabled" : ""}>检测模型连接</button><span class="diagstate" id="diagDeepseek"></span></div>
-      </section>
-      <section class="panel">
-        <header class="panel-head"><span class="panel-name">截止日期待办</span><button class="panel-act" id="addReminderManual" type="button" ${demo ? "disabled" : ""}>＋ 添加待办</button></header>
-        <div class="rem-list" id="reminderList"><div class="rem-empty">暂无待办提醒</div></div>
-      </section>
-      <section class="panel">
-        <header class="panel-head"><span class="panel-name">本地数据</span></header>
-        <div class="data-grid" id="dataGrid"></div>
-        <div class="data-actions">
-          ${demo ? '<span class="tbtn" aria-disabled="true">导出本人数据</span>' : '<a class="tbtn" href="/api/data/export" download>导出本人数据</a>'}
-          <button class="tbtn" id="clearFiles" type="button" ${demo ? "disabled" : ""}>清理附件与生成文件</button>
-          <button class="tbtn danger" id="clearAllData" type="button" ${demo ? "disabled" : ""}>清空全部本地数据</button>
+    <div class="dlg-body set-body">
+      <div class="set-frame">
+        <nav class="set-tabs" id="setTabs" role="tablist" aria-label="设置栏目">
+          <button class="set-tab on" type="button" role="tab" id="setTabAccount" aria-controls="setPaneAccount" aria-selected="true" data-pane="account">教务账号</button>
+          <button class="set-tab" type="button" role="tab" id="setTabModel" aria-controls="setPaneModel" aria-selected="false" data-pane="model">AI 模型</button>
+          <button class="set-tab" type="button" role="tab" id="setTabQQ" aria-controls="setPaneQQ" aria-selected="false" data-pane="qq">QQ 机器人</button>
+          <button class="set-tab" type="button" role="tab" id="setTabReminders" aria-controls="setPaneReminders" aria-selected="false" data-pane="reminders">待办</button>
+          <button class="set-tab" type="button" role="tab" id="setTabData" aria-controls="setPaneData" aria-selected="false" data-pane="data">本地数据</button>
+        </nav>
+        <div class="set-main">
+          <section class="set-pane on" id="setPaneAccount" role="tabpanel" aria-labelledby="setTabAccount" data-pane="account">
+            <p class="dlg-intro">正式查询课表、成绩、考试与通知前，请先配置教务账号。已保存的信息不会在页面中完整显示，留空即保持不变；账号仅加密保存在当前电脑。</p>
+            <label class="fld"><span>学号</span><input id="sUser" type="text" autocomplete="off" ${demo ? "disabled" : ""}></label>
+            <label class="fld"><span>登录密码</span><input id="sPass" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}></label>
+            <div class="cur" id="curJwgl"></div>
+            <div class="diagrow"><button class="tbtn" id="testJwgl" type="button" ${demo ? "disabled" : ""}>检测教务连接</button><span class="diagstate" id="diagJwgl"></span></div>
+          </section>
+          <section class="set-pane" id="setPaneModel" role="tabpanel" aria-labelledby="setTabModel" data-pane="model">
+            <p class="dlg-intro">模型服务使用 DeepSeek API。API Key 与所选型号仅加密保存在当前电脑，留空即保持不变。</p>
+            <label class="fld"><span>API Key</span><input id="sKey" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}></label>
+            <div class="cur" id="curKey"></div>
+            <div class="model-cards" id="modelCards" role="radiogroup" aria-label="选择 AI 模型"></div>
+            <input type="hidden" id="sModel" value="">
+            <div class="cur" id="curModel"></div>
+            <div class="diagrow"><button class="tbtn" id="testDeepseek" type="button" ${demo ? "disabled" : ""}>检测模型连接</button><span class="diagstate" id="diagDeepseek"></span></div>
+          </section>
+          <section class="set-pane" id="setPaneQQ" role="tabpanel" aria-labelledby="setTabQQ" data-pane="qq">
+            <p class="dlg-intro">在 q.qq.com 创建机器人后填入凭证，保存后即可在 QQ 里与本服务对话。凭证仅加密保存在当前电脑，留空即保持不变。</p>
+            <label class="fld"><span>AppID</span><input id="sQQAppId" type="text" autocomplete="off" placeholder="q.qq.com 机器人的 AppID" ${demo ? "disabled" : ""}></label>
+            <label class="fld"><span>AppSecret</span><input id="sQQSecret" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}></label>
+            <label class="fld"><span>激活暗号</span><input id="sQQPass" type="text" autocomplete="off" placeholder="首次激活用的暗号（自定）" ${demo ? "disabled" : ""}></label>
+            <div class="cur" id="curQQ">未配置；到 q.qq.com 创建机器人后填入，保存后即可在 QQ 里使用</div>
+          </section>
+          <section class="set-pane" id="setPaneReminders" role="tabpanel" aria-labelledby="setTabReminders" data-pane="reminders">
+            <p class="dlg-intro">从对话中确认的考试与作业截止会存到这里，也可以手动添加。此栏目的改动即时生效，无需点「保存设置」。</p>
+            <div class="pane-act"><button class="tbtn" id="addReminderManual" type="button" ${demo ? "disabled" : ""}>＋ 添加待办</button></div>
+            <div class="rem-list" id="reminderList"><div class="rem-empty">暂无待办提醒</div></div>
+          </section>
+          <section class="set-pane" id="setPaneData" role="tabpanel" aria-labelledby="setTabData" data-pane="data">
+            <p class="dlg-intro">会话、附件、生成文件与待办都保存在本机，可导出或按需清理。此栏目的操作即时生效，无需点「保存设置」。</p>
+            <div class="data-grid" id="dataGrid"></div>
+            <div class="data-actions">
+              ${demo ? '<span class="tbtn" aria-disabled="true">导出本人数据</span>' : '<a class="tbtn" href="/api/data/export" download>导出本人数据</a>'}
+              <button class="tbtn" id="clearFiles" type="button" ${demo ? "disabled" : ""}>清理附件与生成文件</button>
+              <button class="tbtn danger" id="clearAllData" type="button" ${demo ? "disabled" : ""}>清空全部本地数据</button>
+            </div>
+          </section>
         </div>
-      </section>
-      <div class="setnote">不需要修改的项目请留空。教务账号和 API Key 仅加密保存在当前电脑。</div>
+      </div>
       <div class="setmsg" id="setMsg"></div>
     </div>
     <div class="dlg-foot">
@@ -1057,20 +1103,27 @@ function renderSessList() {
     x.className = "sx";
     x.dataset.actions = s.id;
     x.title = "会话操作";
+    x.setAttribute("aria-haspopup", "menu");
+    x.setAttribute("aria-expanded", sessionActionsId === s.id ? "true" : "false");
     x.textContent = "⋯";
     li.appendChild(x);
     li.appendChild(el2("sm", fmtWhen(s.updatedAt) + " · " + s.count + " 条"));
     if (sessionActionsId === s.id && editingSessionId !== s.id) {
-      const actions = el("sactions");
-      const action = (label, key) => {
+      const menu = el("smenu");
+      menu.setAttribute("role", "menu");
+      const action = (label, key, danger) => {
         const button = document.createElement("button");
         button.type = "button"; button.dataset[key] = s.id; button.textContent = label;
-        actions.appendChild(button);
+        button.setAttribute("role", "menuitem");
+        if (danger) button.className = "danger";
+        menu.appendChild(button);
+        return button;
       };
       action(s.pinned ? "取消置顶" : "置顶", "pin");
       action("改名", "rename");
-      action("删除", "del");
-      li.appendChild(actions);
+      menu.appendChild(el("ssep"));
+      action("删除", "del", true);
+      li.appendChild(menu);
     }
     sessList.appendChild(li);
   });
@@ -1142,10 +1195,11 @@ function startFresh() {
 
 sessList.addEventListener("click", (e) => {
   const del = e.target.closest("button[data-del]");
-  if (del) { delSession(del.dataset.del); return; }
+  if (del) { sessionActionsId = ""; delSession(del.dataset.del); return; }
   const pin = e.target.closest("button[data-pin]");
   if (pin) {
     const current = lastSessions.find((s) => s.id === pin.dataset.pin);
+    sessionActionsId = "";
     if (current) patchSession(current.id, { pinned: !current.pinned }).then(refreshSessions).catch(() => {});
     return;
   }
@@ -1153,11 +1207,20 @@ sessList.addEventListener("click", (e) => {
   if (rename) { editingSessionId = rename.dataset.rename; sessionActionsId = ""; renderSessList(); return; }
   const actions = e.target.closest("button[data-actions]");
   if (actions) {
+    e.stopPropagation();
     sessionActionsId = sessionActionsId === actions.dataset.actions ? "" : actions.dataset.actions;
     renderSessList(); return;
   }
   const li = e.target.closest("li[data-id]");
-  if (li && !busy) openSession(li.dataset.id);
+  if (li && !busy) { sessionActionsId = ""; openSession(li.dataset.id); }
+});
+
+/* 浮层菜单点外面任意处收起（⋯ 按钮自身已在上面 stopPropagation） */
+document.addEventListener("click", (e) => {
+  if (!sessionActionsId) return;
+  if (e.target.closest(".smenu") || e.target.closest("button[data-actions]")) return;
+  sessionActionsId = "";
+  renderSessList();
 });
 
 document.getElementById("sessSearch").addEventListener("input", (e) => {
@@ -1185,6 +1248,9 @@ const sUser = document.getElementById("sUser");
 const sPass = document.getElementById("sPass");
 const sKey = document.getElementById("sKey");
 const sModel = document.getElementById("sModel");
+const sQQAppId = document.getElementById("sQQAppId");
+const sQQSecret = document.getElementById("sQQSecret");
+const sQQPass = document.getElementById("sQQPass");
 const curModel = document.getElementById("curModel");
 const setMsg = document.getElementById("setMsg");
 const reminderOverlay = document.getElementById("reminderOverlay");
@@ -1358,12 +1424,50 @@ document.getElementById("modelCards").addEventListener("keydown", (e) => {
   if (next) { e.preventDefault(); next.focus(); }
 });
 
+/* ── 设置栏目切换：点左列目录，右列换内容。「保存设置」只属于
+   凭证类栏目（教务 / 模型 / QQ）；待办与本地数据即改即存，不亮保存 ── */
+const setTabs = [...document.querySelectorAll(".set-tab")];
+function setTab(name) {
+  for (const tab of setTabs) {
+    const on = tab.dataset.pane === name;
+    tab.classList.toggle("on", on);
+    tab.setAttribute("aria-selected", on ? "true" : "false");
+    tab.tabIndex = on ? 0 : -1;
+  }
+  for (const pane of document.querySelectorAll(".set-pane")) {
+    pane.classList.toggle("on", pane.dataset.pane === name);
+  }
+  document.getElementById("saveSettings").hidden = !["account", "model", "qq"].includes(name);
+}
+for (const tab of setTabs) tab.addEventListener("click", () => setTab(tab.dataset.pane));
+/* 上下方向键在栏目间移动焦点（与会话/型号卡片的键盘习惯一致），空格/回车进入栏目 */
+document.getElementById("setTabs").addEventListener("keydown", (e) => {
+  if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+  const i = setTabs.indexOf(document.activeElement);
+  if (i < 0) return;
+  e.preventDefault();
+  setTabs[(i + (e.key === "ArrowDown" ? 1 : -1) + setTabs.length) % setTabs.length].focus();
+});
+
+function qqStatusText(q) {
+  return q && q.configured
+    ? "已配置：AppID " + (q.appIdMasked || "已保存") + " · " + q.sourceLabel + (q.passcodeSet ? " · 暗号已设" : " · 未设暗号")
+    : "未配置；到 q.qq.com 创建机器人后填入，保存后即可在 QQ 里使用";
+}
+function qqApplyStatus(q) {
+  document.getElementById("curQQ").textContent = qqStatusText(q);
+  sQQSecret.placeholder = q && q.configured ? "已保存；留空不修改" : "q.qq.com 机器人的 AppSecret";
+  sQQPass.placeholder = q && q.passcodeSet ? "已设暗号；留空不修改" : "首次激活用的暗号（自定）";
+}
+
 function showSettings() {
   overlay.hidden = false;
   closeDrawer();
+  setTab("account");
   setMsg.className = "setmsg";
   setMsg.textContent = "";
   sPass.value = ""; sKey.value = ""; pickModel("");
+  sQQAppId.value = ""; sQQSecret.value = ""; sQQPass.value = "";
   document.getElementById("diagJwgl").textContent = "";
   document.getElementById("diagDeepseek").textContent = "";
   refreshReminders(); refreshData();
@@ -1379,6 +1483,7 @@ function showSettings() {
       ? "已保存：" + (d.deepseek.masked || "API Key") + " · " + d.deepseek.sourceLabel + " · " + d.model
       : "尚未配置 API Key · 当前模型 " + d.model;
     sKey.placeholder = "sk-…；留空不修改";
+    qqApplyStatus(d.qq);
     fillModels(d.models, d.model, "");
     (d.jwgl.configured ? sPass : sUser).focus();
   }).catch(() => { setMsg.textContent = "无法读取设置，请确认本地服务正在运行。"; });
@@ -1396,6 +1501,7 @@ document.getElementById("cancelSettings").addEventListener("click", hideSettings
 overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) hideSettings(); });
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
+  if (sessionActionsId) { sessionActionsId = ""; renderSessList(); return; }
   if (!reminderOverlay.hidden) closeReminder();
   else if (!overlay.hidden) hideSettings();
   else closeDrawer();
@@ -1431,6 +1537,16 @@ document.getElementById("saveSettings").addEventListener("click", () => {
     return;
   }
   if (k) body.apiKey = k;
+  const qa = sQQAppId.value.trim(), qs = sQQSecret.value, qp = sQQPass.value.trim();
+  if (qa || qs) {
+    if (!qa || !qs) {
+      setMsg.className = "setmsg";
+      setMsg.textContent = "QQ 的 AppID 与 AppSecret 需要一起填写（q.qq.com 机器人详情页可查）。";
+      return;
+    }
+    body.qqAppId = qa; body.qqAppSecret = qs;
+  }
+  if (qp) body.qqPasscode = qp;
   if (sModel.value) body.model = sModel.value;
   if (!Object.keys(body).length) {
     setMsg.className = "setmsg";
@@ -1457,6 +1573,8 @@ document.getElementById("saveSettings").addEventListener("click", () => {
       document.getElementById("curKey").textContent = d.status.deepseek.configured
         ? "已保存：" + (d.status.deepseek.masked || "API Key") + " · " + d.status.deepseek.sourceLabel + " · " + d.status.model
         : "尚未配置 API Key · 当前模型 " + d.status.model;
+      sQQAppId.value = ""; sQQSecret.value = ""; sQQPass.value = "";
+      qqApplyStatus(d.status.qq);
       pickModel("");
       fillModels(d.status.models, d.status.model, "");
     }

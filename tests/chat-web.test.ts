@@ -16,8 +16,12 @@ import vm from "node:vm";
 
 // 课表工具内部读写 data/，指向临时目录避免污染真实数据
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-chat-"));
+// QQ 凭证保存走临时文件：测试里绝不碰真机 credentials.enc
+process.env.RAPTOR_CREDENTIALS_FILE = path.join(process.env.RAPTOR_DATA_DIR, "credentials.enc");
 
-const { setChatAgent, startChatWeb } = await import("../src/web/chat-web");
+const { setChatAgent, setQQBridgeLauncher, setTitleMaker, startChatWeb } = await import(
+  "../src/web/chat-web"
+);
 const { generatedDir } = await import("../src/document/save");
 
 /** 页面签发的 CSRF token（写请求必须带上；浏览器里由注入的 fetch 包装自动完成） */
@@ -239,6 +243,76 @@ test("会话接口支持改名与置顶", async () => {
   assert.equal(list.sessions[0].id, "manage111", "置顶会话应排在最前");
 });
 
+test("模型自动命名：落盘后覆盖首问兜底，人工改过名不再覆盖", async () => {
+  setChatAgent({
+    stream() {
+      async function* gen() {
+        yield { type: "text-delta", text: "答复" };
+        yield { type: "finish" };
+      }
+      return Promise.resolve({ fullStream: gen() });
+    },
+  });
+  const url = (await startChatWeb())!;
+  // 注入替身命名 maker：记录拿到的消息、返回固定标题（不联网）
+  let makerInput: unknown = null;
+  setTitleMaker(async (input) => {
+    makerInput = input;
+    return "高数答疑";
+  });
+
+  // 首轮落盘后即触发自动命名：标题不再是首问原文
+  await post(url, { message: "帮我看看这周的高数课在第几节", sessionId: "autotitle1" });
+  const list = await (await fetch(`${url}/api/sessions`)).json();
+  const item = list.sessions.find((s: { id: string }) => s.id === "autotitle1");
+  assert.equal(item.title, "高数答疑", "模型命名的标题应落盘");
+  assert.ok(makerInput, "命名 maker 应收到会话消息");
+
+  // 人工改名后 titleSet 置位：再来的轮次不覆盖人工标题
+  await wfetch(`${url}/api/sessions/autotitle1`, {
+    method: "PATCH",
+    body: JSON.stringify({ title: "我自己的名字" }),
+  });
+  setTitleMaker(async () => "不该出现");
+  await post(url, { message: "再问一句", sessionId: "autotitle1" });
+  const list2 = await (await fetch(`${url}/api/sessions`)).json();
+  const item2 = list2.sessions.find((s: { id: string }) => s.id === "autotitle1");
+  assert.equal(item2.title, "我自己的名字", "人工命名优先级高于模型自动命名");
+
+  // 还原默认 maker，避免影响后续用例
+  setTitleMaker(null);
+});
+
+test("自动命名失败时保留首问兜底，绝不静默清空标题", async () => {
+  setChatAgent({
+    stream() {
+      async function* gen() {
+        yield { type: "text-delta", text: "好的" };
+        yield { type: "finish" };
+      }
+      return Promise.resolve({ fullStream: gen() });
+    },
+  });
+  const url = (await startChatWeb())!;
+  // maker 抛错：标题必须保持首问兜底
+  setTitleMaker(async () => {
+    throw new Error("网络挂了");
+  });
+  await post(url, { message: "兜底标题测试问题", sessionId: "autotitle2" });
+  let list = await (await fetch(`${url}/api/sessions`)).json();
+  let item = list.sessions.find((s: { id: string }) => s.id === "autotitle2");
+  assert.equal(item.title, "兜底标题测试问题", "命名失败时首问兜底仍在");
+
+  // maker 返回超长烂输出：同样放弃，不清空
+  setTitleMaker(async () => "这是一个长得不像标题的模型输出根本不该被采纳");
+  await post(url, { message: "再触发一次命名", sessionId: "autotitle2" });
+  list = await (await fetch(`${url}/api/sessions`)).json();
+  item = list.sessions.find((s: { id: string }) => s.id === "autotitle2");
+  assert.equal(item.title, "兜底标题测试问题", "烂输出不得覆盖兜底标题");
+
+  setTitleMaker(null);
+});
+
 test("网页上传只回附件编号，对话可读取受控路径且详情不泄露路径", async () => {
   const calls: unknown[][] = [];
   setChatAgent({
@@ -427,6 +501,10 @@ test("GET /api/settings 只回脱敏状态，不吐明文密钥", async () => {
   assert.ok(!("password" in s.jwgl), "不得返回教务密码");
   assert.equal(typeof s.deepseek.configured, "boolean");
   assert.ok(!("key" in s.deepseek) && !("apiKey" in s.deepseek), "不得返回完整 Key");
+  // QQ 分组同样是脱敏状态：只有打码 AppID，绝不回显 AppSecret
+  assert.equal(typeof s.qq.configured, "boolean");
+  assert.equal(typeof s.qq.passcodeSet, "boolean");
+  assert.ok(!("appSecret" in s.qq) && !("qqBotAppSecret" in s.qq), "不得返回 QQ AppSecret");
   // 模型下拉候选随设置一起回：这里绝不联网（弹窗不能因为等远端而卡住），
   // 没有实时缓存时必须是内置兜底清单
   assert.ok(Array.isArray(s.models) && s.models.length >= 2, "models 必须是非空候选清单");
@@ -493,6 +571,58 @@ test("POST /api/settings：坏格式 Key、半套教务凭证、清单外模型�
   const r5 = await call({ model: "../../etc/passwd" });
   assert.equal(r5.status, 400);
   assert.equal(await readModel(), before, "被拒的模型选择不得改动运行时配置");
+});
+
+test("QQ 凭证可经设置面板保存：成对校验、脱敏回显、保存成功后热拉起桥", async () => {
+  const url = (await startChatWeb())!;
+  // 注入替身桥启动器：记录调用、不真实连 QQ
+  let launches = 0;
+  setQQBridgeLauncher(async () => {
+    launches++;
+    return "；QQ 桥已拉起（测试替身）";
+  });
+
+  // 半套凭证被拒，且不触发拉起
+  const half = await wfetch(`${url}/api/settings`, {
+    method: "POST",
+    body: JSON.stringify({ qqAppId: "1023456789" }),
+  });
+  assert.equal(half.status, 400);
+  const halfBody = await half.json();
+  assert.match(halfBody.results[0].message, /一起/);
+  assert.equal(launches, 0, "被拒的保存不得拉起桥");
+
+  // 完整凭证 + 暗号：保存成功、热启动触发、状态脱敏
+  const save = await wfetch(`${url}/api/settings`, {
+    method: "POST",
+    body: JSON.stringify({
+      qqAppId: "1023456789",
+      qqAppSecret: "web-save-secret",
+      qqPasscode: "raptor-pass",
+    }),
+  });
+  assert.equal(save.status, 200);
+  const body = await save.json();
+  const qqLine = body.results.find((x: { field: string }) => x.field === "qq");
+  assert.equal(qqLine.ok, true);
+  assert.match(qqLine.message, /测试替身/);
+  assert.equal(launches, 1);
+  assert.equal(body.status.qq.configured, true);
+  assert.equal(body.status.qq.passcodeSet, true);
+  assert.equal(body.status.qq.appIdMasked, "1023••••89");
+  assert.ok(!JSON.stringify(body).includes("web-save-secret"), "AppSecret 不得出现在响应任何位置");
+
+  // 加密落盘 + GET 状态一致
+  const { loadCredentialsStore } = await import("../src/credentials");
+  const stored = loadCredentialsStore();
+  assert.equal(stored?.qqBotAppSecret, "web-save-secret");
+  assert.equal(stored?.qqBotPasscode, "raptor-pass");
+  const after = (await (await fetch(`${url}/api/settings`)).json()).qq;
+  assert.equal(after.configured, true);
+  assert.ok(!JSON.stringify(after).includes("web-save-secret"));
+
+  // 还原默认启动器，避免影响后续用例
+  setQQBridgeLauncher(null);
 });
 
 /** 桩 agent 收到的 messages，供「思考不进上下文」那条测试回看 */
@@ -679,6 +809,11 @@ test("渲染产物语法自检 + 思考卡片与齿轮图标锚点", async () =>
   assert.match(html, /<svg viewBox="0 0 24 24"/, "工具行首应为内联 SVG 图标");
   assert.match(html, /function toolDone[\s\S]{0,400}"完成"/, "完成状态用文字表达");
   assert.ok(!html.includes('"✓"') && !html.includes("'✓'"), "工具状态不再用勾号");
+  // 会话操作是浮层菜单卡片：置顶/改名/删除不再撑开列表行
+  assert.match(html, /\.smenu \{/, "缺少浮层菜单样式");
+  assert.match(html, /class="smenu"|el\("smenu"\)/, "菜单应渲染成浮层卡片");
+  assert.ok(!html.includes("sactions"), "旧的内联操作行应已移除");
+  assert.match(html, /setAttribute\("aria-haspopup", "menu"\)/, "⋯ 按钮应声明弹出菜单语义");
 });
 
 test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", async () => {

@@ -174,7 +174,11 @@ Agent 默认可调用 **28 个工具**（选课季 +4 抢课工具共 32 个）�
 
 ```bash
 # 1. 在 https://q.qq.com 用主号实名注册 -> 创建机器人 -> 拿到 AppID / AppSecret
-# 2. .env 填入 QQBOT_APP_ID / QQBOT_APP_SECRET / QQBOT_PASSCODE（自定激活暗号）
+#    （机器人能力勾选「群聊（@消息）」，单聊需用户先添加机器人为好友）
+# 2. 凭证二选一填法：
+#    a. 网页「设置」弹窗（推荐）：AppID / AppSecret / 激活暗号三项填好保存，
+#       AES-256-GCM 加密存本机，桥自动上线，不用碰任何文件
+#    b. .env 填入 QQBOT_APP_ID / QQBOT_APP_SECRET / QQBOT_PASSCODE（自定激活暗号）
 # 3. 启动：一条 raptor 全包（终端对话 + QQ 机器人同时在线，前台运行，Ctrl+C 退出）
 raptor
 #    只跑 QQ 桥（不开终端对话）：
@@ -237,7 +241,7 @@ npm run qq
 任何人均可下载安装包并自行配置所需凭证：
 
 1. 到 [Releases](https://github.com/Health-525/courseraptor/releases/latest) 下载文件名带 **`portable-win-x64`** 的那个 zip（约 112MB，已内置 Node 运行时，**不用装 Node.js、也不用联网装依赖**）。别下页面最底部 GitHub 自动生成的 Source code 包，那只是源码快照。
-2. 右键 zip →「全部解压缩」，双击解压出来文件夹里的 **`start.bat`**（首次会引导录入教务账号和 DeepSeek API Key，加密存在本机，之后免填）。
+2. 右键 zip →「全部解压缩」，双击解压出来文件夹里的 **`start.bat`**（首次会引导录入教务账号和 DeepSeek API Key，加密存在本机，之后免填；教务账号也可直接回车跳过，之后在网页「设置 → 教务账号」里补填）。
 
 > 双击没反应或被拦截：包里的 `runtime\node.exe` 是 Node 官方运行时、未做代码签名，SmartScreen 弹窗选「更多信息 → 仍要运行」，或把解压出的 `CourseRaptor` 文件夹加入杀软信任区。
 
@@ -250,7 +254,7 @@ cd courseraptor && npm install
 
 # 2. 配置凭证
 #    DeepSeek Key：cp .env.example .env 后编辑填入
-#    教务账号：留空即可，首次启动 raptor 引导录入并加密保存本机
+#    教务账号：留空即可，首次启动 raptor 引导录入并加密保存本机；引导时回车可跳过，跳过后在网页「设置 → 教务账号」里补填
 
 # 3. 注册全局命令（一次即可，任意目录可用）
 npm link
@@ -307,15 +311,15 @@ npm run publish -- major "更新说明"          # 0.1.0 -> 1.0.0
 | 变量 | 说明 |
 |---|---|
 | `DEEPSEEK_API_KEY` | DeepSeek API Key（或启动后对话里输入 `/key sk-你的Key` 配置，加密保存、立即生效） |
-| `JWGL_USERNAME` / `JWGL_PASSWORD` | 教务系统学号 / 密码（可选；留空则首次启动引导录入并 AES-256-GCM 加密保存） |
-| `RAPTOR_MODEL` | 模型，默认 `deepseek-flash`（官方当前主力型号 V4.1-Flash，原生支持图片输入），可选 `deepseek-v4-pro` 等；官方已停用 `deepseek-chat` / `deepseek-reasoner` 别名并退役 `deepseek-v4-flash` 系列，本地存有旧型号时启动自动迁移；网页「账号与模型」里选过的型号加密保存并优先于此项 |
+| `JWGL_USERNAME` / `JWGL_PASSWORD` | 教务系统学号 / 密码（可选；留空则首次启动引导录入并 AES-256-GCM 加密保存，引导可回车跳过、不配也能用，跳过后在网页「设置 → 教务账号」里补填） |
+| `RAPTOR_MODEL` | 模型，默认 `deepseek-flash`（官方当前主力型号 V4.1-Flash，原生支持图片输入），可选 `deepseek-v4-pro` 等；官方已停用 `deepseek-chat` / `deepseek-reasoner` 别名并退役 `deepseek-v4-flash` 系列，本地存有旧型号时启动自动迁移；网页「设置」里选过的型号加密保存并优先于此项 |
 | `RAPTOR_ENABLE_GRAB` | 抢课模式开关：选课季设 `1` 启用抢课/盯课工具，平时留空（默认） |
 | `RAPTOR_TUI_INLINE` | 设 `1` 让终端默认走行内渲染（输出顺命令行下滚、滚轮/选中复制可用），等价对话里的 `/inline` |
 | `RAPTOR_WEB_PORT` | 网页版端口，默认 `3210`（被占用时自动选空闲端口，以终端提示为准） |
 | `FIRECRAWL_API_KEY` | Firecrawl 云解析通知附件（可选；本地已支持 xlsx/docx/pdf，仅作兜底） |
 | `GITHUB_TOKEN` / `GITEE_TOKEN` | 日历订阅发布令牌（可选）：配后 `publish_calendar` 可把课表/考试发到名下公开仓库、手机用订阅链接自动同步。国内手机优先 `GITEE_TOKEN`（直连更稳），GitHub 令牌需 `repo` 权限 |
-| `QQBOT_APP_ID` / `QQBOT_APP_SECRET` | QQ 官方机器人凭证（可选） |
-| `QQBOT_PASSCODE` | QQ 授权暗号：首次给机器人发此暗号完成授权 |
+| `QQBOT_APP_ID` / `QQBOT_APP_SECRET` | QQ 官方机器人凭证（可选；也可在网页「设置」里填写，AES 加密保存且保存后桥自动上线。两边都配时 `.env` 优先） |
+| `QQBOT_PASSCODE` | QQ 授权暗号：首次给机器人发此暗号完成授权（同样可在网页「设置」里设置） |
 | `RAPTOR_DISABLE_CAPTCHA_OCR` | 设 `1` 停用附件下载里的图形验证码自动识别（默认启用、重试上限 3 次） |
 | `RAPTOR_MAX_RPS` | 教务请求全局限速上限：只允许下调、请勿调高，尊重教务系统承载 |
 | `RAPTOR_NO_TODO_REMINDERS` | 设 `1` 关闭待办到期自动提醒（默认开启：距到期 ≤ 7 天每天一次，Windows 桌面通知 + QQ 推送） |

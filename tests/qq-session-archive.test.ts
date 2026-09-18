@@ -121,7 +121,7 @@ test("QQ 一轮问答进历史：标题带渠道前缀，答失败那轮只留�
 });
 
 test("建档标题只认首问：后续轮次不改名，超长首问按 24 字截断", () => {
-  const slot = qqArchiveSlot(c2c("C2C_LONG", "问".repeat(40)))!;
+  const slot = qqArchiveSlot(c2c("C2C_LONG", "问".repeat(80)))!;
   S.appendRound(slot.id, slot.userText, "答一", null, { titlePrefix: slot.titlePrefix });
   S.appendRound(slot.id, "第二问", "答二", null, { titlePrefix: slot.titlePrefix });
   const s = S.getSession(slot.id);

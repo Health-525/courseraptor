@@ -11,6 +11,13 @@ const RETRY_MAX = 5;
 
 // ── 普通登录 cookie（课表/成绩/考试用）────────────────────────
 
+/** 教务功能前置检查：没配账号时直接给可操作的提示，而不是拿 undefined 去撞登录接口 */
+function requireJwglCredentials(): void {
+  if (!config.jwglUsername || !config.jwglPassword) {
+    throw new Error("尚未配置教务账号：请在网页对话窗口「设置 → 教务账号」里填写学号和密码后重试");
+  }
+}
+
 interface AuthCache {
   cookie: string;
   createdAt: number;
@@ -21,6 +28,7 @@ const AUTH_TTL_MS = 25 * 60 * 1000; // 25 分钟（保守于 30 分钟会话）
 
 /** 获取登录 cookie（缓存复用，失效/被强制时重建） */
 export async function getCookie(force = false): Promise<string> {
+  requireJwglCredentials();
   if (!force && authCache && Date.now() - authCache.createdAt < AUTH_TTL_MS) {
     return authCache.cookie;
   }
@@ -41,6 +49,7 @@ const XK_TTL_MS = 25 * 60 * 1000;
 
 /** 获取选课会话（缓存复用） */
 export async function getXkSession(force = false): Promise<XkSession> {
+  requireJwglCredentials();
   if (!force && xkCache && Date.now() - xkCache.createdAt < XK_TTL_MS) {
     return xkCache.session;
   }

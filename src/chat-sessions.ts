@@ -4,8 +4,9 @@
  * 之前网页对话只有一份内存历史：主程序一重启就全丢（交接文档
  * 「已知取舍」里的头一条）。这个模块把会话变成可管理的档案：
  *
- * - 每个会话 {id,title,createdAt,updatedAt,messages[]}，标题自动取
- *   第一条提问的截断；第一条消息发出时才建档（不留空壳会话）
+ * - 每个会话 {id,title,createdAt,updatedAt,messages[]}，标题先取
+ *   第一条提问的截断兜底，随后由模型命名覆盖（人工改名优先级最高）；
+ *   第一条消息发出时才建档（不留空壳会话）
  * - 每轮完整问答原子写盘，重启不丢；中断/失败的半截照旧不进历史
  * - 给 Agent 的上下文取最后 CONTEXT_WINDOW 条（语义同旧 MAX_HISTORY）
  * - 会话数、单会话消息数都有上限，防文件无限膨胀
@@ -46,6 +47,8 @@ export interface StoredMessage {
 export interface ChatSession {
   id: string;
   title: string;
+  /** 标题已定（人工改名或模型命名过）：此后不再被自动命名覆盖 */
+  titleSet?: boolean;
   pinned?: boolean;
   createdAt: number;
   updatedAt: number;
@@ -105,7 +108,7 @@ function writeSessions(list: ChatSession[]): void {
 const byRecent = (a: ChatSession, b: ChatSession): number =>
   Number(!!b.pinned) - Number(!!a.pinned) || b.updatedAt - a.updatedAt;
 
-/** 一行标题：首问压成空格并截断；渠道前缀（如「QQ」）拼在最前面 */
+/** 一行标题：压成空格并截断（24 字，侧栏两行内可见全）；渠道前缀（如「QQ」）拼在最前面 */
 function titleOf(text: string, prefix?: string): string {
   const flat = text.replace(/\s+/g, " ").trim();
   const topic = flat.length > 24 ? `${flat.slice(0, 24)}…` : flat;
@@ -156,6 +159,7 @@ export function updateSession(
     const title = titleOf(patch.title);
     if (!title) return null;
     session.title = title;
+    session.titleSet = true; // 人工命名优先级最高，自动命名从此让位
   }
   if (typeof patch.pinned === "boolean") session.pinned = patch.pinned;
   writeSessions(list.sort(byRecent));
@@ -205,6 +209,22 @@ export function appendRound(
   }
   s.updatedAt = now;
   writeSessions(list.sort(byRecent).slice(0, MAX_SESSIONS));
+}
+
+/**
+ * 模型命名写入：只在会话尚未定题（titleSet 未置）时生效。
+ * 兜底规则：agent 还没就绪、命名失败或返回空时，标题保持「首问截断」，
+ * 绝不静默清空已有标题；置顶过的会话同样尊重 titleSet。
+ */
+export function setAutoTitle(id: string, title: string): ChatSession | null {
+  const list = readSessions();
+  const s = list.find((x) => x.id === id);
+  if (!s || s.titleSet) return null;
+  const t = titleOf(title);
+  if (!t) return null;
+  s.title = t;
+  writeSessions(list.sort(byRecent));
+  return s;
 }
 
 /** 本轮发给 Agent 的上下文：最后 CONTEXT_WINDOW 条，转 ModelMessage 形状。

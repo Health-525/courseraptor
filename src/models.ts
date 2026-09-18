@@ -1,7 +1,7 @@
 /**
  * DeepSeek 模型清单与选择校验
  *
- * 「账号与模型」里的模型下拉不能凭空写死：DeepSeek 会换型号 id——V4.1 上线
+ * 「设置」里的模型下拉不能凭空写死：DeepSeek 会换型号 id——V4.1 上线
  * 时退役了 V4 Flash 系列（deepseek-v4-flash / -flash-vision-exp 改由 V4.1-
  * Flash 兼容承接），deepseek-chat / deepseek-reasoner 旧别名更已于 2026-07-24
  * 停用。所以清单以 `GET {base}/models` 的实时结果为准（OpenAI 兼容，取
@@ -243,7 +243,7 @@ export function resolveModelDrift(current: string, liveIds: string[]): ModelDrif
   return {
     model: target,
     migrated: true,
-    message: `模型 ${describeModel(current).label}（${current}）已不在服务可用清单中，已自动切换到 ${describeModel(target).label}（${target}）。可在「账号与模型」里改选其他型号。`,
+    message: `模型 ${describeModel(current).label}（${current}）已不在服务可用清单中，已自动切换到 ${describeModel(target).label}（${target}）。可在「设置」里改选其他型号。`,
   };
 }
 

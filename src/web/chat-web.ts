@@ -29,6 +29,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ModelMessage } from "ai";
 import { attachmentStats, clearAttachments } from "../attachment-store";
+import { type AttachmentResult, openLocalFile } from "../attachments";
 import {
   appendRound,
   contextMessages,
@@ -38,6 +39,7 @@ import {
   listSessions,
   readSessions,
   resetAll,
+  setAutoTitle,
   updateSession,
 } from "../chat-sessions";
 import { config } from "../config";
@@ -51,10 +53,16 @@ import {
   listModelOptions,
   validateModelChoice,
 } from "../models";
-import { getDeepSeekKeyStatus, setDeepSeekApiKey } from "../onboarding";
+import {
+  getDeepSeekKeyStatus,
+  getQQBotStatus,
+  setDeepSeekApiKey,
+  setQQBotCredentials,
+} from "../onboarding";
 import { getCookie } from "../tools/session";
 import { chatPage } from "./chat-page";
 import { knowledgePage } from "./knowledge-page";
+import { buildTitlePrompt, cleanTitle, type TitleMaker } from "./session-titles";
 import { buildTodayBrief } from "./today-brief";
 import { todayPage } from "./today-page";
 import {
@@ -117,6 +125,35 @@ export function setChatAgentRefresher(refresh: () => Promise<void>): void {
   agentRefresher = refresh;
 }
 
+// ── 会话自动命名：落盘后让模型把「首问截断」换成像样的标题 ──────
+
+/** 主程序注入的真实命名实现；null 时（测试/agent 未装配）自动命名静默关闭 */
+let titleMaker: TitleMaker | null = null;
+
+export function setTitleMaker(maker: TitleMaker | null): void {
+  titleMaker = maker;
+}
+
+/**
+ * 一轮完整落盘后调用：会话尚未定题（titleSet 未置）才交给模型命名。
+ * 尽力而为——maker 缺席、联网失败、输出不合形状都直接放弃，标题保持
+ * 首问兜底，绝不影响对话主流程，也不抛错打断落盘链。
+ */
+async function maybeAutoTitle(sessionId: string): Promise<void> {
+  if (!titleMaker) return;
+  try {
+    const s = getSession(sessionId);
+    if (!s || s.titleSet || !s.messages.length) return;
+    const raw = await titleMaker({
+      messages: s.messages.map(({ role, text }) => ({ role, text })),
+    });
+    const title = cleanTitle(raw);
+    if (title) setAutoTitle(sessionId, title);
+  } catch {
+    // 命名失败无关紧要：兜底标题还在
+  }
+}
+
 /** 重建串行链：连续保存两次模型也不会并发建两个 agent */
 let refreshChain: Promise<string> = Promise.resolve("");
 
@@ -160,6 +197,41 @@ async function doStart(): Promise<string | null> {
     }
   }
   return null;
+}
+
+// ── QQ 凭证保存后的桥热启动 ─────────────────────────────────
+
+/** 返回追加到保存结果里的说明文案；测试可注入替身避免真实连 QQ */
+export type QQBridgeLauncher = () => Promise<string>;
+
+let qqBridgeLauncher: QQBridgeLauncher | null = null;
+
+/** 测试注入用：替换默认的桥热启动实现 */
+export function setQQBridgeLauncher(fn: QQBridgeLauncher | null): void {
+  qqBridgeLauncher = fn;
+}
+
+/** 未在跑则拉起；已在跑则沿用启动时的凭证（重启后切换），失败如实说明 */
+async function defaultQQBridgeLauncher(): Promise<string> {
+  const { isQQBridgeOnline, startQQBridge } = await import("../qq/bridge");
+  if (isQQBridgeOnline()) {
+    return "；QQ 桥已在线（沿用启动时的凭证），重启 raptor 后切换为新凭证";
+  }
+  try {
+    const { createQQFileLogger } = await import("../qq/logger");
+    // 20 秒没连上就先回话：桥后台继续尝试，凭证已加密保存
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("连接超时（20 秒）")), 20_000);
+    });
+    await Promise.race([startQQBridge({ logger: createQQFileLogger() }), timeout]);
+    return "；QQ 桥已拉起，到 QQ 里给机器人发激活暗号即可开始使用";
+  } catch (error) {
+    return `；QQ 桥拉起失败：${oneLine(error instanceof Error ? error.message : String(error), 120)}。凭证已保存，可稍后重启 raptor 重试`;
+  }
+}
+
+async function maybeStartQQBridge(): Promise<string> {
+  return (qqBridgeLauncher ?? defaultQQBridgeLauncher)();
 }
 
 // ── 轮次串行化 ──────────────────────────────────────────────
@@ -447,6 +519,7 @@ const SOURCE_LABEL: Record<string, string> = {
 /** 给设置弹窗的状态：只有脱敏摘要，永远不回显密码与完整 Key */
 function settingsPayload() {
   const ds = getDeepSeekKeyStatus();
+  const qq = getQQBotStatus();
   return {
     jwgl: {
       configured: !!(config.jwglUsername && config.jwglPassword),
@@ -454,6 +527,7 @@ function settingsPayload() {
       sourceLabel: SOURCE_LABEL[config.credentialsSource] ?? config.credentialsSource,
     },
     deepseek: { ...ds, sourceLabel: SOURCE_LABEL[ds.source] ?? ds.source },
+    qq: { ...qq, sourceLabel: SOURCE_LABEL[qq.source] ?? qq.source },
     model: config.model,
     /** 下拉候选：只读同步缓存/兜底清单，联网刷新走 GET /api/models，别卡住弹窗 */
     models: cachedModelOptions(),
@@ -586,6 +660,18 @@ function applySettings(body: Record<string, unknown>): {
     results.push({ field: "apiKey", ok: r.ok, message: r.message.replace(/^[✅❌]\s*/, "") });
     // 可用型号跟 Key 走：换 Key 后旧清单作废，下次打开弹窗重新拉
     if (r.ok) invalidateModelCache();
+  }
+  const qqPatch: { appId?: string; appSecret?: string; passcode?: string } = {};
+  if (typeof body.qqAppId === "string" && body.qqAppId.trim()) qqPatch.appId = body.qqAppId.trim();
+  if (typeof body.qqAppSecret === "string" && body.qqAppSecret.trim()) {
+    qqPatch.appSecret = body.qqAppSecret.trim();
+  }
+  if (typeof body.qqPasscode === "string" && body.qqPasscode.trim()) {
+    qqPatch.passcode = body.qqPasscode.trim();
+  }
+  if (qqPatch.appId || qqPatch.appSecret || qqPatch.passcode) {
+    const r = setQQBotCredentials(qqPatch);
+    results.push({ field: "qq", ok: r.ok, message: r.message.replace(/^[✅❌]\s*/, "") });
   }
   let modelChanged = false;
   const requestedModel = typeof body.model === "string" ? body.model.trim() : "";
@@ -796,6 +882,11 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         const line = r.results.find((item) => item.field === "model");
         if (line) line.message += note;
       }
+      // QQ 凭证保存成功且已凑齐：顺手把桥拉起来（未在跑时），不用等重启
+      const qqLine = r.results.find((item) => item.field === "qq");
+      if (r.ok && qqLine?.ok && config.qqBotAppId && config.qqBotAppSecret) {
+        qqLine.message += await maybeStartQQBridge();
+      }
       json(res, r, r.ok ? 200 : 400);
       return;
     }
@@ -989,6 +1080,52 @@ async function handleChat(req: http.IncomingMessage, res: http.ServerResponse) {
   await prev;
 }
 
+/**
+ * 把一个已解析的附件渲染成注入模型的文本块。
+ * 小文件给全文（agent 无需再调工具即可回答），大文件给概览 + id
+ * （agent 拿着 id 直接做精准的 query_table / 续读，省一轮试错）。
+ */
+function attachmentDigest(result: AttachmentResult, name: string, storedPath: string): string {
+  const head = `[附件：${name}；本机路径：${storedPath}]`;
+  if (result.mode === "text") {
+    const lead = `解析成功（${result.format}，全文 ${result.charCount} 字符）`;
+    if (!result.hasMore) return `${head}\n${lead}，全文如下：\n${result.text}`;
+    return `${head}\n${lead}。以下是前 ${result.text.length} 字符，剩余用 read_local_file(path, offset=${result.nextOffset}) 续读，或用 keyword 参数定位：\n${result.text}`;
+  }
+  if (result.mode === "table") {
+    const sheets = result.sheets
+      .map(
+        (s) =>
+          `sheet「${s.name}」：${s.dataRows} 行 × ${s.cols} 列\n${s.preview.join("\n")}${s.moreRows ? `\n（还有 ${s.moreRows} 行未展示）` : ""}`,
+      )
+      .join("\n");
+    return `${head}\n表格（${result.format}，共 ${result.totalDataRows} 数据行），缓存 id=${result.id}。概览：\n${sheets}\n后续用 query_table(id="${result.id}") 按条件筛选，不要试图通读全表。`;
+  }
+  if (result.mode === "search")
+    return `${head}\n（关键词视图，命中 ${result.matchCount} 处）\n${result.matches.join("\n")}`;
+  // file 模式（不支持解析的格式）：如实告知，路径仍给 agent 备用
+  if (result.mode === "file")
+    return `${head}\n该格式暂不支持自动解析，已存副本（${result.size} 字节）。`;
+  return `${head}\n（内容已由云解析兜底，见 markdown）`;
+}
+
+/** 发消息前把本轮上传预解析成小型文本块，直接注入模型上下文 */
+async function preparseUploads(uploads: WebUpload[]): Promise<string> {
+  if (!uploads.length) return "";
+  const blocks: string[] = [];
+  for (const upload of uploads) {
+    try {
+      const result = await openLocalFile(upload.storedPath);
+      blocks.push(attachmentDigest(result, upload.name, upload.storedPath));
+    } catch (e) {
+      blocks.push(
+        `[附件：${upload.name}；本机路径：${upload.storedPath}]\n预解析失败（${(e as Error).message.slice(0, 120)}），请用 read_local_file 读取。`,
+      );
+    }
+  }
+  return `\n\n${blocks.join("\n\n")}\n以上附件内容已预先解析注入。小文件可直接基于内容回答；大表格/长文按各块内指引用工具按需取数。`;
+}
+
 async function runTurn(
   agent: ChatStreamableAgent,
   sessionId: string,
@@ -997,11 +1134,8 @@ async function runTurn(
   send: (obj: unknown) => void,
   signal: AbortSignal,
 ): Promise<void> {
-  const attachmentContext = uploads.length
-    ? `\n\n${uploads
-        .map((upload) => `[用户通过网页上传附件：${upload.name}；本机路径：${upload.storedPath}]`)
-        .join("\n")}\n请按用户问题读取所需附件，不要假设附件内容。`
-    : "";
+  // 预解析注入：agent 不必先调一次 read_local_file 才知道文件里是什么
+  const attachmentContext = await preparseUploads(uploads);
   const messages: ModelMessage[] = [
     ...contextMessages(sessionId),
     { role: "user", content: message + attachmentContext },
@@ -1104,6 +1238,8 @@ async function runTurn(
     appendRound(sessionId, message, text.trim() ? text : null, think.trim() || null, {
       attachments: uploads.map(({ id, name, storedPath }) => ({ id, name, storedPath })),
     });
+    // 落盘后顺手让模型给会话定个像样的标题（首轮触发一次即定题）
+    await maybeAutoTitle(sessionId);
   }
 }
 

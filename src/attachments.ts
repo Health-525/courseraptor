@@ -26,6 +26,7 @@ import {
 } from "./attachment-store";
 import { config } from "./config";
 import { isTableFilename, loadWorkbook, sheetOverview, type TableSheet } from "./spreadsheet";
+import { decodeTextBuffer } from "./text-decode";
 
 const require = createRequire(import.meta.url);
 const FIRECRAWL_API = "https://api.firecrawl.dev/v1/scrape";
@@ -97,9 +98,46 @@ export interface AnalyzeOpts {
 
 // ── 本地解析 ──────────────────────────────────────────────────
 
-const TEXT_EXT_RE = /\.(docx|pdf|txt|md|log|json|html?)$/i;
+const TEXT_EXT_RE = /\.(docx|pdf|pptx|txt|md|log|json|html?)$/i;
 
-/** docx/pdf 抽全文；txt/md 等直接解码。解析不出内容返回 null */
+/** XML 实体还原（顺序固定：&amp; 必须最后，否则会二次还原） */
+function unescapeXml(s: string): string {
+  return s
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, d: string) => String.fromCodePoint(Number(d)))
+    .replace(/&amp;/g, "&");
+}
+
+/**
+ * pptx 抽正文：pptx = zip，幻灯片正文是 ppt/slides/slideN.xml 里的 <a:t> 文本段。
+ * pptxgenjs 生成、Office 另存的都吃这个结构；按自然页序拼段。
+ */
+async function extractPptxText(buf: Buffer): Promise<string> {
+  const JSZip = require("jszip") as typeof import("jszip");
+  const zip = await JSZip.loadAsync(buf);
+  const slideNo = (name: string) => Number(name.match(/slide(\d+)\.xml$/)?.[1] ?? 0);
+  const names = Object.keys(zip.files)
+    .filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+    .sort((a, b) => slideNo(a) - slideNo(b));
+  const slides: string[] = [];
+  for (const name of names) {
+    const xml = await zip.file(name)?.async("string");
+    if (!xml) continue;
+    // 一个 <a:p> 是一个段落：段内文本段直接拼接，段落间换行
+    const text = xml
+      .split(/<\/a:p>/)
+      .map((p) => [...p.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => unescapeXml(m[1])).join(""))
+      .filter((t) => t.trim())
+      .join("\n");
+    if (text) slides.push(text);
+  }
+  return slides.join("\n\n");
+}
+
+/** docx/pdf/pptx 抽全文；txt/md 等直接解码。解析不出内容返回 null */
 async function extractText(
   buf: Buffer,
   filename: string,
@@ -120,8 +158,13 @@ async function extractText(
       const r = await mammoth.extractRawText({ buffer: buf });
       return { format: "docx", text: r.value };
     }
+    if (ext === "pptx") {
+      const text = await extractPptxText(buf);
+      return text.trim() ? { format: "pptx", text } : null;
+    }
     if (TEXT_EXT_RE.test(filename)) {
-      return { format: ext, text: buf.toString("utf8") };
+      // GBK/GB2312 老文件在这里被救回来（详见 text-decode.ts）
+      return { format: ext, text: decodeTextBuffer(buf) };
     }
     return null;
   } catch {
@@ -204,6 +247,7 @@ async function analyzeBuffer(
   filename: string,
   source: { type: "url"; url: string } | { type: "local"; path: string },
   opts: AnalyzeOpts,
+  extra?: { mtimeMs?: number },
 ): Promise<AttachmentResult> {
   const id =
     source.type === "url"
@@ -216,7 +260,7 @@ async function analyzeBuffer(
   const register = (
     input: Omit<Parameters<typeof putAttachment>[0], "id">,
   ): Promise<AttachmentMeta> =>
-    reused ? Promise.resolve(reused) : putAttachment({ id, ...input });
+    reused ? Promise.resolve(reused) : putAttachment({ id, mtimeMs: extra?.mtimeMs, ...input });
 
   // 1) 表格：结构化概览（默认只给每 sheet 表头 + 前 15 行，读不完是设计而非事故）
   if (isTableFilename(filename)) {
@@ -526,10 +570,15 @@ export async function openLocalFile(
   const filename = path.basename(abs);
   const source = { type: "local", path: abs } as const;
 
-  // 缓存命中且体积未变 = 文件没动过；refresh 或体积变化都重新入缓存
+  // 缓存命中且体积与 mtime 都没变 = 文件没动过；refresh、体积或 mtime 变化都重新入缓存
+  // （只看体积会被「同长度改内容」骗过：mtime 补上这个洞）
   if (!opts.refresh) {
     const cached = findByLocalPath(abs);
-    if (cached && cached.size === stat.size) {
+    if (
+      cached &&
+      cached.size === stat.size &&
+      (cached.mtimeMs == null || cached.mtimeMs === stat.mtimeMs)
+    ) {
       const buf = readStoredBuffer(cached.id);
       if (buf) {
         touchAttachment(cached.id);
@@ -538,7 +587,7 @@ export async function openLocalFile(
     }
   }
   const buf = await fs.readFile(abs);
-  return analyzeBuffer(buf, filename, source, opts);
+  return analyzeBuffer(buf, filename, source, opts, { mtimeMs: stat.mtimeMs });
 }
 
 /** 从缓存按 id 重新出视图（query_table / 续读用，不重新下载） */
