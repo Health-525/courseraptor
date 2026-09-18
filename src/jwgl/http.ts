@@ -210,7 +210,8 @@ export function httpFailure(resp: HttpResponse): string | null {
 }
 
 /** 统一的抓取结果：ok=false 时必须把 error 如实上报给模型，不许降级成空列表 */
-export type FetchResult<T> = { ok: true; data: T } | { ok: false; error: string };
+import type { FetchResult } from "../fetch-result";
+export type { FetchResult };
 
 /**
  * 抓取 + 解析的通用包装：传输失败直接短路，解析失败也区分成因。

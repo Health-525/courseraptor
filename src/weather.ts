@@ -17,8 +17,7 @@
  *    注入，坏网/超时/查无此城的分支都不用联网也能测。
  */
 
-import { BASE as JWGL_BASE } from "./jwgl/auth";
-import type { FetchResult } from "./jwgl/http";
+import type { FetchResult } from "./fetch-result";
 
 const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
@@ -52,7 +51,7 @@ const SCHOOL_CITY: Record<string, string> = {
 };
 
 /** 学校所在城市。主机名没登记时仍退回南京——当前只有 NJTECH 一套教务 */
-export function defaultWeatherCity(jwglBase: string = JWGL_BASE): string {
+export function defaultWeatherCity(jwglBase: string): string {
   const host = jwglBase.replace(/^https?:\/\//, "").split("/")[0];
   return SCHOOL_CITY[host] ?? "南京";
 }
