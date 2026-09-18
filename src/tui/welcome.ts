@@ -5,6 +5,7 @@
  * 任何一段失败只降级那一段的文案，不影响其他段和正常对话。
  */
 
+import { config } from "../config";
 import {
   expandWeeks,
   fetchScheduleSmart,
@@ -136,6 +137,12 @@ async function refreshSchedule() {
   const cached = loadScheduleCache();
   if (cached) {
     renderSchedule(cached.schedule);
+    return;
+  }
+  // 没配教务账号（首次引导被跳过）就不去撞登录接口，直接给补填指引
+  if (!config.jwglUsername || !config.jwglPassword) {
+    panel.scheduleLines = [dim("  尚未配置教务账号；网页「设置 → 教务账号」里补填后即可查课表")];
+    render();
     return;
   }
   try {

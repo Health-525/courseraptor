@@ -8,6 +8,7 @@
  */
 
 import { createRequire } from "node:module";
+import { decodeTextBuffer } from "./text-decode";
 
 const require = createRequire(import.meta.url);
 
@@ -40,7 +41,7 @@ export function loadWorkbook(buf: Buffer, filename: string): TableSheet[] | null
   try {
     const XLSX = require2("xlsx") as typeof import("xlsx");
     // csv/tsv 是纯文本：SheetJS 对 buffer 默认按 latin1 解码，中文必挂，
-    // 先自己按 utf8 解开再喂给 string 模式
+    // 先自己解成字符串再喂给 string 模式（GBK 老文件也在这里被救回来）
     const isText = /\.(csv|tsv)$/i.test(filename);
     if (!isText) {
       // SheetJS 对垃圾字节会宽容解析成单格表（测试实测），先验格式魔数：
@@ -51,7 +52,7 @@ export function loadWorkbook(buf: Buffer, filename: string): TableSheet[] | null
       if (!zip && !ole) return null;
     }
     const wb = isText
-      ? XLSX.read(buf.toString("utf8").replace(/^\uFEFF/, ""), { type: "string" })
+      ? XLSX.read(decodeTextBuffer(buf), { type: "string" })
       : XLSX.read(buf, { type: "buffer" });
     const sheets: TableSheet[] = [];
     for (const name of wb.SheetNames) {

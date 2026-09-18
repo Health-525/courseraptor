@@ -164,12 +164,29 @@ export function archiveQQRound(
 
 // ── 主流程 ────────────────────────────────────────────────────
 
-export async function startQQBridge(opts: { logger?: BridgeLogger } = {}): Promise<void> {
+/** 桥是否已连上（设置面板保存凭证后据此决定是热拉起还是提示重启切换） */
+let bridgeOnline = false;
+/** 进行中的启动：连点保存/多处触发也只连一次 WebSocket */
+let bridgeStarting: Promise<void> | null = null;
+
+export function isQQBridgeOnline(): boolean {
+  return bridgeOnline;
+}
+
+export function startQQBridge(opts: { logger?: BridgeLogger } = {}): Promise<void> {
+  bridgeStarting ??= launchQQBridge(opts).finally(() => {
+    bridgeStarting = null;
+  });
+  return bridgeStarting;
+}
+
+async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
   const log = opts.logger ?? console;
 
+  if (bridgeOnline) return;
   if (!config.qqBotAppId || !config.qqBotAppSecret) {
     throw new Error(
-      "缺少 QQ 机器人配置：请在 .env 填写 QQBOT_APP_ID / QQBOT_APP_SECRET（q.qq.com 开放平台获取）",
+      "缺少 QQ 机器人配置：请在 .env 或网页「设置」里填写 QQBOT_APP_ID / QQBOT_APP_SECRET（q.qq.com 开放平台获取）",
     );
   }
   await loadAllowlist();
@@ -210,7 +227,7 @@ export async function startQQBridge(opts: { logger?: BridgeLogger } = {}): Promi
         rejectedNotified.add(senderId);
         await bot.sendText(
           msg.replyTarget,
-          "⛔ 未授权。首次使用请发送激活暗号（管理员在 .env 的 QQBOT_PASSCODE 中设置）。",
+          "⛔ 未授权。首次使用请发送激活暗号（管理员在 .env 或网页「设置」里设置）。",
         );
       }
       return;
@@ -271,6 +288,7 @@ export async function startQQBridge(opts: { logger?: BridgeLogger } = {}): Promi
   });
 
   await bot.start();
+  bridgeOnline = true;
   log.log("🦖 CourseRaptor QQ 桥已启动（官方机器人 · WebSocket）");
   log.log(`已授权用户：${allowedOpenids.size} 个（暗号激活：发送 QQBOT_PASSCODE）`);
 
@@ -305,7 +323,10 @@ export interface StandaloneQQDependencies {
 /** 独立 QQ 入口与主程序共用相同的授权前置条件。 */
 export async function startStandaloneQQ(
   dependencies: StandaloneQQDependencies = {
-    ensureCredentials,
+    // 引导现在可跳过（返回 configured/skipped）；桥只关心流程走完与否
+    ensureCredentials: async () => {
+      await ensureCredentials();
+    },
     startBridge: () => startQQBridge(),
   },
 ): Promise<void> {

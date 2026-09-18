@@ -52,7 +52,7 @@ The demo uses **fictional data and scripted responses**. It does not read person
 
 ## Use your own academic account
 
-Run `npm start`, or double-click `start.bat` on Windows. Follow the prompts to configure your own university credentials and DeepSeek API key. Provider API usage may incur charges.
+Run `npm start`, or double-click `start.bat` on Windows. Follow the prompts to configure your own university credentials and DeepSeek API key. You can also skip the campus account with an empty Enter and fill it in later via the web Settings panel. Provider API usage may incur charges.
 
 The browser UI usually runs at `http://localhost:3210`; follow the actual startup address if that port is busy. Keep the terminal running. To change your API key securely, enter `/key` without arguments in the terminal.
 

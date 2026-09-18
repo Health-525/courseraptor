@@ -33,8 +33,48 @@ export interface RaptorConfig {
   qqBotAppId?: string;
   qqBotAppSecret?: string;
   qqBotPasscode?: string;
+  /** QQ 凭证来源（诊断用）；「完整可用」指 AppID 与 AppSecret 都在 */
+  qqBotSource: QQBotSource;
   /** 抢课功能开关（选课季设为 1 才暴露抢课/盯课工具，平时关闭回到日常对话） */
   enableGrab: boolean;
+}
+
+export type QQBotSource = "env" | "encrypted" | "unset";
+
+export interface ResolvedQQBotCredentials {
+  appId?: string;
+  appSecret?: string;
+  passcode?: string;
+  source: QQBotSource;
+}
+
+/** QQ 凭证解析：.env 优先（与教务账号同规则），缺失时回退加密存储 */
+export function resolveQQBotCredentials(input: {
+  environmentAppId?: string;
+  environmentAppSecret?: string;
+  environmentPasscode?: string;
+  storedAppId?: string;
+  storedAppSecret?: string;
+  storedPasscode?: string;
+}): ResolvedQQBotCredentials {
+  const passcode = input.environmentPasscode || input.storedPasscode;
+  if (input.environmentAppId && input.environmentAppSecret) {
+    return {
+      appId: input.environmentAppId,
+      appSecret: input.environmentAppSecret,
+      passcode,
+      source: "env",
+    };
+  }
+  if (input.storedAppId && input.storedAppSecret) {
+    return {
+      appId: input.storedAppId,
+      appSecret: input.storedAppSecret,
+      passcode,
+      source: "encrypted",
+    };
+  }
+  return { passcode, source: "unset" };
 }
 
 export interface ResolvedDeepSeekApiKey {
@@ -90,6 +130,15 @@ function loadConfig(): RaptorConfig {
   });
   if (resolvedKey.key) process.env.DEEPSEEK_API_KEY = resolvedKey.key;
 
+  const resolvedQQ = resolveQQBotCredentials({
+    environmentAppId: env("QQBOT_APP_ID"),
+    environmentAppSecret: env("QQBOT_APP_SECRET"),
+    environmentPasscode: env("QQBOT_PASSCODE"),
+    storedAppId: stored?.qqBotAppId,
+    storedAppSecret: stored?.qqBotAppSecret,
+    storedPasscode: stored?.qqBotPasscode,
+  });
+
   const config: RaptorConfig = {
     deepseekApiKey: resolvedKey.key,
     deepseekApiKeySource: resolvedKey.source,
@@ -105,9 +154,10 @@ function loadConfig(): RaptorConfig {
     firecrawlApiKey: env("FIRECRAWL_API_KEY"),
     githubToken: env("GITHUB_TOKEN"),
     giteeToken: env("GITEE_TOKEN"),
-    qqBotAppId: env("QQBOT_APP_ID"),
-    qqBotAppSecret: env("QQBOT_APP_SECRET"),
-    qqBotPasscode: env("QQBOT_PASSCODE"),
+    qqBotAppId: resolvedQQ.appId,
+    qqBotAppSecret: resolvedQQ.appSecret,
+    qqBotPasscode: resolvedQQ.passcode,
+    qqBotSource: resolvedQQ.source,
     enableGrab: env("RAPTOR_ENABLE_GRAB") === "1",
   };
 

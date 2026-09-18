@@ -120,14 +120,14 @@ test("QQ 一轮问答进历史：标题带渠道前缀，答失败那轮只留�
   assert.equal(second.count, 1, "失败轮只存提问");
 });
 
-test("建档标题只认首问：后续轮次不改名，超长首问按 24 字截断", () => {
-  const slot = qqArchiveSlot(c2c("C2C_LONG", "问".repeat(40)))!;
+test("建档标题只认首问：后续轮次不改名，超长首问按 40 字截断", () => {
+  const slot = qqArchiveSlot(c2c("C2C_LONG", "问".repeat(80)))!;
   S.appendRound(slot.id, slot.userText, "答一", null, { titlePrefix: slot.titlePrefix });
   S.appendRound(slot.id, "第二问", "答二", null, { titlePrefix: slot.titlePrefix });
   const s = S.getSession(slot.id);
   assert.ok(s);
   assert.equal(s.messages.length, 4);
-  assert.equal(s.title, `QQ｜${"问".repeat(24)}…`, "前缀 + 截断到 24 字");
+  assert.equal(s.title, `QQ｜${"问".repeat(40)}…`, "前缀 + 截断到 40 字");
 });
 
 test("QQ 档不串网页上下文：default 档读不到 QQ 的内容", () => {

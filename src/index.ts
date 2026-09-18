@@ -30,14 +30,18 @@ import { runUpdateCommand } from "./updater";
 // 更新检查先发出，与凭证加载/agent 构建并行跑，后面收结果
 const updatePromise = checkForUpdate();
 
-// 教务凭证缺失时引导录入（.env > credentials.enc 加密文件 > 首次引导）
+// 教务凭证缺失时引导录入（.env > credentials.enc 加密文件 > 首次引导）。
+// 引导可回车跳过：不配教务账号也能进入应用，之后在网页设置里补填。
 const needsJwglSetup = !(config.jwglUsername && config.jwglPassword);
-await ensureCredentials();
-if (needsJwglSetup) {
+const jwglSetup = await ensureCredentials();
+if (needsJwglSetup && jwglSetup === "configured") {
   console.log(
     "💡 下次打开 Raptor：直接双击安装包中的 start.bat，它会自动启动 CourseRaptor；查询教务信息时会自动登录，不必重新输入学号和密码。",
   );
   console.log("   如需更换账号，请删除安装目录中的 credentials.enc 后重新启动。\n");
+} else if (needsJwglSetup) {
+  console.log("💡 教务账号暂未配置：聊天、待办、通知、天气等功能不受影响。");
+  console.log("   需要查课表/成绩时，在网页对话窗口右上角「设置 → 教务账号」里补填即可。\n");
 } else if (config.credentialsSource === "encrypted") {
   console.log("🔐 已读取本机加密保存的教务账号；下次双击 start.bat 即可再次打开 Raptor。\n");
 }
@@ -87,11 +91,28 @@ if (config.qqBotAppId && config.qqBotAppSecret) {
 const agent = await createRaptorAgent();
 
 // 网页对话窗口：浏览器打开即聊（地址显示在欢迎卡片下方），起不来不影响终端
-const { setChatAgent, setChatAgentRefresher, startChatWeb } = await import("./web/chat-web");
+const { setChatAgent, setChatAgentRefresher, setTitleMaker, startChatWeb } = await import(
+  "./web/chat-web"
+);
 setChatAgent(agent);
 // 换模型即重建 agent 给网页用；终端 TUI 持有的是上面这个实例，重启后才用新模型
 setChatAgentRefresher(async () => {
   setChatAgent(await createRaptorAgent());
+});
+// 会话自动命名：直接调模型 API（不带工具），失败静默——标题还有首问兜底
+setTitleMaker(async (input) => {
+  const { generateText } = await import("ai");
+  const { createDeepSeek } = await import("@ai-sdk/deepseek");
+  const deepseek = createDeepSeek(
+    config.deepseekBaseUrl ? { baseURL: config.deepseekBaseUrl } : {},
+  );
+  const result = await generateText({
+    model: deepseek(config.model),
+    prompt: (await import("./web/session-titles")).buildTitlePrompt(input.messages),
+    maxOutputTokens: 30,
+    abortSignal: AbortSignal.timeout(15_000),
+  });
+  return result.text;
 });
 startChatWeb().catch(() => {});
 

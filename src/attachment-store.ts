@@ -50,6 +50,8 @@ export interface AttachmentMeta {
   storedPath: string;
   size: number;
   fetchedAt: string;
+  /** 本地文件最后修改时间（source=local 时；体积相同但改过内容也能识别为过期） */
+  mtimeMs?: number;
   /** 表格类：sheet 名列表（概览由表格引擎现算，这里只留结构线索） */
   sheetNames?: string[];
   /** 文本类：解析后全文字符数 */
@@ -126,6 +128,8 @@ export async function putAttachment(input: {
   source: "url" | "local";
   url?: string;
   originPath?: string;
+  /** 本地文件最后修改时间（source=local 时；体积相同但改过内容也能识别为过期） */
+  mtimeMs?: number;
   buf: Buffer;
   sheetNames?: string[];
   textLength?: number;
@@ -148,6 +152,7 @@ export async function putAttachment(input: {
     storedPath,
     size: input.buf.length,
     fetchedAt: new Date().toISOString(),
+    ...(input.mtimeMs != null ? { mtimeMs: input.mtimeMs } : {}),
     ...(input.sheetNames ? { sheetNames: input.sheetNames } : {}),
     ...(input.textLength != null ? { textLength: input.textLength } : {}),
     hits: 0,

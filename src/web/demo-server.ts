@@ -382,6 +382,7 @@ export function createDemoServer(): http.Server {
         json(res, {
           jwgl: { configured: false, username: "", sourceLabel: "演示模式" },
           deepseek: { configured: false, masked: "", sourceLabel: "演示模式" },
+          qq: { configured: false, passcodeSet: false, source: "unset", sourceLabel: "演示模式" },
           model: "离线固定回答",
           models: [],
         });
