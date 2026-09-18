@@ -4,11 +4,10 @@
  */
 
 import fs from "node:fs";
-import path from "node:path";
 
-import { PROJECT_ROOT } from "../config";
+import { migratedDataPath } from "../paths";
 
-const LOG_FILE = path.join(PROJECT_ROOT, "qq-bridge.log");
+const LOG_FILE = migratedDataPath("qq-bridge.log");
 const stream = fs.createWriteStream(LOG_FILE, { flags: "a" });
 
 export interface QQFileLogger {

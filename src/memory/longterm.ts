@@ -7,9 +7,8 @@
  */
 
 import fs from "node:fs/promises";
-import path from "node:path";
 import { quarantineCorruptFile, writeFileAtomic } from "../atomic-write";
-import { PROJECT_ROOT } from "../config";
+import { migratedDataPath } from "../paths";
 
 export interface MemoryEntry {
   id: string;
@@ -68,7 +67,7 @@ function isActive(e: MemoryEntry): boolean {
   return e.status !== "archived" && !isExpired(e);
 }
 
-const MEMORY_FILE = path.join(PROJECT_ROOT, "memory.json");
+const MEMORY_FILE = migratedDataPath("memory.json");
 const MAX_ENTRIES = 100;
 const MAX_PROMPT_CHARS = 4000;
 

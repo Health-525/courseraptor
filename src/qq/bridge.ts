@@ -29,7 +29,8 @@ import type { ModelMessage } from "ai";
 import { createRaptorAgent } from "../agent";
 import { quarantineCorruptFile, writeFileAtomic } from "../atomic-write";
 import { appendRound } from "../chat-sessions";
-import { config, PROJECT_ROOT } from "../config";
+import { config } from "../config";
+import { migratedDataPath } from "../paths";
 import { drainGeneratedRound, runInDocumentRound } from "../document/save";
 import { ensureCredentials } from "../onboarding";
 import { localOnlyCommandMessage } from "../tui/slash-menu";
@@ -68,7 +69,7 @@ async function deliverGeneratedFiles(
 
 // ── 授权：白名单 + 暗号激活 ────────────────────────────────────
 
-const ALLOWLIST_FILE = path.join(PROJECT_ROOT, "qq-allowlist.json");
+const ALLOWLIST_FILE = migratedDataPath("qq-allowlist.json");
 const allowedOpenids = new Set<string>();
 
 async function loadAllowlist(): Promise<void> {
