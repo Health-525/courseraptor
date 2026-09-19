@@ -838,10 +838,14 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
     fs.writeFileSync(f, code, "utf8");
     execFileSync(process.execPath, ["--check", f], { stdio: "pipe" });
   });
-  // 聊天页三处入口：侧栏按钮、首屏链接、窄屏顶栏
+  // 聊天页入口已收敛为「功能大厅」：侧栏与窄屏顶栏各一个按钮，完整页由面板内链接承接
   const chat = await (await fetch(url)).text();
-  assert.match(chat, /href="\/today"[^>]*>今日日程</, "侧栏应有今日日程入口");
-  assert.match(chat, /href="\/today"[^>]*>今日</, "移动顶栏应有今日入口");
+  assert.match(chat, /id="openHall"[^>]*>功能大厅</, "侧栏应有功能大厅入口");
+  assert.match(chat, /id="openHallM"[^>]*>大厅</, "移动顶栏应有功能大厅入口");
+  assert.match(chat, /class="hall" id="hall"/, "功能大厅抽屉应存在");
+  assert.match(chat, /today: \(\) => briefOf\(\)\.then\(buildToday\)/, "面板注册表应包含今日日程");
+  assert.match(chat, /const TOOL_PANEL = \{/, "应有工具→面板联动映射");
+  assert.match(chat, /get_schedule: "schedule"/, "课表工具应联动课表面板");
   assert.ok(
     !chat.includes("看今日日程：下一节课在哪 · 今天还有什么"),
     "首屏不应再展示今日日程 chip",
