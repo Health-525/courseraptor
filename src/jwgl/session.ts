@@ -11,10 +11,13 @@ const RETRY_MAX = 5;
 
 // ── 普通登录 cookie（课表/成绩/考试用）────────────────────────
 
-/** 教务功能前置检查：没配账号时直接给可操作的提示，而不是拿 undefined 去撞登录接口 */
+/** 教务功能前置检查：没配账号时直接给可操作的提示，而不是拿 undefined 去撞登录接口。
+    文案命中 chat-web 的 NEED_SETUP_RE：网页端会据此自动弹出设置面板 */
 function requireJwglCredentials(): void {
   if (!config.jwglUsername || !config.jwglPassword) {
-    throw new Error("尚未配置教务账号：请在网页对话窗口「设置 → 教务账号」里填写学号和密码后重试");
+    throw new Error(
+      "尚未配置教务账号：请在设置面板里填写学号和密码（网页端我已自动为你打开）后重试",
+    );
   }
 }
 

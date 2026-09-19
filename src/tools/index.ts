@@ -1,6 +1,6 @@
 /**
  * CourseRaptor agent 工具集（聚合层）
- * 32 个工具按领域拆分到独立模块，本文件只负责合并与抢课开关过滤。
+ * 33 个工具按领域拆分到独立模块，本文件只负责合并与抢课开关过滤。
  *
  * 模块划分：
  * - schedule.ts        课表 / 校历（2）
@@ -31,6 +31,7 @@ import { newsTools } from "./news";
 import { pomodoroTools } from "./pomodoro";
 import { reminderTools } from "./reminders";
 import { scheduleTools } from "./schedule";
+import { settingsTools } from "./settings";
 import { studentTools } from "./student";
 import { timeTools } from "./time";
 import { weatherTools } from "./weather";
@@ -47,6 +48,7 @@ const raptorToolsAll = {
   ...reminderTools,
   ...knowledgeTools,
   ...pomodoroTools,
+  ...settingsTools,
   ...weatherTools,
   ...timeTools,
   ...calendarTools,

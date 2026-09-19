@@ -1814,6 +1814,8 @@ const TOOL_PANEL = {
   manage_todos: "todos",
   manage_knowledge: "knowledge",
   manage_pomodoro: "pomodoro",
+  /* agent 自己请求打开设置（用户说「打开设置/我要配账号」） */
+  open_settings: "settings",
 };
 
 
@@ -2246,12 +2248,15 @@ async function send(text) {
             toolDone(shell, ev, ev.phase === "end");
             if (ev.files && ev.files.length) fileRows(shell.tl, ev.files);
             if (ev.pomodoro) pomoCard(shell.tl, ev.pomodoro);
-            /* 工具改了数据（加待办、起番茄钟……）：面板开着就刷新，没开着就作废缓存 */
+            /* 工具改了数据（加待办、起番茄钟……）：面板开着就刷新，没开着就作废缓存。
+               settings 是静态面板且工具失败也可能带它：只负责推出，不参与刷新 */
             const panel = TOOL_PANEL[ev.name];
-            if (panel) {
+            if (panel && panel !== "settings") {
               hallBrief = null;
               if (hallPanel === panel && document.body.classList.contains("hall-open")) renderHall();
             }
+            /* 工具因凭证未配置失败等服务端点名要设置：自动推出（本轮手动关过则不打扰） */
+            if (ev.panel && !hallAutoMuted) openHall(ev.panel, { focus: false });
           }
         } else if (ev.t === "err") {
           thinkClose(shell);
