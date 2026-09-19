@@ -6,6 +6,7 @@
  */
 
 import { config } from "../config";
+import { loadExamCache } from "../exam-cache";
 import {
   expandWeeks,
   fetchScheduleSmart,
@@ -44,6 +45,7 @@ const panel = {
   webUrl: null as string | null,
   scheduleLines: [dim("  正在登录教务系统…")],
   todoLines: [dim("  正在获取…")],
+  examLines: [dim("  正在获取…")],
   newsLines: [dim("  正在获取…")],
 };
 
@@ -59,6 +61,9 @@ function render() {
     "",
     header("一周内待办"),
     ...panel.todoLines,
+    "",
+    header("临近考试"),
+    ...panel.examLines,
     "",
     header("最新通知"),
     ...panel.newsLines,
@@ -78,6 +83,7 @@ async function bootstrap() {
   void refreshNews(); // 通知不依赖教务登录，并行先刷
   void refreshWebUrl(); // 网页版地址随本地服务起好后补进面板
   refreshTodos(); // 待办是本地数据，同步读
+  refreshExams(); // 考试是本地缓存，同步读
   await refreshSchedule();
 }
 
@@ -109,6 +115,48 @@ function refreshTodos() {
     }
   } catch {
     panel.todoLines = [dim("  待办读取失败（不影响使用）")];
+  }
+  render();
+}
+
+/** 临近考试：只读本地考试缓存（14 天窗口），学期对不上时如实说明不硬讲 */
+function refreshExams() {
+  try {
+    const cached = loadExamCache();
+    if (!cached) {
+      panel.examLines = [dim("  暂无考试数据，问一次考试安排即缓存")];
+      render();
+      return;
+    }
+    const term = loadScheduleCache()?.schedule;
+    if (term && (cached.exams.year !== term.year || cached.exams.semester !== term.semester)) {
+      panel.examLines = [dim("  考试缓存是旧学期的，问一次即刷新")];
+      render();
+      return;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const upcoming = cached.exams.exams.flatMap((e) => {
+      const m = String(e.date).match(/(20\d{2})-(\d{1,2})-(\d{1,2})/);
+      if (!m) return [];
+      const inDays = Math.round(
+        (new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() - today.getTime()) /
+          DAY_MS,
+      );
+      return inDays < 0 || inDays > 14 ? [] : [{ ...e, inDays }];
+    });
+    upcoming.sort((a, b) => a.inDays - b.inDays || a.subject.localeCompare(b.subject, "zh"));
+    if (!upcoming.length) {
+      panel.examLines = [dim("  14 天内没有考试安排")];
+      render();
+      return;
+    }
+    panel.examLines = upcoming.slice(0, 3).map((e) => {
+      const when = e.inDays === 0 ? "今天" : e.inDays === 1 ? "明天" : `还有 ${e.inDays} 天`;
+      return `• ${e.subject} ${dim(`· ${when}${e.location ? ` · ${e.location}` : ""}`)}`;
+    });
+  } catch {
+    panel.examLines = [dim("  考试读取失败（不影响使用）")];
   }
   render();
 }
