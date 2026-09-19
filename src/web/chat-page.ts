@@ -37,12 +37,16 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   /* 锁定整页：只有消息区能滚，输入/发送条永远钉在视口底部；
-     dvh 让移动端键盘弹出时底栏跟着抬进可见区而不是被顶出屏幕 */
-  body { margin: 0; display: grid; grid-template-columns: 284px 1fr;
+     dvh 让移动端键盘弹出时底栏跟着抬进可见区而不是被顶出屏幕。
+     第三列 0px 是功能大厅的坑位：打开时撑到 min(420px, 40vw)，
+     聊天主区被真实地往左推——不是浮层盖上来。 */
+  body { margin: 0; display: grid; grid-template-columns: 284px 1fr 0;
          height: 100vh; height: 100dvh; overflow: hidden;
          background: var(--paper); color: var(--ink);
          font-family: var(--sans); font-size: 16px; line-height: 1.7;
-         -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+         -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+         transition: grid-template-columns .24s ease; }
+  body.hall-open { grid-template-columns: 284px 1fr min(420px, 40vw); }
   ::selection { background: var(--accent-soft); }
   button, input, textarea { font-family: inherit; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -88,8 +92,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                      color: var(--accent-deep); font-weight: 600; }
   .mastbtns .tbtn.hall-btn:hover { background: var(--accent); border-color: transparent;
                            color: #fff; }
-  .foot-btn { flex: none; width: 100%; background: rgba(252, 251, 247, .48);
-              color: var(--ink-2); }
 
   /* 只有会话列表可以滚动；设置按钮固定在侧栏底部，不进入滚动区。
      滚动条默认隐去，指针进入列表或键盘焦点落在列表内时才显现。 */
@@ -546,17 +548,14 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .drawer-backdrop { display: none; position: fixed; inset: 0; z-index: 39;
                      background: rgba(38, 35, 29, .35); }
 
-  /* ── 功能大厅：从右侧 push 出来的抽屉。同一份 UI 服务两个入口：
-     侧栏按钮点击，或对话里触发对应工具时自动推出。 ── */
+  /* ── 功能大厅：占据正文网格的第三列，打开时把聊天区往左推（真 push）。
+     同一份 UI 服务两个入口：侧栏按钮点击，或对话里触发对应工具时自动推出。
+     窄屏（≤960px）推不动，退回右侧滑入的浮层 + 遮罩。 ── */
   .hall-backdrop { display: none; position: fixed; inset: 0; z-index: 44;
                    background: rgba(38, 35, 29, .35); }
-  .hall { position: fixed; top: 0; right: 0; bottom: 0; z-index: 45;
-          width: min(420px, 92vw); display: flex; flex-direction: column;
-          background: var(--paper); border-left: 1px solid var(--rule-2);
-          box-shadow: -14px 0 36px rgba(38, 35, 29, .2);
-          transform: translateX(103%); transition: transform .22s ease; }
-  body.hall-open .hall { transform: translateX(0); }
-  body.hall-open .hall-backdrop { display: block; }
+  .hall { grid-column: 3; min-width: 0; min-height: 0;
+          display: flex; flex-direction: column; overflow: hidden;
+          background: var(--paper); border-left: 1px solid var(--rule-2); }
   .hall-head { display: flex; align-items: center; gap: 10px; padding: 16px 22px 9px; }
   .hall-title { flex: 1; font-family: var(--kai); font-size: 22px;
                 color: var(--accent); letter-spacing: 3px; }
@@ -590,6 +589,27 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                    margin-top: 2px; }
   .hall-item.hot { border-left: 3px solid var(--accent); }
   .hall-item.hot .hm { color: var(--accent-deep); }
+  /* 大厅里的设置：抽屉不宽，栏目目录改横排（沿用窄屏设置的形态），
+     字段与检测行等内部样式原样复用 */
+  .hall .set-frame { flex-direction: column; gap: 0; }
+  .hall .set-tabs { flex-direction: row; width: auto; gap: 6px;
+                    overflow-x: auto; overflow-y: hidden;
+                    border-bottom: 1px solid var(--rule);
+                    padding: 0 0 10px; margin: 0 0 12px; }
+  .hall .set-tab { white-space: nowrap; border-left: 0;
+                   border-bottom: 2px solid transparent;
+                   border-radius: 4px 4px 0 0; padding: 6px 10px; }
+  .hall .set-tab.on { border-bottom-color: var(--accent); box-shadow: none; }
+  .hall .set-main { padding-right: 0; }
+  .hall #hallSettings .setmsg { margin: 10px 2px 0; }
+  .hall-settings-foot { display: flex; justify-content: flex-end; gap: 8px;
+                        margin-top: 12px; padding-top: 12px;
+                        border-top: 1px dashed var(--rule); }
+  .hall-settings-foot .tbtn.primary { background: var(--accent);
+                                      border-color: var(--accent); color: var(--card);
+                                      font-weight: 600; }
+  .hall-settings-foot .tbtn.primary:hover { background: var(--accent-deep);
+                                            border-color: var(--accent-deep); color: #fff; }
 
   #log::-webkit-scrollbar { width: 10px; }
   #log::-webkit-scrollbar-thumb {
@@ -612,6 +632,14 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 
   @media (max-width: 960px) {
     body { grid-template-columns: 1fr; }
+    /* 窄屏推不动主区：大厅退回右侧滑入的浮层 + 遮罩 */
+    body.hall-open { grid-template-columns: 1fr; }
+    .hall { position: fixed; top: 0; right: 0; bottom: 0; z-index: 45;
+            width: min(420px, 92vw); transform: translateX(103%);
+            transition: transform .2s ease;
+            box-shadow: -14px 0 36px rgba(38, 35, 29, .2); }
+    body.hall-open .hall { transform: translateX(0); }
+    body.hall-open .hall-backdrop { display: block; }
     aside { display: flex; position: fixed; inset: 0 auto 0 0; z-index: 40; width: min(320px, 88vw);
             transform: translateX(-102%); transition: transform .2s ease;
             box-shadow: 14px 0 36px rgba(38, 35, 29, .2); }
@@ -683,7 +711,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     <input class="sess-search" id="sessSearch" type="search" placeholder="搜索会话" aria-label="搜索会话">
     <ul class="sess" id="sessList"></ul>
   </section>
-  <button class="tbtn foot-btn" id="openSettings" title="教务账号、AI 模型、QQ 机器人、待办与本地数据">设置</button>
 </aside>
 <main>
   ${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 全部为虚构数据</strong><span>不连接教务或 AI，不保存到磁盘。请勿输入个人信息。正式使用请在终端运行 npm start。</span></div>' : ""}
@@ -692,7 +719,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     <button class="tbtn" id="openHallM">大厅</button>
     <button class="tbtn" id="openDrawerM">会话</button>
     <button class="tbtn" id="newSessionM">新会话</button>
-    <button class="tbtn" id="openSettingsM">设置</button>
   </div>
   <div id="log"><div class="inner" id="inner">
     <div class="hero" id="hero">
@@ -720,21 +746,16 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   </form>
 </main>
 <div class="hall-backdrop" id="hallBackdrop"></div>
-<aside class="hall" id="hall" role="dialog" aria-modal="true" aria-label="功能大厅">
+<aside class="hall" id="hall" aria-label="功能大厅" inert>
   <div class="hall-head">
     <button class="hall-back" id="hallBack" type="button" hidden>← 大厅</button>
     <span class="hall-title" id="hallTitle">功能大厅</span>
     <button class="dclose" id="closeHall" aria-label="关闭功能大厅">✕</button>
   </div>
   <div class="hall-rule"></div>
-  <div class="hall-body" id="hallBody"></div>
-</aside>
-<div class="drawer-backdrop" id="drawerBackdrop"></div>
-<div class="overlay" id="overlay" hidden>
-  <div class="dlg wide" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
-    <div class="dlg-head"><span id="dlgTitle">设置</span><button class="dclose" id="closeSettings" aria-label="关闭设置">✕</button></div>
-    <div class="dlg-rule"></div>
-    <div class="dlg-body set-body">
+  <div class="hall-body" id="hallBody">
+    <div id="hallDyn"></div>
+    <div id="hallSettings" hidden>
       <div class="set-frame">
         <nav class="set-tabs" id="setTabs" role="tablist" aria-label="设置栏目">
           <button class="set-tab on" type="button" role="tab" id="setTabAccount" aria-controls="setPaneAccount" aria-selected="true" data-pane="account">教务账号</button>
@@ -784,13 +805,14 @@ export function chatPage(options: { demo?: boolean } = {}): string {
         </div>
       </div>
       <div class="setmsg" id="setMsg"></div>
-    </div>
-    <div class="dlg-foot">
-      <button class="tbtn" id="cancelSettings">取消</button>
-      <button class="tbtn primary" id="saveSettings" ${demo ? "disabled" : ""}>保存设置</button>
+      <div class="hall-settings-foot">
+        <button class="tbtn" id="cancelSettings" type="button">取消</button>
+        <button class="tbtn primary" id="saveSettings" ${demo ? "disabled" : ""}>保存设置</button>
+      </div>
     </div>
   </div>
-</div>
+</aside>
+<div class="drawer-backdrop" id="drawerBackdrop"></div>
 <div class="overlay" id="reminderOverlay" hidden>
   <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="reminderTitle">
     <div class="dlg-head"><span id="reminderTitle">确认待办</span><button class="dclose" id="closeReminder" aria-label="关闭待办设置">✕</button></div>
@@ -1459,6 +1481,7 @@ const HALL_CARDS = [
   { id: "todos", t: "待办", d: "作业与事务的截止提醒" },
   { id: "knowledge", t: "知识库", d: "对话中沉淀的知识条目" },
   { id: "pomodoro", t: "番茄钟", d: "专注计时与最近记录" },
+  { id: "settings", t: "设置", d: "教务账号、AI 模型、QQ 机器人、待办与本地数据" },
 ];
 const HALL_TITLES = Object.fromEntries(HALL_CARDS.map((c) => [c.id, c.t]));
 const HALL_DEMO = document.body.dataset.demo === "true";
@@ -1586,8 +1609,18 @@ const HALL_PANELS = {
 };
 
 function renderHall() {
-  hallBody.innerHTML = "";
+  const dyn = document.getElementById("hallDyn");
+  const staticSettings = document.getElementById("hallSettings");
+  dyn.innerHTML = "";
   hallBack.hidden = !hallPanel;
+  const isSettings = hallPanel === "settings";
+  staticSettings.hidden = !isSettings;
+  if (isSettings) {
+    /* 设置是常驻 DOM（字段/栏目不重建），进入时只做状态复位与取数 */
+    hallTitle.textContent = "设置";
+    showSettings();
+    return;
+  }
   if (!hallPanel) {
     hallTitle.textContent = "功能大厅";
     const grid = el("hall-grid");
@@ -1598,42 +1631,53 @@ function renderHall() {
       const s = document.createElement("span"); s.textContent = c.d; card.appendChild(s);
       grid.appendChild(card);
     });
-    hallBody.appendChild(grid);
-    hallBody.appendChild(hallNote(HALL_DEMO
+    dyn.appendChild(grid);
+    dyn.appendChild(hallNote(HALL_DEMO
       ? "离线演示不含实时数据；正式运行后点开即显示。"
       : "提示：在对话框里说「课表」「考试」，对应面板会自动从右边推出。"));
     return;
   }
   hallTitle.textContent = HALL_TITLES[hallPanel] || hallPanel;
   const build = HALL_PANELS[hallPanel];
-  if (!build) { hallBody.appendChild(hallNote("该功能暂无面板。")); return; }
+  if (!build) { dyn.appendChild(hallNote("该功能暂无面板。")); return; }
   const body = build();
   if (body && typeof body.then === "function") {
     body.then((node) => {
       /* 取数期间用户可能已关掉或切走：只往还开着的面板里补画 */
-      if (document.body.classList.contains("hall-open") && hallBody) hallBody.replaceChildren(node);
+      if (document.body.classList.contains("hall-open") && dyn) dyn.replaceChildren(node);
     }).catch(() => {
       if (document.body.classList.contains("hall-open")) {
-        hallBody.replaceChildren(hallNote(HALL_DEMO
+        dyn.replaceChildren(hallNote(HALL_DEMO
           ? "离线演示不含该数据；正式运行 npm start 后可用。"
           : "取数失败，稍后再试。"));
       }
     });
   } else {
-    hallBody.replaceChildren(body);
+    dyn.replaceChildren(body);
   }
 }
-function openHall(panel) {
+function openHall(panel, opts) {
   if (panel) hallPanel = panel;
   document.body.classList.add("hall-open");
+  /* 收起态宽度为 0：inert 挡住不可见内容的键盘焦点，打开时解除 */
+  document.getElementById("hall").inert = false;
   renderHall();
-  document.getElementById("closeHall").focus();
+  /* push 进来时不抢焦点：对话联动自动打开的场合，用户可能正在打字 */
+  if (!opts || opts.focus !== false) document.getElementById("closeHall").focus();
 }
 function closeHall() {
   if (!document.body.classList.contains("hall-open")) return;
   document.body.classList.remove("hall-open");
+  document.getElementById("hall").inert = true;
   /* 对话进行中手动关掉：这一轮不再因工具调用自动弹出 */
   if (busy) hallAutoMuted = true;
+  /* 从设置面板关掉时，焦点还给打开它的那张卡片（#21 的焦点归还语义） */
+  if (settingsReturnFocus) {
+    if (typeof settingsReturnFocus.focus === "function" && document.contains(settingsReturnFocus)) {
+      settingsReturnFocus.focus();
+    }
+    settingsReturnFocus = null;
+  }
 }
 document.getElementById("openHall").addEventListener("click", () => { hallPanel = ""; openHall(); });
 document.getElementById("openHallM").addEventListener("click", () => { hallPanel = ""; openHall(); });
@@ -1669,8 +1713,8 @@ async function doNewSession() {
 document.getElementById("newSession").addEventListener("click", doNewSession);
 document.getElementById("newSessionM").addEventListener("click", doNewSession);
 
-/* ── 设置弹窗：教务账号 + DeepSeek API Key（后端走 /key 同一套加密热生效）── */
-const overlay = document.getElementById("overlay");
+/* ── 设置：常驻在功能大厅抽屉里（见 #hallSettings），教务账号 / DeepSeek API Key
+   等凭证仍走后端 /api/settings 同一套加密热生效 ── */
 const sUser = document.getElementById("sUser");
 const sPass = document.getElementById("sPass");
 const sKey = document.getElementById("sKey");
@@ -1890,9 +1934,10 @@ function qqApplyStatus(q) {
 }
 
 function showSettings() {
-  settingsReturnFocus = document.activeElement;
-  overlay.hidden = false;
-  closeDrawer();
+  /* #21 的焦点归还：记下抽屉外的打开者（宫格卡片在抽屉里，归还无意义），
+     关掉大厅时还给 */
+  const hall = document.getElementById("hall");
+  if (!hall.contains(document.activeElement)) settingsReturnFocus = document.activeElement;
   setTab("account");
   setMsg.className = "setmsg";
   setMsg.textContent = "";
@@ -1915,7 +1960,6 @@ function showSettings() {
     sKey.placeholder = "sk-…；留空不修改";
     qqApplyStatus(d.qq);
     fillModels(d.models, d.model, "");
-    (d.jwgl.configured ? sPass : sUser).focus();
   }).catch(() => { setMsg.textContent = "无法读取设置，请确认本地服务正在运行。"; });
   // 清单以该 Key 实际可用的型号为准；服务端 10 分钟内走缓存，不重复联网
   fetch("/api/models").then((r) => r.json()).then((m) => {
@@ -1923,27 +1967,12 @@ function showSettings() {
     fillModels(m.options, m.current, m.source === "live" ? "" : m.message);
   }).catch(() => {});
 }
-function hideSettings() {
-  overlay.hidden = true;
-  if (
-    settingsReturnFocus &&
-    typeof settingsReturnFocus.focus === "function" &&
-    document.contains(settingsReturnFocus)
-  ) {
-    settingsReturnFocus.focus();
-  }
-  settingsReturnFocus = null;
-}
-document.getElementById("openSettings").addEventListener("click", showSettings);
-document.getElementById("openSettingsM").addEventListener("click", showSettings);
-document.getElementById("closeSettings").addEventListener("click", hideSettings);
-document.getElementById("cancelSettings").addEventListener("click", hideSettings);
-overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) hideSettings(); });
+/* 「取消」= 关掉大厅抽屉；设置面板是常驻 DOM，下次进入重新复位取数 */
+document.getElementById("cancelSettings").addEventListener("click", closeHall);
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (sessionActionsId) { sessionActionsId = ""; renderSessList(); return; }
   if (!reminderOverlay.hidden) closeReminder();
-  else if (!overlay.hidden) hideSettings();
   else closeDrawer();
 });
 
@@ -2179,7 +2208,7 @@ async function send(text) {
             toolCard(shell, ev);
             /* 说到哪块，对应面板自动从右边推出；这轮被手动关过就不再打扰 */
             const panel = TOOL_PANEL[ev.name];
-            if (panel && !hallAutoMuted) openHall(panel);
+            if (panel && !hallAutoMuted) openHall(panel, { focus: false });
           } else {
             toolDone(shell, ev, ev.phase === "end");
             if (ev.files && ev.files.length) fileRows(shell.tl, ev.files);

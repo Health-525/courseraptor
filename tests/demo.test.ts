@@ -11,7 +11,7 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
   try {
     const html = await (await fetch(base)).text();
     assert.match(html, /离线演示 · 全部为虚构数据/);
-    assert.match(html, /id="openSettings"/);
+    assert.match(html, /id="hallSettings"/, "设置面板常驻在功能大厅抽屉里");
     assert.match(html, /id="sUser"[^>]+disabled/);
     // 型号改用卡片单选：hidden input 载值，无 disabled 属性可挂，演示拦截由脚本守卫实现
     assert.match(html, /id="sModel"/);

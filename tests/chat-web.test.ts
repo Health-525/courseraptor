@@ -843,6 +843,8 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
   assert.match(chat, /id="openHall"[^>]*>功能大厅</, "侧栏应有功能大厅入口");
   assert.match(chat, /id="openHallM"[^>]*>大厅</, "移动顶栏应有功能大厅入口");
   assert.match(chat, /class="hall" id="hall"/, "功能大厅抽屉应存在");
+  assert.match(chat, /id="hallSettings"/, "设置面板应常驻在功能大厅抽屉里");
+  assert.ok(!chat.includes('id="openSettings"'), "侧栏不应再有独立的设置按钮");
   assert.match(chat, /today: \(\) => briefOf\(\)\.then\(buildToday\)/, "面板注册表应包含今日日程");
   assert.match(chat, /const TOOL_PANEL = \{/, "应有工具→面板联动映射");
   assert.match(chat, /get_schedule: "schedule"/, "课表工具应联动课表面板");
