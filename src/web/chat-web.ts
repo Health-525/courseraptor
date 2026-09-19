@@ -47,6 +47,10 @@ import { saveCredentialsStore } from "../credentials";
 import { generatedDir } from "../document/save";
 import { getCookie } from "../jwgl/session";
 import { clearKnowledge, deleteKnowledge, knowledgeStats, listKnowledge } from "../knowledge";
+import { loadGradesCache } from "../grades-cache";
+import { fetchJwcNews } from "../jwgl/news";
+import { relevanceOf } from "../tools/news";
+import { loadUserGrade } from "../memory/longterm";
 import {
   allowedModelIds,
   cachedModelOptions,
@@ -775,6 +779,33 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     }
     if (url === "/api/knowledge") {
       json(res, { entries: listKnowledge() });
+      return;
+    }
+    if (url === "/api/grades") {
+      // 成绩面板走纯缓存（get_grades 查通一次即落盘），这里绝不登录教务
+      json(res, loadGradesCache() ?? { savedAt: null });
+      return;
+    }
+    if (url === "/api/news") {
+      // 教务处官网公开页，无需登录；现场抓取（可能要几秒），失败如实降级
+      try {
+        const items = await fetchJwcNews([], 30);
+        const grade = await loadUserGrade();
+        const scored = items.slice(0, 10).map((i) => {
+          const { level, reason } = relevanceOf(i.title, grade);
+          return {
+            title: i.title,
+            date: i.date,
+            category: i.category,
+            relevance: level,
+            relevanceReason: reason,
+            url: i.url,
+          };
+        });
+        json(res, { items: scored, gradeBasis: grade ?? undefined, fetchedAt: Date.now() });
+      } catch (e) {
+        json(res, { items: [], error: e instanceof Error ? e.message : String(e) });
+      }
       return;
     }
     if (url === "/api/today" || url.startsWith("/api/today?")) {

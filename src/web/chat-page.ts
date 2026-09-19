@@ -496,6 +496,22 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .setmsg { font-family: var(--mono); font-size: 12px; min-height: 16px;
             margin: 0 2px 2px; white-space: pre-wrap; color: var(--accent-deep); }
   .setmsg.good { color: var(--ink-2); }
+  /* 设置状态总览：四栏配置一览（已配/未配），点 chip 直达对应栏目 */
+  .set-status { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+  .set-status:empty { display: none; }
+  .set-chip { flex: 1 1 60px; min-width: 0; display: inline-flex; align-items: center; gap: 6px;
+              border: 1px solid var(--rule); background: var(--card); border-radius: 3px;
+              padding: 6px 8px; cursor: pointer; font-family: var(--mono); font-size: 11px;
+              color: var(--ink-2); white-space: nowrap; }
+  .set-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .set-chip .dot { flex: none; width: 7px; height: 7px; border-radius: 50%;
+                   border: 1px solid var(--rule-2); background: transparent; }
+  .set-chip.ok .dot { border-color: var(--accent); background: var(--accent); }
+  .set-chip.warn { color: var(--accent-deep); border-color: var(--rule-2); }
+  /* 两步确认的 armed 态：朱砂底白字（与 .hall-del.armed 同一语言，免原生 confirm） */
+  .data-actions .tbtn.armed { color: var(--card); background: var(--accent);
+                              border-color: var(--accent); }
+  .data-cell.err { color: var(--accent-deep); font-family: var(--mono); font-size: 12px; }
 
   #toBottom { position: fixed; right: 30px; bottom: 104px; z-index: 5;
               background: var(--card); border: 1px solid var(--rule-2);
@@ -1561,6 +1577,8 @@ const HALL_CARDS = [
   { id: "today", t: "今日日程", d: "下一节课、今日安排与本周概览", icon: "📅", group: "学习安排" },
   { id: "schedule", t: "课表", d: "本周每天的课与调休安排", icon: "🗓️", group: "学习安排" },
   { id: "exams", t: "考试", d: "临近考试的时间、地点与座位", icon: "📝", group: "学习安排" },
+  { id: "grades", t: "成绩", d: "GPA、学分与最近学期成绩速览", icon: "📊", group: "学习安排" },
+  { id: "news", t: "教务通知", d: "教务处官网最新通知，标记需要行动的", icon: "📣", group: "学习安排" },
   { id: "todos", t: "待办", d: "逾期置顶，按今天 / 明天分组", icon: "✅", group: "效率工具" },
   { id: "knowledge", t: "知识库", d: "按课程归类，可搜可展开全文", icon: "📚", group: "效率工具" },
   { id: "pomodoro", t: "番茄钟", d: "进行中实时倒计时与最近记录", icon: "🍅", group: "效率工具" },
@@ -1696,7 +1714,8 @@ function hallSkel() {
 }
 function hallFullPage(panel) {
   if (panel === "knowledge") return "/knowledge";
-  if (panel === "pomodoro") return ""; /* 番茄钟没有完整页 */
+  /* 番茄钟/成绩/通知没有独立完整页：工具条不挂「完整页」链接 */
+  if (panel === "pomodoro" || panel === "grades" || panel === "news") return "";
   return "/today";
 }
 function hallMore(panel) {
@@ -2152,16 +2171,72 @@ function hallPomoTick() {
     fill.style.width = (100 * (total - left) / total).toFixed(1) + "%";
   });
 }
+/* 成绩面板：纯缓存（get_grades 查通一次即落盘），零登录零模型 */
+function buildGrades() {
+  const wrap = el("");
+  if (HALL_DEMO) { wrap.appendChild(hallNote("离线演示不提供成绩数据。")); return wrap; }
+  return fetch("/api/grades").then((r) => r.json()).then((g) => {
+    if (g.savedAt == null) {
+      wrap.appendChild(hallEmpty("📊", "还没有成绩缓存", "在对话框里说「我的成绩」，查询后这里就会显示。"));
+      return wrap;
+    }
+    wrap.dataset.total = String(g.courseCount || 0);
+    wrap.appendChild(hallItem("GPA " + g.gpa + (g.gpaBasis ? "（" + g.gpaBasis + "）" : ""),
+      "必修学分 " + g.requiredCredits + " · 共 " + g.courseCount + " 门课", true));
+    if (g.recentSemester) {
+      wrap.appendChild(hallNote("最近学期 " + g.recentSemester + "："));
+      (g.recentCourses || []).slice(0, 8).forEach((c) => {
+        wrap.appendChild(hallItem(c.course, "成绩 " + c.score + " · " + c.credit + " 学分" + (c.type ? " · " + c.type : "")));
+      });
+    }
+    wrap.appendChild(hallNote("缓存于 " + new Date(g.savedAt).toLocaleString("zh-CN", { hour12: false }) + "；在对话框里再问一次成绩即刷新。"));
+    return wrap;
+  });
+}
+/* 教务通知面板：现场抓官网公开页（无需登录，可能要几秒） */
+function buildNews() {
+  const wrap = el("");
+  if (HALL_DEMO) { wrap.appendChild(hallNote("离线演示不抓取官网；正式运行后这里显示最新通知。")); return wrap; }
+  return fetch("/api/news").then((r) => r.json()).then((d) => {
+    const items = d.items || [];
+    wrap.dataset.total = String(items.length);
+    if (d.error) wrap.appendChild(hallNote("抓取失败：" + d.error));
+    if (!items.length) {
+      if (!d.error) wrap.appendChild(hallEmpty("📣", "没抓到通知", "教务处官网结构可能变化，或当前网络异常。"));
+      return wrap;
+    }
+    if (d.gradeBasis) wrap.appendChild(hallNote("已按你所在「" + d.gradeBasis + " 级」标记相关性，需行动的置顶。"));
+    items.forEach((n) => {
+      wrap.appendChild(hallItemAct(n.title,
+        [n.category, n.date, n.relevance === "high" ? "需本人行动" : n.relevance === "medium" ? "视个人情况" : ""].filter(Boolean).join(" · "),
+        () => { window.open(n.url, "_blank", "noopener"); }, "原文"));
+      const item = wrap.lastChild;
+      if (n.relevance === "high") item.classList.add("hot");
+    });
+    return wrap;
+  });
+}
 const HALL_PANELS = {
   today: () => briefOf().then(buildToday),
   schedule: () => briefOf().then(buildSchedule),
   exams: () => briefOf().then(buildExams),
-  /* 演示环境没有 /api/today：待办直接读 /api/reminders（只读，返回空即为干净空态） */
+  grades: buildGrades,
+  news: buildNews,
+  /* 演示环境没有 /api/today：待办直接读 /api/reminders（只读，返回空即为干净空态）；
+     顺手在前端补 overdue/isToday，分组口径与正式一致 */
   todos: () => (HALL_DEMO
     ? fetch("/api/reminders").then((r) => r.json())
-        .then((d) => buildTodoList((d.reminders || []).map((t) => ({
-          ...t, dueLabel: new Date(t.dueAt).toLocaleString("zh-CN", { hour12: false }),
-        }))))
+        .then((d) => buildTodoList((d.reminders || []).map((t) => {
+          const due = new Date(t.dueAt);
+          const now = new Date();
+          const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+          return {
+            ...t,
+            dueLabel: due.toLocaleString("zh-CN", { hour12: false }),
+            overdue: due.getTime() < now.getTime(),
+            isToday: day(due) === day(now),
+          };
+        })))
     : briefOf().then((b) => buildTodoList(b.todos.items))),
   knowledge: () => briefOf().then(buildKnowledge),
   pomodoro: buildPomodoro,
@@ -2181,7 +2256,7 @@ let hallSearch = { panel: "", q: "" };
 const HALL_SEARCHABLE = ["schedule", "exams", "todos", "knowledge"];
 function hallListTotal(node, panel) {
   const items = node.querySelectorAll ? node.querySelectorAll(".hall-item").length : 0;
-  if (panel === "knowledge" && node.dataset && node.dataset.total) {
+  if (panel === "knowledge" && node.dataset && node.dataset.total && !hallKnowCat) {
     return Number(node.dataset.total) || items;
   }
   return items;
@@ -2321,8 +2396,9 @@ function renderHall(force) {
     hallBody.scrollTop = keepScroll ? Math.min(lastTop, hallBody.scrollHeight) : 0;
   };
   if (force) hallBrief = null;
-  /* 切面板时清空搜索；刷新保留搜索态 */
+  /* 切面板时清空搜索与知识分类筛；刷新保留两者（勾选/删除/换分类后态不丢） */
   if (!force && hallSearch.panel !== hallPanel) hallSearch = { panel: hallPanel, q: "" };
+  if (!force && hallPanel !== "knowledge") hallKnowCat = "";
   dyn.innerHTML = "";
   dyn.setAttribute("aria-busy", "false");
   hallBack.hidden = !hallPanel;
@@ -2543,6 +2619,9 @@ const TOOL_PANEL = {
   manage_todos: "todos",
   manage_knowledge: "knowledge",
   manage_pomodoro: "pomodoro",
+  get_grades: "grades",
+  get_news: "news",
+  read_notice: "news",
   /* agent 自己请求打开设置（用户说「打开设置/我要配账号」） */
   open_settings: "settings",
 };

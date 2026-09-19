@@ -9,6 +9,7 @@ import { summarizeAcademics, summarizeGeneralElectives } from "../academic-summa
 import { config } from "../config";
 import { saveExamCache } from "../exam-cache";
 import { fetchExamsSmart, parseSemesterString } from "../jwgl/academics";
+import { saveGradesCache } from "../grades-cache";
 import { fetchAllGrades } from "../jwgl/grades";
 import { fetchLabGradesSmart } from "../jwgl/portal";
 import { getCookie } from "../jwgl/session";
@@ -24,6 +25,26 @@ export const gradesTools = {
       const result = await fetchAllGrades(cookie, config.jwglUsername);
 
       const generalElectives = summarizeGeneralElectives(result.allCourses);
+
+      // 落盘成绩缓存：成绩面板（/api/grades）纯读缓存零登录，对话里问一次即刷新
+      const semesters = [...new Set(result.allCourses.map((g) => g.semester))].sort();
+      const recentSemester = semesters[semesters.length - 1];
+      saveGradesCache({
+        gpa: result.gpa,
+        gpaBasis: result.gpaBasis || undefined,
+        requiredCredits: result.requiredCredits,
+        courseCount: result.allCourses.length,
+        recentSemester,
+        recentCourses: result.allCourses
+          .filter((g) => g.semester === recentSemester)
+          .map((g) => ({
+            course: g.course,
+            score: g.score,
+            credit: g.credit,
+            type: g.type || undefined,
+            semester: g.semester,
+          })),
+      });
 
       return {
         gpa: result.gpa,

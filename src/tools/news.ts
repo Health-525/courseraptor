@@ -59,7 +59,7 @@ const IRRELEVANT = [
   "教改",
 ];
 
-function relevanceOf(
+export function relevanceOf(
   title: string,
   grade: string | null,
 ): { level: RelevanceLevel; reason?: string } {
