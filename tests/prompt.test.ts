@@ -46,3 +46,12 @@ test("校历段：开学日期与放假/调休从运行时真值渲染进提示�
   assert.match(s, /2026-09-27 调休补课（按周4课表）/);
   assert.match(s, /以工具返回为准/, "永远声明运行时真值优先级");
 });
+
+const { basePrompt } = await import("../src/prompt");
+
+test("行为准则：今日简报规则要求日程与待办结合分析", () => {
+  const s = basePrompt(false);
+  assert.match(s, /今日简报/, "应有今日简报规则");
+  assert.match(s, /manage_todos list 看未完成待办/, "应要求结合待办");
+  assert.match(s, /不要分两张清单各念各的/, "应要求交叉分析而非两张清单");
+});
