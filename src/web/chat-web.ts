@@ -490,6 +490,9 @@ async function serveGeneratedFile(rawName: string, res: http.ServerResponse): Pr
  * export_calendar 的 {file: {filename, filePath, bytes}}；
  * 路径不在 generated 目录内的一律不透出。
  */
+/** 工具因凭证未配置而失败的口径：命中时 SSE 事件带 panel=settings，网页端自动推出设置面板 */
+const NEED_SETUP_RE = /尚未配置|请先配置/;
+
 function filesOfToolOutput(output: unknown): Array<{ name: string; size: number }> {
   if (typeof output !== "object" || output == null || Array.isArray(output)) return [];
   const o = output as Record<string, unknown>;
@@ -1264,6 +1267,8 @@ async function runTurn(
             id: p.toolCallId ?? "",
             name: p.toolName ?? "tool",
             brief: msg,
+            // 教务凭证等未配置导致的失败：网页端自动推出设置面板，用户补填后重试
+            ...(NEED_SETUP_RE.test(msg) ? { panel: "settings" } : {}),
           });
           break;
         }

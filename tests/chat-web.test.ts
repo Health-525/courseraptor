@@ -848,6 +848,8 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
   assert.match(chat, /today: \(\) => briefOf\(\)\.then\(buildToday\)/, "面板注册表应包含今日日程");
   assert.match(chat, /const TOOL_PANEL = \{/, "应有工具→面板联动映射");
   assert.match(chat, /get_schedule: "schedule"/, "课表工具应联动课表面板");
+  assert.match(chat, /open_settings: "settings"/, "agent 应可通过 open_settings 工具打开设置");
+  assert.match(chat, /ev\.panel && !hallAutoMuted\) openHall/, "未配置等场景应据 ev.panel 自动推出设置");
   assert.ok(
     !chat.includes("看今日日程：下一节课在哪 · 今天还有什么"),
     "首屏不应再展示今日日程 chip",
