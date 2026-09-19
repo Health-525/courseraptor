@@ -849,12 +849,24 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
   assert.match(chat, /const TOOL_PANEL = \{/, "应有工具→面板联动映射");
   assert.match(chat, /get_schedule: "schedule"/, "课表工具应联动课表面板");
   assert.match(chat, /open_settings: "settings"/, "agent 应可通过 open_settings 工具打开设置");
+  assert.match(chat, /get_grades: "grades"/, "成绩工具应联动成绩面板");
+  assert.match(chat, /get_news: "news"/, "通知工具应联动通知面板");
+  assert.match(chat, /\{ id: "grades"/, "宫格应有成绩卡片");
+  assert.match(chat, /\{ id: "news"/, "宫格应有通知卡片");
   assert.match(chat, /ev\.panel && !hallAutoMuted\) openHall/, "未配置等场景应据 ev.panel 自动推出设置");
   assert.ok(
     !chat.includes("看今日日程：下一节课在哪 · 今天还有什么"),
     "首屏不应再展示今日日程 chip",
   );
   assert.match(chat, /默认进入新的空会话/, "每次打开网页应默认新建空会话");
+});
+
+test("GET /api/grades 纯缓存读取（无缓存时 savedAt=null，绝不登录教务）", async () => {
+  const url = (await startChatWeb())!;
+  const res = await fetch(`${url}/api/grades`);
+  assert.equal(res.status, 200);
+  const data = (await res.json()) as { savedAt: number | null };
+  assert.equal(data.savedAt, null, "测试数据目录没有成绩缓存：必须如实返回 null");
 });
 
 test("GET /api/today 纯本地组装当日档案（无缓存时如实降级）", async () => {
