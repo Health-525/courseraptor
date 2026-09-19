@@ -551,6 +551,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
              transition: color .15s ease, transform .15s ease; }
   .hall-card:hover .hall-go { color: var(--accent); transform: translateX(2px); }
   .hall-card span { font-size: 12px; color: var(--ink-3); line-height: 1.6; }
+  /* 主页徽标：一眼信息（N 条待办/今日 N 节），与大厅入口同族的浅底深字 */
+  .hall-badge { align-self: flex-start; font-family: var(--mono); font-size: 11px;
+                letter-spacing: .04em; color: var(--accent-deep);
+                background: var(--accent-soft); padding: 1px 8px; border-radius: 2px; }
   .hall-note { margin: 14px 2px 0; font-family: var(--mono); font-size: 12px;
                color: var(--ink-3); line-height: 1.7; }
   /* 面板工具条：条数在左，刷新与完整页在右；粘在面板顶部方便长列表回看 */
@@ -571,23 +575,41 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                border-radius: 4px; padding: 4px 10px; min-height: 30px;
                text-decoration: none; }
   .hall-more:hover { border-color: var(--accent); color: var(--accent); }
+  /* 面板内搜索：贴在工具条下方一起粘住，长列表边滚边滤 */
+  .hall-search { display: flex; margin: 0 0 10px; }
+  .hall-search input { flex: 1; min-width: 0; border: 1px solid var(--rule);
+                       background: var(--card); color: var(--ink);
+                       font-size: 13px; padding: 7px 10px; border-radius: 4px;
+                       outline: none; }
+  .hall-search input:focus { border-color: var(--ink-3); }
+  .hall-search input::placeholder { color: var(--ink-3); }
   /* 面板条目：与待办列表同一语言，等信息以两行表达（标题 + 等宽小字） */
   .hall-item { border: 1px solid var(--rule); background: var(--card);
                padding: 9px 11px; margin-bottom: 6px; border-radius: 2px; }
+  /* 面板内容淡入：切换/刷新时给 0.16s 过渡（reduced-motion 下全局已禁用） */
+  .hall-dyn-in { animation: hallFade .16s ease; }
+  @keyframes hallFade { from { opacity: .2; } to { opacity: 1; } }
   .hall-item .ht { font-size: 14px; font-weight: 600; line-height: 1.5;
                    overflow-wrap: anywhere; }
   .hall-item .hm { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
                    margin-top: 2px; line-height: 1.6; overflow-wrap: anywhere; }
   .hall-item.has-act { display: flex; align-items: flex-start; gap: 8px; }
   .hall-item-main { flex: 1; min-width: 0; }
-  .hall-done { flex: none; width: 16px; height: 16px; margin: 4px 0 0;
+  /* 勾选即完成是乐观更新：先变灰 + 标题删除线，后台落盘 */
+  .hall-item.done { opacity: .55; }
+  .hall-item.done .ht { text-decoration: line-through; }
+  .hall-done { flex: none; width: 20px; height: 20px; margin: 2px 0 0;
                accent-color: var(--accent); cursor: pointer; }
-  .hall-del { flex: none; border: 0; background: none; padding: 2px 4px;
-              color: var(--ink-3); font-family: var(--mono); font-size: 12px;
-              cursor: pointer; border-radius: 3px;
+  .hall-del { flex: none; border: 0; background: none; padding: 4px 8px;
+              min-height: 28px; color: var(--ink-3); font-family: var(--mono);
+              font-size: 12px; cursor: pointer; border-radius: 3px;
               transition: color .15s ease, background .15s ease; }
   .hall-del:hover { color: var(--accent); text-decoration: underline; }
-  .hall-del.armed { color: var(--card); background: var(--accent); padding: 2px 8px; }
+  .hall-del.armed { color: var(--card); background: var(--accent); }
+  /* 知识条目可点开看全文：整块 main 区都是热区，键盘同样可达 */
+  .hall-item.know .hall-item-main { cursor: pointer; }
+  .hall-item.know:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .hall-item.know .hm.more { color: var(--ink-2); }
   .hall-item.hot { border-left: 3px solid var(--accent); }
   .hall-item.hot .hm { color: var(--accent-deep); }
   /* 加载骨架：纯色块脉冲（不用渐变，与纸面主题一致），减少取数时的布局跳动 */
@@ -908,7 +930,7 @@ function fmtWhen(ts) {
 }
 
 /* ── 快速提问：常驻在输入框上方 ── */
-const QUESTIONS = ["这周课表", "教务处最近有什么通知", "我的成绩和 GPA", "最近的考试安排", "通识学分还缺哪些", "导出课表到手机日历"];
+const QUESTIONS = ["今天有什么安排", "这周课表", "教务处最近有什么通知", "我的成绩和 GPA", "最近的考试安排", "通识学分还缺哪些", "导出课表到手机日历"];
 const qchips = document.getElementById("qchips");
 QUESTIONS.forEach((q) => {
   const c = document.createElement("button");
