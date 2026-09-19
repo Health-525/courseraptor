@@ -853,7 +853,11 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
   assert.match(chat, /get_news: "news"/, "通知工具应联动通知面板");
   assert.match(chat, /\{ id: "grades"/, "宫格应有成绩卡片");
   assert.match(chat, /\{ id: "news"/, "宫格应有通知卡片");
-  assert.match(chat, /ev\.panel && !hallAutoMuted\) openHall/, "未配置等场景应据 ev.panel 自动推出设置");
+  assert.match(
+    chat,
+    /ev\.panel && !hallAutoMuted\) openHall/,
+    "未配置等场景应据 ev.panel 自动推出设置",
+  );
   assert.ok(
     !chat.includes("看今日日程：下一节课在哪 · 今天还有什么"),
     "首屏不应再展示今日日程 chip",

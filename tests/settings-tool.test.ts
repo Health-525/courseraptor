@@ -13,5 +13,9 @@ test("工具层接线：open_settings 可直接 execute，返回面板引导文�
   ).execute;
   const result = await execute({});
   assert.match(String(result), /设置面板/);
-  assert.doesNotMatch(String(result), /(sk-|password|密码[:：]\s*\S+)/, "不应包含任何凭证形态的内容");
+  assert.doesNotMatch(
+    String(result),
+    /(sk-|password|密码[:：]\s*\S+)/,
+    "不应包含任何凭证形态的内容",
+  );
 });
