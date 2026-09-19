@@ -6,11 +6,13 @@
 
 ### Less time navigating academic portals. More time for student life.
 
-**An open-source academic AI assistant for Nanjing Tech University students.**
+**An open-source academic AI assistant for Nanjing Tech University (NJTECH) students only.**
 
 [简体中文](README.md) · **English**
 
-[![Checks](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml) [![ISC License](https://img.shields.io/badge/License-ISC-8f2b21)](LICENSE) [![Node 24+](https://img.shields.io/badge/Node.js-24%2B-8f2b21?logo=nodedotjs&logoColor=white)](https://nodejs.org/en/download)
+[![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
+[![ISC License](https://img.shields.io/badge/License-ISC-8f2b21)](LICENSE)
+[![Node 24+](https://img.shields.io/badge/Node.js-24%2B-8f2b21?logo=nodedotjs&logoColor=white)](https://nodejs.org/en/download)
 
 [Try the demo](#try-it-without-credentials) · [Discuss](https://github.com/Health-525/courseraptor/discussions) · [Contribute](CONTRIBUTING.md)
 
@@ -18,7 +20,7 @@
 
 CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Use the browser or terminal, with an optional QQ bot connection.
 
-**The current academic-system integration supports Nanjing Tech University only.** This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project.
+> ⚠️ **The current academic-system integration supports Nanjing Tech University only.** This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project.
 
 ## What it does
 
@@ -55,6 +57,36 @@ The demo uses **fictional data and scripted responses**. It does not read person
 Run `npm start`, or double-click `start.bat` on Windows. Follow the prompts to configure your own university credentials and DeepSeek API key. You can also skip the campus account with an empty Enter and fill it in later via the web Settings panel. Provider API usage may incur charges.
 
 The browser UI usually runs at `http://localhost:3210`; follow the actual startup address if that port is busy. Keep the terminal running. To change your API key securely, enter `/key` without arguments in the terminal.
+
+## Architecture overview
+
+- **Agent runtime**: Vercel AI SDK v7 (`ToolLoopAgent` + `runAgentTUI` for terminal)
+- **LLM**: DeepSeek (default `deepseek-flash` / V4.1-Flash)
+- **Academic protocol**: Custom NJTECH 正方新版 adapter (RSA + CSRF login; course selection reverse-engineered from official frontend)
+- **Web UI**: Single-page Node server (`src/web/`) with push-panel layout, session history, and real-time tool result sync
+- **Data storage**: Local JSON files only (`data/`, `session.json`, `memory.json`, `credentials.enc`); no database, no cloud sync
+
+## Project structure (key directories)
+
+```
+├── bin/raptor.cjs        # Global CLI entry (npm link)
+├── docs/                 # Assets & extended docs
+└── src/
+    ├── index.ts          # Terminal entry (spawns QQ bridge if configured)
+    ├── agent.ts          # System prompt + tool registration
+    ├── config.ts         # .env loading (works from any CWD)
+    ├── jwgl/             # NJTECH academic protocol layer
+    │   ├── auth.ts       # RSA + CSRF login
+    │   ├── academics.ts  # Timetable & exams (semester detection, week calc)
+    │   ├── grades.ts     # Grades + GPA + gen-ed categories
+    │   ├── news.ts       # Announcements & attachments
+    │   └── xk.ts         # Course selection protocol
+    ├── web/              # Web UI: chat, hall, /today, /knowledge
+    ├── tools/            # 30 agent tools (schemas + implementations)
+    ├── memory/           # Dual-layer memory (session + long-term facts)
+    ├── qq/               # QQ Official Bot bridge
+    └── ...               # todo, knowledge, pomodoro, weather, attachments, sandbox
+```
 
 ## Boundaries that matter
 
