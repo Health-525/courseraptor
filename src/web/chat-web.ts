@@ -45,11 +45,10 @@ import {
 import { config } from "../config";
 import { saveCredentialsStore } from "../credentials";
 import { generatedDir } from "../document/save";
-import { getCookie } from "../jwgl/session";
-import { clearKnowledge, deleteKnowledge, knowledgeStats, listKnowledge } from "../knowledge";
 import { loadGradesCache } from "../grades-cache";
 import { fetchJwcNews } from "../jwgl/news";
-import { relevanceOf } from "../tools/news";
+import { getCookie } from "../jwgl/session";
+import { clearKnowledge, deleteKnowledge, knowledgeStats, listKnowledge } from "../knowledge";
 import { loadUserGrade } from "../memory/longterm";
 import {
   allowedModelIds,
@@ -72,6 +71,7 @@ import {
   type PomodoroView,
   toView,
 } from "../pomodoro";
+import { relevanceOf } from "../tools/news";
 import {
   addReminder,
   clearReminders,

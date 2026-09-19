@@ -1631,7 +1631,7 @@ let hallKnowCat = "";
 /* 知识条目：标题 + 分类·日期·摘要，可展开看全文（main 区是热区，删除按钮在外不冲突），
    删除乐观更新（先移除节点，失败重刷恢复） */
 function hallKnowledgeItem(k) {
-  const full = String(k.content || "").replace(/\s+/g, " ").trim();
+  const full = String(k.content || "").replace(/\\s+/g, " ").trim();
   const snippet = full.slice(0, 60);
   const date = hallKDate(k.updatedAt);
   const head = (k.category || "未分类") + (date ? " · " + date + " · " : " · ");
@@ -2058,7 +2058,7 @@ function buildKnowledge(b) {
       const date = hallKDate(k.updatedAt);
       wrap.appendChild(hallItem(k.title,
         (k.category || "未分类") + (date ? " · " + date : "") + " · "
-        + String(k.content || "").replace(/\s+/g, " ").slice(0, 60)));
+        + String(k.content || "").replace(/\\s+/g, " ").slice(0, 60)));
     });
     return wrap;
   }
