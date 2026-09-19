@@ -876,6 +876,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   <div class="hall-body" id="hallBody">
     <div id="hallDyn" aria-live="polite"></div>
     <div id="hallSettings" hidden>
+      <div class="set-status" id="setStatus" aria-label="各栏目配置状态"></div>
       <div class="set-frame">
         <nav class="set-tabs" id="setTabs" role="tablist" aria-label="设置栏目">
           <button class="set-tab on" type="button" role="tab" id="setTabAccount" aria-controls="setPaneAccount" aria-selected="true" data-pane="account">教务账号</button>
@@ -1582,7 +1583,7 @@ const HALL_CARDS = [
   { id: "todos", t: "待办", d: "逾期置顶，按今天 / 明天分组", icon: "✅", group: "效率工具" },
   { id: "knowledge", t: "知识库", d: "按课程归类，可搜可展开全文", icon: "📚", group: "效率工具" },
   { id: "pomodoro", t: "番茄钟", d: "进行中实时倒计时与最近记录", icon: "🍅", group: "效率工具" },
-  { id: "settings", t: "设置", d: "教务账号、AI 模型与本地数据", icon: "⚙️", group: "系统" },
+  { id: "settings", t: "设置", d: "教务账号、AI 模型、QQ 与本地数据", icon: "⚙️", group: "系统" },
 ];
 const HALL_GROUPS = ["学习安排", "效率工具", "系统"];
 const HALL_TITLES = Object.fromEntries(HALL_CARDS.map((c) => [c.id, c.t]));
@@ -2385,6 +2386,14 @@ function hallBadges(dyn) {
     put("todos", overdueN ? "⚠ " + overdueN + " 逾期" : (td.length ? td.length + " 条待办" : ""));
     put("knowledge", b.knowledge && b.knowledge.total ? "共 " + b.knowledge.total + " 条" : "");
   }).catch(() => {});
+  /* 设置卡徽标：缺关键凭证才亮（与自动推出设置的口径一致：教务 > 模型；QQ 选配不打扰） */
+  fetch("/api/settings").then((r) => r.json()).then((d) => {
+    if (hallPanel !== "" || !document.body.classList.contains("hall-open")) return;
+    const card = dyn.querySelector('[data-panel="settings"]');
+    if (!card || card.querySelector(".hall-badge")) return;
+    if (!d.jwgl || !d.jwgl.configured) card.appendChild(el2("hall-badge", "教务未配"));
+    else if (!d.deepseek || !d.deepseek.configured) card.appendChild(el2("hall-badge", "模型未配"));
+  }).catch(() => {});
 }
 function renderHall(force) {
   const dyn = document.getElementById("hallDyn");
@@ -2669,7 +2678,13 @@ function refreshData() {
       const strong = document.createElement("strong"); strong.textContent = value; cell.appendChild(strong);
       host.appendChild(cell);
     });
-  }).catch(() => {});
+  }).catch(() => {
+    /* 取数失败给一行看得见的提示，不静默留空 */
+    const host = document.getElementById("dataGrid"); host.innerHTML = "";
+    const cell = el("data-cell err");
+    cell.textContent = "读取失败，检查本地服务后重进";
+    host.appendChild(cell);
+  });
 }
 
 
@@ -2742,9 +2757,12 @@ document.getElementById("modelCards").addEventListener("keydown", (e) => {
 });
 
 /* ── 设置栏目切换：点左列目录，右列换内容。「保存设置」只属于
-   凭证类栏目（教务 / 模型 / QQ）；待办与本地数据即改即存，不亮保存 ── */
+   凭证类栏目（教务 / 模型 / QQ）；本地数据即改即存，不亮保存 ── */
 const setTabs = [...document.querySelectorAll(".set-tab")];
+let setLastTab = "account"; // 记住上次停留的栏目，进设置直达上次位置
 function setTab(name) {
+  if (!setTabs.some((t) => t.dataset.pane === name)) name = "account";
+  setLastTab = name;
   for (const tab of setTabs) {
     const on = tab.dataset.pane === name;
     tab.classList.toggle("on", on);
@@ -2757,14 +2775,41 @@ function setTab(name) {
   document.getElementById("saveSettings").hidden = !["account", "model", "qq"].includes(name);
 }
 for (const tab of setTabs) tab.addEventListener("click", () => setTab(tab.dataset.pane));
-/* 上下方向键在栏目间移动焦点（与会话/型号卡片的键盘习惯一致），空格/回车进入栏目 */
+/* 方向键在栏目间移动焦点：大厅里目录是横排（左右）+ 窄屏也是横排，竖排同样支持上下 */
 document.getElementById("setTabs").addEventListener("keydown", (e) => {
-  if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+  if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) return;
   const i = setTabs.indexOf(document.activeElement);
   if (i < 0) return;
   e.preventDefault();
-  setTabs[(i + (e.key === "ArrowDown" ? 1 : -1) + setTabs.length) % setTabs.length].focus();
+  const step = (e.key === "ArrowDown" || e.key === "ArrowRight") ? 1 : -1;
+  setTabs[(i + step + setTabs.length) % setTabs.length].focus();
 });
+/* 状态总览：四栏配置一眼看完，点 chip 直达栏目（数据来自 showSettings 那次 /api/settings） */
+function renderSetStatus(d) {
+  const host = document.getElementById("setStatus");
+  if (!host || !d) return;
+  host.innerHTML = "";
+  const chips = [
+    { pane: "account", label: "教务", ok: !!(d.jwgl && d.jwgl.configured), warn: true },
+    { pane: "model", label: "模型", ok: !!(d.deepseek && d.deepseek.configured), warn: true },
+    { pane: "qq", label: "QQ", ok: !!(d.qq && d.qq.configured), warn: false },
+    { pane: "data", label: "数据", ok: true, warn: false },
+  ];
+  chips.forEach((c) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "set-chip" + (c.ok ? " ok" : "") + (!c.ok && c.warn ? " warn" : "");
+    b.dataset.pane = c.pane;
+    const dot = document.createElement("i");
+    dot.className = "dot";
+    dot.setAttribute("aria-hidden", "true");
+    b.appendChild(dot);
+    b.appendChild(document.createTextNode(c.label + " · " + (c.pane === "data" ? "本地" : (c.ok ? "已配" : "未配"))));
+    b.setAttribute("aria-label", c.label + "栏目：" + (c.pane === "data" ? "本地数据" : (c.ok ? "已配置" : "未配置")) + "，点击直达");
+    b.addEventListener("click", () => setTab(c.pane));
+    host.appendChild(b);
+  });
+}
 
 function qqStatusText(q) {
   return q && q.configured
@@ -2782,9 +2827,10 @@ function showSettings() {
      关掉大厅时还给 */
   const hall = document.getElementById("hall");
   if (!hall.contains(document.activeElement)) settingsReturnFocus = document.activeElement;
-  setTab("account");
+  setTab(setLastTab);
   setMsg.className = "setmsg";
   setMsg.textContent = "";
+  document.getElementById("setStatus").innerHTML = "";
   sPass.value = ""; sKey.value = ""; pickModel("");
   sQQAppId.value = ""; sQQSecret.value = ""; sQQPass.value = "";
   document.getElementById("diagJwgl").textContent = "";
@@ -2792,6 +2838,7 @@ function showSettings() {
   refreshData();
   fetch("/api/settings").then((r) => r.json()).then((d) => {
     setStatus = d;
+    renderSetStatus(d);
     sUser.value = "";
     sUser.placeholder = d.jwgl.username || "请输入教务系统学号";
     sPass.placeholder = d.jwgl.configured ? "已保存；留空不修改" : "请输入教务系统密码";
@@ -2819,23 +2866,47 @@ document.addEventListener("keydown", (e) => {
   closeDrawer();
 });
 
-function clearData(scopes, prompt) {
-  if (!window.confirm(prompt)) return;
+/* 本地数据清理：两步确认（与待办/知识的两步删除同一语言），替代原生 confirm。
+   第一击变身「确认清理/清空」，3 秒内再击才执行，超时还原；演示环境按钮本就 disabled */
+function armClearData(btn, scopes, confirmLabel) {
+  if (!btn || btn.disabled) return;
+  if (btn.dataset.armed !== "1") {
+    btn.dataset.armed = "1";
+    btn.dataset.label = btn.textContent;
+    btn.textContent = confirmLabel;
+    btn.classList.add("armed");
+    window.clearTimeout(btn.dataset.timer);
+    btn.dataset.timer = String(window.setTimeout(() => {
+      btn.dataset.armed = "";
+      btn.textContent = btn.dataset.label || confirmLabel;
+      btn.classList.remove("armed");
+    }, 3000));
+    return;
+  }
+  window.clearTimeout(Number(btn.dataset.timer));
+  btn.dataset.armed = "";
+  btn.classList.remove("armed");
+  btn.disabled = true;
+  btn.textContent = "清理中…";
   fetch("/api/data/clear", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scopes }),
   }).then((r) => r.json()).then(() => {
     refreshData(); refreshSessions();
     if (scopes.includes("sessions")) startFresh();
-  }).catch(() => {});
+  }).catch(() => {}).finally(() => {
+    btn.disabled = document.body.dataset.demo === "true";
+    btn.textContent = btn.dataset.label || confirmLabel;
+  });
 }
-document.getElementById("clearFiles").addEventListener("click", () => clearData(
-  ["attachments", "uploads", "generated"],
-  "清理已读附件副本、网页上传和生成文件？聊天记录与待办会保留。",
+document.getElementById("clearFiles").addEventListener("click", (e) => armClearData(
+  e.currentTarget, ["attachments", "uploads", "generated"], "确认清理文件？",
 ));
-document.getElementById("clearAllData").addEventListener("click", () => clearData(
-  ["sessions", "attachments", "uploads", "generated", "reminders"],
-  "清空全部本地会话、附件、生成文件和待办？此操作不可恢复。",
+document.getElementById("clearAllData").addEventListener("click", (e) => armClearData(
+  e.currentTarget, ["sessions", "attachments", "uploads", "generated", "reminders"], "确认清空全部？",
 ));
+/* 危险按钮的作用范围收进 title（悬停可见），常态文案保持短 */
+document.getElementById("clearFiles").title = "清理已读附件副本、网页上传和生成文件；聊天记录与待办保留";
+document.getElementById("clearAllData").title = "清空全部本地会话、附件、生成文件和待办；不可恢复";
 document.getElementById("saveSettings").addEventListener("click", () => {
   const body = {};
   const u = sUser.value.trim(), pw = sPass.value, k = sKey.value.trim();
@@ -2867,16 +2938,19 @@ document.getElementById("saveSettings").addEventListener("click", () => {
   }
   const saveBtn = document.getElementById("saveSettings");
   saveBtn.disabled = true;
+  saveBtn.textContent = "保存中…";
   fetch("/api/settings", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   }).then((r) => r.json().then((d) => ({ ok: r.ok, d }))).then(({ ok, d }) => {
     saveBtn.disabled = false;
+    saveBtn.textContent = "保存设置";
     setMsg.className = "setmsg" + (ok ? " good" : "");
     setMsg.textContent = (d.results || []).map((x) => x.message).join("\\n");
     if (ok && d.status) {
       setStatus = d.status; sUser.value = ""; sPass.value = ""; sKey.value = "";
+      renderSetStatus(d.status);
       sUser.placeholder = d.status.jwgl.username || "请输入教务系统学号";
       sPass.placeholder = d.status.jwgl.configured ? "已保存；留空不修改" : "请输入教务系统密码";
       document.getElementById("curJwgl").textContent = d.status.jwgl.configured
@@ -2892,6 +2966,7 @@ document.getElementById("saveSettings").addEventListener("click", () => {
     }
   }).catch(() => {
     saveBtn.disabled = false;
+    saveBtn.textContent = "保存设置";
     setMsg.textContent = "保存失败，请确认本地服务正在运行后重试。";
   });
 });
