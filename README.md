@@ -16,7 +16,7 @@
 [![Last Commit](https://img.shields.io/github/last-commit/Health-525/courseraptor?color=orange)](https://github.com/Health-525/courseraptor/commits/master)
 [![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social)](https://github.com/Health-525/courseraptor)
 
-**[🚀 快速开始](#-快速开始) · [✨ 核心能力](#-核心能力) · [📸 界面预览](#-界面预览) · [📡 已知状态](#-已知状态-2026-09) · [🏗️ 技术栈](#-技术栈) · [⚠️ 免责声明](#️-免责声明与使用建议) · [📖 完整文档](docs/capabilities.md)**
+**[🚀 快速开始](#-快速开始) · [✨ 核心能力](#-核心能力) · [📡 已知状态](#-已知状态-2026-09) · [🏗️ 技术栈](#-技术栈) · [⚠️ 免责声明](#️-免责声明与使用建议) · [📖 完整文档](docs/capabilities.md)**
 
 </div>
 
@@ -54,6 +54,8 @@
 ---
 
 ## 🚀 快速开始
+
+同一个 agent，两种入口：终端里敲 `raptor` 直接对话，或浏览器打开 `http://localhost:3210` 用网页版。思考过程、工具调用、每轮问答都会归档进会话历史。
 
 ### 方式一：下载安装包（推荐给同学，无需任何开发环境）
 
@@ -106,26 +108,6 @@ Agent 默认可调用 **30 个工具**，覆盖十大能力线。完整参数表
 | 🧠 两层记忆 | 📝 待办提醒 | 📚 知识库 | 🍅 番茄钟 | 💬 QQ 接入 |
 |-------------|-------------|-----------|-----------|------------|
 | 短期会话跨重启延续 / 长期事实自主维护(合并/过期/归档) | 随口记、到期自动提醒(桌面+QQ)、三端同步 | 对话自动沉淀、按课程归类、多入口检索 | 对话开计时、网页实时倒计时 | 官方机器人零封号、白名单制、对话双向归档 |
-
----
-
-## 📸 界面预览
-
-同一个 agent，两种入口：终端里敲 `raptor` 直接对话，或浏览器打开 `http://localhost:3210` 用网页版。思考过程、工具调用、每轮问答都会归档进会话历史。
-
-<div align="center">
-
-**网页版 · 红头档案 UI**  
-*聊天区展示思考草稿卡片、工具调用链、教务通知回答；右侧功能大厅可推出待办/知识库/番茄钟等面板*
-
-<img src="docs/screenshot-web.png" width="880" alt="CourseRaptor 网页对话界面" />
-
-**终端版 · TUI 欢迎面板**  
-*启动即展示今日课表、临近考试、最新通知；支持卡片/行内双模式、斜杠命令菜单*
-
-<img src="docs/screenshot-tui.png" width="880" alt="CourseRaptor 终端对话界面" />
-
-</div>
 
 ---
 
