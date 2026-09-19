@@ -37,12 +37,16 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   /* 锁定整页：只有消息区能滚，输入/发送条永远钉在视口底部；
-     dvh 让移动端键盘弹出时底栏跟着抬进可见区而不是被顶出屏幕 */
-  body { margin: 0; display: grid; grid-template-columns: 284px 1fr;
+     dvh 让移动端键盘弹出时底栏跟着抬进可见区而不是被顶出屏幕。
+     第三列 0px 是功能大厅的坑位：打开时撑到 min(420px, 40vw)，
+     聊天主区被真实地往左推——不是浮层盖上来。 */
+  body { margin: 0; display: grid; grid-template-columns: 284px 1fr 0;
          height: 100vh; height: 100dvh; overflow: hidden;
          background: var(--paper); color: var(--ink);
          font-family: var(--sans); font-size: 16px; line-height: 1.7;
-         -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+         -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+         transition: grid-template-columns .24s ease; }
+  body.hall-open { grid-template-columns: 284px 1fr min(420px, 40vw); }
   ::selection { background: var(--accent-soft); }
   button, input, textarea { font-family: inherit; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -130,6 +134,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                   border-radius: 2px; }
   .smenu button:hover { background: var(--accent-soft); color: var(--accent-deep); }
   .smenu button.danger:hover { background: var(--accent); color: #fff; }
+  /* 两步删除的确认态：常驻红底（对齐待办/知识页的 armed 习惯） */
+  .smenu button.armed { background: var(--accent); color: #fff; }
   .smenu .ssep { height: 1px; margin: 4px 6px; background: var(--rule); }
   .sess .snone { display: block; color: var(--ink-3); font-size: 14px;
                  padding: 6px 2px; cursor: default; }
@@ -542,17 +548,14 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .drawer-backdrop { display: none; position: fixed; inset: 0; z-index: 39;
                      background: rgba(38, 35, 29, .35); }
 
-  /* ── 功能大厅：从右侧 push 出来的抽屉。同一份 UI 服务两个入口：
-     侧栏按钮点击，或对话里触发对应工具时自动推出。 ── */
+  /* ── 功能大厅：占据正文网格的第三列，打开时把聊天区往左推（真 push）。
+     同一份 UI 服务两个入口：侧栏按钮点击，或对话里触发对应工具时自动推出。
+     窄屏（≤960px）推不动，退回右侧滑入的浮层 + 遮罩。 ── */
   .hall-backdrop { display: none; position: fixed; inset: 0; z-index: 44;
                    background: rgba(38, 35, 29, .35); }
-  .hall { position: fixed; top: 0; right: 0; bottom: 0; z-index: 45;
-          width: min(420px, 92vw); display: flex; flex-direction: column;
-          background: var(--paper); border-left: 1px solid var(--rule-2);
-          box-shadow: -14px 0 36px rgba(38, 35, 29, .2);
-          transform: translateX(103%); transition: transform .22s ease; }
-  body.hall-open .hall { transform: translateX(0); }
-  body.hall-open .hall-backdrop { display: block; }
+  .hall { grid-column: 3; min-width: 0; min-height: 0;
+          display: flex; flex-direction: column; overflow: hidden;
+          background: var(--paper); border-left: 1px solid var(--rule-2); }
   .hall-head { display: flex; align-items: center; gap: 10px; padding: 16px 22px 9px; }
   .hall-title { flex: 1; font-family: var(--kai); font-size: 22px;
                 color: var(--accent); letter-spacing: 3px; }
@@ -629,6 +632,14 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 
   @media (max-width: 960px) {
     body { grid-template-columns: 1fr; }
+    /* 窄屏推不动主区：大厅退回右侧滑入的浮层 + 遮罩 */
+    body.hall-open { grid-template-columns: 1fr; }
+    .hall { position: fixed; top: 0; right: 0; bottom: 0; z-index: 45;
+            width: min(420px, 92vw); transform: translateX(103%);
+            transition: transform .2s ease;
+            box-shadow: -14px 0 36px rgba(38, 35, 29, .2); }
+    body.hall-open .hall { transform: translateX(0); }
+    body.hall-open .hall-backdrop { display: block; }
     aside { display: flex; position: fixed; inset: 0 auto 0 0; z-index: 40; width: min(320px, 88vw);
             transform: translateX(-102%); transition: transform .2s ease;
             box-shadow: 14px 0 36px rgba(38, 35, 29, .2); }
@@ -735,7 +746,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   </form>
 </main>
 <div class="hall-backdrop" id="hallBackdrop"></div>
-<aside class="hall" id="hall" role="dialog" aria-modal="true" aria-label="功能大厅">
+<aside class="hall" id="hall" aria-label="功能大厅" inert>
   <div class="hall-head">
     <button class="hall-back" id="hallBack" type="button" hidden>← 大厅</button>
     <span class="hall-title" id="hallTitle">功能大厅</span>
@@ -840,6 +851,9 @@ let msgs = [];
 let lastSessions = [];
 let sessionQuery = "";
 let sessionActionsId = "";
+/* 会话删除的两步确认态：armed 的那条 3 秒内再点才执行（对齐待办/知识页） */
+let delArmId = "";
+let delArmTimer = 0;
 let editingSessionId = "";
 let pendingUploads = [];
 function lsSet(k, v) {
@@ -1292,6 +1306,7 @@ function renderSessList() {
     x.className = "sx";
     x.dataset.actions = s.id;
     x.title = "会话操作";
+    x.setAttribute("aria-label", "会话操作");
     x.setAttribute("aria-haspopup", "menu");
     x.setAttribute("aria-expanded", sessionActionsId === s.id ? "true" : "false");
     x.textContent = "⋯";
@@ -1311,7 +1326,13 @@ function renderSessList() {
       action(s.pinned ? "取消置顶" : "置顶", "pin");
       action("改名", "rename");
       menu.appendChild(el("ssep"));
-      action("删除", "del", true);
+      const delBtn = action("删除", "del", true);
+      /* 两步确认：已 armed 的那条直接渲染成确认态 */
+      if (delArmId === s.id) {
+        delBtn.dataset.armed = "1";
+        delBtn.textContent = "确认删除";
+        delBtn.classList.add("armed");
+      }
       li.appendChild(menu);
     }
     sessList.appendChild(li);
@@ -1360,7 +1381,7 @@ function openSession(id) {
 
 function delSession(id) {
   if (busy) return;
-  if (!window.confirm("删除这个会话？不可恢复。")) return;
+  /* 调用方已做两步确认（菜单 armed），这里不再弹 confirm */
   fetch("/api/sessions/" + encodeURIComponent(id), { method: "DELETE" })
     .then(() => refreshSessions())
     .then(() => {
@@ -1384,7 +1405,24 @@ function startFresh() {
 
 sessList.addEventListener("click", (e) => {
   const del = e.target.closest("button[data-del]");
-  if (del) { sessionActionsId = ""; delSession(del.dataset.del); return; }
+  if (del) {
+    const id = del.dataset.del;
+    /* 第一次点变身「确认删除」，3 秒内再点才执行，超时还原（对齐待办/知识页） */
+    if (delArmId === id) {
+      clearTimeout(delArmTimer);
+      delArmId = "";
+      sessionActionsId = "";
+      delSession(id);
+    } else {
+      delArmId = id;
+      renderSessList();
+      clearTimeout(delArmTimer);
+      delArmTimer = setTimeout(() => {
+        if (delArmId === id) { delArmId = ""; renderSessList(); }
+      }, 3000);
+    }
+    return;
+  }
   const pin = e.target.closest("button[data-pin]");
   if (pin) {
     const current = lastSessions.find((s) => s.id === pin.dataset.pin);
@@ -1414,6 +1452,19 @@ document.addEventListener("click", (e) => {
 
 document.getElementById("sessSearch").addEventListener("input", (e) => {
   sessionQuery = e.target.value.trim(); renderSessList();
+});
+/* 部分浏览器点搜索框原生 × 只发 search 不发 input，兜底同步一次 */
+document.getElementById("sessSearch").addEventListener("search", (e) => {
+  sessionQuery = e.target.value.trim(); renderSessList();
+});
+/* Esc 清空搜索（对齐知识库页）；有内容时吞掉事件，别冒泡去关抽屉 */
+document.getElementById("sessSearch").addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && e.target.value) {
+    e.stopPropagation();
+    e.target.value = "";
+    sessionQuery = "";
+    renderSessList();
+  }
 });
 
 function openDrawer() { document.body.classList.add("drawer-open"); }
@@ -1605,17 +1656,28 @@ function renderHall() {
     dyn.replaceChildren(body);
   }
 }
-function openHall(panel) {
+function openHall(panel, opts) {
   if (panel) hallPanel = panel;
   document.body.classList.add("hall-open");
+  /* 收起态宽度为 0：inert 挡住不可见内容的键盘焦点，打开时解除 */
+  document.getElementById("hall").inert = false;
   renderHall();
-  document.getElementById("closeHall").focus();
+  /* push 进来时不抢焦点：对话联动自动打开的场合，用户可能正在打字 */
+  if (!opts || opts.focus !== false) document.getElementById("closeHall").focus();
 }
 function closeHall() {
   if (!document.body.classList.contains("hall-open")) return;
   document.body.classList.remove("hall-open");
+  document.getElementById("hall").inert = true;
   /* 对话进行中手动关掉：这一轮不再因工具调用自动弹出 */
   if (busy) hallAutoMuted = true;
+  /* 从设置面板关掉时，焦点还给打开它的那张卡片（#21 的焦点归还语义） */
+  if (settingsReturnFocus) {
+    if (typeof settingsReturnFocus.focus === "function" && document.contains(settingsReturnFocus)) {
+      settingsReturnFocus.focus();
+    }
+    settingsReturnFocus = null;
+  }
 }
 document.getElementById("openHall").addEventListener("click", () => { hallPanel = ""; openHall(); });
 document.getElementById("openHallM").addEventListener("click", () => { hallPanel = ""; openHall(); });
@@ -1670,6 +1732,8 @@ const rSource = document.getElementById("rSource");
 const rNotes = document.getElementById("rNotes");
 let reminderSourceUrl = "";
 let setStatus = null;
+/* 设置弹窗关闭后焦点回到触发按钮（键盘用户不丢位置） */
+let settingsReturnFocus = null;
 
 function localDateTime(value) {
   if (!value) return "";
@@ -1870,6 +1934,10 @@ function qqApplyStatus(q) {
 }
 
 function showSettings() {
+  /* #21 的焦点归还：记下抽屉外的打开者（宫格卡片在抽屉里，归还无意义），
+     关掉大厅时还给 */
+  const hall = document.getElementById("hall");
+  if (!hall.contains(document.activeElement)) settingsReturnFocus = document.activeElement;
   setTab("account");
   setMsg.className = "setmsg";
   setMsg.textContent = "";
@@ -1991,9 +2059,10 @@ refreshSessions().then(() => {
 });
 
 /* QQ 那边的对话也写进同一份档案，光靠启动拉一次要重开页面才看得见。
-   定时补一次列表：正在回复（busy）不打断，标签页在后台（hidden）不刷 */
+   定时补一次列表：正在回复（busy）不打断，标签页在后台（hidden）不刷，
+   正在改名或操作菜单开着时不刷——重绘会销毁输入中的改名框并关掉菜单 */
 setInterval(() => {
-  if (!busy && !document.hidden) refreshSessions();
+  if (!busy && !document.hidden && !editingSessionId && !sessionActionsId) refreshSessions();
 }, 20000);
 
 /* ── 网页附件：先上传到本机受控目录，再随本轮只发送附件 id ── */
@@ -2004,7 +2073,24 @@ function renderUploads() {
   uploadTray.innerHTML = "";
   pendingUploads.forEach((upload) => {
     const chip = el("upchip" + (upload.status === "uploading" ? " loading" : ""));
-    chip.appendChild(el2("", (upload.status === "uploading" ? "上传中 · " : upload.status === "error" ? "失败 · " : "附件 · ") + upload.name));
+    if (upload.status === "error") {
+      /* 失败 chip 可点击重试：原名保留，错误原因收进 title */
+      chip.appendChild(el2("", "失败，点击重试 · " + upload.name));
+      chip.title = upload.error || "上传失败";
+      chip.tabIndex = 0;
+      chip.setAttribute("role", "button");
+      chip.style.cursor = "pointer";
+      const retry = () => { doUpload(upload); };
+      chip.addEventListener("click", (e) => {
+        if (e.target.closest("button")) return;
+        retry();
+      });
+      chip.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); retry(); }
+      });
+    } else {
+      chip.appendChild(el2("", (upload.status === "uploading" ? "上传中 · " : "附件 · ") + upload.name));
+    }
     const remove = document.createElement("button");
     remove.type = "button"; remove.textContent = "✕"; remove.title = "移除附件";
     remove.addEventListener("click", () => {
@@ -2023,21 +2109,25 @@ function fileAsBase64(file) {
   });
 }
 async function uploadFile(file) {
-  const localId = uuid();
-  const item = { localId, name: file.name, size: file.size, status: "uploading" };
+  const item = { localId: uuid(), name: file.name, size: file.size, status: "uploading", file };
   pendingUploads.push(item); renderUploads(); syncBtn();
+  await doUpload(item);
+}
+/* 上传执行体拆出来：失败 chip 点一下就能重试，不用删了重选 */
+async function doUpload(item) {
+  item.status = "uploading"; item.error = "";
+  renderUploads(); syncBtn();
   try {
-    const data = await fileAsBase64(file);
+    const data = await fileAsBase64(item.file);
     const response = await fetch("/api/uploads", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: file.name, type: file.type, data }),
+      body: JSON.stringify({ name: item.file.name, type: item.file.type, data }),
     });
     const body = await response.json();
     if (!response.ok) throw new Error(body.error || "上传失败");
     Object.assign(item, body.upload, { status: "ready" });
   } catch (error) {
     item.status = "error"; item.error = String(error.message || error);
-    item.name = item.name + "（" + item.error + "）";
   }
   renderUploads(); syncBtn();
 }
@@ -2059,6 +2149,7 @@ async function send(text) {
   busy = true;
   lastPrompt = text;
   hero.style.display = "none";
+  document.title = "● 回复中 · CourseRaptor";
   const t0 = Date.now();
   const sendingUploads = pendingUploads.filter((x) => x.status === "ready");
   const attachmentView = sendingUploads.map((x) => ({ id: x.id, name: x.name }));
@@ -2117,7 +2208,7 @@ async function send(text) {
             toolCard(shell, ev);
             /* 说到哪块，对应面板自动从右边推出；这轮被手动关过就不再打扰 */
             const panel = TOOL_PANEL[ev.name];
-            if (panel && !hallAutoMuted) openHall(panel);
+            if (panel && !hallAutoMuted) openHall(panel, { focus: false });
           } else {
             toolDone(shell, ev, ev.phase === "end");
             if (ev.files && ev.files.length) fileRows(shell.tl, ev.files);
@@ -2183,8 +2274,10 @@ async function send(text) {
     btn.classList.remove("stop");
     btn.innerHTML = '发送<span class="kbd">⏎</span>';
     syncBtn();
-    /* 标题可能挂着完成提醒；切走了就补一次亮灯 */
+    /* 标题可能挂着完成提醒；切走了就补一次亮灯。
+       一直可见时把「回复中」复位（番茄钟到点写的标题不碰） */
     if (document.hidden) document.title = "● 回复完成 · CourseRaptor";
+    else if (document.title.startsWith("● 回复中")) document.title = "CourseRaptor";
     refreshSessions();
     input.focus();
   }
