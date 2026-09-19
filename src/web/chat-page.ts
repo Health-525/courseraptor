@@ -21,7 +21,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     --shade: #ECE8DD;   /* 压深的纸（表头/代码底） */
     --ink: #25221C;     /* 墨 */
     --ink-2: #5A554A;
-    --ink-3: #898274;
+    /* 旧值 #898274 在纸底上仅 ~3.5:1，调深以满足 WCAG AA（小字 ≥4.5:1，与 today/knowledge 页一致） */
+    --ink-3: #6E6656;
     --rule: #E1DCCF;    /* 细线 */
     --rule-2: #C9C1AF;  /* 重一点的线 */
     --accent: #AD392C;      /* 朱砂 */
@@ -82,10 +83,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                             font-weight: 600; letter-spacing: .12em; }
   .mastbtns .tbtn.primary:hover { background: var(--accent-deep);
                                   border-color: var(--accent-deep); color: #fff; }
-  /* 日程入口：朱砂同族浅底深字，与主按钮构成主/次两级；不要描边（用户要求），悬停加深成实底 */
-  .mastbtns a.tbtn { background: var(--accent-soft); border-color: transparent;
+  /* 大厅入口：朱砂同族浅底深字，与主按钮构成主/次两级；不要描边（用户要求），悬停加深成实底 */
+  .mastbtns .tbtn.hall-btn { background: var(--accent-soft); border-color: transparent;
                      color: var(--accent-deep); font-weight: 600; }
-  .mastbtns a.tbtn:hover { background: var(--accent); border-color: transparent;
+  .mastbtns .tbtn.hall-btn:hover { background: var(--accent); border-color: transparent;
                            color: #fff; }
   .foot-btn { flex: none; width: 100%; background: rgba(252, 251, 247, .48);
               color: var(--ink-2); }
@@ -543,6 +544,51 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .drawer-backdrop { display: none; position: fixed; inset: 0; z-index: 39;
                      background: rgba(38, 35, 29, .35); }
 
+  /* ── 功能大厅：从右侧 push 出来的抽屉。同一份 UI 服务两个入口：
+     侧栏按钮点击，或对话里触发对应工具时自动推出。 ── */
+  .hall-backdrop { display: none; position: fixed; inset: 0; z-index: 44;
+                   background: rgba(38, 35, 29, .35); }
+  .hall { position: fixed; top: 0; right: 0; bottom: 0; z-index: 45;
+          width: min(420px, 92vw); display: flex; flex-direction: column;
+          background: var(--paper); border-left: 1px solid var(--rule-2);
+          box-shadow: -14px 0 36px rgba(38, 35, 29, .2);
+          transform: translateX(103%); transition: transform .22s ease; }
+  body.hall-open .hall { transform: translateX(0); }
+  body.hall-open .hall-backdrop { display: block; }
+  .hall-head { display: flex; align-items: center; gap: 10px; padding: 16px 22px 9px; }
+  .hall-title { flex: 1; font-family: var(--kai); font-size: 22px;
+                color: var(--accent); letter-spacing: 3px; }
+  .hall-back { border: 0; background: none; color: var(--ink-3); cursor: pointer;
+               font-size: 13px; padding: 2px 4px; border-radius: 3px; }
+  .hall-back:hover { color: var(--accent); }
+  .hall-rule { border-bottom: 2px solid var(--accent); margin: 0 22px; }
+  .hall-body { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 22px 24px; }
+  /* 宫格：每个功能一张档案卡片，朱砂竖线在选中语言里已是「可进入」的记号 */
+  .hall-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
+  .hall-card { display: flex; flex-direction: column; gap: 4px; text-align: left;
+               border: 1px solid var(--rule); border-left: 3px solid var(--rule-2);
+               background: var(--card); border-radius: 3px; padding: 12px 12px 10px;
+               cursor: pointer; font-family: inherit;
+               transition: border-color .15s ease, box-shadow .15s ease; }
+  .hall-card:hover { border-color: var(--rule-2); border-left-color: var(--accent);
+                     box-shadow: var(--shadow-sm); }
+  .hall-card b { font-size: 15px; font-weight: 600; }
+  .hall-card span { font-size: 12px; color: var(--ink-3); line-height: 1.6; }
+  .hall-note { margin: 14px 2px 0; font-family: var(--mono); font-size: 12px;
+               color: var(--ink-3); line-height: 1.7; }
+  .hall-more { display: inline-block; margin-top: 12px; font-family: var(--mono);
+               font-size: 12px; color: var(--ink-3); text-decoration: none; }
+  .hall-more:hover { color: var(--accent); }
+  /* 面板条目：与待办列表同一语言，等信息以两行表达（标题 + 等宽小字） */
+  .hall-item { border: 1px solid var(--rule); background: var(--card);
+               padding: 8px 11px; margin-bottom: 6px; }
+  .hall-item .ht { font-size: 14px; font-weight: 600; line-height: 1.5;
+                   overflow-wrap: anywhere; }
+  .hall-item .hm { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
+                   margin-top: 2px; }
+  .hall-item.hot { border-left: 3px solid var(--accent); }
+  .hall-item.hot .hm { color: var(--accent-deep); }
+
   #log::-webkit-scrollbar { width: 10px; }
   #log::-webkit-scrollbar-thumb {
     background: var(--rule-2); border: 3px solid transparent;
@@ -628,8 +674,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   </div>
   <div class="mastbtns">
     <button class="tbtn primary" id="newSession" title="另起一个会话（旧会话保留在档案里）">新会话</button>
-    <a class="tbtn" href="/today" title="下一节课、今日安排、本周概览与临近考试">今日日程</a>
-    <a class="tbtn" href="/knowledge" title="对话中沉淀的知识，按课程自动归类">知识库</a>
+    <button class="tbtn hall-btn" id="openHall" title="今日日程、课表、考试、待办、知识库、番茄钟">功能大厅</button>
   </div>
   <section class="sec">
     <h2>会话档案<span id="sessCount"></span></h2>
@@ -642,8 +687,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   ${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 全部为虚构数据</strong><span>不连接教务或 AI，不保存到磁盘。请勿输入个人信息。正式使用请在终端运行 npm start。</span></div>' : ""}
   <div class="topbar">
     <span class="tb-title wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></span>
-    <a class="tbtn" href="/today">今日</a>
-    <a class="tbtn" href="/knowledge">知识</a>
+    <button class="tbtn" id="openHallM">大厅</button>
     <button class="tbtn" id="openDrawerM">会话</button>
     <button class="tbtn" id="newSessionM">新会话</button>
     <button class="tbtn" id="openSettingsM">设置</button>
@@ -673,6 +717,16 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     </div>
   </form>
 </main>
+<div class="hall-backdrop" id="hallBackdrop"></div>
+<aside class="hall" id="hall" role="dialog" aria-modal="true" aria-label="功能大厅">
+  <div class="hall-head">
+    <button class="hall-back" id="hallBack" type="button" hidden>← 大厅</button>
+    <span class="hall-title" id="hallTitle">功能大厅</span>
+    <button class="dclose" id="closeHall" aria-label="关闭功能大厅">✕</button>
+  </div>
+  <div class="hall-rule"></div>
+  <div class="hall-body" id="hallBody"></div>
+</aside>
 <div class="drawer-backdrop" id="drawerBackdrop"></div>
 <div class="overlay" id="overlay" hidden>
   <div class="dlg wide" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
@@ -1354,6 +1408,215 @@ function closeDrawer() { document.body.classList.remove("drawer-open"); }
 document.getElementById("openDrawerM").addEventListener("click", openDrawer);
 document.getElementById("drawerBackdrop").addEventListener("click", closeDrawer);
 
+/* ── 功能大厅：右侧 push 抽屉。宫格是主页，各面板按需取数；
+   对话过程中 agent 调到对应工具（TOOL_PANEL）时自动推出该面板。 ── */
+const HALL_CARDS = [
+  { id: "today", t: "今日日程", d: "下一节课、今日安排与本周概览" },
+  { id: "schedule", t: "课表", d: "本周每天的课与调休安排" },
+  { id: "exams", t: "考试", d: "临近考试的时间、地点与座位" },
+  { id: "todos", t: "待办", d: "作业与事务的截止提醒" },
+  { id: "knowledge", t: "知识库", d: "对话中沉淀的知识条目" },
+  { id: "pomodoro", t: "番茄钟", d: "专注计时与最近记录" },
+];
+const HALL_TITLES = Object.fromEntries(HALL_CARDS.map((c) => [c.id, c.t]));
+const HALL_DEMO = document.body.dataset.demo === "true";
+const hallBody = document.getElementById("hallBody");
+const hallTitle = document.getElementById("hallTitle");
+const hallBack = document.getElementById("hallBack");
+let hallPanel = "";        // 当前面板 id；空 = 宫格主页
+let hallBrief = null;      // /api/today 一次取数，日程/课表/考试/待办/知识五个面板共享
+let hallAutoMuted = false; // 本轮对话里用户手动关过抽屉：这轮不再自动弹
+
+function briefOf() {
+  if (hallBrief) return Promise.resolve(hallBrief);
+  if (HALL_DEMO) return Promise.reject(new Error("demo"));
+  return fetch("/api/today").then((r) => r.json()).then((d) => { hallBrief = d; return d; });
+}
+
+function hallItem(title, meta, hot) {
+  const item = el("hall-item" + (hot ? " hot" : ""));
+  item.appendChild(el2("ht", title));
+  if (meta) item.appendChild(el2("hm", meta));
+  return item;
+}
+function hallNote(text) { return el2("hall-note", text); }
+function hallFullPage(panel) {
+  return panel === "knowledge" ? "/knowledge" : "/today";
+}
+function hallMore(panel) {
+  const a = document.createElement("a");
+  a.className = "hall-more"; a.href = hallFullPage(panel);
+  a.textContent = "打开完整页 →";
+  return a;
+}
+
+/* 各面板的构建函数：入参是 /api/today 的 Brief（番茄钟除外，走自己的接口） */
+function buildToday(b) {
+  const wrap = el("");
+  wrap.appendChild(hallItem(b.dateLabel + " · " + (b.term.weekLabel || "未在教学周"), "", true));
+  if (b.next) {
+    wrap.appendChild(hallItem("下一节 · " + b.next.course.title,
+      b.next.dateLabel + " " + (b.next.course.time || b.next.course.periods || "")
+      + (b.next.course.location ? " @" + b.next.course.location : ""),
+      b.next.startsInMin <= 60));
+  }
+  (b.schedule.courses || []).forEach((c) => {
+    wrap.appendChild(hallItem(c.title, [c.periods, c.time, c.location ? "@" + c.location : ""].filter(Boolean).join(" · ")));
+  });
+  if (!(b.schedule.courses || []).length && !b.next) wrap.appendChild(hallNote("今天没有课。"));
+  wrap.appendChild(hallMore("today"));
+  return wrap;
+}
+function buildSchedule(b) {
+  const wrap = el("");
+  if (!b.schedule.available) {
+    wrap.appendChild(hallNote("还没有课表缓存；在对话框里说「课表」，查询后这里就会显示。"));
+    return wrap;
+  }
+  ((b.week && b.week.days) || []).forEach((d) => {
+    if (d.holiday) {
+      wrap.appendChild(hallItem(d.label + " " + d.dateShort, d.holiday + (d.makeup ? " · 调休补课日" : "")));
+      return;
+    }
+    d.courses.forEach((c) => {
+      wrap.appendChild(hallItem(d.label + " " + c.title,
+        [c.time, c.location ? "@" + c.location : "", c.teacher].filter(Boolean).join(" · "), d.isToday));
+    });
+  });
+  wrap.appendChild(hallMore("schedule"));
+  return wrap;
+}
+function buildExams(b) {
+  const wrap = el("");
+  const list = (b.exams && b.exams.upcoming) || [];
+  if (!list.length) wrap.appendChild(hallNote("近 14 天没有考试安排。"));
+  list.forEach((x) => {
+    wrap.appendChild(hallItem(x.subject,
+      [x.date, x.time, x.location, x.seatNumber ? "座位 " + x.seatNumber : ""].filter(Boolean).join(" · "),
+      x.isToday || x.inDays <= 3));
+  });
+  wrap.appendChild(hallMore("exams"));
+  return wrap;
+}
+function buildTodos(b) {
+  const wrap = el("");
+  const list = (b.todos && b.todos.items) || [];
+  if (!list.length) wrap.appendChild(hallNote("暂无待办；在对话框里说「提醒我……」就能记录。"));
+  list.forEach((t) => {
+    wrap.appendChild(hallItem(t.title, t.dueLabel + (t.overdue ? " · 已逾期" : t.isToday ? " · 今天到期" : ""), t.overdue));
+  });
+  wrap.appendChild(hallMore("todos"));
+  return wrap;
+}
+function buildKnowledge(b) {
+  const wrap = el("");
+  wrap.appendChild(hallNote("共 " + b.knowledge.total + " 条，最近更新的："));
+  (b.knowledge.recent || []).forEach((k) => {
+    wrap.appendChild(hallItem(k.title, (k.category || "未分类") + " · " + String(k.content || "").replace(/\s+/g, " ").slice(0, 48)));
+  });
+  wrap.appendChild(hallMore("knowledge"));
+  return wrap;
+}
+function buildPomodoro() {
+  const wrap = el("");
+  if (HALL_DEMO) { wrap.appendChild(hallNote("离线演示不提供番茄钟数据。")); return wrap; }
+  return fetch("/api/pomodoro").then((r) => r.json()).then((d) => {
+    if (d.active) {
+      wrap.appendChild(hallItem(d.active.label + " · 进行中",
+        "剩余 " + Math.floor(d.active.remainingSec / 60) + " 分 " + pad(d.active.remainingSec % 60) + " 秒（共 " + d.active.focusMinutes + " 分钟）", true));
+    } else {
+      wrap.appendChild(hallNote("没有进行中的番茄钟；在对话框里说「来一个 25 分钟番茄钟」。"));
+    }
+    const stateName = { running: "进行中", done: "已完成", cancelled: "已取消" };
+    (d.recent || []).slice(0, 5).forEach((p) => {
+      wrap.appendChild(hallItem(p.label, (stateName[p.status] || p.status) + " · " + p.focusMinutes + " 分钟"));
+    });
+    return wrap;
+  });
+}
+const HALL_PANELS = {
+  today: () => briefOf().then(buildToday),
+  schedule: () => briefOf().then(buildSchedule),
+  exams: () => briefOf().then(buildExams),
+  todos: () => briefOf().then(buildTodos),
+  knowledge: () => briefOf().then(buildKnowledge),
+  pomodoro: buildPomodoro,
+};
+
+function renderHall() {
+  hallBody.innerHTML = "";
+  hallBack.hidden = !hallPanel;
+  if (!hallPanel) {
+    hallTitle.textContent = "功能大厅";
+    const grid = el("hall-grid");
+    HALL_CARDS.forEach((c) => {
+      const card = document.createElement("button");
+      card.type = "button"; card.className = "hall-card"; card.dataset.panel = c.id;
+      const t = document.createElement("b"); t.textContent = c.t; card.appendChild(t);
+      const s = document.createElement("span"); s.textContent = c.d; card.appendChild(s);
+      grid.appendChild(card);
+    });
+    hallBody.appendChild(grid);
+    hallBody.appendChild(hallNote(HALL_DEMO
+      ? "离线演示不含实时数据；正式运行后点开即显示。"
+      : "提示：在对话框里说「课表」「考试」，对应面板会自动从右边推出。"));
+    return;
+  }
+  hallTitle.textContent = HALL_TITLES[hallPanel] || hallPanel;
+  const build = HALL_PANELS[hallPanel];
+  if (!build) { hallBody.appendChild(hallNote("该功能暂无面板。")); return; }
+  const body = build();
+  if (body && typeof body.then === "function") {
+    body.then((node) => {
+      /* 取数期间用户可能已关掉或切走：只往还开着的面板里补画 */
+      if (document.body.classList.contains("hall-open") && hallBody) hallBody.replaceChildren(node);
+    }).catch(() => {
+      if (document.body.classList.contains("hall-open")) {
+        hallBody.replaceChildren(hallNote(HALL_DEMO
+          ? "离线演示不含该数据；正式运行 npm start 后可用。"
+          : "取数失败，稍后再试。"));
+      }
+    });
+  } else {
+    hallBody.replaceChildren(body);
+  }
+}
+function openHall(panel) {
+  if (panel) hallPanel = panel;
+  document.body.classList.add("hall-open");
+  renderHall();
+  document.getElementById("closeHall").focus();
+}
+function closeHall() {
+  if (!document.body.classList.contains("hall-open")) return;
+  document.body.classList.remove("hall-open");
+  /* 对话进行中手动关掉：这一轮不再因工具调用自动弹出 */
+  if (busy) hallAutoMuted = true;
+}
+document.getElementById("openHall").addEventListener("click", () => { hallPanel = ""; openHall(); });
+document.getElementById("openHallM").addEventListener("click", () => { hallPanel = ""; openHall(); });
+document.getElementById("closeHall").addEventListener("click", closeHall);
+document.getElementById("hallBackdrop").addEventListener("click", closeHall);
+hallBack.addEventListener("click", () => { hallPanel = ""; renderHall(); });
+hallBody.addEventListener("click", (e) => {
+  const card = e.target.closest("[data-panel]");
+  if (card) { hallPanel = card.dataset.panel; renderHall(); }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeHall();
+});
+
+/* 工具名 → 功能大厅面板：对话里问到哪块，对应面板就从右边推出来 */
+const TOOL_PANEL = {
+  get_schedule: "schedule",
+  export_calendar: "schedule",
+  get_exams: "exams",
+  manage_todos: "todos",
+  manage_knowledge: "knowledge",
+  manage_pomodoro: "pomodoro",
+};
+
+
 async function doNewSession() {
   if (busy) return;
   /* 当前会话还没说过话：不重复建档，光标归位即可 */
@@ -1791,6 +2054,9 @@ async function send(text) {
   btn.innerHTML = '停止<span class="kbd">⏎</span>';
   let raw = "";
   let thinkRaw = "";
+  /* 新一轮对话：面板数据按本轮重取；手动关过的自动弹出重新允许 */
+  hallBrief = null;
+  hallAutoMuted = false;
   controller = new AbortController();
   try {
     const res = await fetch("/api/chat", {
@@ -1831,11 +2097,21 @@ async function send(text) {
           renderStreaming(shell.msg, raw);
         } else if (ev.t === "tool") {
           thinkClose(shell);
-          if (ev.phase === "start") toolCard(shell, ev);
-          else {
+          if (ev.phase === "start") {
+            toolCard(shell, ev);
+            /* 说到哪块，对应面板自动从右边推出；这轮被手动关过就不再打扰 */
+            const panel = TOOL_PANEL[ev.name];
+            if (panel && !hallAutoMuted) openHall(panel);
+          } else {
             toolDone(shell, ev, ev.phase === "end");
             if (ev.files && ev.files.length) fileRows(shell.tl, ev.files);
             if (ev.pomodoro) pomoCard(shell.tl, ev.pomodoro);
+            /* 工具改了数据（加待办、起番茄钟……）：面板开着就刷新，没开着就作废缓存 */
+            const panel = TOOL_PANEL[ev.name];
+            if (panel) {
+              hallBrief = null;
+              if (hallPanel === panel && document.body.classList.contains("hall-open")) renderHall();
+            }
           }
         } else if (ev.t === "err") {
           thinkClose(shell);
