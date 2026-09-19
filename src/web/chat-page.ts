@@ -580,6 +580,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                    margin-top: 2px; line-height: 1.6; overflow-wrap: anywhere; }
   .hall-item.has-act { display: flex; align-items: flex-start; gap: 8px; }
   .hall-item-main { flex: 1; min-width: 0; }
+  .hall-done { flex: none; width: 16px; height: 16px; margin: 4px 0 0;
+               accent-color: var(--accent); cursor: pointer; }
   .hall-del { flex: none; border: 0; background: none; padding: 2px 4px;
               color: var(--ink-3); font-family: var(--mono); font-size: 12px;
               cursor: pointer; border-radius: 3px;
@@ -1535,7 +1537,7 @@ function hallDelBtn(label, onConfirm) {
   });
   return b;
 }
-/* 空态：虚线框纸片 + 标题 + 等宽小字说明，与 .rem-empty 同一语言 */
+/* 空态：虚线框纸片 + 标题 + 等宽小字说明，与档案空态同一语言 */
 function hallEmpty(icon, title, hint, actionLabel, onAction) {
   const box = el("hall-empty");
   box.appendChild(el2("he-ico", icon));
@@ -1557,7 +1559,9 @@ function hallSkel() {
   return sk;
 }
 function hallFullPage(panel) {
-  return panel === "knowledge" ? "/knowledge" : "/today";
+  if (panel === "knowledge") return "/knowledge";
+  if (panel === "pomodoro") return ""; /* 番茄钟没有完整页 */
+  return "/today";
 }
 function hallMore(panel) {
   const a = document.createElement("a");
@@ -1579,7 +1583,8 @@ function hallToolbar(panel, countText) {
     renderHall(true);
   });
   bar.appendChild(refresh);
-  bar.appendChild(hallMore(panel));
+  const more = hallFullPage(panel);
+  if (more) bar.appendChild(hallMore(panel));
   return bar;
 }
 
@@ -1642,15 +1647,36 @@ function buildExams(b) {
   });
   return wrap;
 }
-function buildTodos(b) {
+function buildTodoList(list) {
   const wrap = el("");
-  const list = (b.todos && b.todos.items) || [];
+  list = list || [];
   if (!list.length) {
     wrap.appendChild(hallEmpty("✅", "暂无待办", "在对话框里说「提醒我……」就能记录。"));
     return wrap;
   }
   list.forEach((t) => {
-    wrap.appendChild(hallItem(t.title, t.dueLabel + (t.overdue ? " · 已逾期" : t.isToday ? " · 今天到期" : ""), t.overdue));
+    const item = el("hall-item has-act");
+    /* 勾选即完成（PATCH done 后未完成列表里自然消失）；演示接口只读，禁用交互 */
+    const pick = document.createElement("input");
+    pick.type = "checkbox"; pick.className = "hall-done"; pick.title = "标记完成";
+    pick.disabled = HALL_DEMO;
+    if (!HALL_DEMO) pick.addEventListener("change", () => {
+      fetch("/api/reminders/" + encodeURIComponent(t.id), {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ done: pick.checked }),
+      }).catch(() => {}).then(() => renderHall(true));
+    });
+    item.appendChild(pick);
+    const main = el("hall-item-main");
+    main.appendChild(el2("ht", t.title));
+    main.appendChild(el2("hm", t.dueLabel + (t.overdue ? " · 已逾期" : t.isToday ? " · 今天到期" : "")));
+    item.appendChild(main);
+    if (!HALL_DEMO) item.appendChild(hallDelBtn("删除", () => {
+      fetch("/api/reminders/" + encodeURIComponent(t.id), { method: "DELETE" })
+        .catch(() => {})
+        .then(() => renderHall(true));
+    }));
+    wrap.appendChild(item);
   });
   return wrap;
 }
@@ -1711,7 +1737,13 @@ const HALL_PANELS = {
   today: () => briefOf().then(buildToday),
   schedule: () => briefOf().then(buildSchedule),
   exams: () => briefOf().then(buildExams),
-  todos: () => briefOf().then(buildTodos),
+  /* 演示环境没有 /api/today：待办直接读 /api/reminders（只读，返回空即为干净空态） */
+  todos: () => (HALL_DEMO
+    ? fetch("/api/reminders").then((r) => r.json())
+        .then((d) => buildTodoList((d.reminders || []).map((t) => ({
+          ...t, dueLabel: new Date(t.dueAt).toLocaleString("zh-CN", { hour12: false }),
+        }))))
+    : briefOf().then((b) => buildTodoList(b.todos.items))),
   knowledge: () => briefOf().then(buildKnowledge),
   pomodoro: buildPomodoro,
 };
