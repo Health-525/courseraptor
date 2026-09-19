@@ -578,6 +578,14 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                    overflow-wrap: anywhere; }
   .hall-item .hm { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
                    margin-top: 2px; line-height: 1.6; overflow-wrap: anywhere; }
+  .hall-item.has-act { display: flex; align-items: flex-start; gap: 8px; }
+  .hall-item-main { flex: 1; min-width: 0; }
+  .hall-del { flex: none; border: 0; background: none; padding: 2px 4px;
+              color: var(--ink-3); font-family: var(--mono); font-size: 12px;
+              cursor: pointer; border-radius: 3px;
+              transition: color .15s ease, background .15s ease; }
+  .hall-del:hover { color: var(--accent); text-decoration: underline; }
+  .hall-del.armed { color: var(--card); background: var(--accent); padding: 2px 8px; }
   .hall-item.hot { border-left: 3px solid var(--accent); }
   .hall-item.hot .hm { color: var(--accent-deep); }
   /* 加载骨架：纯色块脉冲（不用渐变，与纸面主题一致），减少取数时的布局跳动 */
@@ -1497,6 +1505,36 @@ function hallItem(title, meta, hot) {
   return item;
 }
 function hallNote(text) { return el2("hall-note", text); }
+/* 条目右侧挂动作位（如删除）：标题/说明收进 main 列，动作贴右 */
+function hallItemAct(title, meta, action, actLabel) {
+  const item = el("hall-item has-act");
+  const main = el("hall-item-main");
+  main.appendChild(el2("ht", title));
+  if (meta) main.appendChild(el2("hm", meta));
+  item.appendChild(main);
+  item.appendChild(hallDelBtn(actLabel || "删除", action));
+  return item;
+}
+/* 两步删除防误删：第一击变「确认删除」，3 秒内再击才执行，超时还原 */
+function hallDelBtn(label, onConfirm) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "hall-del"; b.textContent = label;
+  let armed = false, timer = 0;
+  b.addEventListener("click", () => {
+    if (!armed) {
+      armed = true;
+      b.textContent = "确认删除";
+      b.classList.add("armed");
+      timer = window.setTimeout(() => {
+        armed = false; b.textContent = label; b.classList.remove("armed");
+      }, 3000);
+      return;
+    }
+    window.clearTimeout(timer);
+    onConfirm();
+  });
+  return b;
+}
 /* 空态：虚线框纸片 + 标题 + 等宽小字说明，与 .rem-empty 同一语言 */
 function hallEmpty(icon, title, hint, actionLabel, onAction) {
   const box = el("hall-empty");
@@ -1609,18 +1647,40 @@ function buildTodos(b) {
   return wrap;
 }
 function buildKnowledge(b) {
-  const wrap = el("");
-  const total = (b.knowledge && b.knowledge.total) || 0;
-  const recent = (b.knowledge && b.knowledge.recent) || [];
-  if (!total || !recent.length) {
-    wrap.appendChild(hallEmpty("📚", "知识库还是空的", "对话中沉淀的知识点会自动收录到这里。"));
+  /* 演示环境没有 /api/knowledge 接口：保持 brief 速览（只读） */
+  if (HALL_DEMO) {
+    const wrap = el("");
+    const recent = (b.knowledge && b.knowledge.recent) || [];
+    if (!recent.length) {
+      wrap.appendChild(hallEmpty("📚", "知识库还是空的", "对话中沉淀的知识点会自动收录到这里。"));
+      return wrap;
+    }
+    wrap.dataset.total = String((b.knowledge && b.knowledge.total) || recent.length);
+    recent.forEach((k) => {
+      wrap.appendChild(hallItem(k.title, (k.category || "未分类") + " · " + String(k.content || "").replace(/\s+/g, " ").slice(0, 48)));
+    });
     return wrap;
   }
-  wrap.dataset.total = String(total);
-  (b.knowledge.recent || []).forEach((k) => {
-    wrap.appendChild(hallItem(k.title, (k.category || "未分类") + " · " + String(k.content || "").replace(/\s+/g, " ").slice(0, 48)));
+  /* 正式环境：全量列表 + 两步删除（与 /knowledge 页同一防误删口径） */
+  return fetch("/api/knowledge").then((r) => r.json()).then((d) => {
+    const wrap = el("");
+    const entries = d.entries || [];
+    wrap.dataset.total = String(entries.length);
+    if (!entries.length) {
+      wrap.appendChild(hallEmpty("📚", "知识库还是空的", "对话中沉淀的知识点会自动收录到这里。"));
+      return wrap;
+    }
+    entries.forEach((k) => {
+      wrap.appendChild(hallItemAct(k.title,
+        (k.category || "未分类") + " · " + String(k.content || "").replace(/\s+/g, " ").slice(0, 48),
+        () => {
+          fetch("/api/knowledge/" + encodeURIComponent(k.id), { method: "DELETE" })
+            .catch(() => {})
+            .then(() => renderHall(true));
+        }, "删除"));
+    });
+    return wrap;
   });
-  return wrap;
 }
 function buildPomodoro() {
   const wrap = el("");
