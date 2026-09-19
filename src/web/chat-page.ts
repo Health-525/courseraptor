@@ -89,9 +89,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                                   border-color: var(--accent-deep); color: #fff; }
   /* 大厅入口：朱砂同族浅底深字，与主按钮构成主/次两级；不要描边（用户要求），悬停加深成实底 */
   #openHall, #openHallM { position: relative; }
-  .hall-badge { position: absolute; top: -4px; right: -4px; width: 9px; height: 9px;
-                border-radius: 50%; background: var(--accent);
-                box-shadow: 0 0 0 2px var(--paper-deep); }
+  /* 侧栏红点（与宫格卡片内的文字徽标 .hall-badge 是两回事） */
+  .hall-dot { position: absolute; top: -4px; right: -4px; width: 9px; height: 9px;
+              border-radius: 50%; background: var(--accent);
+              box-shadow: 0 0 0 2px var(--paper-deep); }
   .mastbtns .tbtn.hall-btn { background: var(--accent-soft); border-color: transparent;
                      color: var(--accent-deep); font-weight: 600; }
   .mastbtns .tbtn.hall-btn:hover { background: var(--accent); border-color: transparent;
@@ -621,6 +622,47 @@ export function chatPage(options: { demo?: boolean } = {}): string {
               transition: color .15s ease, background .15s ease; }
   .hall-del:hover { color: var(--accent); text-decoration: underline; }
   .hall-del.armed { color: var(--card); background: var(--accent); }
+  /* 待办分组题注：与 /today 页 .todo-group 同一语言（等宽小字 + 计数），只更紧凑 */
+  .hall-group { margin: 12px 0 6px; font-family: var(--mono); font-size: 11.5px;
+                letter-spacing: .12em; color: var(--ink-3); }
+  .hall-group:first-of-type { margin-top: 2px; }
+  .hall-group.overdue { color: var(--accent-deep); font-weight: 600; }
+  .hall-item .hm .overdue-tag { color: var(--accent-deep); font-weight: 600; }
+  .hall-ics { flex: none; align-self: center; font-family: var(--mono); font-size: 11px;
+              color: var(--ink-3); text-decoration: none; border: 1px solid var(--rule);
+              border-radius: 3px; padding: 2px 7px; white-space: nowrap; }
+  .hall-ics:hover { border-color: var(--accent); color: var(--accent); }
+  /* 添加表单校验与快捷时间：错误行是朱砂小字，快捷 chip 是等宽小按钮 */
+  .hall-err { display: none; flex-basis: 100%; font-family: var(--mono); font-size: 12px;
+              color: var(--accent-deep); line-height: 1.6; }
+  .hall-err.show { display: block; }
+  .hall-quick { display: flex; flex-basis: 100%; gap: 6px; flex-wrap: wrap; }
+  .hall-quick button { border: 1px solid var(--rule); background: var(--paper);
+                       color: var(--ink-2); font-family: var(--mono); font-size: 11px;
+                       border-radius: 3px; padding: 2px 8px; cursor: pointer; min-height: 26px; }
+  .hall-quick button:hover { border-color: var(--accent); color: var(--accent); }
+  /* 知识分类筛：横向可滚的一排小 chip，与搜索框叠加过滤 */
+  .hall-cats { display: flex; gap: 6px; overflow-x: auto; margin: 0 0 10px; padding-bottom: 2px; }
+  .hall-cat { flex: none; border: 1px solid var(--rule); background: var(--card);
+              color: var(--ink-2); font-family: var(--mono); font-size: 11px;
+              border-radius: 3px; padding: 3px 9px; cursor: pointer; min-height: 28px; }
+  .hall-cat:hover { border-color: var(--accent); color: var(--accent); }
+  .hall-cat.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-deep); }
+  .hall-item .hm .kdate { color: var(--ink-3); }
+  /* 番茄钟进行中：标题 + 倒计时大字 + 进度条 + 至几点结束，与对话内 .pomo 卡同族 */
+  .hall-pomo-active { border-left: 3px solid var(--accent); }
+  .hall-pomo-clock { font-family: var(--mono); font-size: 26px; font-weight: 600;
+                     letter-spacing: .06em; color: var(--accent-deep); line-height: 1.3; }
+  .hall-pomo-bar { height: 5px; border: 1px solid var(--rule); border-radius: 3px;
+                   background: var(--paper-deep); overflow: hidden; margin-top: 7px; }
+  .hall-pomo-bar i { display: block; height: 100%; width: 0;
+                     background: var(--accent); transition: width 1s linear; }
+  .hall-pomo-row { display: flex; align-items: center; gap: 8px; margin-top: 7px; }
+  .hall-pomo-row .hall-count { flex: 1; }
+  .hall-pomo-cancel { flex: none; border: 1px solid var(--rule); background: var(--card);
+                      color: var(--ink-2); font-family: var(--mono); font-size: 12px;
+                      border-radius: 4px; padding: 3px 12px; min-height: 30px; cursor: pointer; }
+  .hall-pomo-cancel:hover { border-color: var(--accent); color: var(--accent); }
   /* 知识条目可点开看全文：整块 main 区都是热区，键盘同样可达 */
   .hall-item.know .hall-item-main { cursor: pointer; }
   .hall-item.know:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -1301,7 +1343,10 @@ function pomoTick() {
     } catch { /* 通知发不出就只靠页面 */ }
   });
 }
-setInterval(pomoTick, 1000);
+setInterval(() => {
+  pomoTick();
+  try { if (typeof hallPomoTick === "function") hallPomoTick(); } catch { /* 大厅没开就跳过 */ }
+}, 1000);
 
 /* ── 会话档案：列表 / 打开 / 删除 / 新会话 ── */
 const sessList = document.getElementById("sessList");
@@ -1516,9 +1561,9 @@ const HALL_CARDS = [
   { id: "today", t: "今日日程", d: "下一节课、今日安排与本周概览", icon: "📅", group: "学习安排" },
   { id: "schedule", t: "课表", d: "本周每天的课与调休安排", icon: "🗓️", group: "学习安排" },
   { id: "exams", t: "考试", d: "临近考试的时间、地点与座位", icon: "📝", group: "学习安排" },
-  { id: "todos", t: "待办", d: "作业与事务的截止提醒", icon: "✅", group: "效率工具" },
-  { id: "knowledge", t: "知识库", d: "对话中沉淀的知识条目", icon: "📚", group: "效率工具" },
-  { id: "pomodoro", t: "番茄钟", d: "专注计时与最近记录", icon: "🍅", group: "效率工具" },
+  { id: "todos", t: "待办", d: "逾期置顶，按今天 / 明天分组", icon: "✅", group: "效率工具" },
+  { id: "knowledge", t: "知识库", d: "按课程归类，可搜可展开全文", icon: "📚", group: "效率工具" },
+  { id: "pomodoro", t: "番茄钟", d: "进行中实时倒计时与最近记录", icon: "🍅", group: "效率工具" },
   { id: "settings", t: "设置", d: "教务账号、AI 模型与本地数据", icon: "⚙️", group: "系统" },
 ];
 const HALL_GROUPS = ["学习安排", "效率工具", "系统"];
@@ -1544,16 +1589,39 @@ function hallItem(title, meta, hot) {
   return item;
 }
 function hallNote(text) { return el2("hall-note", text); }
-/* 知识条目：摘要 + 可展开看全文（main 区是热区，删除按钮在外不冲突），
+/* 空态引导：一键回到输入框并预填话术（纯前端，不调后端） */
+function hallFocusChat(preset) {
+  try {
+    closeHall();
+    if (typeof preset === "string" && preset) {
+      input.value = preset;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    input.focus();
+  } catch { /* 输入框不在就只关抽屉 */ }
+}
+/* 知识日期：今天显示 HH:MM，其余显示 M月d日（与 fmtWhen 同口径，知识页用日精度） */
+function hallKDate(ts) {
+  if (!ts) return "";
+  const d = new Date(ts), n = new Date();
+  if (d.toDateString() === n.toDateString()) return pad(d.getHours()) + ":" + pad(d.getMinutes());
+  return (d.getMonth() + 1) + "月" + d.getDate() + "日";
+}
+/* 知识分类筛选中态：搜索框是文本维，这个是分类维，两者叠加 */
+let hallKnowCat = "";
+/* 知识条目：标题 + 分类·日期·摘要，可展开看全文（main 区是热区，删除按钮在外不冲突），
    删除乐观更新（先移除节点，失败重刷恢复） */
 function hallKnowledgeItem(k) {
   const full = String(k.content || "").replace(/\s+/g, " ").trim();
-  const snippet = full.slice(0, 48);
-  const head = (k.category || "未分类") + " · ";
+  const snippet = full.slice(0, 60);
+  const date = hallKDate(k.updatedAt);
+  const head = (k.category || "未分类") + (date ? " · " + date + " · " : " · ");
   const item = el("hall-item has-act know");
+  item.dataset.category = k.category || "未分类";
   const main = el("hall-item-main");
   main.appendChild(el2("ht", k.title));
-  const meta = el2("hm", head + snippet);
+  const meta = el2("hm", head + snippet + (full.length > snippet.length ? "…" : ""));
+  if (k.source) meta.title = "来源：" + k.source;
   main.appendChild(meta);
   item.appendChild(main);
   if (!HALL_DEMO) item.appendChild(hallDelBtn("删除", () => {
@@ -1717,96 +1785,247 @@ function buildExams(b) {
   });
   return wrap;
 }
-/* 待办添加行：折叠的内联小表单（标题 + 截止时间），POST /api/reminders 后就地刷新 */
+/* 待办添加行：折叠的内联小表单（标题 + 截止时间 + 快捷时间），POST /api/reminders 后就地刷新。
+   校验失败 inline 提示不吞错；回车保存、Esc 收起；快捷 chip 一键填常用截止点 */
 function todoAddRow() {
   const row = el("todo-add");
   const btn = document.createElement("button");
   btn.type = "button"; btn.className = "tbtn"; btn.textContent = "+ 添加待办";
+  btn.setAttribute("aria-expanded", "false");
   const form = el("todo-form");
   form.hidden = true;
   const title = document.createElement("input");
-  title.type = "text"; title.placeholder = "要做什么事"; title.maxLength = 100;
+  title.type = "text"; title.placeholder = "要做什么事（必填）"; title.maxLength = 100;
+  title.setAttribute("aria-label", "待办标题");
   const due = document.createElement("input");
-  due.type = "datetime-local"; due.title = "截止时间";
+  due.type = "datetime-local"; due.title = "截止时间（必填）";
+  due.setAttribute("aria-label", "截止时间");
+  /* 快捷时间：今晚 22:00 / 明早 9:00 / 三天后 18:00，直接填进 datetime-local */
+  const quick = el("hall-quick");
+  const pad2 = (x) => (x < 10 ? "0" : "") + x;
+  const toLocal = (d) => d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate())
+    + "T" + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+  const quicks = [
+    ["今晚 22:00", () => { const d = new Date(); d.setHours(22, 0, 0, 0); if (d.getTime() < Date.now()) d.setDate(d.getDate() + 1); return d; }],
+    ["明早 9:00", () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d; }],
+    ["三天后 18:00", () => { const d = new Date(); d.setDate(d.getDate() + 3); d.setHours(18, 0, 0, 0); return d; }],
+  ];
+  quicks.forEach(([label, make]) => {
+    const q = document.createElement("button");
+    q.type = "button"; q.textContent = label;
+    q.addEventListener("click", () => { due.value = toLocal(make()); due.focus(); });
+    quick.appendChild(q);
+  });
+  const err = el2("hall-err", "");
+  err.setAttribute("role", "alert");
   const save = document.createElement("button");
   save.type = "button"; save.className = "tbtn primary"; save.textContent = "保存";
   const cancel = document.createElement("button");
   cancel.type = "button"; cancel.className = "tbtn"; cancel.textContent = "取消";
-  form.append(title, due, save, cancel);
+  form.append(title, due, quick, err, save, cancel);
+  const setErr = (msg) => {
+    err.textContent = msg || "";
+    err.classList.toggle("show", !!msg);
+  };
+  const close = () => { form.hidden = true; setErr(""); btn.setAttribute("aria-expanded", "false"); btn.focus(); };
   btn.addEventListener("click", () => {
     form.hidden = !form.hidden;
-    if (!form.hidden) title.focus();
+    btn.setAttribute("aria-expanded", form.hidden ? "false" : "true");
+    if (!form.hidden) { setErr(""); title.focus(); }
   });
-  cancel.addEventListener("click", () => { form.hidden = true; btn.focus(); });
-  save.addEventListener("click", () => {
+  cancel.addEventListener("click", close);
+  title.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); save.click(); }
+    if (e.key === "Escape") { e.stopPropagation(); close(); }
+  });
+  due.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); save.click(); }
+    if (e.key === "Escape") { e.stopPropagation(); close(); }
+  });
+  title.addEventListener("input", () => { if (err.textContent) setErr(""); });
+  due.addEventListener("input", () => { if (err.textContent) setErr(""); });
+  const doSave = () => {
     const text = title.value.trim();
     const dueAt = new Date(due.value);
-    if (!text || Number.isNaN(dueAt.getTime())) return;
+    if (!text) { setErr("请先填写要做什么事。"); title.focus(); return; }
+    if (!due.value || Number.isNaN(dueAt.getTime())) { setErr("请选择有效的截止时间，或点上面的快捷时间。"); due.focus(); return; }
+    setErr("");
     save.disabled = true;
+    save.textContent = "保存中…";
     fetch("/api/reminders", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ title: text, dueAt: dueAt.toISOString() }),
     }).then((r) => {
       if (!r.ok) throw new Error("HTTP " + r.status);
       renderHall(true);
-    }).catch(() => { save.disabled = false; });
-  });
+    }).catch(() => {
+      save.disabled = false;
+      save.textContent = "保存";
+      setErr("保存失败，检查本地服务后重试。");
+    });
+  };
+  save.addEventListener("click", doSave);
   row.appendChild(btn);
   row.appendChild(form);
+  row.openForm = () => {
+    if (form.hidden) btn.click();
+    else title.focus();
+  };
   return row;
+}
+/* 待办条目行：勾选完成 + 删除都是乐观更新；逾期朱砂高亮，备注悬停可见，附 .ics 导出 */
+function todoHallItem(t) {
+  const item = el("hall-item has-act" + (t.overdue ? " hot" : ""));
+  /* 勾选即完成：乐观更新——先变灰，落盘成功直接移除节点（未完成列表里自然消失），
+     失败才回滚；整面板不重刷，焦点与滚动都不丢 */
+  const pick = document.createElement("input");
+  pick.type = "checkbox"; pick.className = "hall-done"; pick.title = "标记完成";
+  pick.setAttribute("aria-label", "标记完成：" + t.title);
+  pick.disabled = HALL_DEMO;
+  if (!HALL_DEMO) pick.addEventListener("change", () => {
+    const done = pick.checked;
+    item.classList.toggle("done", done);
+    pick.disabled = true;
+    fetch("/api/reminders/" + encodeURIComponent(t.id), {
+      method: "PATCH", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ done }),
+    }).then((r) => {
+      if (!r.ok) throw new Error("save failed");
+      const group = item.parentElement;
+      item.remove();
+      /* 分组变空就把题注一起收掉，避免留下光杆标题 */
+      if (group && group.classList.contains("hall-todo-group") && !group.querySelector(".hall-item")) {
+        const head = group.previousElementSibling;
+        if (head && head.classList.contains("hall-group")) head.remove();
+        group.remove();
+      }
+      hallRecount("todos");
+    }).catch(() => {
+      pick.checked = !done;
+      item.classList.toggle("done", !done);
+      pick.disabled = false;
+    });
+  });
+  item.appendChild(pick);
+  const main = el("hall-item-main");
+  const ht = el2("ht", t.title);
+  if (t.notes) ht.title = t.notes;
+  main.appendChild(ht);
+  const metaText = t.dueLabel
+    + (t.overdue ? " · 已逾期" : t.isToday ? " · 今天到期" : "")
+    + (t.source ? " · 来自" + t.source : "");
+  const hm = el2("hm", metaText);
+  if (t.overdue) {
+    hm.innerHTML = "";
+    hm.appendChild(document.createTextNode(t.dueLabel + " · "));
+    const tag = document.createElement("span");
+    tag.className = "overdue-tag";
+    tag.textContent = "⚠ 已逾期";
+    hm.appendChild(tag);
+    if (t.source) hm.appendChild(document.createTextNode(" · 来自" + t.source));
+  }
+  if (t.notes) hm.title = t.notes;
+  main.appendChild(hm);
+  item.appendChild(main);
+  if (!HALL_DEMO && t.id) {
+    const ics = document.createElement("a");
+    ics.className = "hall-ics";
+    ics.href = "/api/reminders/" + encodeURIComponent(t.id) + ".ics";
+    ics.textContent = ".ics";
+    ics.title = "导出到手机日历";
+    ics.setAttribute("aria-label", "导出待办到日历：" + t.title);
+    item.appendChild(ics);
+  }
+  if (!HALL_DEMO) item.appendChild(hallDelBtn("删除", () => {
+    /* 删除同样乐观：先移除节点，失败整面板重刷恢复 */
+    const group = item.parentElement;
+    item.remove();
+    if (group && group.classList.contains("hall-todo-group") && !group.querySelector(".hall-item")) {
+      const head = group.previousElementSibling;
+      if (head && head.classList.contains("hall-group")) head.remove();
+      group.remove();
+    }
+    hallRecount("todos");
+    fetch("/api/reminders/" + encodeURIComponent(t.id), { method: "DELETE" })
+      .then((r) => { if (!r.ok) throw new Error("delete failed"); })
+      .catch(() => renderHall(true));
+  }));
+  return item;
 }
 function buildTodoList(list) {
   const wrap = el("");
   list = list || [];
-  if (!HALL_DEMO) wrap.appendChild(todoAddRow());
+  const addRow = HALL_DEMO ? null : todoAddRow();
+  if (addRow) wrap.appendChild(addRow);
   if (!list.length) {
-    wrap.appendChild(hallEmpty("✅", "暂无待办", "在对话框里说「提醒我……」就能记录。"));
+    wrap.appendChild(hallEmpty("✅", "暂无待办", "在对话框里说「提醒我……」就能记录，也可点下面直接加一条。",
+      addRow ? "+ 添加第一条待办" : "",
+      addRow ? () => addRow.openForm() : null));
     return wrap;
   }
+  /* 分组：逾期 / 今天 / 明天 / 以后（与 /today 页同口径，逾期自然置顶） */
+  const groups = [
+    { name: "逾期", overdue: true, items: [] },
+    { name: "今天", overdue: false, items: [] },
+    { name: "明天", overdue: false, items: [] },
+    { name: "以后", overdue: false, items: [] },
+  ];
   list.forEach((t) => {
-    const item = el("hall-item has-act");
-    /* 勾选即完成：乐观更新——先变灰，落盘成功直接移除节点（未完成列表里自然消失），
-       失败才回滚；整面板不重刷，焦点与滚动都不丢 */
-    const pick = document.createElement("input");
-    pick.type = "checkbox"; pick.className = "hall-done"; pick.title = "标记完成";
-    pick.setAttribute("aria-label", "标记完成：" + t.title);
-    pick.disabled = HALL_DEMO;
-    if (!HALL_DEMO) pick.addEventListener("change", () => {
-      const done = pick.checked;
-      item.classList.toggle("done", done);
-      pick.disabled = true;
-      fetch("/api/reminders/" + encodeURIComponent(t.id), {
-        method: "PATCH", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ done }),
-      }).then((r) => {
-        if (!r.ok) throw new Error("save failed");
-        item.remove();
-        hallRecount("todos");
-      }).catch(() => {
-        pick.checked = !done;
-        item.classList.toggle("done", !done);
-        pick.disabled = false;
-      });
-    });
-    item.appendChild(pick);
-    const main = el("hall-item-main");
-    main.appendChild(el2("ht", t.title));
-    main.appendChild(el2("hm", t.dueLabel + (t.overdue ? " · 已逾期" : t.isToday ? " · 今天到期" : "")));
-    item.appendChild(main);
-    if (!HALL_DEMO) item.appendChild(hallDelBtn("删除", () => {
-      /* 删除同样乐观：先移除节点，失败整面板重刷恢复 */
-      item.remove();
-      hallRecount("todos");
-      fetch("/api/reminders/" + encodeURIComponent(t.id), { method: "DELETE" })
-        .then((r) => { if (!r.ok) throw new Error("delete failed"); })
-        .catch(() => renderHall(true));
-    }));
-    wrap.appendChild(item);
+    if (t.overdue) groups[0].items.push(t);
+    else if (t.isToday) groups[1].items.push(t);
+    else if ((t.dueLabel || "").indexOf("明天") === 0) groups[2].items.push(t);
+    else groups[3].items.push(t);
+  });
+  groups.forEach((g) => {
+    if (!g.items.length) return;
+    const head = el("hall-group" + (g.overdue ? " overdue" : ""));
+    head.textContent = g.name + " · " + g.items.length;
+    head.dataset.hallGroup = g.name;
+    wrap.appendChild(head);
+    const box = el("hall-todo-group");
+    box.dataset.hallGroup = g.name;
+    g.items.forEach((t) => { box.appendChild(todoHallItem(t)); });
+    wrap.appendChild(box);
   });
   return wrap;
 }
+/* 知识分类条：全部分类 chip，点选过滤（与搜索框叠加）；只在条目多于 1 类时出现 */
+function hallKnowCats(entries) {
+  const cats = [];
+  const seen = {};
+  (entries || []).forEach((k) => {
+    const c = k.category || "未分类";
+    if (!seen[c]) { seen[c] = 1; cats.push(c); }
+  });
+  if (cats.length < 2) return null;
+  cats.sort((a, b) => a.localeCompare(b, "zh-CN"));
+  const bar = el("hall-cats");
+  bar.setAttribute("role", "group");
+  bar.setAttribute("aria-label", "按分类筛选知识");
+  const all = document.createElement("button");
+  all.type = "button"; all.className = "hall-cat" + (!hallKnowCat ? " on" : "");
+  all.textContent = "全部 " + entries.length;
+  all.addEventListener("click", () => { hallKnowCat = ""; renderHall(true); });
+  bar.appendChild(all);
+  cats.forEach((c) => {
+    const n = entries.filter((k) => (k.category || "未分类") === c).length;
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "hall-cat" + (hallKnowCat === c ? " on" : "");
+    b.textContent = c + " " + n;
+    b.setAttribute("aria-pressed", hallKnowCat === c ? "true" : "false");
+    b.addEventListener("click", () => { hallKnowCat = (hallKnowCat === c ? "" : c); renderHall(true); });
+    bar.appendChild(b);
+  });
+  return bar;
+}
+function hallKnowEmpty() {
+  return hallEmpty("📚", "知识库还是空的",
+    "在对话框里分享知识点（或说「记住：……」），我会按课程归类记进来。",
+    HALL_DEMO ? "" : "去记第一条",
+    HALL_DEMO ? null : () => hallFocusChat("记住："));
+}
 function buildKnowledge(b) {
-  /* 演示环境没有 /api/knowledge 接口：保持 brief 速览（只读） */
+  /* 演示环境没有 /api/knowledge 接口：保持 brief 速览（只读，带日期） */
   if (HALL_DEMO) {
     const wrap = el("");
     const recent = (b.knowledge && b.knowledge.recent) || [];
@@ -1816,40 +2035,121 @@ function buildKnowledge(b) {
     }
     wrap.dataset.total = String((b.knowledge && b.knowledge.total) || recent.length);
     recent.forEach((k) => {
-      wrap.appendChild(hallItem(k.title, (k.category || "未分类") + " · " + String(k.content || "").replace(/\s+/g, " ").slice(0, 48)));
+      const date = hallKDate(k.updatedAt);
+      wrap.appendChild(hallItem(k.title,
+        (k.category || "未分类") + (date ? " · " + date : "") + " · "
+        + String(k.content || "").replace(/\s+/g, " ").slice(0, 60)));
     });
     return wrap;
   }
-  /* 正式环境：全量列表 + 两步删除（与 /knowledge 页同一防误删口径） */
+  /* 正式环境：全量列表 + 分类筛 + 两步删除（与 /knowledge 页同一防误删口径）；
+     条目多时厅内只展前 30 条，余下走完整页，避免抽屉过长 */
   return fetch("/api/knowledge").then((r) => r.json()).then((d) => {
     const wrap = el("");
-    const entries = d.entries || [];
+    let entries = d.entries || [];
     wrap.dataset.total = String(entries.length);
     if (!entries.length) {
-      wrap.appendChild(hallEmpty("📚", "知识库还是空的", "对话中沉淀的知识点会自动收录到这里。"));
+      wrap.appendChild(hallKnowEmpty());
       return wrap;
     }
-    entries.forEach((k) => {
-      wrap.appendChild(hallKnowledgeItem(k));
-    });
+    if (hallKnowCat) entries = entries.filter((k) => (k.category || "未分类") === hallKnowCat);
+    const cats = hallKnowCats(d.entries || []);
+    if (cats) wrap.appendChild(cats);
+    if (!entries.length) {
+      wrap.appendChild(hallEmpty("📚", "该分类下暂无条目", "换个分类或清空搜索试试。"));
+      return wrap;
+    }
+    const LIMIT = 30;
+    const shown = entries.slice(0, LIMIT);
+    const box = el("hall-know-list");
+    shown.forEach((k) => { box.appendChild(hallKnowledgeItem(k)); });
+    wrap.appendChild(box);
+    if (entries.length > LIMIT) {
+      wrap.appendChild(hallNote("仅显示前 " + LIMIT + " 条，共 " + entries.length + " 条；完整检索去知识库完整页。"));
+    }
     return wrap;
   });
+}
+/* 番茄钟日期：M月d日 HH:MM（最近记录用，日精度不够看） */
+function hallPomoDate(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  return (d.getMonth() + 1) + "月" + d.getDate() + "日 "
+    + pad(d.getHours()) + ":" + pad(d.getMinutes());
 }
 function buildPomodoro() {
   const wrap = el("");
   if (HALL_DEMO) { wrap.appendChild(hallNote("离线演示不提供番茄钟数据。")); return wrap; }
   return fetch("/api/pomodoro").then((r) => r.json()).then((d) => {
     if (d.active) {
-      wrap.appendChild(hallItem(d.active.label + " · 进行中",
-        "剩余 " + Math.floor(d.active.remainingSec / 60) + " 分 " + pad(d.active.remainingSec % 60) + " 秒（共 " + d.active.focusMinutes + " 分钟）", true));
+      const p = d.active;
+      const total = p.totalSec || Math.max(1, (p.focusMinutes || 25) * 60);
+      const card = el("hall-item hot hall-pomo-active");
+      card.appendChild(el2("ht", (p.label || "专注") + " · 进行中"));
+      const clk = el2("hall-pomo-clock", pomoFmt((p.remainingSec != null ? p.remainingSec : Math.max(0, (p.endsAt - Date.now()) / 1000))));
+      clk.dataset.ends = String(p.endsAt || "");
+      card.appendChild(clk);
+      card.appendChild(el2("hm", "共 " + (p.focusMinutes || Math.round(total / 60)) + " 分钟 · 至 " + clock(p.endsAt) + " 结束"));
+      const bar = el("hall-pomo-bar");
+      const fill = document.createElement("i");
+      fill.dataset.ends = String(p.endsAt || "");
+      fill.dataset.total = String(total);
+      bar.appendChild(fill);
+      card.appendChild(bar);
+      const row = el("hall-pomo-row");
+      row.appendChild(el2("hall-count", "时间到会响铃 + 标题闪灯，切页也能结算"));
+      const cancel = document.createElement("button");
+      cancel.type = "button"; cancel.className = "hall-pomo-cancel"; cancel.textContent = "取消";
+      cancel.setAttribute("aria-label", "取消番茄钟：" + (p.label || "专注"));
+      cancel.addEventListener("click", () => {
+        cancel.disabled = true;
+        cancel.textContent = "取消中…";
+        fetch("/api/pomodoro/cancel", {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify(p.id ? { id: p.id } : {}),
+        }).then(() => renderHall(true)).catch(() => {
+          cancel.disabled = false;
+          cancel.textContent = "取消";
+        });
+      });
+      row.appendChild(cancel);
+      card.appendChild(row);
+      wrap.appendChild(card);
+      hallPomoTick();
     } else {
-      wrap.appendChild(hallEmpty("🍅", "没有进行中的番茄钟", "在对话框里说「来一个 25 分钟番茄钟」。"));
+      wrap.appendChild(hallEmpty("🍅", "没有进行中的番茄钟", "厅里只看进度；开始还是在对话框里说一声。",
+        "去开始一个 25 分钟", () => hallFocusChat("来一个 25 分钟番茄钟")));
     }
     const stateName = { running: "进行中", done: "已完成", cancelled: "已取消" };
-    (d.recent || []).slice(0, 5).forEach((p) => {
-      wrap.appendChild(hallItem(p.label, (stateName[p.status] || p.status) + " · " + p.focusMinutes + " 分钟"));
-    });
+    const recent = (d.recent || []).slice(0, 5);
+    if (recent.length) {
+      const head = el("hall-group");
+      head.textContent = "最近 · " + recent.length;
+      wrap.appendChild(head);
+      recent.forEach((p) => {
+        wrap.appendChild(hallItem(p.label,
+          (stateName[p.status] || p.status) + " · " + p.focusMinutes + " 分钟"
+          + (p.startsAt ? " · " + hallPomoDate(p.startsAt) : ""),
+          p.status === "running"));
+      });
+    }
+    if (!d.active) wrap.appendChild(hallNote("提示：在对话框说「来一个 25 分钟番茄钟」，这里会自动倒计时。"));
     return wrap;
+  });
+}
+/* 大厅番茄钟每秒自跳：时钟 + 进度条（与对话内 .pomo 卡的 pomoTick 同频，互不干扰） */
+function hallPomoTick() {
+  const now = Date.now();
+  document.querySelectorAll(".hall-pomo-clock[data-ends]").forEach((clk) => {
+    const ends = Number(clk.dataset.ends);
+    if (!ends) return;
+    const left = Math.max(0, Math.ceil((ends - now) / 1000));
+    clk.textContent = pomoFmt(left);
+  });
+  document.querySelectorAll(".hall-pomo-bar i[data-ends]").forEach((fill) => {
+    const ends = Number(fill.dataset.ends), total = Number(fill.dataset.total) || 1;
+    const left = Math.max(0, Math.ceil((ends - now) / 1000));
+    fill.style.width = (100 * (total - left) / total).toFixed(1) + "%";
   });
 }
 const HALL_PANELS = {
@@ -1921,7 +2221,7 @@ function hallSearchBox(panel) {
   box.appendChild(input);
   return box;
 }
-/* 按标题 + 说明过滤条目，计数联动成「可见 / 全部」 */
+/* 按标题 + 说明过滤条目，计数联动成「可见 / 全部」；分组题注随之显隐，避免光杆标题 */
 function hallApplySearch(dyn, panel) {
   const node = dyn.querySelector("[data-hall-list]");
   if (!node) return;
@@ -1932,6 +2232,26 @@ function hallApplySearch(dyn, panel) {
     const hit = !q || it.textContent.toLowerCase().includes(q);
     it.style.display = hit ? "" : "none";
     if (hit) visible++;
+  });
+  /* 待办/番茄钟的分组头：组内全被滤掉就一起藏，组内有可见才留 */
+  node.querySelectorAll(".hall-group").forEach((head) => {
+    const key = head.dataset.hallGroup;
+    /* 番茄钟「最近」头没有 dataset key：看它后面直到下一个头的条目即可 */
+    let box = null;
+    if (key) {
+      box = node.querySelector('[data-hall-group="' + key + '"].hall-todo-group')
+        || head.nextElementSibling;
+    } else {
+      box = head.nextElementSibling;
+    }
+    if (!box) return;
+    const kids = [...box.querySelectorAll(".hall-item")];
+    /* 只有待办分组盒才按组藏；知识列表没有分组头（分类走 chip），番茄钟最近头同理按可见收 */
+    const anyVisible = kids.some((k) => k.style.display !== "none");
+    head.style.display = (!q || anyVisible) ? "" : "none";
+    if (box.classList && box.classList.contains("hall-todo-group")) {
+      box.style.display = (!q || anyVisible) ? "" : "none";
+    }
   });
   let nosearch = dyn.querySelector("[data-hall-nosearch]");
   if (!nosearch) {
@@ -1986,7 +2306,8 @@ function hallBadges(dyn) {
     const ex = (b.exams && b.exams.upcoming) || [];
     put("exams", ex.length ? ex.length + " 场临近" : "");
     const td = (b.todos && b.todos.items) || [];
-    put("todos", td.length ? td.length + " 条待办" : "");
+    const overdueN = td.filter((t) => t.overdue).length;
+    put("todos", overdueN ? "⚠ " + overdueN + " 逾期" : (td.length ? td.length + " 条待办" : ""));
     put("knowledge", b.knowledge && b.knowledge.total ? "共 " + b.knowledge.total + " 条" : "");
   }).catch(() => {});
 }
@@ -2123,6 +2444,16 @@ window.addEventListener("hashchange", () => {
     renderHall();
   }
 });
+/* 带 #hall=xx 打开页面：直接还原到对应面板（不抢焦点）。
+   必须推迟到整个初始化脚本走完再执行——openHall 触达的
+   settingsReturnFocus 等 let 声明在更后面，同步调用会踩 TDZ */
+const hallInitial = hallPanelFromHash();
+if (hallInitial) {
+  setTimeout(() => {
+    try { openHall(hallInitial, { focus: false }); }
+    catch (e) { window.__hallInitErr = String((e && e.stack) || e); }
+  }, 0);
+}
 function closeHall() {
   if (!document.body.classList.contains("hall-open")) return;
   document.body.classList.remove("hall-open");
@@ -2149,12 +2480,13 @@ hallBack.addEventListener("click", () => {
   hallPanel = "";
   hallFromCard = "";
   renderHall();
+  syncHallHash();
   const card = from && hallBody.querySelector('[data-panel="' + from + '"]');
   (card || document.getElementById("closeHall")).focus();
 });
 hallBody.addEventListener("click", (e) => {
   const card = e.target.closest("[data-panel]");
-  if (card) { hallFromCard = card.dataset.panel; hallPanel = card.dataset.panel; renderHall(); hallBack.focus(); }
+  if (card) { hallFromCard = card.dataset.panel; hallPanel = card.dataset.panel; renderHall(); syncHallHash(); hallBack.focus(); }
 });
 /* 宫格内方向键移动焦点（原生 grid 无方向导航，补上桌面键盘习惯） */
 hallBody.addEventListener("keydown", (e) => {
@@ -2189,10 +2521,10 @@ function refreshHallBadge() {
     for (const id of ["openHall", "openHallM"]) {
       const btn = document.getElementById(id);
       if (!btn) continue;
-      let dot = btn.querySelector(".hall-badge");
+      let dot = btn.querySelector(".hall-dot");
       if (show && !dot) {
         dot = document.createElement("i");
-        dot.className = "hall-badge";
+        dot.className = "hall-dot";
         btn.appendChild(dot);
       }
       if (!show && dot) dot.remove();
