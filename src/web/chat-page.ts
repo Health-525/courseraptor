@@ -409,33 +409,14 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .fhint { margin: 6px 4px 0; text-align: right; font-family: var(--mono);
            font-size: 12px; letter-spacing: .08em; color: var(--ink-3); }
 
-  /* ── 设置弹窗：一张盖了红头的办理单 ── */
-  .overlay { position: fixed; inset: 0; z-index: 50;
-             background: rgba(38, 35, 29, 0.42);
-             display: grid; place-items: center; padding: 20px; }
-  .overlay[hidden] { display: none; }
-  .dlg { width: min(480px, 100%); background: var(--paper);
-         border: 1px solid var(--rule-2); border-radius: 6px; overflow: hidden;
-         box-shadow: 0 18px 60px rgba(38, 35, 29, 0.28); }
-  .dlg.wide { width: min(720px, 100%); max-height: min(840px, calc(100dvh - 40px));
-              display: flex; flex-direction: column; }
-  /* 弹窗本体不再整体滚动：左目录钉住，只有右侧内容区滚 */
-  .dlg.wide .dlg-body { flex: 1; min-height: 0; }
-  .dlg-head { display: flex; align-items: center; justify-content: space-between;
-              padding: 16px 22px 9px; }
-  .dlg-head span { font-family: var(--kai); font-size: 22px;
-                   color: var(--accent); letter-spacing: 3px; }
   .dclose { border: 0; background: none; color: var(--ink-3); cursor: pointer;
             font-size: 15px; padding: 2px 5px; border-radius: 3px; }
   .dclose:hover { color: var(--accent); }
-  .dlg-rule { border-bottom: 2px solid var(--accent); margin: 0 22px; }
-  .dlg-body { padding: 18px 22px 12px; }
   .dlg-intro { margin: 0 0 16px; color: var(--ink-2); font-size: 14px;
                line-height: 1.75; }
 
   /* ── 设置栏目：左侧目录 + 右侧办理内容。选中栏目与会话列表同一语言：
      朱砂竖线 + 浮起纸片；目录不滚动，滚的永远是右侧内容 ── */
-  .set-body { display: flex; flex-direction: column; }
   .set-frame { display: flex; flex: 1; min-height: 0; gap: 22px; }
   .set-tabs { flex: none; width: 138px; display: flex; flex-direction: column; gap: 2px;
               overflow-y: auto; }
@@ -452,9 +433,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .set-pane { display: none; }
   .set-pane.on { display: block; }
   /* 栏目内动作行：替代原 panel 头行右侧挂动作的做法 */
-  .pane-act { margin: 0 0 12px; }
-  .pane-act .tbtn { min-height: 34px; padding: 5px 12px; font-size: 13px; }
-  .set-body .setmsg { flex: none; margin-top: 10px; }
 
   /* 字段：标签在上、输入在下，全宽对齐；不再用 72px 边栏配 82px 缩进魔数 */
   .fld { display: grid; gap: 5px; margin: 0 0 10px; }
@@ -502,20 +480,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                  background: var(--card); color: var(--ink-3);
                  font-size: 13px; text-align: center; padding: 16px 10px; }
 
-  .rem-list { display: grid; gap: 6px; }
-  .rem-empty { border: 1px dashed var(--rule-2); border-radius: 3px;
-               background: var(--card); color: var(--ink-3);
-               font-size: 13px; text-align: center; padding: 16px 10px; }
-  .rem-item { display: grid; grid-template-columns: auto 1fr auto; gap: 8px;
-              align-items: start; border: 1px solid var(--rule); background: var(--card);
-              padding: 8px 9px; }
-  .rem-item.done { opacity: .58; }
-  .rem-title { font-size: 14px; line-height: 1.45; }
-  .rem-time { grid-column: 2; font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
-  .rem-tools { display: flex; gap: 7px; }
-  .rem-tools a, .rem-tools button { border: 0; background: none; padding: 0; color: var(--ink-3);
-                                   cursor: pointer; font-size: 12px; text-decoration: none; }
-  .rem-tools a:hover, .rem-tools button:hover { color: var(--accent); }
   .data-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; align-items: stretch; }
   .data-cell { border: 1px solid var(--rule); background: var(--card); padding: 10px 8px;
                min-height: 72px; display: flex; flex-direction: column;
@@ -527,15 +491,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .setmsg { font-family: var(--mono); font-size: 12px; min-height: 16px;
             margin: 0 2px 2px; white-space: pre-wrap; color: var(--accent-deep); }
   .setmsg.good { color: var(--ink-2); }
-  .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; flex: none;
-              padding: 13px 22px 15px; border-top: 1px solid var(--rule);
-              background: var(--card); }
-  .dlg-foot .tbtn.primary { background: var(--accent);
-                            border-color: var(--accent); color: var(--card);
-                            font-weight: 600; }
-  .dlg-foot .tbtn.primary:hover { background: var(--accent-deep);
-                                  border-color: var(--accent-deep); color: #fff; }
-  .dlg-foot .tbtn:disabled { opacity: .5; cursor: default; }
 
   #toBottom { position: fixed; right: 30px; bottom: 104px; z-index: 5;
               background: var(--card); border: 1px solid var(--rule-2);
@@ -557,38 +512,91 @@ export function chatPage(options: { demo?: boolean } = {}): string {
           display: flex; flex-direction: column; overflow: hidden;
           background: var(--paper); border-left: 1px solid var(--rule-2); }
   .hall-head { display: flex; align-items: center; gap: 10px; padding: 16px 22px 9px; }
-  .hall-title { flex: 1; font-family: var(--kai); font-size: 22px;
+  .hall-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+                white-space: nowrap; font-family: var(--kai); font-size: 22px;
                 color: var(--accent); letter-spacing: 3px; }
-  .hall-back { border: 0; background: none; color: var(--ink-3); cursor: pointer;
-               font-size: 13px; padding: 2px 4px; border-radius: 3px; }
-  .hall-back:hover { color: var(--accent); }
+  .hall-back { flex: none; border: 1px solid var(--rule); background: var(--card);
+               color: var(--ink-2); cursor: pointer; font-size: 13px;
+               padding: 4px 10px; border-radius: 4px; min-height: 30px; }
+  .hall-back:hover { border-color: var(--accent); color: var(--accent); }
   .hall-rule { border-bottom: 2px solid var(--accent); margin: 0 22px; }
-  .hall-body { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 22px 24px; }
-  /* 宫格：每个功能一张档案卡片，朱砂竖线在选中语言里已是「可进入」的记号 */
-  .hall-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
-  .hall-card { display: flex; flex-direction: column; gap: 4px; text-align: left;
+  .hall-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 22px 24px; }
+  /* 宫格分组题注：与侧栏 .sec h2 同一语言（等宽小字 + 下划线），只更紧凑 */
+  .hall-sec { display: flex; align-items: baseline; justify-content: space-between;
+              margin: 16px 0 8px; padding-bottom: 6px;
+              font-family: var(--mono); font-size: 12px; font-weight: 600;
+              letter-spacing: .14em; color: var(--ink-3);
+              border-bottom: 1px solid var(--rule); }
+  .hall-sec:first-child { margin-top: 0; }
+  .hall-sec span { letter-spacing: .04em; font-weight: 400; }
+  /* 宫格：每个功能一张档案卡片，朱砂竖线在选中语言里已是「可进入」的记号。
+     首行是图标 + 标题 + 右箭头（可进入的 affordance），次行是等宽小字说明 */
+  .hall-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .hall-card { display: flex; flex-direction: column; gap: 5px; text-align: left;
                border: 1px solid var(--rule); border-left: 3px solid var(--rule-2);
-               background: var(--card); border-radius: 3px; padding: 12px 12px 10px;
-               cursor: pointer; font-family: inherit;
-               transition: border-color .15s ease, box-shadow .15s ease; }
+               background: var(--card); border-radius: 3px; padding: 12px 12px 11px;
+               min-height: 88px; cursor: pointer; font-family: inherit;
+               transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
   .hall-card:hover { border-color: var(--rule-2); border-left-color: var(--accent);
-                     box-shadow: var(--shadow-sm); }
-  .hall-card b { font-size: 15px; font-weight: 600; }
+                     box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+  .hall-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .hall-card-top { display: flex; align-items: center; gap: 8px; }
+  .hall-ico { flex: none; width: 26px; height: 26px; display: inline-flex;
+              align-items: center; justify-content: center;
+              background: var(--paper-deep); border: 1px solid var(--rule);
+              border-radius: 4px; font-size: 14px; line-height: 1; }
+  .hall-card b { flex: 1; min-width: 0; font-size: 15px; font-weight: 600;
+                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hall-go { flex: none; color: var(--rule-2); font-size: 14px;
+             transition: color .15s ease, transform .15s ease; }
+  .hall-card:hover .hall-go { color: var(--accent); transform: translateX(2px); }
   .hall-card span { font-size: 12px; color: var(--ink-3); line-height: 1.6; }
   .hall-note { margin: 14px 2px 0; font-family: var(--mono); font-size: 12px;
                color: var(--ink-3); line-height: 1.7; }
-  .hall-more { display: inline-block; margin-top: 12px; font-family: var(--mono);
-               font-size: 12px; color: var(--ink-3); text-decoration: none; }
-  .hall-more:hover { color: var(--accent); }
+  /* 面板工具条：条数在左，刷新与完整页在右；粘在面板顶部方便长列表回看 */
+  .hall-toolbar { position: sticky; top: -16px; display: flex; align-items: center;
+                  gap: 8px; margin: 0 -2px 10px; padding: 4px 2px 8px;
+                  background: var(--paper); }
+  .hall-count { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+                white-space: nowrap; font-family: var(--mono); font-size: 12px;
+                color: var(--ink-3); letter-spacing: .04em; }
+  .hall-refresh { flex: none; border: 1px solid var(--rule); background: var(--card);
+                  color: var(--ink-2); font-size: 12px; font-family: var(--mono);
+                  min-height: 30px; padding: 3px 10px; border-radius: 4px; cursor: pointer; }
+  .hall-refresh:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .hall-refresh:disabled { opacity: .5; cursor: default; }
+  .hall-more { flex: none; display: inline-flex; align-items: center; gap: 4px;
+               font-family: var(--mono); font-size: 12px; color: var(--ink-2);
+               border: 1px solid var(--rule); background: var(--card);
+               border-radius: 4px; padding: 4px 10px; min-height: 30px;
+               text-decoration: none; }
+  .hall-more:hover { border-color: var(--accent); color: var(--accent); }
   /* 面板条目：与待办列表同一语言，等信息以两行表达（标题 + 等宽小字） */
   .hall-item { border: 1px solid var(--rule); background: var(--card);
-               padding: 8px 11px; margin-bottom: 6px; }
+               padding: 9px 11px; margin-bottom: 6px; border-radius: 2px; }
   .hall-item .ht { font-size: 14px; font-weight: 600; line-height: 1.5;
                    overflow-wrap: anywhere; }
   .hall-item .hm { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
-                   margin-top: 2px; }
+                   margin-top: 2px; line-height: 1.6; overflow-wrap: anywhere; }
   .hall-item.hot { border-left: 3px solid var(--accent); }
   .hall-item.hot .hm { color: var(--accent-deep); }
+  /* 加载骨架：纯色块脉冲（不用渐变，与纸面主题一致），减少取数时的布局跳动 */
+  .hall-skel { display: grid; gap: 6px; }
+  .hall-skel i { display: block; height: 52px; border: 1px solid var(--rule);
+                 background: var(--card); border-radius: 2px;
+                 animation: hallPulse 1.1s ease-in-out infinite; }
+  .hall-skel i:nth-child(2) { animation-delay: .15s; }
+  .hall-skel i:nth-child(3) { animation-delay: .3s; }
+  @keyframes hallPulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+  /* 空态 / 错误态：虚线框纸片居中，与 .rem-empty / .model-empty 同一语言 */
+  .hall-empty { border: 1px dashed var(--rule-2); border-radius: 3px;
+                background: var(--card); color: var(--ink-2);
+                text-align: center; padding: 20px 14px; margin-bottom: 6px; }
+  .hall-empty .he-ico { font-size: 22px; line-height: 1; margin-bottom: 6px; }
+  .hall-empty .he-t { font-size: 14px; font-weight: 600; }
+  .hall-empty .he-s { margin-top: 4px; font-family: var(--mono); font-size: 12px;
+                      color: var(--ink-3); line-height: 1.7; }
+  .hall-empty .tbtn { margin-top: 10px; min-height: 32px; padding: 4px 14px; font-size: 12px; }
   /* 大厅里的设置：抽屉不宽，栏目目录改横排（沿用窄屏设置的形态），
      字段与检测行等内部样式原样复用 */
   .hall .set-frame { flex-direction: column; gap: 0; }
@@ -679,6 +687,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     #b { min-height: 40px; padding: 8px 14px; }
     #b .kbd { display: none; }
     .data-grid { grid-template-columns: repeat(2, 1fr); }
+    /* 大厅在小屏保持两列宫格，超窄（折叠屏竖向）才退回单列，保证拇指可达 */
+    .hall-grid { gap: 8px; }
+    .hall-card { min-height: 84px; padding: 11px 11px 10px; }
+    .hall-toolbar { top: -12px; }
     /* 窄屏设置弹窗：目录改横排在内容上方，选中态换用下划朱砂线 */
     .set-frame { flex-direction: column; gap: 0; }
     .set-tabs { flex-direction: row; width: auto; gap: 6px;
@@ -690,6 +702,9 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                padding: 6px 10px; }
     .set-tab.on { border-bottom-color: var(--accent); box-shadow: none; }
     .set-main { padding-right: 0; }
+  }
+  @media (max-width: 360px) {
+    .hall-grid { grid-template-columns: 1fr; }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important;
@@ -704,7 +719,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   </div>
   <div class="mastbtns">
     <button class="tbtn primary" id="newSession" title="另起一个会话（旧会话保留在档案里）">新会话</button>
-    <button class="tbtn hall-btn" id="openHall" title="今日日程、课表、考试、待办、知识库、番茄钟">功能大厅</button>
+    <button class="tbtn hall-btn" id="openHall" title="今日日程、课表、考试、待办、知识库、番茄钟" aria-haspopup="dialog" aria-expanded="false" aria-controls="hall">功能大厅</button>
   </div>
   <section class="sec">
     <h2>会话档案<span id="sessCount"></span></h2>
@@ -716,7 +731,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   ${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 全部为虚构数据</strong><span>不连接教务或 AI，不保存到磁盘。请勿输入个人信息。正式使用请在终端运行 npm start。</span></div>' : ""}
   <div class="topbar">
     <span class="tb-title wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></span>
-    <button class="tbtn" id="openHallM">大厅</button>
+    <button class="tbtn" id="openHallM" aria-haspopup="dialog" aria-expanded="false" aria-controls="hall">大厅</button>
     <button class="tbtn" id="openDrawerM">会话</button>
     <button class="tbtn" id="newSessionM">新会话</button>
   </div>
@@ -746,22 +761,21 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   </form>
 </main>
 <div class="hall-backdrop" id="hallBackdrop"></div>
-<aside class="hall" id="hall" aria-label="功能大厅" inert>
+<aside class="hall" id="hall" role="dialog" aria-modal="false" aria-labelledby="hallTitle" aria-label="功能大厅" inert>
   <div class="hall-head">
-    <button class="hall-back" id="hallBack" type="button" hidden>← 大厅</button>
-    <span class="hall-title" id="hallTitle">功能大厅</span>
+    <button class="hall-back" id="hallBack" type="button" aria-label="返回功能大厅主页" hidden>← 大厅</button>
+    <h2 class="hall-title" id="hallTitle" style="margin:0;font-weight:400;">功能大厅</h2>
     <button class="dclose" id="closeHall" aria-label="关闭功能大厅">✕</button>
   </div>
-  <div class="hall-rule"></div>
+  <div class="hall-rule" aria-hidden="true"></div>
   <div class="hall-body" id="hallBody">
-    <div id="hallDyn"></div>
+    <div id="hallDyn" aria-live="polite"></div>
     <div id="hallSettings" hidden>
       <div class="set-frame">
         <nav class="set-tabs" id="setTabs" role="tablist" aria-label="设置栏目">
           <button class="set-tab on" type="button" role="tab" id="setTabAccount" aria-controls="setPaneAccount" aria-selected="true" data-pane="account">教务账号</button>
           <button class="set-tab" type="button" role="tab" id="setTabModel" aria-controls="setPaneModel" aria-selected="false" data-pane="model">AI 模型</button>
           <button class="set-tab" type="button" role="tab" id="setTabQQ" aria-controls="setPaneQQ" aria-selected="false" data-pane="qq">QQ 机器人</button>
-          <button class="set-tab" type="button" role="tab" id="setTabReminders" aria-controls="setPaneReminders" aria-selected="false" data-pane="reminders">待办</button>
           <button class="set-tab" type="button" role="tab" id="setTabData" aria-controls="setPaneData" aria-selected="false" data-pane="data">本地数据</button>
         </nav>
         <div class="set-main">
@@ -788,11 +802,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             <label class="fld"><span>激活暗号</span><input id="sQQPass" type="text" autocomplete="off" placeholder="首次激活用的暗号（自定）" ${demo ? "disabled" : ""}></label>
             <div class="cur" id="curQQ">未配置；到 q.qq.com 创建机器人后填入，保存后即可在 QQ 里使用</div>
           </section>
-          <section class="set-pane" id="setPaneReminders" role="tabpanel" aria-labelledby="setTabReminders" data-pane="reminders">
-            <p class="dlg-intro">从对话中确认的考试与作业截止会存到这里，也可以手动添加。此栏目的改动即时生效，无需点「保存设置」。</p>
-            <div class="pane-act"><button class="tbtn" id="addReminderManual" type="button" ${demo ? "disabled" : ""}>＋ 添加待办</button></div>
-            <div class="rem-list" id="reminderList"><div class="rem-empty">暂无待办提醒</div></div>
-          </section>
           <section class="set-pane" id="setPaneData" role="tabpanel" aria-labelledby="setTabData" data-pane="data">
             <p class="dlg-intro">会话、附件、生成文件与待办都保存在本机，可导出或按需清理。此栏目的操作即时生效，无需点「保存设置」。</p>
             <div class="data-grid" id="dataGrid"></div>
@@ -813,24 +822,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   </div>
 </aside>
 <div class="drawer-backdrop" id="drawerBackdrop"></div>
-<div class="overlay" id="reminderOverlay" hidden>
-  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="reminderTitle">
-    <div class="dlg-head"><span id="reminderTitle">确认待办</span><button class="dclose" id="closeReminder" aria-label="关闭待办设置">✕</button></div>
-    <div class="dlg-rule"></div>
-    <div class="dlg-body">
-      <p class="dlg-intro">请核对截止时间。系统不会根据不明确的日期自动创建提醒。</p>
-      <label class="fld"><span>待办</span><input id="rTitle" type="text" maxlength="100"></label>
-      <label class="fld"><span>截止</span><input id="rDue" type="datetime-local"></label>
-      <label class="fld"><span>来源</span><input id="rSource" type="text" maxlength="160"></label>
-      <label class="fld"><span>备注</span><input id="rNotes" type="text" maxlength="500"></label>
-      <div class="setmsg" id="reminderMsg"></div>
-    </div>
-    <div class="dlg-foot">
-      <button class="tbtn" id="cancelReminder" type="button">取消</button>
-      <button class="tbtn primary" id="saveReminder" type="button">保存待办</button>
-    </div>
-  </div>
-</div>
 <button id="toBottom" hidden>↓ 回到底部</button>
 <script>
 const logScroll = document.getElementById("log");
@@ -1475,14 +1466,15 @@ document.getElementById("drawerBackdrop").addEventListener("click", closeDrawer)
 /* ── 功能大厅：右侧 push 抽屉。宫格是主页，各面板按需取数；
    对话过程中 agent 调到对应工具（TOOL_PANEL）时自动推出该面板。 ── */
 const HALL_CARDS = [
-  { id: "today", t: "今日日程", d: "下一节课、今日安排与本周概览" },
-  { id: "schedule", t: "课表", d: "本周每天的课与调休安排" },
-  { id: "exams", t: "考试", d: "临近考试的时间、地点与座位" },
-  { id: "todos", t: "待办", d: "作业与事务的截止提醒" },
-  { id: "knowledge", t: "知识库", d: "对话中沉淀的知识条目" },
-  { id: "pomodoro", t: "番茄钟", d: "专注计时与最近记录" },
-  { id: "settings", t: "设置", d: "教务账号、AI 模型、QQ 机器人、待办与本地数据" },
+  { id: "today", t: "今日日程", d: "下一节课、今日安排与本周概览", icon: "📅", group: "学习安排" },
+  { id: "schedule", t: "课表", d: "本周每天的课与调休安排", icon: "🗓️", group: "学习安排" },
+  { id: "exams", t: "考试", d: "临近考试的时间、地点与座位", icon: "📝", group: "学习安排" },
+  { id: "todos", t: "待办", d: "作业与事务的截止提醒", icon: "✅", group: "效率工具" },
+  { id: "knowledge", t: "知识库", d: "对话中沉淀的知识条目", icon: "📚", group: "效率工具" },
+  { id: "pomodoro", t: "番茄钟", d: "专注计时与最近记录", icon: "🍅", group: "效率工具" },
+  { id: "settings", t: "设置", d: "教务账号、AI 模型与本地数据", icon: "⚙️", group: "系统" },
 ];
+const HALL_GROUPS = ["学习安排", "效率工具", "系统"];
 const HALL_TITLES = Object.fromEntries(HALL_CARDS.map((c) => [c.id, c.t]));
 const HALL_DEMO = document.body.dataset.demo === "true";
 const hallBody = document.getElementById("hallBody");
@@ -1505,17 +1497,56 @@ function hallItem(title, meta, hot) {
   return item;
 }
 function hallNote(text) { return el2("hall-note", text); }
+/* 空态：虚线框纸片 + 标题 + 等宽小字说明，与 .rem-empty 同一语言 */
+function hallEmpty(icon, title, hint, actionLabel, onAction) {
+  const box = el("hall-empty");
+  box.appendChild(el2("he-ico", icon));
+  box.appendChild(el2("he-t", title));
+  if (hint) box.appendChild(el2("he-s", hint));
+  if (actionLabel && onAction) {
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "tbtn"; btn.textContent = actionLabel;
+    btn.addEventListener("click", onAction);
+    box.appendChild(btn);
+  }
+  return box;
+}
+/* 骨架屏：先占位再补画，避免取数时布局跳动；aria-busy 交给调用方 */
+function hallSkel() {
+  const sk = el("hall-skel");
+  sk.setAttribute("aria-hidden", "true");
+  for (let i = 0; i < 3; i++) sk.appendChild(document.createElement("i"));
+  return sk;
+}
 function hallFullPage(panel) {
   return panel === "knowledge" ? "/knowledge" : "/today";
 }
 function hallMore(panel) {
   const a = document.createElement("a");
   a.className = "hall-more"; a.href = hallFullPage(panel);
-  a.textContent = "打开完整页 →";
+  a.textContent = "完整页 →";
+  a.setAttribute("aria-label", "在完整页打开" + (HALL_TITLES[panel] || panel));
   return a;
 }
+/* 面板工具条：左侧条数，右侧刷新 + 完整页；刷新清掉 brief 缓存重取 */
+function hallToolbar(panel, countText) {
+  const bar = el("hall-toolbar");
+  const count = el2("hall-count", countText || "");
+  bar.appendChild(count);
+  const refresh = document.createElement("button");
+  refresh.type = "button"; refresh.className = "hall-refresh"; refresh.textContent = "↻ 刷新";
+  refresh.setAttribute("aria-label", "刷新" + (HALL_TITLES[panel] || panel));
+  refresh.addEventListener("click", () => {
+    hallBrief = null;
+    renderHall(true);
+  });
+  bar.appendChild(refresh);
+  bar.appendChild(hallMore(panel));
+  return bar;
+}
 
-/* 各面板的构建函数：入参是 /api/today 的 Brief（番茄钟除外，走自己的接口） */
+/* 各面板的构建函数：入参是 /api/today 的 Brief（番茄钟除外，走自己的接口）。
+   只返回列表内容；工具条（条数 + 刷新 + 完整页）由 renderHall 统一补。 */
 function buildToday(b) {
   const wrap = el("");
   wrap.appendChild(hallItem(b.dateLabel + " · " + (b.term.weekLabel || "未在教学周"), "", true));
@@ -1528,14 +1559,15 @@ function buildToday(b) {
   (b.schedule.courses || []).forEach((c) => {
     wrap.appendChild(hallItem(c.title, [c.periods, c.time, c.location ? "@" + c.location : ""].filter(Boolean).join(" · ")));
   });
-  if (!(b.schedule.courses || []).length && !b.next) wrap.appendChild(hallNote("今天没有课。"));
-  wrap.appendChild(hallMore("today"));
+  if (!(b.schedule.courses || []).length && !b.next) {
+    wrap.appendChild(hallEmpty("🍃", "今天没有课", "在对话框里问「这周课表」查看整周安排。"));
+  }
   return wrap;
 }
 function buildSchedule(b) {
   const wrap = el("");
   if (!b.schedule.available) {
-    wrap.appendChild(hallNote("还没有课表缓存；在对话框里说「课表」，查询后这里就会显示。"));
+    wrap.appendChild(hallEmpty("🗓️", "还没有课表", "在对话框里说「课表」，查询后这里就会显示。"));
     return wrap;
   }
   ((b.week && b.week.days) || []).forEach((d) => {
@@ -1548,38 +1580,46 @@ function buildSchedule(b) {
         [c.time, c.location ? "@" + c.location : "", c.teacher].filter(Boolean).join(" · "), d.isToday));
     });
   });
-  wrap.appendChild(hallMore("schedule"));
   return wrap;
 }
 function buildExams(b) {
   const wrap = el("");
   const list = (b.exams && b.exams.upcoming) || [];
-  if (!list.length) wrap.appendChild(hallNote("近 14 天没有考试安排。"));
+  if (!list.length) {
+    wrap.appendChild(hallEmpty("📝", "近 14 天没有考试", "有新安排时，这里会标出时间、地点与座位。"));
+    return wrap;
+  }
   list.forEach((x) => {
     wrap.appendChild(hallItem(x.subject,
       [x.date, x.time, x.location, x.seatNumber ? "座位 " + x.seatNumber : ""].filter(Boolean).join(" · "),
       x.isToday || x.inDays <= 3));
   });
-  wrap.appendChild(hallMore("exams"));
   return wrap;
 }
 function buildTodos(b) {
   const wrap = el("");
   const list = (b.todos && b.todos.items) || [];
-  if (!list.length) wrap.appendChild(hallNote("暂无待办；在对话框里说「提醒我……」就能记录。"));
+  if (!list.length) {
+    wrap.appendChild(hallEmpty("✅", "暂无待办", "在对话框里说「提醒我……」就能记录。"));
+    return wrap;
+  }
   list.forEach((t) => {
     wrap.appendChild(hallItem(t.title, t.dueLabel + (t.overdue ? " · 已逾期" : t.isToday ? " · 今天到期" : ""), t.overdue));
   });
-  wrap.appendChild(hallMore("todos"));
   return wrap;
 }
 function buildKnowledge(b) {
   const wrap = el("");
-  wrap.appendChild(hallNote("共 " + b.knowledge.total + " 条，最近更新的："));
+  const total = (b.knowledge && b.knowledge.total) || 0;
+  const recent = (b.knowledge && b.knowledge.recent) || [];
+  if (!total || !recent.length) {
+    wrap.appendChild(hallEmpty("📚", "知识库还是空的", "对话中沉淀的知识点会自动收录到这里。"));
+    return wrap;
+  }
+  wrap.dataset.total = String(total);
   (b.knowledge.recent || []).forEach((k) => {
     wrap.appendChild(hallItem(k.title, (k.category || "未分类") + " · " + String(k.content || "").replace(/\s+/g, " ").slice(0, 48)));
   });
-  wrap.appendChild(hallMore("knowledge"));
   return wrap;
 }
 function buildPomodoro() {
@@ -1590,7 +1630,7 @@ function buildPomodoro() {
       wrap.appendChild(hallItem(d.active.label + " · 进行中",
         "剩余 " + Math.floor(d.active.remainingSec / 60) + " 分 " + pad(d.active.remainingSec % 60) + " 秒（共 " + d.active.focusMinutes + " 分钟）", true));
     } else {
-      wrap.appendChild(hallNote("没有进行中的番茄钟；在对话框里说「来一个 25 分钟番茄钟」。"));
+      wrap.appendChild(hallEmpty("🍅", "没有进行中的番茄钟", "在对话框里说「来一个 25 分钟番茄钟」。"));
     }
     const stateName = { running: "进行中", done: "已完成", cancelled: "已取消" };
     (d.recent || []).slice(0, 5).forEach((p) => {
@@ -1608,10 +1648,41 @@ const HALL_PANELS = {
   pomodoro: buildPomodoro,
 };
 
-function renderHall() {
+/* 大厅焦点归还：记住抽屉外的打开者，关闭时还回去（键盘用户不丢位置） */
+let hallReturnFocus = null;
+function hallSyncExpanded() {
+  const open = document.body.classList.contains("hall-open");
+  for (const id of ["openHall", "openHallM"]) {
+    const btn = document.getElementById(id);
+    if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+  }
+}
+/* 面板装配：工具条（条数 + 刷新 + 完整页）+ 列表内容 */
+function hallMountPanel(dyn, panel, node) {
+  const items = node.querySelectorAll ? node.querySelectorAll(".hall-item").length : 0;
+  const total = node.dataset && node.dataset.total ? Number(node.dataset.total) || items : items;
+  let countText = "";
+  if (panel === "knowledge" && total) countText = "共 " + total + " 条";
+  else if (items) countText = "共 " + items + " 条";
+  dyn.innerHTML = "";
+  dyn.appendChild(hallToolbar(panel, countText));
+  dyn.appendChild(node);
+  dyn.setAttribute("aria-busy", "false");
+}
+function hallShowError(dyn, panel) {
+  dyn.setAttribute("aria-busy", "false");
+  dyn.innerHTML = "";
+  dyn.appendChild(hallToolbar(panel, ""));
+  dyn.appendChild(hallEmpty("⚠️", HALL_DEMO ? "演示环境没有该数据" : "取数失败",
+    HALL_DEMO ? "正式运行 npm start 后可用。" : "检查本地服务后重试。",
+    "重新加载", () => renderHall(true)));
+}
+function renderHall(force) {
   const dyn = document.getElementById("hallDyn");
   const staticSettings = document.getElementById("hallSettings");
+  if (force) hallBrief = null;
   dyn.innerHTML = "";
+  dyn.setAttribute("aria-busy", "false");
   hallBack.hidden = !hallPanel;
   const isSettings = hallPanel === "settings";
   staticSettings.hidden = !isSettings;
@@ -1623,15 +1694,30 @@ function renderHall() {
   }
   if (!hallPanel) {
     hallTitle.textContent = "功能大厅";
-    const grid = el("hall-grid");
-    HALL_CARDS.forEach((c) => {
-      const card = document.createElement("button");
-      card.type = "button"; card.className = "hall-card"; card.dataset.panel = c.id;
-      const t = document.createElement("b"); t.textContent = c.t; card.appendChild(t);
-      const s = document.createElement("span"); s.textContent = c.d; card.appendChild(s);
-      grid.appendChild(card);
+    /* 主页按分组排布：学习安排 / 效率工具 / 系统，扫一眼就能定位 */
+    HALL_GROUPS.forEach((g) => {
+      const cards = HALL_CARDS.filter((c) => c.group === g);
+      if (!cards.length) return;
+      const sec = el("hall-sec");
+      sec.appendChild(el2("", g));
+      const count = el2("", cards.length + " 项");
+      sec.appendChild(count);
+      dyn.appendChild(sec);
+      const grid = el("hall-grid");
+      cards.forEach((c) => {
+        const card = document.createElement("button");
+        card.type = "button"; card.className = "hall-card"; card.dataset.panel = c.id;
+        card.setAttribute("aria-label", c.t + "：" + c.d);
+        const top = el("hall-card-top");
+        top.appendChild(el2("hall-ico", c.icon || "·"));
+        const t = document.createElement("b"); t.textContent = c.t; top.appendChild(t);
+        top.appendChild(el2("hall-go", "→"));
+        card.appendChild(top);
+        const s = document.createElement("span"); s.textContent = c.d; card.appendChild(s);
+        grid.appendChild(card);
+      });
+      dyn.appendChild(grid);
     });
-    dyn.appendChild(grid);
     dyn.appendChild(hallNote(HALL_DEMO
       ? "离线演示不含实时数据；正式运行后点开即显示。"
       : "提示：在对话框里说「课表」「考试」，对应面板会自动从右边推出。"));
@@ -1640,27 +1726,39 @@ function renderHall() {
   hallTitle.textContent = HALL_TITLES[hallPanel] || hallPanel;
   const build = HALL_PANELS[hallPanel];
   if (!build) { dyn.appendChild(hallNote("该功能暂无面板。")); return; }
-  const body = build();
+  /* 先给骨架屏占位，避免取数时闪空；同步面板直接装配 */
+  let body = null;
+  try { body = build(); } catch { hallShowError(dyn, hallPanel); return; }
   if (body && typeof body.then === "function") {
+    dyn.setAttribute("aria-busy", "true");
+    dyn.appendChild(hallSkel());
+    const want = hallPanel;
     body.then((node) => {
-      /* 取数期间用户可能已关掉或切走：只往还开着的面板里补画 */
-      if (document.body.classList.contains("hall-open") && dyn) dyn.replaceChildren(node);
+      /* 取数期间用户可能已关掉或切走：只往还开着的同一面板里补画 */
+      if (document.body.classList.contains("hall-open") && hallPanel === want && dyn) {
+        hallMountPanel(dyn, want, node);
+      }
     }).catch(() => {
-      if (document.body.classList.contains("hall-open")) {
-        dyn.replaceChildren(hallNote(HALL_DEMO
-          ? "离线演示不含该数据；正式运行 npm start 后可用。"
-          : "取数失败，稍后再试。"));
+      if (document.body.classList.contains("hall-open") && hallPanel === want) {
+        hallShowError(dyn, want);
       }
     });
   } else {
-    dyn.replaceChildren(body);
+    hallMountPanel(dyn, hallPanel, body);
   }
 }
 function openHall(panel, opts) {
   if (panel) hallPanel = panel;
+  /* 记住抽屉外的打开者：关闭时焦点归还；抽屉内卡片跳转不需要 */
+  const active = document.activeElement;
+  if (active && !document.getElementById("hall").contains(active)) {
+    hallReturnFocus = active;
+    if (!settingsReturnFocus) settingsReturnFocus = active;
+  }
   document.body.classList.add("hall-open");
   /* 收起态宽度为 0：inert 挡住不可见内容的键盘焦点，打开时解除 */
   document.getElementById("hall").inert = false;
+  hallSyncExpanded();
   renderHall();
   /* push 进来时不抢焦点：对话联动自动打开的场合，用户可能正在打字 */
   if (!opts || opts.focus !== false) document.getElementById("closeHall").focus();
@@ -1669,24 +1767,40 @@ function closeHall() {
   if (!document.body.classList.contains("hall-open")) return;
   document.body.classList.remove("hall-open");
   document.getElementById("hall").inert = true;
+  hallSyncExpanded();
   /* 对话进行中手动关掉：这一轮不再因工具调用自动弹出 */
   if (busy) hallAutoMuted = true;
-  /* 从设置面板关掉时，焦点还给打开它的那张卡片（#21 的焦点归还语义） */
-  if (settingsReturnFocus) {
-    if (typeof settingsReturnFocus.focus === "function" && document.contains(settingsReturnFocus)) {
-      settingsReturnFocus.focus();
-    }
-    settingsReturnFocus = null;
+  /* 焦点归还：优先还给抽屉外的打开者（键盘用户不丢位置） */
+  const target = hallReturnFocus || settingsReturnFocus;
+  hallReturnFocus = null;
+  settingsReturnFocus = null;
+  if (target && typeof target.focus === "function" && document.contains(target)) {
+    target.focus();
   }
 }
 document.getElementById("openHall").addEventListener("click", () => { hallPanel = ""; openHall(); });
 document.getElementById("openHallM").addEventListener("click", () => { hallPanel = ""; openHall(); });
 document.getElementById("closeHall").addEventListener("click", closeHall);
 document.getElementById("hallBackdrop").addEventListener("click", closeHall);
-hallBack.addEventListener("click", () => { hallPanel = ""; renderHall(); });
+hallBack.addEventListener("click", () => { hallPanel = ""; renderHall(); hallBack.hidden = true; document.getElementById("closeHall").focus(); });
 hallBody.addEventListener("click", (e) => {
   const card = e.target.closest("[data-panel]");
-  if (card) { hallPanel = card.dataset.panel; renderHall(); }
+  if (card) { hallPanel = card.dataset.panel; renderHall(); hallBack.focus(); }
+});
+/* 宫格内方向键移动焦点（原生 grid 无方向导航，补上桌面键盘习惯） */
+hallBody.addEventListener("keydown", (e) => {
+  if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) return;
+  const cards = [...hallBody.querySelectorAll(".hall-card")];
+  if (cards.length < 2 || !cards.includes(document.activeElement)) return;
+  e.preventDefault();
+  const cols = 2;
+  const i = cards.indexOf(document.activeElement);
+  let next = i;
+  if (e.key === "ArrowRight") next = (i + 1) % cards.length;
+  if (e.key === "ArrowLeft") next = (i - 1 + cards.length) % cards.length;
+  if (e.key === "ArrowDown") next = (i + cols) % cards.length;
+  if (e.key === "ArrowUp") next = (i - cols + cards.length) % cards.length;
+  cards[next].focus();
 });
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closeHall();
@@ -1724,57 +1838,11 @@ const sQQSecret = document.getElementById("sQQSecret");
 const sQQPass = document.getElementById("sQQPass");
 const curModel = document.getElementById("curModel");
 const setMsg = document.getElementById("setMsg");
-const reminderOverlay = document.getElementById("reminderOverlay");
-const reminderMsg = document.getElementById("reminderMsg");
-const rTitle = document.getElementById("rTitle");
-const rDue = document.getElementById("rDue");
-const rSource = document.getElementById("rSource");
-const rNotes = document.getElementById("rNotes");
-let reminderSourceUrl = "";
 let setStatus = null;
 /* 设置弹窗关闭后焦点回到触发按钮（键盘用户不丢位置） */
 let settingsReturnFocus = null;
 
-function localDateTime(value) {
-  if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  const off = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - off).toISOString().slice(0, 16);
-}
 
-function refreshReminders() {
-  return fetch("/api/reminders").then((r) => r.json()).then((d) => {
-    const host = document.getElementById("reminderList");
-    host.innerHTML = "";
-    const reminders = d.reminders || [];
-    if (!reminders.length) { host.appendChild(el2("rem-empty", "暂无待办提醒")); return; }
-    reminders.forEach((reminder) => {
-      const item = el("rem-item" + (reminder.done ? " done" : ""));
-      const done = document.createElement("input");
-      done.type = "checkbox"; done.checked = !!reminder.done; done.title = "标记完成";
-      done.addEventListener("change", () => fetch("/api/reminders/" + reminder.id, {
-        method: "PATCH", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ done: done.checked }),
-      }).then(refreshReminders));
-      item.appendChild(done);
-      item.appendChild(el2("rem-title", reminder.title));
-      const tools = el("rem-tools");
-      const cal = document.createElement("a");
-      cal.href = "/api/reminders/" + reminder.id + ".ics"; cal.download = ""; cal.textContent = "日历";
-      tools.appendChild(cal);
-      const del = document.createElement("button");
-      del.type = "button"; del.textContent = "删除";
-      del.addEventListener("click", () => {
-        if (!window.confirm("删除这条待办提醒？")) return;
-        fetch("/api/reminders/" + reminder.id, { method: "DELETE" }).then(refreshReminders).then(refreshData);
-      });
-      tools.appendChild(del); item.appendChild(tools);
-      item.appendChild(el2("rem-time", new Date(reminder.dueAt).toLocaleString("zh-CN", { hour12: false })));
-      host.appendChild(item);
-    });
-  }).catch(() => {});
-}
 
 function refreshData() {
   return fetch("/api/data").then((r) => r.json()).then((d) => {
@@ -1794,40 +1862,6 @@ function refreshData() {
   }).catch(() => {});
 }
 
-function openReminder(preset) {
-  const p = preset || {};
-  reminderSourceUrl = p.sourceUrl || "";
-  rTitle.value = p.title || "";
-  rDue.value = localDateTime(p.dueAt);
-  rSource.value = p.source || "";
-  rNotes.value = "";
-  reminderMsg.textContent = "";
-  reminderOverlay.hidden = false;
-  (rTitle.value ? rDue : rTitle).focus();
-}
-function closeReminder() { reminderOverlay.hidden = true; }
-document.getElementById("addReminderManual").addEventListener("click", () => openReminder({}));
-document.getElementById("closeReminder").addEventListener("click", closeReminder);
-document.getElementById("cancelReminder").addEventListener("click", closeReminder);
-reminderOverlay.addEventListener("mousedown", (e) => { if (e.target === reminderOverlay) closeReminder(); });
-document.getElementById("saveReminder").addEventListener("click", () => {
-  const button = document.getElementById("saveReminder");
-  if (!rTitle.value.trim() || !rDue.value) {
-    reminderMsg.textContent = "请填写待办内容并确认截止时间。"; return;
-  }
-  button.disabled = true;
-  fetch("/api/reminders", {
-    method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      title: rTitle.value.trim(), dueAt: new Date(rDue.value).toISOString(),
-      source: rSource.value.trim(), sourceUrl: reminderSourceUrl, notes: rNotes.value.trim(),
-    }),
-  }).then((r) => r.json().then((d) => ({ ok: r.ok, d }))).then(({ ok, d }) => {
-    button.disabled = false;
-    if (!ok) { reminderMsg.textContent = d.error || "保存失败"; return; }
-    closeReminder(); refreshReminders(); refreshData();
-  }).catch(() => { button.disabled = false; reminderMsg.textContent = "保存失败，请重试。"; });
-});
 
 function runDiagnostic(target, buttonId, stateId) {
   const button = document.getElementById(buttonId), state = document.getElementById(stateId);
@@ -1945,7 +1979,7 @@ function showSettings() {
   sQQAppId.value = ""; sQQSecret.value = ""; sQQPass.value = "";
   document.getElementById("diagJwgl").textContent = "";
   document.getElementById("diagDeepseek").textContent = "";
-  refreshReminders(); refreshData();
+  refreshData();
   fetch("/api/settings").then((r) => r.json()).then((d) => {
     setStatus = d;
     sUser.value = "";
@@ -1972,8 +2006,7 @@ document.getElementById("cancelSettings").addEventListener("click", closeHall);
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (sessionActionsId) { sessionActionsId = ""; renderSessList(); return; }
-  if (!reminderOverlay.hidden) closeReminder();
-  else closeDrawer();
+  closeDrawer();
 });
 
 function clearData(scopes, prompt) {
@@ -1981,7 +2014,7 @@ function clearData(scopes, prompt) {
   fetch("/api/data/clear", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ scopes }),
   }).then((r) => r.json()).then(() => {
-    refreshReminders(); refreshData(); refreshSessions();
+    refreshData(); refreshSessions();
     if (scopes.includes("sessions")) startFresh();
   }).catch(() => {});
 }
