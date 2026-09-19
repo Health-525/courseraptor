@@ -1588,16 +1588,24 @@ function hallToolbar(panel, countText) {
 function buildToday(b) {
   const wrap = el("");
   wrap.appendChild(hallItem(b.dateLabel + " · " + (b.term.weekLabel || "未在教学周"), "", true));
-  if (b.next) {
-    wrap.appendChild(hallItem("下一节 · " + b.next.course.title,
-      b.next.dateLabel + " " + (b.next.course.time || b.next.course.periods || "")
-      + (b.next.course.location ? " @" + b.next.course.location : ""),
-      b.next.startsInMin <= 60));
+  /* 今日日程只看今天：brief.next 会向后看到最多 14 天，跨天的（明天及以后）不进这个面板 */
+  const todayNext = b.next && b.next.dateLabel === "今天" ? b.next : null;
+  if (todayNext) {
+    wrap.appendChild(hallItem("下一节 · " + todayNext.course.title,
+      (todayNext.course.time || todayNext.course.periods || "")
+      + (todayNext.course.location ? " @" + todayNext.course.location : ""),
+      todayNext.startsInMin <= 60));
   }
-  (b.schedule.courses || []).forEach((c) => {
-    wrap.appendChild(hallItem(c.title, [c.periods, c.time, c.location ? "@" + c.location : ""].filter(Boolean).join(" · ")));
+  /* 放假 / 调休补课的当日说明（如「今天是调休补课日，按被换周几的课表上课」） */
+  if (b.schedule.note) wrap.appendChild(hallNote(b.schedule.note));
+  const list = b.schedule.courses || [];
+  list.forEach((c) => {
+    wrap.appendChild(hallItem(c.title,
+      [c.periods, c.time, c.location ? "@" + c.location : "",
+       c.status === "done" ? "已下课" : c.status === "current" ? "进行中" : ""].filter(Boolean).join(" · "),
+      c.status === "current"));
   });
-  if (!(b.schedule.courses || []).length && !b.next) {
+  if (!list.length && !todayNext) {
     wrap.appendChild(hallEmpty("🍃", "今天没有课", "在对话框里问「这周课表」查看整周安排。"));
   }
   return wrap;
