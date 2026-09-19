@@ -317,12 +317,17 @@ function renderNav() {
 function catBtn(key, label, count) {
   const btn = el("button", "cat-btn" + (activeCat === key ? " active" : ""), label);
   btn.type = "button";
+  btn.dataset.cat = key;
   btn.appendChild(el("span", "cat-count", String(count)));
   btn.addEventListener("click", () => {
     activeCat = key;
     visibleCount = BATCH;
     renderNav();
     renderList();
+    /* 导航重建后焦点归位到同分类（键盘用户不用重新 Tab） */
+    for (const b of document.querySelectorAll("#catNav .cat-btn")) {
+      if (b.dataset.cat === key) { b.focus(); break; }
+    }
   });
   return btn;
 }
@@ -418,6 +423,12 @@ function load() {
     });
 }
 $("kwBox").addEventListener("input", (ev) => {
+  keyword = ev.target.value.trim();
+  visibleCount = BATCH;
+  renderList();
+});
+/* 部分浏览器点搜索框原生 × 只发 search 不发 input，兜底同步一次 */
+$("kwBox").addEventListener("search", (ev) => {
   keyword = ev.target.value.trim();
   visibleCount = BATCH;
   renderList();
