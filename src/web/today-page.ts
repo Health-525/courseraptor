@@ -212,29 +212,64 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
                color: var(--ink-3); overflow-wrap: anywhere; }
   .exam-list { display: grid; gap: 8px; }
 
-  /* 待办卡：按 逾期 / 今天 / 明天 / 以后 分组的纸质清单行 */
-  .todo-group { margin: 12px 0 6px; font-family: var(--mono); font-size: 11.5px;
+  /* 待办卡：按 逾期 / 今天 / 明天 / 以后 分组的纸质清单行。
+     题注 = 等宽小字 + 计数徽章 + 虚线引到行尾，编辑部目录页的语言 */
+  .todo-group { display: flex; align-items: center; gap: 8px; margin: 12px 0 6px;
+                font-family: var(--mono); font-size: 11.5px;
                 letter-spacing: .12em; color: var(--ink-3); }
   .todo-group:first-child { margin-top: 0; }
+  .todo-group::after { content: ""; flex: 1; border-top: 1px dashed var(--rule); }
   .todo-group.overdue { color: var(--accent-deep); }
+  .todo-count { display: inline-flex; align-items: center; justify-content: center;
+                min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px;
+                background: var(--shade); color: var(--ink-2);
+                font-size: 10.5px; letter-spacing: 0; line-height: 1; }
+  .todo-group.overdue .todo-count { background: var(--accent-soft); color: var(--accent-deep); }
   /* 已完成折叠开关：题注变身按钮，保持等宽小字外观 */
-  .todo-group.toggle { border: 0; background: none; padding: 0; cursor: pointer; text-align: left; }
+  .todo-group.toggle { border: 0; background: none; padding: 0; cursor: pointer;
+                       text-align: left; font: inherit; font-family: var(--mono);
+                       font-size: 11.5px; letter-spacing: .12em; width: 100%; }
   .todo-group.toggle:hover { color: var(--ink-2); }
   .todo-list { display: grid; gap: 6px; }
   /* [hidden] 必须显式赢过上面的 display: grid，否则已完成折叠区收不起来 */
   .todo-list[hidden] { display: none; }
+  /* 条目行：圆角纸片，逾期压一条朱砂左线（与课格 .tt-course 同一语言），
+     悬停浮起一点阴影；左线用 transparent 占位，保证四组行内文本对齐 */
   .todo-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 10px;
                align-items: center; padding: 9px 12px; border: 1px solid var(--rule);
-               background: var(--paper); }
-  .todo-item:hover, .todo-item:focus-within { border-color: var(--rule-2); }
-  .todo-chk { width: 17px; height: 17px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+               border-left: 3px solid transparent; border-radius: 4px;
+               background: var(--paper);
+               transition: border-color .15s ease, box-shadow .15s ease; }
+  .todo-item:hover, .todo-item:focus-within {
+    border-color: var(--rule-2);
+    box-shadow: 0 2px 10px rgba(50, 42, 31, .07);
+  }
+  .todo-item.overdue, .todo-item.overdue:hover,
+  .todo-item.overdue:focus-within { border-left-color: var(--accent); }
+  /* 勾选框：自绘纸片方框，选中后朱砂底 + 纸色勾，与全站单色朱砂语言统一 */
+  .todo-chk { appearance: none; -webkit-appearance: none; position: relative;
+              width: 18px; height: 18px; margin: 0;
+              border: 1.5px solid var(--rule-2); border-radius: 4px;
+              background: var(--card); cursor: pointer;
+              transition: border-color .15s ease, background .15s ease; }
+  .todo-chk:hover { border-color: var(--accent); }
+  .todo-chk:checked { background: var(--accent); border-color: var(--accent); }
+  .todo-chk:checked::after { content: ""; position: absolute; left: 5px; top: 1.5px;
+                             width: 4px; height: 9px;
+                             border: solid var(--paper); border-width: 0 2px 2px 0;
+                             transform: rotate(45deg); }
+  .todo-chk:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .todo-chk:disabled { cursor: default; }
   .todo-title { font-size: 15px; overflow-wrap: anywhere; }
-  .todo-due { font-family: var(--mono); font-size: 12px; color: var(--ink-3); white-space: nowrap; }
-  .todo-item.overdue .todo-due { color: var(--accent-deep); }
+  /* 截止时间：小胶囊徽标一眼分层；逾期换朱砂软底，已完成文字较长不封胶囊 */
+  .todo-due { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2);
+              background: var(--shade); padding: 2px 9px; border-radius: 999px;
+              white-space: nowrap; }
+  .todo-item.overdue .todo-due { background: var(--accent-soft); color: var(--accent-deep);
+                                 font-weight: 600; }
   /* 已完成条目：整行退后（灰显 + 标题删除线），与对话页同一语言 */
   .todo-item.finished .todo-title { text-decoration: line-through; color: var(--ink-3); }
-  .todo-item.finished .todo-due { color: var(--ink-3); }
+  .todo-item.finished .todo-due { background: none; padding: 2px 0; color: var(--ink-3); }
   .todo-del { background: none; border: none; padding: 2px 4px; color: var(--ink-3);
               font-family: var(--mono); font-size: 12px; cursor: pointer; }
   .todo-del:hover { color: var(--accent); text-decoration: underline; }
@@ -243,14 +278,15 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
   /* 行内编辑行：朱砂左条的纸片，输入与按钮同行换行，与整体纸质语言一致 */
   .todo-edit-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 2px;
                     padding: 10px; border: 1px solid var(--rule); border-left: 3px solid var(--accent);
-                    background: var(--card); }
+                    border-radius: 4px; background: var(--card); }
   .todo-edit-form input { flex: 1 1 150px; min-width: 0; border: 1px solid var(--rule-2);
                           background: var(--paper); color: var(--ink); font-family: var(--mono);
                           font-size: 13px; padding: 7px 8px; border-radius: 3px; outline: none; }
   .todo-edit-form input:focus { border-color: var(--accent); }
   /* 编辑 + 删除共用的行内动作格 */
   .todo-acts { display: inline-flex; gap: 2px; align-items: center; justify-self: end; }
-  .todo-empty { margin: 0; padding: 18px 8px; border: 1px dashed var(--rule-2); text-align: center;
+  .todo-empty { margin: 0; padding: 18px 8px; border: 1px dashed var(--rule-2);
+                border-radius: 4px; text-align: center;
                 color: var(--ink-3); font-size: 14px; }
 
   /* 知识卡：最近沉淀的知识点速览，全量在 /knowledge 页 */
@@ -798,7 +834,11 @@ function renderTodos(b) {
   }
   for (const item of groups) {
     if (!item[2].length) continue;
-    body.appendChild(el("p", item[1] ? "todo-group overdue" : "todo-group", item[0] + " · " + item[2].length));
+    /* 题注 = 组名 + 计数徽章，虚线由 CSS ::after 引到行尾 */
+    const head = el("p", item[1] ? "todo-group overdue" : "todo-group");
+    head.appendChild(document.createTextNode(item[0]));
+    head.appendChild(el("span", "todo-count", String(item[2].length)));
+    body.appendChild(head);
     const list = el("div", "todo-list");
     for (const t of item[2]) list.appendChild(todoItem(t));
     body.appendChild(list);
