@@ -83,9 +83,19 @@ async function withInline(fn: (rig: Rig) => Promise<void>): Promise<void> {
 /** 菜单框首行固定是这个开头，用它判断菜单是否画在屏上 */
 const MENU_TOP = "┌ 命令";
 
-/** 取这一帧里处于选中态（反显）的菜单行 */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: 剥离 ANSI 转义序列必须按 ESC 字面匹配
+const ANSI_SGR = /\x1b\[[0-9;]*m/g;
+
+/**
+ * 取这一帧里处于选中态的菜单行。选中态用行首记号 "│ › " 认而不是反显色码：
+ * CI 等无色环境按约定（color.ts 遵循 clig.dev）整层关掉 ANSI，反显码不存在，
+ * 而 › 记号（slash-menu.ts 渲染选中行的 mark）在有无颜色时都在。
+ */
 const selectedRows = (frame: string): string[] =>
-  frame.split("\r\n").filter((l) => l.includes("\x1b[7m"));
+  frame
+    .split(/\r\n|\n/)
+    .map((l) => l.replace(ANSI_SGR, ""))
+    .filter((l) => l.includes("│ › "));
 
 // 每个用例都要顶替 process.stdin，必须串行跑：并发会让它们抢同一个替身
 describe("行内模式斜杠菜单", { concurrency: 1 }, () => {
