@@ -217,20 +217,39 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
                 letter-spacing: .12em; color: var(--ink-3); }
   .todo-group:first-child { margin-top: 0; }
   .todo-group.overdue { color: var(--accent-deep); }
+  /* 已完成折叠开关：题注变身按钮，保持等宽小字外观 */
+  .todo-group.toggle { border: 0; background: none; padding: 0; cursor: pointer; text-align: left; }
+  .todo-group.toggle:hover { color: var(--ink-2); }
   .todo-list { display: grid; gap: 6px; }
-  .todo-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px;
+  /* [hidden] 必须显式赢过上面的 display: grid，否则已完成折叠区收不起来 */
+  .todo-list[hidden] { display: none; }
+  .todo-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 10px;
                align-items: center; padding: 9px 12px; border: 1px solid var(--rule);
                background: var(--paper); }
+  .todo-item:hover, .todo-item:focus-within { border-color: var(--rule-2); }
   .todo-chk { width: 17px; height: 17px; margin: 0; accent-color: var(--accent); cursor: pointer; }
   .todo-chk:disabled { cursor: default; }
   .todo-title { font-size: 15px; overflow-wrap: anywhere; }
   .todo-due { font-family: var(--mono); font-size: 12px; color: var(--ink-3); white-space: nowrap; }
   .todo-item.overdue .todo-due { color: var(--accent-deep); }
+  /* 已完成条目：整行退后（灰显 + 标题删除线），与对话页同一语言 */
+  .todo-item.finished .todo-title { text-decoration: line-through; color: var(--ink-3); }
+  .todo-item.finished .todo-due { color: var(--ink-3); }
   .todo-del { background: none; border: none; padding: 2px 4px; color: var(--ink-3);
               font-family: var(--mono); font-size: 12px; cursor: pointer; }
   .todo-del:hover { color: var(--accent); text-decoration: underline; }
   .todo-del.armed { color: var(--card); background: var(--accent); border-radius: 3px;
                     padding: 2px 8px; }
+  /* 行内编辑行：朱砂左条的纸片，输入与按钮同行换行，与整体纸质语言一致 */
+  .todo-edit-form { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 2px;
+                    padding: 10px; border: 1px solid var(--rule); border-left: 3px solid var(--accent);
+                    background: var(--card); }
+  .todo-edit-form input { flex: 1 1 150px; min-width: 0; border: 1px solid var(--rule-2);
+                          background: var(--paper); color: var(--ink); font-family: var(--mono);
+                          font-size: 13px; padding: 7px 8px; border-radius: 3px; outline: none; }
+  .todo-edit-form input:focus { border-color: var(--accent); }
+  /* 编辑 + 删除共用的行内动作格 */
+  .todo-acts { display: inline-flex; gap: 2px; align-items: center; justify-self: end; }
   .todo-empty { margin: 0; padding: 18px 8px; border: 1px dashed var(--rule-2); text-align: center;
                 color: var(--ink-3); font-size: 14px; }
 
@@ -284,7 +303,8 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
   /* ── 打印：隐去导航与操作，只留课表、待办等内容 ── */
   @media print {
     body { background: #fff; }
-    .ph-right, .demo-banner, .schedule-rail, .week-nav, .tbtn, .todo-del { display: none !important; }
+    .ph-right, .demo-banner, .schedule-rail, .week-nav, .tbtn, .todo-del,
+    .todo-acts, .todo-edit-form, .todo-group.toggle { display: none !important; }
     main { display: block; max-width: none; padding: 0; }
     .col { display: block; }
     .card, .lead { box-shadow: none; break-inside: avoid; }
@@ -613,6 +633,13 @@ function renderExams(b) {
   body.appendChild(wrap);
 }
 
+/* ISO 截止 -> datetime-local 预填值 */
+function toLocalInput(iso) {
+  const d = new Date(iso);
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate())
+    + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+}
+
 function todoItem(t) {
   const row = el("div", "todo-item" + (t.overdue ? " overdue" : ""));
   const chk = el("input", "todo-chk");
@@ -635,6 +662,109 @@ function todoItem(t) {
   row.appendChild(title);
   row.appendChild(el("span", "todo-due", (t.overdue ? "⚠ " : "") + t.dueLabel));
   if (!DEMO_DATA) {
+    /* 行内编辑 + 两步删除收进同一动作格：第三列起不再折行，行高保持稳定 */
+    const acts = el("span", "todo-acts");
+    const edit = el("button", "todo-del", "编辑");
+    edit.type = "button";
+    edit.title = "修改标题、截止时间或备注";
+    edit.setAttribute("aria-label", "编辑待办：" + t.title);
+    edit.addEventListener("click", () => {
+      if (row.nextElementSibling && row.nextElementSibling.classList.contains("todo-edit-form")) return;
+      row.after(todoEditForm(t, row));
+      row.hidden = true;
+    });
+    const del = el("button", "todo-del", "删除");
+    del.type = "button";
+    del.addEventListener("click", () => {
+      armDelete(del, () => {
+        fetch("/api/reminders/" + t.id, { method: "DELETE" }).then(() => load()).catch(() => load());
+      });
+    });
+    acts.append(edit, del);
+    row.appendChild(acts);
+  }
+  return row;
+}
+
+/* 待办编辑行：标题 + 截止时间 + 备注，PATCH 成功后整卡重排（分组可能变化） */
+function todoEditForm(t, row) {
+  const form = el("div", "todo-edit-form");
+  const title = el("input", null);
+  title.type = "text"; title.value = t.title; title.maxLength = 100;
+  title.setAttribute("aria-label", "待办标题");
+  const due = el("input", null);
+  due.type = "datetime-local"; due.value = toLocalInput(t.dueAt);
+  due.setAttribute("aria-label", "截止时间");
+  const notes = el("input", null);
+  notes.type = "text"; notes.value = t.notes || ""; notes.maxLength = 500;
+  notes.setAttribute("aria-label", "待办备注（可选）");
+  const save = el("button", "tbtn", "保存修改");
+  save.type = "button";
+  const cancel = el("button", "tbtn", "取消");
+  cancel.type = "button";
+  form.append(title, due, notes, save, cancel);
+  const close = () => { form.remove(); row.hidden = false; };
+  cancel.addEventListener("click", close);
+  [title, due].forEach((input) => {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); save.click(); }
+      if (e.key === "Escape") { e.stopPropagation(); close(); }
+    });
+  });
+  save.addEventListener("click", () => {
+    const text = title.value.trim();
+    const dueAt = new Date(due.value);
+    if (!text) { title.focus(); return; }
+    if (!due.value || Number.isNaN(dueAt.getTime())) { due.focus(); return; }
+    save.disabled = true;
+    save.textContent = "保存中…";
+    const body = { title: text, dueAt: dueAt.toISOString() };
+    if (notes.value.trim()) body.notes = notes.value.trim();
+    fetch("/api/reminders/" + t.id, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      load();
+    }).catch(() => {
+      save.disabled = false;
+      save.textContent = "保存修改";
+    });
+  });
+  title.focus();
+  return form;
+}
+
+/* 已完成条目：取消勾选即恢复为未完成；默认收进「已完成」折叠区，不抢今天的注意力 */
+let todoDoneOpen = false;
+function todoDoneItem(t) {
+  const row = el("div", "todo-item finished");
+  const chk = el("input", "todo-chk");
+  chk.type = "checkbox"; chk.checked = true;
+  chk.title = "取消勾选就恢复为未完成";
+  chk.setAttribute("aria-label", "恢复未完成：" + t.title);
+  if (!DEMO_DATA) {
+    chk.addEventListener("change", () => {
+      chk.checked = true;
+      chk.disabled = true;
+      fetch("/api/reminders/" + t.id, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ done: false }),
+      }).then((r) => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        load();
+      }).catch(() => { chk.disabled = false; });
+    });
+  } else {
+    chk.disabled = true;
+  }
+  row.appendChild(chk);
+  row.appendChild(el("span", "todo-title", t.title));
+  row.appendChild(el("span", "todo-due",
+    (t.doneAt ? "完成于 " + fmtStamp(t.doneAt) + " · " : "") + "原截止 " + t.dueLabel));
+  if (!DEMO_DATA) {
     const del = el("button", "todo-del", "删除");
     del.type = "button";
     del.addEventListener("click", () => {
@@ -652,11 +782,12 @@ function renderTodos(b) {
   const body = $("todoCard").querySelector(".cbody");
   const note = $("todoNote");
   body.textContent = "";
-  const items = (b.todos && b.todos.items) || [];
+  const todos = b.todos || {};
+  const items = todos.items || [];
+  const doneList = todos.done || [];
   note.textContent = items.length ? items.length + " 项未完成" : "";
   if (!items.length) {
     body.appendChild(el("p", "todo-empty", "没有未完成的待办。在对话页对我说「我这周要……」即可记录。"));
-    return;
   }
   const groups = [["逾期", true, []], ["今天", false, []], ["明天", false, []], ["以后", false, []]];
   for (const t of items) {
@@ -672,6 +803,25 @@ function renderTodos(b) {
     for (const t of item[2]) list.appendChild(todoItem(t));
     body.appendChild(list);
   }
+  if (!doneList.length) return;
+  /* 已完成折叠区：点题注就地展开/收起，不重新取数 */
+  const head = el("button", "todo-group toggle");
+  head.type = "button";
+  head.dataset.doneToggle = "1";
+  head.setAttribute("aria-expanded", todoDoneOpen ? "true" : "false");
+  head.textContent = "已完成 · " + doneList.length + (todoDoneOpen ? " ▾" : " ▸");
+  const list = el("div", "todo-list");
+  list.hidden = !todoDoneOpen;
+  for (const t of doneList) list.appendChild(todoDoneItem(t));
+  head.addEventListener("click", () => {
+    todoDoneOpen = !todoDoneOpen;
+    list.hidden = !todoDoneOpen;
+    head.textContent = "已完成 · " + list.querySelectorAll(".todo-item").length
+      + (todoDoneOpen ? " ▾" : " ▸");
+    head.setAttribute("aria-expanded", todoDoneOpen ? "true" : "false");
+  });
+  body.appendChild(head);
+  body.appendChild(list);
 }
 
 /* 知识速览：最近沉淀的知识点，全量在 /knowledge 页 */

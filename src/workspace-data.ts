@@ -181,6 +181,10 @@ export function updateReminder(id: string, patch: Record<string, unknown>): Remi
     if (Number.isNaN(Date.parse(dueAt))) throw new Error("截止时间无效");
     reminder.dueAt = new Date(dueAt).toISOString();
   }
+  // 备注显式传入即可改（含清空）；不传不动，避免误抹 agent 记录的备注
+  if (typeof patch.notes === "string") {
+    reminder.notes = cleanText(patch.notes, 500) || undefined;
+  }
   reminder.updatedAt = Date.now();
   writeState(state);
   return reminder;
