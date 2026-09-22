@@ -271,6 +271,13 @@ test("待办：未完成按截止升序进简报，逾期/今天标注与标签�
   assert.equal(b.todos.items[1].dueLabel, "今天 22:00");
   assert.equal(b.todos.items[2].dueLabel, "9月3日 周四 14:00");
   assert.equal(b.todos.items[2].isToday, false);
+  assert.deepEqual(
+    b.todos.done.map((t) => t.title),
+    ["已完成的旧待办"],
+    "最近完成的待办单独成列（供「已完成」折叠区与撤销）",
+  );
+  assert.equal(typeof b.todos.done[0].doneAt, "number");
+  assert.equal(b.todos.done[0].dueLabel, "8月29日 周六 10:00");
 });
 
 test("知识库：速览带总数与最近条目，课程归类随缓存课程走", () => {

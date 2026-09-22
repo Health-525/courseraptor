@@ -409,9 +409,9 @@ function pomoCard(tl, p) {
         body: JSON.stringify({ id: card.dataset.id }),
       }).then((r) => { if (!r.ok) throw new Error("cancel failed"); })
         .then(() => {
-          card.classList.add("cancelled");
-          card.querySelector(".pstate").textContent = "已取消";
-          cancel.remove();
+          pomoCancelCard(card);
+          /* 顶部恢复卡、别处的同 id 卡也一并收掉 */
+          pomoSync();
         })
         .catch(() => {
           cancel.disabled = false;
@@ -433,7 +433,56 @@ function pomoCard(tl, p) {
   pomoTick();
   scroll(false);
 }
-/* 每秒刷全页进行中的卡片；到点翻成「时间到」+提示音+标题闪灯（切回页面自动复位） */
+/* 到点收尾：翻朱砂底 + 提示音 + 标题闪灯（切回页面自动复位）+ 一键接龙 */
+function pomoFinish(card) {
+  if (card.dataset.finished) return;
+  delete card.dataset.confirming;
+  card.dataset.finished = "1";
+  card.classList.add("done");
+  const clockEl = card.querySelector(".pclock"), fill = card.querySelector(".pbar i");
+  if (clockEl) clockEl.textContent = "00:00";
+  if (fill) fill.style.width = "100%";
+  const st = card.querySelector(".pstate");
+  if (st) st.textContent = "⏰ 时间到！休息一下吧";
+  const btn = card.querySelector(".pfoot .tbtn");
+  if (btn) btn.remove();
+  /* 后续动作一键接龙：话术走正常对话，agent 建新计时后原链路再出一卡片 */
+  const foot = card.querySelector(".pfoot");
+  if (foot) {
+    const mins = Math.max(1, Math.round((Number(card.dataset.total) || 1) / 60));
+    const followup = (text, label) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "tbtn"; b.textContent = label;
+      b.addEventListener("click", () => {
+        if (busy) return;
+        foot.querySelectorAll(".tbtn").forEach((x) => { x.disabled = true; });
+        send(text);
+      });
+      return b;
+    };
+    foot.appendChild(followup("再来一个 " + mins + " 分钟番茄钟", "再来 " + mins + " 分钟"));
+    foot.appendChild(followup("来一个 5 分钟番茄钟，休息一下", "休息 5 分钟"));
+  }
+  pomoBeep();
+  document.title = "⏰ 番茄钟时间到 · CourseRaptor";
+  try {
+    if (window.Notification && Notification.permission === "granted") {
+      new Notification("⏰ 番茄钟时间到", { body: (card.dataset.label || "专注") + "结束，休息一下吧" });
+    }
+  } catch { /* 通知发不出就只靠页面 */ }
+}
+/* 取消收尾：对话内的卡留档盖「已取消」章；恢复容器只是计时器的另一张脸，整张收走 */
+function pomoCancelCard(card) {
+  const restore = card.closest(".pomo-restore");
+  if (restore) { restore.remove(); return; }
+  card.classList.add("cancelled");
+  const st = card.querySelector(".pstate");
+  if (st) st.textContent = "已取消";
+  const btn = card.querySelector(".pfoot .tbtn");
+  if (btn) btn.remove();
+}
+/* 每秒刷全页进行中的卡片；到点先跟服务端对一次表——别处已取消的
+   不再翻「时间到」、不响铃 */
 function pomoTick() {
   const now = Date.now();
   document.querySelectorAll(".pomo").forEach((card) => {
@@ -446,44 +495,47 @@ function pomoTick() {
       if (fill) fill.style.width = (100 * (total - left) / total).toFixed(1) + "%";
       return;
     }
-    card.dataset.finished = "1";
-    card.classList.add("done");
     if (clockEl) clockEl.textContent = "00:00";
     if (fill) fill.style.width = "100%";
-    const st = card.querySelector(".pstate");
-    if (st) st.textContent = "⏰ 时间到！休息一下吧";
-    const btn = card.querySelector(".pfoot .tbtn");
-    if (btn) btn.remove();
-    /* 后续动作一键接龙：话术走正常对话，agent 建新计时后原链路再出一卡片 */
-    const foot = card.querySelector(".pfoot");
-    if (foot) {
-      const mins = Math.max(1, Math.round(total / 60));
-      const followup = (text, label) => {
-        const b = document.createElement("button");
-        b.type = "button"; b.className = "tbtn"; b.textContent = label;
-        b.addEventListener("click", () => {
-          if (busy) return;
-          foot.querySelectorAll(".tbtn").forEach((x) => { x.disabled = true; });
-          send(text);
-        });
-        return b;
-      };
-      foot.appendChild(followup("再来一个 " + mins + " 分钟番茄钟", "再来 " + mins + " 分钟"));
-      foot.appendChild(followup("来一个 5 分钟番茄钟，休息一下", "休息 5 分钟"));
-    }
-    pomoBeep();
-    document.title = "⏰ 番茄钟时间到 · CourseRaptor";
-    try {
-      if (window.Notification && Notification.permission === "granted") {
-        new Notification("⏰ 番茄钟时间到", { body: (card.dataset.label || "专注") + "结束，休息一下吧" });
-      }
-    } catch { /* 通知发不出就只靠页面 */ }
+    if (card.dataset.confirming) return;
+    card.dataset.confirming = "1";
+    pomoSync();
+  });
+}
+/* 跟服务端对表：取消可能发生在本页按钮之外（agent 对话、大厅面板、别的
+   标签页），已画的卡不会自己知道——查一次，cancelled 的收掉，等确认的
+   到点卡按结果翻卡。start 画新卡走 fresh 事件，这里只兜状态变化 */
+let pomoSyncing = false;
+function pomoSync() {
+  if (document.body.dataset.demo === "true" || pomoSyncing) return;
+  pomoSyncing = true;
+  fetch("/api/pomodoro").then((r) => r.json()).then((d) => {
+    pomoSyncing = false;
+    const activeId = d.active && d.active.id ? String(d.active.id) : "";
+    const rec = {};
+    (d.recent || []).forEach((p) => { if (p && p.id) rec[String(p.id)] = p; });
+    document.querySelectorAll(".pomo").forEach((card) => {
+      if (card.dataset.finished || card.classList.contains("cancelled")) return;
+      const id = card.dataset.id || "";
+      if (id && id === activeId) { delete card.dataset.confirming; return; }
+      const remote = id ? rec[id] : null;
+      if (remote && remote.status === "cancelled") { pomoCancelCard(card); return; }
+      if (card.dataset.confirming && (!remote || remote.status !== "running")) pomoFinish(card);
+    });
+  }).catch(() => {
+    pomoSyncing = false;
+    /* 服务端联系不上：等确认的卡按本地 endsAt 兜底翻「时间到」，别卡死 */
+    document.querySelectorAll(".pomo[data-confirming]").forEach((card) => {
+      if (!card.dataset.finished && !card.classList.contains("cancelled")) pomoFinish(card);
+    });
   });
 }
 setInterval(() => {
   pomoTick();
   try { if (typeof hallPomoTick === "function") hallPomoTick(); } catch { /* 大厅没开就跳过 */ }
 }, 1000);
+/* 低频对表：别处取消后，页面上的卡最多 10 秒内收掉 */
+setInterval(pomoSync, 10000);
 
 /* 刷新/重开页面后，后台还在走的番茄钟在时间线顶部恢复一张实时卡片。
    容器不挂 .turn：切会话清屏时留着——计时是全局的，不跟某段对话走 */
@@ -1053,26 +1105,24 @@ function buildExams(b) {
   });
   return wrap;
 }
-/* 待办添加行：折叠的内联小表单（标题 + 截止时间 + 快捷时间），POST /api/reminders 后就地刷新。
-   校验失败 inline 提示不吞错；回车保存、Esc 收起；快捷 chip 一键填常用截止点 */
-function todoAddRow() {
-  const row = el("todo-add");
-  const btn = document.createElement("button");
-  btn.type = "button"; btn.className = "tbtn"; btn.textContent = "+ 添加待办";
-  btn.setAttribute("aria-expanded", "false");
-  const form = el("todo-form");
-  form.hidden = true;
+/* 待办表单字段组：标题 + 截止时间 + 快捷时间 + 备注（可选）+ 错误行。
+   添加与编辑同一套字段与校验语言；快捷 chip 一键填常用截止点 */
+function todoFields() {
   const title = document.createElement("input");
   title.type = "text"; title.placeholder = "要做什么事（必填）"; title.maxLength = 100;
   title.setAttribute("aria-label", "待办标题");
   const due = document.createElement("input");
   due.type = "datetime-local"; due.title = "截止时间（必填）";
   due.setAttribute("aria-label", "截止时间");
-  /* 快捷时间：今晚 22:00 / 明早 9:00 / 三天后 18:00，直接填进 datetime-local */
+  const notes = document.createElement("input");
+  notes.type = "text"; notes.placeholder = "备注（可选）"; notes.maxLength = 500;
+  notes.setAttribute("aria-label", "待办备注");
   const quick = el("hall-quick");
-  const pad2 = (x) => (x < 10 ? "0" : "") + x;
-  const toLocal = (d) => d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate())
-    + "T" + pad2(d.getHours()) + ":" + pad2(d.getMinutes());
+  const toLocal = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate())
+    + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  /* ISO 截止 -> datetime-local 预填值（编辑行用） */
+  const toLocalValue = (iso) => toLocal(new Date(iso));
+  /* 快捷时间：今晚 22:00 / 明早 9:00 / 三天后 18:00，直接填进 datetime-local */
   const quicks = [
     ["今晚 22:00", () => { const d = new Date(); d.setHours(22, 0, 0, 0); if (d.getTime() < Date.now()) d.setDate(d.getDate() + 1); return d; }],
     ["明早 9:00", () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d; }],
@@ -1086,50 +1136,70 @@ function todoAddRow() {
   });
   const err = el2("hall-err", "");
   err.setAttribute("role", "alert");
-  const save = document.createElement("button");
-  save.type = "button"; save.className = "tbtn primary"; save.textContent = "保存";
-  const cancel = document.createElement("button");
-  cancel.type = "button"; cancel.className = "tbtn"; cancel.textContent = "取消";
-  form.append(title, due, quick, err, save, cancel);
   const setErr = (msg) => {
     err.textContent = msg || "";
     err.classList.toggle("show", !!msg);
   };
-  const close = () => { form.hidden = true; setErr(""); btn.setAttribute("aria-expanded", "false"); btn.focus(); };
+  return { title, due, notes, quick, err, setErr, toLocalValue };
+}
+/* 待办表单校验：标题必填、截止时间有效；不过就 inline 提示并聚焦，返回 null */
+function todoReadForm(f) {
+  const text = f.title.value.trim();
+  const dueAt = new Date(f.due.value);
+  if (!text) { f.setErr("请先填写要做什么事。"); f.title.focus(); return null; }
+  if (!f.due.value || Number.isNaN(dueAt.getTime())) {
+    f.setErr("请选择有效的截止时间，或点上面的快捷时间。"); f.due.focus(); return null;
+  }
+  return { title: text, dueAt: dueAt.toISOString(), notes: f.notes.value.trim() || "" };
+}
+/* 待办添加行：折叠的内联小表单（标题 + 截止时间 + 快捷时间 + 备注），POST /api/reminders 后就地刷新。
+   校验失败 inline 提示不吞错；回车保存、Esc 收起；快捷 chip 一键填常用截止点 */
+function todoAddRow() {
+  const row = el("todo-add");
+  const btn = document.createElement("button");
+  btn.type = "button"; btn.className = "tbtn"; btn.textContent = "+ 添加待办";
+  btn.setAttribute("aria-expanded", "false");
+  const form = el("todo-form");
+  form.hidden = true;
+  const f = todoFields();
+  const save = document.createElement("button");
+  save.type = "button"; save.className = "tbtn primary"; save.textContent = "保存";
+  const cancel = document.createElement("button");
+  cancel.type = "button"; cancel.className = "tbtn"; cancel.textContent = "取消";
+  form.append(f.title, f.due, f.quick, f.notes, f.err, save, cancel);
+  const close = () => { form.hidden = true; f.setErr(""); btn.setAttribute("aria-expanded", "false"); btn.focus(); };
   btn.addEventListener("click", () => {
     form.hidden = !form.hidden;
     btn.setAttribute("aria-expanded", form.hidden ? "false" : "true");
-    if (!form.hidden) { setErr(""); title.focus(); }
+    if (!form.hidden) { f.setErr(""); f.title.focus(); }
   });
   cancel.addEventListener("click", close);
-  title.addEventListener("keydown", (e) => {
+  f.title.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); save.click(); }
     if (e.key === "Escape") { e.stopPropagation(); close(); }
   });
-  due.addEventListener("keydown", (e) => {
+  f.due.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); save.click(); }
     if (e.key === "Escape") { e.stopPropagation(); close(); }
   });
-  title.addEventListener("input", () => { if (err.textContent) setErr(""); });
-  due.addEventListener("input", () => { if (err.textContent) setErr(""); });
+  f.title.addEventListener("input", () => { if (f.err.textContent) f.setErr(""); });
+  f.due.addEventListener("input", () => { if (f.err.textContent) f.setErr(""); });
   const doSave = () => {
-    const text = title.value.trim();
-    const dueAt = new Date(due.value);
-    if (!text) { setErr("请先填写要做什么事。"); title.focus(); return; }
-    if (!due.value || Number.isNaN(dueAt.getTime())) { setErr("请选择有效的截止时间，或点上面的快捷时间。"); due.focus(); return; }
-    setErr("");
+    const body = todoReadForm(f);
+    if (!body) return;
+    f.setErr("");
     save.disabled = true;
     save.textContent = "保存中…";
     fetch("/api/reminders", {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ title: text, dueAt: dueAt.toISOString() }),
+      body: JSON.stringify(body),
     }).then((r) => {
       if (!r.ok) throw new Error("HTTP " + r.status);
       renderHall(true);
     }).catch(() => {
       save.disabled = false;
       save.textContent = "保存";
-      setErr("保存失败，检查本地服务后重试。");
+      f.setErr("保存失败，检查本地服务后重试。");
     });
   };
   save.addEventListener("click", doSave);
@@ -1137,9 +1207,69 @@ function todoAddRow() {
   row.appendChild(form);
   row.openForm = () => {
     if (form.hidden) btn.click();
-    else title.focus();
+    else f.title.focus();
   };
   return row;
+}
+/* 待办编辑行：与添加行同一字段语言，预填现值，PATCH 成功后整面板重排（分组可能变化）。
+   保存中禁用防重复提交；Esc/取消还原条目，不丢焦点外的面板状态 */
+function todoEditRow(t, item) {
+  const form = el("todo-form");
+  const f = todoFields();
+  f.title.value = t.title;
+  f.due.value = f.toLocalValue(t.dueAt);
+  if (t.notes) f.notes.value = t.notes;
+  const save = document.createElement("button");
+  save.type = "button"; save.className = "tbtn primary"; save.textContent = "保存修改";
+  const cancel = document.createElement("button");
+  cancel.type = "button"; cancel.className = "tbtn"; cancel.textContent = "取消";
+  form.append(f.title, f.due, f.quick, f.notes, f.err, save, cancel);
+  const close = () => { form.remove(); item.hidden = false; f.setErr(""); };
+  cancel.addEventListener("click", close);
+  [f.title, f.due].forEach((input) => {
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { e.preventDefault(); save.click(); }
+      if (e.key === "Escape") { e.stopPropagation(); close(); }
+    });
+    input.addEventListener("input", () => { if (f.err.textContent) f.setErr(""); });
+  });
+  save.addEventListener("click", () => {
+    const body = todoReadForm(f);
+    if (!body) return;
+    f.setErr("");
+    save.disabled = true;
+    save.textContent = "保存中…";
+    fetch("/api/reminders/" + encodeURIComponent(t.id), {
+      method: "PATCH", headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      renderHall(true);
+    }).catch(() => {
+      save.disabled = false;
+      save.textContent = "保存修改";
+      f.setErr("保存失败，检查本地服务后重试。");
+    });
+  });
+  item.hidden = true;
+  item.after(form);
+  f.title.focus();
+  return form;
+}
+/* 分组题注计数同步：条目被就地移除/恢复后改写「组名 · N」，组空时连同题注一起收掉 */
+function hallRetitleGroup(group) {
+  if (!group || !group.classList.contains("hall-todo-group")) return;
+  const head = group.previousElementSibling;
+  const kids = group.querySelectorAll(".hall-item").length;
+  if (!kids) {
+    if (head && head.classList.contains("hall-group")) head.remove();
+    group.remove();
+    return;
+  }
+  if (head && head.classList.contains("hall-group")) {
+    const name = head.dataset.hallGroup || head.textContent.split(" ·")[0];
+    if (name) head.textContent = name + " · " + kids;
+  }
 }
 /* 待办条目行：勾选完成 + 删除都是乐观更新；逾期朱砂高亮，备注悬停可见，附 .ics 导出 */
 function todoHallItem(t) {
@@ -1159,15 +1289,9 @@ function todoHallItem(t) {
       body: JSON.stringify({ done }),
     }).then((r) => {
       if (!r.ok) throw new Error("save failed");
-      const group = item.parentElement;
-      item.remove();
-      /* 分组变空就把题注一起收掉，避免留下光杆标题 */
-      if (group && group.classList.contains("hall-todo-group") && !group.querySelector(".hall-item")) {
-        const head = group.previousElementSibling;
-        if (head && head.classList.contains("hall-group")) head.remove();
-        group.remove();
-      }
-      hallRecount("todos");
+      /* 落盘后整面板重排：刚完成的条目立即进「已完成」折叠区，勾错就地能撤销。
+         数据说话，分组/计数/搜索态都由重建逻辑统一接管 */
+      renderHall(true);
     }).catch(() => {
       pick.checked = !done;
       item.classList.toggle("done", !done);
@@ -1196,6 +1320,16 @@ function todoHallItem(t) {
   main.appendChild(hm);
   item.appendChild(main);
   if (!HALL_DEMO && t.id) {
+    /* 原地编辑：条目暂时让位给编辑行，取消即还原（与侧栏会话「改名」同一语言） */
+    const edit = document.createElement("button");
+    edit.type = "button"; edit.className = "hall-edit"; edit.textContent = "编辑";
+    edit.title = "修改标题、截止时间或备注";
+    edit.setAttribute("aria-label", "编辑待办：" + t.title);
+    edit.addEventListener("click", () => {
+      if (item.hidden) return;
+      todoEditRow(t, item);
+    });
+    item.appendChild(edit);
     const ics = document.createElement("a");
     ics.className = "hall-ics";
     ics.href = "/api/reminders/" + encodeURIComponent(t.id) + ".ics";
@@ -1208,11 +1342,7 @@ function todoHallItem(t) {
     /* 删除同样乐观：先移除节点，失败整面板重刷恢复 */
     const group = item.parentElement;
     item.remove();
-    if (group && group.classList.contains("hall-todo-group") && !group.querySelector(".hall-item")) {
-      const head = group.previousElementSibling;
-      if (head && head.classList.contains("hall-group")) head.remove();
-      group.remove();
-    }
+    hallRetitleGroup(group);
     hallRecount("todos");
     fetch("/api/reminders/" + encodeURIComponent(t.id), { method: "DELETE" })
       .then((r) => { if (!r.ok) throw new Error("delete failed"); })
@@ -1220,16 +1350,58 @@ function todoHallItem(t) {
   }));
   return item;
 }
-function buildTodoList(list) {
+/* 已完成条目：取消勾选即恢复为未完成（乐观标记后重排），删除同两步确认 */
+function todoDoneItem(t) {
+  const item = el("hall-item has-act done");
+  const pick = document.createElement("input");
+  pick.type = "checkbox"; pick.className = "hall-done"; pick.checked = true;
+  pick.title = "取消勾选就恢复为未完成";
+  pick.setAttribute("aria-label", "恢复未完成：" + t.title);
+  if (HALL_DEMO) {
+    pick.disabled = true;
+  } else {
+    pick.addEventListener("change", () => {
+      pick.checked = true;
+      /* 恢复要重新落进未完成分组，就地重排不如让数据说话；失败回滚无需处理（勾选态始终勾着） */
+      pick.disabled = true;
+      fetch("/api/reminders/" + encodeURIComponent(t.id), {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ done: false }),
+      }).then((r) => {
+        if (!r.ok) throw new Error("save failed");
+        renderHall(true);
+      }).catch(() => { pick.disabled = false; });
+    });
+  }
+  item.appendChild(pick);
+  const main = el("hall-item-main");
+  main.appendChild(el2("ht", t.title));
+  main.appendChild(el2("hm", (t.doneAt ? "完成于 " + fmtWhen(t.doneAt) + " · " : "") + "原截止 " + t.dueLabel));
+  item.appendChild(main);
+  if (!HALL_DEMO) item.appendChild(hallDelBtn("删除", () => {
+    const group = item.parentElement;
+    item.remove();
+    hallRetitleGroup(group);
+    hallRecount("todos");
+    fetch("/api/reminders/" + encodeURIComponent(t.id), { method: "DELETE" })
+      .then((r) => { if (!r.ok) throw new Error("delete failed"); })
+      .catch(() => renderHall(true));
+  }));
+  return item;
+}
+/* 已完成区的折叠开关：状态只记在内存里，切面板回来保持上次的展开偏好 */
+let todoDoneOpen = false;
+function buildTodoList(data) {
   const wrap = el("");
-  list = list || [];
+  data = data || {};
+  const list = data.items || [];
+  const doneList = data.done || [];
   const addRow = HALL_DEMO ? null : todoAddRow();
   if (addRow) wrap.appendChild(addRow);
   if (!list.length) {
     wrap.appendChild(hallEmpty("✅", "暂无待办", "在对话框里说「提醒我……」就能记录，也可点下面直接加一条。",
       addRow ? "+ 添加第一条待办" : "",
       addRow ? () => addRow.openForm() : null));
-    return wrap;
   }
   /* 分组：逾期 / 今天 / 明天 / 以后（与 /today 页同口径，逾期自然置顶） */
   const groups = [
@@ -1255,6 +1427,36 @@ function buildTodoList(list) {
     g.items.forEach((t) => { box.appendChild(todoHallItem(t)); });
     wrap.appendChild(box);
   });
+  /* 已完成折叠区：默认收起不抢注意力，点题注就地展开（不重拉数据） */
+  if (doneList.length) {
+    const head = document.createElement("button");
+    head.type = "button"; head.className = "hall-group toggle";
+    head.dataset.hallGroup = "已完成";
+    head.textContent = "已完成 · " + doneList.length + (todoDoneOpen ? " ▾" : " ▸");
+    head.setAttribute("aria-expanded", todoDoneOpen ? "true" : "false");
+    head.title = todoDoneOpen ? "收起已完成待办" : "展开已完成待办";
+    const box = el("hall-todo-group");
+    box.dataset.hallGroup = "已完成";
+    box.hidden = !todoDoneOpen;
+    doneList.forEach((t) => { box.appendChild(todoDoneItem(t)); });
+    head.addEventListener("click", () => {
+      todoDoneOpen = !todoDoneOpen;
+      box.hidden = !todoDoneOpen;
+      head.textContent = "已完成 · " + box.querySelectorAll(".hall-item").length
+        + (todoDoneOpen ? " ▾" : " ▸");
+      head.setAttribute("aria-expanded", todoDoneOpen ? "true" : "false");
+      head.title = todoDoneOpen ? "收起已完成待办" : "展开已完成待办";
+      if (todoDoneOpen) {
+        const first = box.querySelector(".hall-item .hall-done");
+        hallRecount("todos");
+        if (first) first.focus();
+      } else {
+        head.focus();
+      }
+    });
+    wrap.appendChild(head);
+    wrap.appendChild(box);
+  }
   return wrap;
 }
 /* 知识分类条：全部分类 chip，点选过滤（与搜索框叠加）；只在条目多于 1 类时出现 */
@@ -1491,7 +1693,7 @@ const HALL_PANELS = {
   exams: () => briefOf().then(buildExams),
   grades: buildGrades,
   news: buildNews,
-  todos: () => briefOf().then((b) => buildTodoList(b.todos.items)),
+  todos: () => briefOf().then((b) => buildTodoList(b.todos)),
   knowledge: () => briefOf().then(buildKnowledge),
   pomodoro: buildPomodoro,
 };
@@ -1575,11 +1777,13 @@ function hallApplySearch(dyn, panel) {
     }
     if (!box) return;
     const kids = [...box.querySelectorAll(".hall-item")];
-    /* 只有待办分组盒才按组藏；知识列表没有分组头（分类走 chip），番茄钟最近头同理按可见收 */
+    /* 只有待办分组盒才按组藏；知识列表没有分组头（分类走 chip），番茄钟最近头同理按可见收。
+       已完成区默认折叠：搜索命中它的条目时临时展开，无搜索词时回到折叠偏好 */
     const anyVisible = kids.some((k) => k.style.display !== "none");
     head.style.display = (!q || anyVisible) ? "" : "none";
     if (box.classList && box.classList.contains("hall-todo-group")) {
-      box.style.display = (!q || anyVisible) ? "" : "none";
+      const doneFolded = box.dataset.hallGroup === "已完成" && !todoDoneOpen;
+      box.style.display = doneFolded && !q ? "none" : (!q || anyVisible) ? "" : "none";
     }
   });
   let nosearch = dyn.querySelector("[data-hall-nosearch]");
@@ -1804,6 +2008,19 @@ if (hallInitial) {
 }
 function closeHall() {
   if (!document.body.classList.contains("hall-open")) return;
+  /* 设置面板里有未保存的凭证：第一次关先拦下（✕/遮罩/Esc/后退统一走这里），
+     武装「关闭」按钮为二次确认；3 秒内再关才放行——防手滑丢掉刚填的密码/Key */
+  if (hallPanel === "settings" && settingsDirty()) {
+    if (!settingsCloseArmed) {
+      armSettingsClose();
+      setMsg.className = "setmsg";
+      setMsg.textContent = "有未保存的修改：再关闭一次将丢弃，或先点「保存设置」。";
+      /* 浏览器后退被拦下时把 #hall=settings 写回去，hash 与界面保持一致 */
+      syncHallHash();
+      return;
+    }
+    disarmSettingsClose();
+  }
   document.body.classList.remove("hall-open");
   document.getElementById("hall").inert = true;
   hallSyncExpanded();
@@ -1920,6 +2137,50 @@ const setMsg = document.getElementById("setMsg");
 let setStatus = null;
 /* 设置弹窗关闭后焦点回到触发按钮（键盘用户不丢位置） */
 let settingsReturnFocus = null;
+/* ── 未保存修改保护：凭证类字段填了内容（未保存）就是 dirty。
+    closeHall 拦一次 + 「关闭」按钮武装二次确认，与清理按钮的两步删除同一语言 ── */
+let settingsCloseArmed = false;
+let settingsCloseTimer = 0;
+function settingsDirty() {
+  if (document.body.dataset.demo === "true") return false;
+  return !!(sUser.value.trim() || sPass.value || sKey.value.trim() || sModel.value ||
+    sQQAppId.value.trim() || sQQSecret.value || sQQPass.value.trim());
+}
+function armSettingsClose() {
+  settingsCloseArmed = true;
+  const cancel = document.getElementById("cancelSettings");
+  if (cancel) {
+    cancel.classList.add("armed");
+    cancel.textContent = "确认关闭？";
+  }
+  window.clearTimeout(settingsCloseTimer);
+  settingsCloseTimer = window.setTimeout(disarmSettingsClose, 3000);
+}
+function disarmSettingsClose() {
+  settingsCloseArmed = false;
+  window.clearTimeout(settingsCloseTimer);
+  const cancel = document.getElementById("cancelSettings");
+  if (cancel) {
+    cancel.classList.remove("armed");
+    cancel.textContent = "关闭";
+  }
+}
+
+/* ── 密码可见性：教务密码 / API Key / AppSecret 右侧「显示/隐藏」。
+    只切 input.type，值不额外落任何地方；点按钮时拦下 label 的默认聚焦转发 ── */
+for (const eye of document.querySelectorAll(".fld-eye")) {
+  const input = eye.parentElement ? eye.parentElement.querySelector("input") : null;
+  if (!input) continue;
+  eye.addEventListener("click", (e) => {
+    if (eye.disabled || input.disabled) return;
+    e.preventDefault();
+    const show = input.type === "password";
+    input.type = show ? "text" : "password";
+    eye.textContent = show ? "隐藏" : "显示";
+    eye.setAttribute("aria-pressed", show ? "true" : "false");
+    eye.title = show ? "隐藏已输入的内容" : "明文显示已输入的内容";
+  });
+}
 
 
 
@@ -2065,6 +2326,8 @@ function renderSetStatus(d) {
     dot.setAttribute("aria-hidden", "true");
     b.appendChild(dot);
     b.appendChild(document.createTextNode(c.label + " · " + (c.pane === "data" ? "本地" : (c.ok ? "已配" : "未配"))));
+    const state = c.pane === "data" ? "本地数据，点此查看与清理" : (c.ok ? "已配置，点此查看或修改" : "尚未配置，点此去填写");
+    b.title = c.label + "：" + state;
     b.setAttribute("aria-label", c.label + "栏目：" + (c.pane === "data" ? "本地数据" : (c.ok ? "已配置" : "未配置")) + "，点击直达");
     b.addEventListener("click", () => setTab(c.pane));
     host.appendChild(b);
@@ -2087,6 +2350,15 @@ function showSettings() {
      关掉大厅时还给 */
   const hall = document.getElementById("hall");
   if (!hall.contains(document.activeElement)) settingsReturnFocus = document.activeElement;
+  /* 表单里还有未保存的凭证：从「← 大厅」绕一圈回来的场合不清空、不复位，
+     保住用户刚填的内容（关闭抽屉的丢弃路径由 closeHall 的两步确认把守） */
+  if (settingsDirty()) {
+    setTab(setLastTab);
+    setMsg.className = "setmsg";
+    setMsg.textContent = "表单里仍有未保存的修改，改完记得点「保存设置」。";
+    return;
+  }
+  disarmSettingsClose();
   setTab(setLastTab);
   setMsg.className = "setmsg";
   setMsg.textContent = "";
@@ -2123,6 +2395,8 @@ document.getElementById("cancelSettings").addEventListener("click", closeHall);
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (sessionActionsId) { sessionActionsId = ""; renderSessList(); return; }
+  /* 大厅（含设置）是更上层的容器：窄屏下它是浮层+遮罩，Esc 应先关它 */
+  if (document.body.classList.contains("hall-open")) { closeHall(); return; }
   closeDrawer();
 });
 
@@ -2205,9 +2479,17 @@ document.getElementById("saveSettings").addEventListener("click", () => {
     body: JSON.stringify(body),
   }).then((r) => r.json().then((d) => ({ ok: r.ok, d }))).then(({ ok, d }) => {
     saveBtn.disabled = false;
-    saveBtn.textContent = "保存设置";
+    /* 保存结果逐条展示：失败行保持朱砂、成功行随 good 变墨色，混在一起也分得清 */
     setMsg.className = "setmsg" + (ok ? " good" : "");
-    setMsg.textContent = (d.results || []).map((x) => x.message).join("\n");
+    setMsg.textContent = "";
+    const lines = d.results || [];
+    for (const x of lines) {
+      const line = document.createElement("div");
+      line.className = "setmsg-line" + (x.ok === false ? " bad" : "");
+      line.textContent = x.message;
+      setMsg.appendChild(line);
+    }
+    if (!lines.length) setMsg.textContent = ok ? "设置已保存。" : (d.error || "保存失败，请重试。");
     if (ok && d.status) {
       setStatus = d.status; sUser.value = ""; sPass.value = ""; sKey.value = "";
       renderSetStatus(d.status);
@@ -2223,10 +2505,15 @@ document.getElementById("saveSettings").addEventListener("click", () => {
       qqApplyStatus(d.status.qq);
       pickModel("");
       fillModels(d.status.models, d.status.model, "");
+      /* 凭证已落库：dirty 归零，「关闭」不必再二次确认；按钮短暂亮一下完成感 */
+      disarmSettingsClose();
+      saveBtn.textContent = "已保存 ✓";
+      window.setTimeout(() => { saveBtn.textContent = "保存设置"; }, 1400);
     }
   }).catch(() => {
     saveBtn.disabled = false;
     saveBtn.textContent = "保存设置";
+    setMsg.className = "setmsg";
     setMsg.textContent = "保存失败，请确认本地服务正在运行后重试。";
   });
 });
@@ -2405,6 +2692,8 @@ async function send(text) {
             toolDone(shell, ev, ev.phase === "end");
             if (ev.files && ev.files.length) fileRows(shell.tl, ev.files);
             if (ev.pomodoro) pomoCard(shell.tl, ev.pomodoro);
+            /* 对话里取消了番茄钟：立即对表收掉页面其他位置的倒计时卡 */
+            if (ev.pomoSync) pomoSync();
             /* 工具改了数据（加待办、起番茄钟……）：面板开着就刷新，没开着就作废缓存。
                settings 是静态面板且工具失败也可能带它：只负责推出，不参与刷新 */
             const panel = TOOL_PANEL[ev.name];

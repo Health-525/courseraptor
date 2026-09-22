@@ -1371,6 +1371,9 @@ async function runTurn(
             ...(files.length ? { files } : {}),
             // 新建番茄钟时前端在工具卡下方渲染实时倒计时卡片
             ...(pomodoro ? { pomodoro } : {}),
+            // manage_pomodoro 的取消/查询也可能改了状态：让页面把
+            // 顶部恢复卡等处的倒计时卡对表收掉（10 秒轮询的即时版）
+            ...(p.toolName === "manage_pomodoro" ? { pomoSync: true } : {}),
           });
           break;
         }

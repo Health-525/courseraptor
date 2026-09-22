@@ -397,6 +397,14 @@ test("待办可创建、完成并导出日历，本地数据接口回脱敏概�
   });
   assert.equal(create.status, 201);
   const reminder = (await create.json()).reminder;
+  const edit = await wfetch(`${url}/api/reminders/${reminder.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ title: "提交选课材料（改）", notes: "带一寸照片" }),
+  });
+  assert.equal(edit.status, 200);
+  const edited = (await edit.json()).reminder as { title: string; notes?: string };
+  assert.equal(edited.title, "提交选课材料（改）");
+  assert.equal(edited.notes, "带一寸照片", "界面编辑行可改标题与备注");
   const patch = await wfetch(`${url}/api/reminders/${reminder.id}`, {
     method: "PATCH",
     body: JSON.stringify({ done: true }),

@@ -518,6 +518,17 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .fld input:focus, .fld select:focus { border-color: var(--accent);
                box-shadow: 0 0 0 3px rgba(173, 57, 44, .09); }
   .fld input::placeholder { color: var(--ink-3); opacity: .75; }
+  /* 密码类字段：右侧「显示/隐藏」切换，长 Key 手填时能核对 */
+  .fld-row { position: relative; display: block; }
+  .fld-row input { padding-right: 64px; }
+  .fld-eye { position: absolute; right: 1px; top: 1px; bottom: 1px;
+             border: 0; border-left: 1px solid var(--rule); background: none;
+             cursor: pointer; font-family: var(--mono); font-size: 11px;
+             letter-spacing: .06em; color: var(--ink-3); padding: 0 12px;
+             border-radius: 0 2px 2px 0; transition: color .15s ease; }
+  .fld-eye:hover { color: var(--accent); }
+  .fld-eye:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .fld-eye:disabled { color: var(--rule-2); cursor: default; }
 
   .cur { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
          letter-spacing: .04em; min-height: 15px; margin: -4px 0 10px; }
@@ -564,6 +575,9 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .setmsg { font-family: var(--mono); font-size: 12px; min-height: 16px;
             margin: 0 2px 2px; white-space: pre-wrap; color: var(--accent-deep); }
   .setmsg.good { color: var(--ink-2); }
+  /* 保存结果逐条展示：成功行墨色、失败行朱砂，一眼分清 */
+  .setmsg.good .setmsg-line { margin: 0; }
+  .setmsg.good .setmsg-line.bad { color: var(--accent-deep); }
   /* 设置状态总览：四栏配置一览（已配/未配），点 chip 直达对应栏目 */
   .set-status { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
   .set-status:empty { display: none; }
@@ -723,22 +737,43 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                              color: var(--card); font-weight: 600; }
   .hall-done { flex: none; width: 20px; height: 20px; margin: 2px 0 0;
                accent-color: var(--accent); cursor: pointer; }
-  .hall-del { flex: none; border: 0; background: none; padding: 4px 8px;
-              min-height: 28px; color: var(--ink-3); font-family: var(--mono);
-              font-size: 12px; cursor: pointer; border-radius: 3px;
-              transition: color .15s ease, background .15s ease; }
-  .hall-del:hover { color: var(--accent); text-decoration: underline; }
-  .hall-del.armed { color: var(--card); background: var(--accent); }
-  /* 待办分组题注：与 /today 页 .todo-group 同一语言（等宽小字 + 计数），只更紧凑 */
-  .hall-group { margin: 12px 0 6px; font-family: var(--mono); font-size: 11.5px;
-                letter-spacing: .12em; color: var(--ink-3); }
-  .hall-group:first-of-type { margin-top: 2px; }
-  .hall-group.overdue { color: var(--accent-deep); font-weight: 600; }
-  .hall-item .hm .overdue-tag { color: var(--accent-deep); font-weight: 600; }
-  .hall-ics { flex: none; align-self: center; font-family: var(--mono); font-size: 11px;
-              color: var(--ink-3); text-decoration: none; border: 1px solid var(--rule);
-              border-radius: 3px; padding: 2px 7px; white-space: nowrap; }
-  .hall-ics:hover { border-color: var(--accent); color: var(--accent); }
+   .hall-del { flex: none; border: 0; background: none; padding: 4px 8px;
+               min-height: 28px; color: var(--ink-3); font-family: var(--mono);
+               font-size: 12px; cursor: pointer; border-radius: 3px;
+               transition: color .15s ease, background .15s ease; }
+   .hall-del:hover { color: var(--accent); text-decoration: underline; }
+   .hall-del.armed { color: var(--card); background: var(--accent); }
+   /* 条目编辑：与删除同一文字按钮语言，排在 .ics 前 */
+   .hall-edit { flex: none; border: 0; background: none; padding: 4px 8px;
+                min-height: 28px; color: var(--ink-3); font-family: var(--mono);
+                font-size: 12px; cursor: pointer; border-radius: 3px;
+                transition: color .15s ease; }
+   .hall-edit:hover { color: var(--accent); text-decoration: underline; }
+   /* 待办分组题注：与 /today 页 .todo-group 同一语言（等宽小字 + 计数），只更紧凑 */
+   .hall-group { margin: 12px 0 6px; font-family: var(--mono); font-size: 11.5px;
+                 letter-spacing: .12em; color: var(--ink-3); }
+   .hall-group:first-of-type { margin-top: 2px; }
+   .hall-group.overdue { color: var(--accent-deep); font-weight: 600; }
+   /* 已完成折叠开关：题注变身按钮，保持等宽小字外观 */
+   .hall-group.toggle { border: 0; background: none; padding: 0; cursor: pointer;
+                        text-align: left; font: inherit; font-family: var(--mono);
+                        font-size: 11.5px; letter-spacing: .12em; color: var(--ink-3); }
+   .hall-group.toggle:hover { color: var(--ink); }
+   .hall-item .hm .overdue-tag { color: var(--accent-deep); font-weight: 600; }
+   .hall-ics { flex: none; align-self: center; font-family: var(--mono); font-size: 11px;
+               color: var(--ink-3); text-decoration: none; border: 1px solid var(--rule);
+               border-radius: 3px; padding: 2px 7px; white-space: nowrap; }
+   .hall-ics:hover { border-color: var(--accent); color: var(--accent); }
+   /* 行内动作（编辑 / .ics / 删除）平时退后半档，悬停或聚焦该行时全显；
+      armed 确认态必须始终可见；触屏无悬停，常显 */
+   .hall-item .hall-edit, .hall-item .hall-ics, .hall-item .hall-del { opacity: .45; }
+   .hall-item:hover .hall-edit, .hall-item:hover .hall-ics, .hall-item:hover .hall-del,
+   .hall-item:focus-within .hall-edit, .hall-item:focus-within .hall-ics,
+   .hall-item:focus-within .hall-del { opacity: 1; }
+   .hall-del.armed { opacity: 1; }
+   @media (hover: none) {
+     .hall-item .hall-edit, .hall-item .hall-ics, .hall-item .hall-del { opacity: 1; }
+   }
   /* 添加表单校验与快捷时间：错误行是朱砂小字，快捷 chip 是等宽小按钮 */
   .hall-err { display: none; flex-basis: 100%; font-family: var(--mono); font-size: 12px;
               color: var(--accent-deep); line-height: 1.6; }
@@ -814,6 +849,9 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                                       font-weight: 600; }
   .hall-settings-foot .tbtn.primary:hover { background: var(--accent-deep);
                                             border-color: var(--accent-deep); color: #fff; }
+  /* 有未保存修改时「关闭」的两步确认 armed 态（与清理按钮同一语言） */
+  .hall-settings-foot .tbtn.armed { color: var(--card); background: var(--accent);
+                                    border-color: var(--accent); }
 
   #log::-webkit-scrollbar { width: 10px; }
   #log::-webkit-scrollbar-thumb {
@@ -1018,13 +1056,13 @@ export function chatPage(options: { demo?: boolean } = {}): string {
           <section class="set-pane on" id="setPaneAccount" role="tabpanel" aria-labelledby="setTabAccount" data-pane="account">
             <p class="dlg-intro">正式查询课表、成绩、考试与通知前，请先配置教务账号。已保存的信息不会在页面中完整显示，留空即保持不变；账号仅加密保存在当前电脑。</p>
             <label class="fld"><span>学号</span><input id="sUser" type="text" autocomplete="off" ${demo ? "disabled" : ""}></label>
-            <label class="fld"><span>登录密码</span><input id="sPass" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}></label>
+            <label class="fld"><span>登录密码</span><span class="fld-row"><input id="sPass" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyePass" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
             <div class="cur" id="curJwgl"></div>
             <div class="diagrow"><button class="tbtn" id="testJwgl" type="button" ${demo ? "disabled" : ""}>检测教务连接</button><span class="diagstate" id="diagJwgl"></span></div>
           </section>
           <section class="set-pane" id="setPaneModel" role="tabpanel" aria-labelledby="setTabModel" data-pane="model">
             <p class="dlg-intro">模型服务使用 DeepSeek API。API Key 与所选型号仅加密保存在当前电脑，留空即保持不变。</p>
-            <label class="fld"><span>API Key</span><input id="sKey" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}></label>
+            <label class="fld"><span>API Key</span><span class="fld-row"><input id="sKey" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyeKey" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
             <div class="cur" id="curKey"></div>
             <div class="model-cards" id="modelCards" role="radiogroup" aria-label="选择 AI 模型"></div>
             <input type="hidden" id="sModel" value="">
@@ -1034,7 +1072,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
           <section class="set-pane" id="setPaneQQ" role="tabpanel" aria-labelledby="setTabQQ" data-pane="qq">
             <p class="dlg-intro">在 q.qq.com 创建机器人后填入凭证，保存后即可在 QQ 里与本服务对话。凭证仅加密保存在当前电脑，留空即保持不变。</p>
             <label class="fld"><span>AppID</span><input id="sQQAppId" type="text" autocomplete="off" placeholder="q.qq.com 机器人的 AppID" ${demo ? "disabled" : ""}></label>
-            <label class="fld"><span>AppSecret</span><input id="sQQSecret" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}></label>
+            <label class="fld"><span>AppSecret</span><span class="fld-row"><input id="sQQSecret" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyeQQSecret" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
             <label class="fld"><span>激活暗号</span><input id="sQQPass" type="text" autocomplete="off" placeholder="首次激活用的暗号（自定）" ${demo ? "disabled" : ""}></label>
             <div class="cur" id="curQQ">未配置；到 q.qq.com 创建机器人后填入，保存后即可在 QQ 里使用</div>
           </section>
@@ -1049,9 +1087,9 @@ export function chatPage(options: { demo?: boolean } = {}): string {
           </section>
         </div>
       </div>
-      <div class="setmsg" id="setMsg"></div>
+      <div class="setmsg" id="setMsg" role="status" aria-live="polite"></div>
       <div class="hall-settings-foot">
-        <button class="tbtn" id="cancelSettings" type="button">取消</button>
+        <button class="tbtn" id="cancelSettings" type="button">关闭</button>
         <button class="tbtn primary" id="saveSettings" ${demo ? "disabled" : ""}>保存设置</button>
       </div>
     </div>

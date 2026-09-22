@@ -250,6 +250,16 @@ function demoTodayBrief(): TodayBrief {
       isToday: false,
     },
   ];
+  // 演示已完成：展示「已完成」折叠区与撤销入口的样子
+  const demoTodosDone: TodayBrief["todos"]["done"] = [
+    {
+      id: "demo-todo-done-1",
+      title: "领取示例教材",
+      dueAt: dueAt(-2, 18, 0).toISOString(),
+      dueLabel: todoLabel(dueAt(-2, 18, 0)),
+      doneAt: Date.now() - 3 * 3600_000,
+    },
+  ];
 
   return {
     now: now.toISOString(),
@@ -288,7 +298,7 @@ function demoTodayBrief(): TodayBrief {
       ],
       note: "演示只展示一场虚构考试",
     },
-    todos: { items: demoTodos },
+    todos: { items: demoTodos, done: demoTodosDone },
     knowledge: { total: demoKnowledge(now).length, recent: demoKnowledge(now).slice(0, 5) },
   };
 }

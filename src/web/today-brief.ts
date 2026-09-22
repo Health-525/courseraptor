@@ -85,6 +85,15 @@ export interface BriefTodo {
   source?: string;
 }
 
+export interface BriefTodoDone {
+  id: string;
+  title: string;
+  dueAt: string;
+  dueLabel: string;
+  /** 完成时刻（时间戳，ms）；由最近一次更新时间近似 */
+  doneAt: number;
+}
+
 export interface BriefKnowledge {
   id: string;
   title: string;
@@ -145,6 +154,8 @@ export interface TodayBrief {
   todos: {
     /** 未完成待办，按截止时间升序（逾期自然排最前），至多 50 条 */
     items: BriefTodo[];
+    /** 最近完成的待办（按完成时间降序，至多 8 条），供「已完成」折叠区展示与撤销 */
+    done: BriefTodoDone[];
   };
   knowledge: {
     /** 知识库总数 */
@@ -365,36 +376,55 @@ function buildExams(todayIso: string, scheduleTerm: { year: number; semester: nu
   };
 }
 
-/** 未完成待办按截止时间升序（逾期自然在最前），标签带相对日期 */
+/** 截止标签：今天/明天给钟点，更远给「9月20日 周日 14:00」 */
+function dueLabelOf(due: Date, today: Date): string {
+  const dayDiff = Math.round(
+    (new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime() - today.getTime()) /
+      DAY_MS,
+  );
+  const hm = `${pad(due.getHours())}:${pad(due.getMinutes())}`;
+  if (dayDiff === 0) return `今天 ${hm}`;
+  if (dayDiff === 1) return `明天 ${hm}`;
+  return `${due.getMonth() + 1}月${due.getDate()}日 ${WEEKDAY_NAMES[weekdayOf(due)] ?? ""} ${hm}`.trim();
+}
+
+/** 未完成按截止升序（逾期自然在最前）；已完成单独一份最近清单，供撤销与回顾 */
 function buildTodos(now: Date): TodayBrief["todos"] {
-  const open = listReminders().filter((r) => !r.done);
-  open.sort((a, b) => a.dueAt.localeCompare(b.dueAt));
+  const all = listReminders();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const items = open.slice(0, 50).map((r) => {
-    const due = new Date(r.dueAt);
-    const dayDiff = Math.round(
-      (new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime() - today.getTime()) /
-        DAY_MS,
-    );
-    const hm = `${pad(due.getHours())}:${pad(due.getMinutes())}`;
-    let dueLabel: string;
-    if (dayDiff === 0) dueLabel = `今天 ${hm}`;
-    else if (dayDiff === 1) dueLabel = `明天 ${hm}`;
-    else
-      dueLabel =
-        `${due.getMonth() + 1}月${due.getDate()}日 ${WEEKDAY_NAMES[weekdayOf(due)] ?? ""} ${hm}`.trim();
-    return {
+  const items = all
+    .filter((r) => !r.done)
+    .sort((a, b) => a.dueAt.localeCompare(b.dueAt))
+    .slice(0, 50)
+    .map((r) => {
+      const due = new Date(r.dueAt);
+      const dayDiff = Math.round(
+        (new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime() - today.getTime()) /
+          DAY_MS,
+      );
+      return {
+        id: r.id,
+        title: r.title,
+        dueAt: r.dueAt,
+        dueLabel: dueLabelOf(due, today),
+        overdue: due.getTime() < now.getTime(),
+        isToday: dayDiff === 0,
+        ...(r.notes ? { notes: r.notes } : {}),
+        ...(r.source ? { source: r.source } : {}),
+      };
+    });
+  const done = all
+    .filter((r) => r.done)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, 8)
+    .map((r) => ({
       id: r.id,
       title: r.title,
       dueAt: r.dueAt,
-      dueLabel,
-      overdue: due.getTime() < now.getTime(),
-      isToday: dayDiff === 0,
-      ...(r.notes ? { notes: r.notes } : {}),
-      ...(r.source ? { source: r.source } : {}),
-    };
-  });
-  return { items };
+      dueLabel: dueLabelOf(new Date(r.dueAt), today),
+      doneAt: r.updatedAt,
+    }));
+  return { items, done };
 }
 
 /** 知识速览：最近更新的至多 5 条（listKnowledge 已按 updatedAt 降序） */
