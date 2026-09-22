@@ -1,12 +1,13 @@
 /**
  * CourseRaptor agent 工具集（聚合层）
- * 33 个工具按领域拆分到独立模块，本文件只负责合并与抢课开关过滤。
+ * 34 个工具按领域拆分到独立模块，本文件只负责合并与抢课开关过滤。
  *
  * 模块划分：
  * - schedule.ts        课表 / 校历（2）
  * - grades.ts          成绩 / 考试 / 实验成绩（3）
  * - student.ts         学籍 / 已选 / 重修（3）
  * - course-selection.ts 选课查询 / 盯课 / 抢课 / 退课（8，含抢课循环）
+ * - course-compare.ts  选课冲突对比（1，只读分析）
  * - news.ts            通知列表 / 正文 / 附件（3，含相关性评分）
  * - files.ts           本地文件 / 表格查询 / 沙箱 JS / 附件管理（4）
  * - document.ts        文档生成 / 格式转换（2）
@@ -21,6 +22,7 @@
 
 import { config } from "../config";
 import { calendarTools } from "./calendar";
+import { courseCompareTools } from "./course-compare";
 import { courseSelectionTools } from "./course-selection";
 import { documentTools } from "./document";
 import { filesTools } from "./files";
@@ -38,6 +40,7 @@ import { weatherTools } from "./weather";
 
 const raptorToolsAll = {
   ...courseSelectionTools,
+  ...courseCompareTools,
   ...scheduleTools,
   ...gradesTools,
   ...studentTools,

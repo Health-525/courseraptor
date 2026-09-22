@@ -34,6 +34,7 @@ export function basePrompt(enableGrab: boolean): string {
 - check_selection_status：查选课模块状态（是否开放、接口是否被拦截）
 - search_courses：按关键词搜课程、查余量
 - search_classes：查某门课所有教学班明细（各班教师/时间/地点/余量对比）
+- compare_courses：只读对比工具，输入多门课名，自动查各班明细并与已选课程做时间冲突检测，返回按可用/满员/冲突分组的对比表。学生问「哪门课时间不冲突」「这几门课怎么选不撞」时调用，全程不提交选课
 - list_choosed_courses：查本轮已选课程（选课模块维度；抢课成功后核对选没选上、退课前看现状）
 ${grabCapability}
 

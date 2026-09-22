@@ -83,6 +83,66 @@ export interface WeekGroup {
   lines: string[];
 }
 
+// ── sksj（上课时间字符串）解析 ────────────────────────────────
+
+/** 中文星期 → 数字（1=周一…7=周日） */
+export const WEEKDAY_CN: Record<string, number> = {
+  一: 1,
+  二: 2,
+  三: 3,
+  四: 4,
+  五: 5,
+  六: 6,
+  日: 7,
+  天: 7,
+};
+
+/** sksj 拆分后的单个时段 */
+export interface SkwjSegment {
+  weekday: number;
+  /** 节次数组，如 [5, 6] */
+  periods: number[];
+  /** 周次表达式原文，如 "2-17" 或 "2-6,8-12" */
+  weeks: string;
+  /** 展开后的周号列表 */
+  expandedWeeks: number[];
+}
+
+/**
+ * 解析 sksj（上课时间）字符串为结构化时段数组。
+ * 输入格式形如 "星期一第5-6节{2-17周};星期四第5-6节{2-17周}"
+ * 每段以 ; 分隔，分别给出星期、节次区间、周次区间。
+ * 无法解析的段跳过，不抛错。
+ */
+export function parseSksjSegments(sksj: string): SkwjSegment[] {
+  if (!sksj) return [];
+  const out: SkwjSegment[] = [];
+  for (const seg of sksj.split(";").filter(Boolean)) {
+    const weekdayMatch = seg.match(/星期([一二三四五六日天])/);
+    const periodMatch = seg.match(/第(\d+)-?(\d+)?节/);
+    const weeksMatch = seg.match(/\{([^}]+)周\}/);
+    if (!weekdayMatch) continue;
+    const weekday = WEEKDAY_CN[weekdayMatch[1]] ?? 0;
+    const startPeriod = periodMatch ? parseInt(periodMatch[1], 10) : 0;
+    const endPeriod = periodMatch?.[2] ? parseInt(periodMatch[2], 10) : startPeriod;
+    const periods: number[] = [];
+    for (let i = startPeriod; i <= endPeriod; i++) periods.push(i);
+    const weeks = weeksMatch ? weeksMatch[1] : "";
+    out.push({ weekday, periods, weeks, expandedWeeks: expandWeeks(weeks) });
+  }
+  return out;
+}
+
+/** 两个时段是否在节次和周次上有交集（视为时间冲突） */
+export function segmentsOverlap(a: SkwjSegment, b: SkwjSegment): boolean {
+  if (a.weekday !== b.weekday) return false;
+  const periodSet = new Set(a.periods);
+  if (!b.periods.some((p) => periodSet.has(p))) return false;
+  // 周次交集：任一周号共有即冲突
+  const aWeeks = new Set(a.expandedWeeks);
+  return b.expandedWeeks.some((w) => aWeeks.has(w));
+}
+
 /** 课程行去掉星期后的主体（节次 · 时间 · 课程 · 地点 · 教师），供周分组与调休覆盖行复用 */
 export function courseLineBody(c: CourseData): string {
   return [
@@ -302,16 +362,7 @@ async function buildScheduleFromExams(
 
       if (!weekdayMatch) continue;
 
-      const weekdayMap: Record<string, number> = {
-        一: 1,
-        二: 2,
-        三: 3,
-        四: 4,
-        五: 5,
-        六: 6,
-        日: 7,
-        天: 7,
-      };
+      const weekdayMap = WEEKDAY_CN;
       const weekday = weekdayMap[weekdayMatch[1]] || 0;
 
       const startPeriod = periodMatch ? parseInt(periodMatch[1], 10) : 0;
