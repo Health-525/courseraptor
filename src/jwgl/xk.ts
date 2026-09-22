@@ -628,16 +628,21 @@ export async function fetchJxbList(
     throw new Error("SESSION_EXPIRED");
   }
 
+  let data: Array<Record<string, unknown>> | { tmpList?: Array<Record<string, unknown>> };
   try {
-    const data = JSON.parse(resp.body) as
+    data = JSON.parse(resp.body) as
       | Array<Record<string, unknown>>
       | { tmpList?: Array<Record<string, unknown>> };
-    // 官方 JS 中响应直接是数组（data[i].xxx 遍历）
-    const list = Array.isArray(data) ? data : (data?.tmpList ?? []);
-    return parseCourseList({ tmpList: list });
   } catch {
-    return [];
+    // 响应是 HTML/错误页而非 JSON：教务系统改版或被拦截。这里若静默返空，
+    // 调用方会把故障当成「该课程没有教学班」上报给用户，必须抛错区分
+    throw new Error(
+      `XK_PARSE_FAILED: 教学班列表响应不是 JSON（教务系统改版或被拦截），片段：${resp.body.slice(0, 80)}`,
+    );
   }
+  // 官方 JS 中响应直接是数组（data[i].xxx 遍历）；空列表仍属正常数据
+  const list = Array.isArray(data) ? data : (data?.tmpList ?? []);
+  return parseCourseList({ tmpList: list });
 }
 
 /**
@@ -664,11 +669,19 @@ export async function fetchChoosedList(session: XkSession): Promise<ChoosedCours
     throw new Error("SESSION_EXPIRED");
   }
 
+  let raw: unknown;
   try {
-    return parseChoosedList(JSON.parse(resp.body));
+    raw = JSON.parse(resp.body);
   } catch {
-    return [];
+    // 响应是 HTML/错误页而非 JSON：教务系统改版或被拦截。能解析成合法 JSON
+    // 的空结果仍走 parseChoosedList 正常返回 []；走到这里说明是真故障，
+    // 静默返空会把故障伪装成「本轮已选为空」，必须抛错区分
+    throw new Error(
+      `XK_PARSE_FAILED: 已选课程响应不是 JSON（教务系统改版或被拦截），片段：${resp.body.slice(0, 80)}`,
+    );
   }
+  // 合法 JSON 的形状容错仍由纯函数兜底：非列表输入返回空
+  return parseChoosedList(raw);
 }
 
 /**
