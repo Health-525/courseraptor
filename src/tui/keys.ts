@@ -319,6 +319,7 @@ export function createKeyProxy(stdin: Readable, options: KeyProxyOptions = {}): 
     // SGR 鼠标事件：滚轮(编码 64/65)翻译成合成方向键，其余（按下/释放/移动）吞掉
     let wheelUp = 0;
     let wheelDown = 0;
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: 终端 SGR 鼠标协议以 ESC 序列上报，必须按字面匹配
     const text = chunk.toString("utf8").replace(/\x1b\[<(\d+);\d+;\d+[Mm]/g, (_m, code: string) => {
       if (code === "64") wheelUp++;
       else if (code === "65") wheelDown++;

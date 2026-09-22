@@ -138,7 +138,8 @@ export function textToBlocks(text: string): NonNullable<DocumentSpec["blocks"]> 
         items: lines.map((l) => l.replace(/^([-*•]|\d+[.)、])\s+/, "")),
       });
     } else if (lines.length === 1 && /^#{1,3}\s+/.test(lines[0])) {
-      const level = lines[0].match(/^#+/)![0].length as 1 | 2 | 3;
+      const hashes = lines[0].match(/^#+/);
+      const level = (hashes?.[0].length ?? 1) as 1 | 2 | 3;
       blocks.push({ type: "heading", text: lines[0].replace(/^#+\s+/, ""), level });
     } else {
       blocks.push({ type: "paragraph", text: chunk.trim() });

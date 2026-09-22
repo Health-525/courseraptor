@@ -293,14 +293,15 @@ export async function renderPptx(spec: DocumentSpec): Promise<Buffer> {
 
 function slidesFromBlocks(spec: DocumentSpec): SlideSpec[] {
   const slides: SlideSpec[] = [];
-  let cur: SlideSpec | null = null;
+  // 组装期间 bullets 由构造保证存在；接口类型保持可选（展示方可空）
+  let cur: (SlideSpec & { bullets: string[] }) | null = null;
   for (const b of spec.blocks ?? []) {
     if (b.type === "heading" && (b.level ?? 1) <= 2) {
       if (cur) slides.push(cur);
       cur = { title: b.text, bullets: [] };
     } else if (cur) {
-      if (b.type === "paragraph") cur.bullets!.push(b.text);
-      else if (b.type === "list") cur.bullets!.push(...b.items);
+      if (b.type === "paragraph") cur.bullets.push(b.text);
+      else if (b.type === "list") cur.bullets.push(...b.items);
       else if (b.type === "table") cur.table = b.table;
     }
   }

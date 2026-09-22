@@ -297,6 +297,7 @@ export async function runInlineTUI(options: {
 
   const handleRawKey = (text: string): void => {
     // 防御：吞掉终端的光标位置报告（实现不依赖 CPR，混进输入行会成乱码）
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: 终端 CPR 序列以 ESC 开头，必须按字面匹配
     if (/^\x1b\[\d+;\d+R$/.test(text)) return;
     if (text === "\x7f" || text === "\b") {
       writeBackspace();

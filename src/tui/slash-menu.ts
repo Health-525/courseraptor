@@ -82,6 +82,7 @@ export function filterSlashCommands(query: string, pool: SlashCommand[]): SlashC
  * 同一个 chunk（"\x1b\x1b[A"），若让 `\x1b` 吃掉下一个字符，剩下的 "[A" 会
  * 被当成普通文本拼进输入行/命令镜像。排除后能正确切成 ESC + \x1b[A。
  */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: 终端按键协议本身就是控制字符序列（ESC/CSI/BEL），必须按字面匹配
 const ESC_SEQ = /^(?:\x1b\[[0-9;?]*[A-Za-z~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[^\x1b[]?)/;
 
 /**
@@ -121,6 +122,7 @@ export function splitKeys(text: string): string[] {
 }
 
 /** C0 控制符与 DEL。ESC / \r / \t / \x7f 都在这里面 */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: 按键分类表本身就要枚举控制字符区间
 const CONTROL = /[\x00-\x1f\x7f]/;
 
 /**
@@ -165,6 +167,7 @@ const INVERT = "\x1b[7m";
  * 补丁把行原样插进帧，超宽会撑破布局，源头保证 ≤ 最小合理终端宽 */
 const MENU_INNER = 50;
 
+// biome-ignore lint/suspicious/noControlCharactersInRegex: 清洗终端 ANSI 颜色序列必须按 ESC 字面匹配
 const ANSI_SGR = /\x1b\[[0-9;]*m/g;
 
 /** 显示宽度：剔除 ANSI 颜色序列后，CJK/全角按 2 列，其余按 1 列 */

@@ -120,7 +120,8 @@ export async function generateAndSave(
   const dir = generatedDir();
   await fsp.mkdir(dir, { recursive: true });
   const ext = FORMAT_EXT[spec.format];
-  const baseRaw = opts?.filename?.trim() ? stripExt(opts.filename!) : suggestBaseName(spec);
+  const given = opts?.filename?.trim();
+  const baseRaw = given ? stripExt(given) : suggestBaseName(spec);
   const base = sanitize(baseRaw);
   const filePath = uniquePath(dir, base, ext);
   await fsp.writeFile(filePath, buffer);

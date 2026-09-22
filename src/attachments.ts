@@ -558,7 +558,7 @@ export async function openLocalFile(
   opts: AnalyzeOpts = {},
 ): Promise<AttachmentResult> {
   const abs = path.resolve(inputPath);
-  let stat;
+  let stat: Awaited<ReturnType<typeof fs.stat>>;
   try {
     stat = await fs.stat(abs);
   } catch {
