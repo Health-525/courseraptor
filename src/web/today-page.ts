@@ -26,7 +26,7 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
 <style>
   /* 与 chat-page 同源的设计令牌：红头档案（编辑部排版风） */
   :root {
-    color-scheme: light;
+    color-scheme: light dark;
     --paper: #F6F4ED;
     --paper-deep: #F0EDE4;
     --card: #FCFBF7;
@@ -288,6 +288,31 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
     .weekwrap { overflow: visible; }
     .week-timetable { min-width: 0; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+  /* 暗色模式：与 chat-page 同源的「夜班编辑部」调色板 */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #1F1D1A;
+      --paper-deep: #1A1815;
+      --card: #2A2722;
+      --shade: #23211D;
+      --ink: #EDE9DF;
+      --ink-2: #B8B0A0;
+      --ink-3: #8E8674;
+      --rule: #3A362F;
+      --rule-2: #4A453C;
+      --accent: #D14A3C;
+      --accent-deep: #B83A2E;
+      --accent-soft: #3A2520;
+      --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.28);
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--paper-deep); }
+    ::-webkit-scrollbar-thumb {
+      background: var(--rule-2); border: 2px solid transparent;
+      background-clip: content-box; border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: var(--ink-3); background-clip: content-box; }
   }
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }

@@ -11,6 +11,8 @@
  *   画完按行数上移归位），不查询光标绝对位置，readline 对这一切无感。
  */
 
+import { CYAN, DIM, INVERT, RESET } from "./color";
+
 export interface SlashCommand {
   name: string;
   desc: string;
@@ -156,12 +158,6 @@ export function coalesceText(keys: string[]): string[] {
 }
 
 // ── 菜单框渲染（两种 UI 共用） ────────────────────────────────
-
-const DIM = "\x1b[2m";
-const CYAN = "\x1b[36m";
-const RESET = "\x1b[0m";
-/** 选中项反显：单靠一个 › 标记，↑↓ 快速切换时眼睛跟不上 */
-const INVERT = "\x1b[7m";
 
 /** 菜单内容区显示宽度（不含左右边框）。行宽固定不随终端变——卡片模式的
  * 补丁把行原样插进帧，超宽会撑破布局，源头保证 ≤ 最小合理终端宽 */

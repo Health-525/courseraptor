@@ -28,6 +28,7 @@
 
 import readline from "node:readline";
 import { PassThrough } from "node:stream";
+import { CYAN, DIM, GREEN, RED, RESET, YELLOW } from "./color";
 import {
   coalesceText,
   commandsForMode,
@@ -71,15 +72,6 @@ export interface TUIStreamableAgent {
 /** 进程级 SIGINT 监听（流式中断用）。运行时切换 UI 会多次进入本模块， */
 /** 用模块级引用去重，避免监听器累积 */
 let sigintHandler: (() => void) | null = null;
-
-// ── ANSI 辅助 ─────────────────────────────────────────────────
-
-const DIM = "\x1b[2m";
-const CYAN = "\x1b[36m";
-const GREEN = "\x1b[32m";
-const YELLOW = "\x1b[33m";
-const RED = "\x1b[31m";
-const RESET = "\x1b[0m";
 
 // ── 摘要工具 ──────────────────────────────────────────────────
 
