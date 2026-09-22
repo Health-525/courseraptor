@@ -49,7 +49,7 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--paper); color: var(--ink);
          font-family: var(--sans); font-size: 16px; line-height: 1.7;
-         -webkit-font-smoothing: antialiased; }
+         -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
   ::selection { background: var(--accent-soft); }
   a { color: inherit; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -125,7 +125,8 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
                 line-height: 1.3; min-width: 0; overflow-wrap: anywhere; }
   .lead-meta { margin: 6px 0 0; font-family: var(--mono); font-size: 12.5px;
                color: var(--ink-2); overflow-wrap: anywhere; }
-  .lead-count { margin: 4px 0 0; font-family: var(--kai); font-size: 15px;
+  .lead-count { margin: 4px 0 0; font-family: var(--kai); font-size: 19px;
+                font-weight: 600; letter-spacing: .06em;
                 color: var(--accent-deep); }
   .lead-note { margin: 8px 0 0; font-size: 14px; color: var(--ink-2); }
   .today-strip { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px;
@@ -182,7 +183,10 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
   .tt-empty.td-today { background: var(--accent-soft); }
   .tt-course { z-index: 1; display: flex; flex-direction: column; justify-content: center;
                min-width: 0; margin: 4px; padding: 6px 7px; border-left: 3px solid var(--accent);
-               background: var(--card); box-shadow: 0 2px 8px rgba(50, 42, 31, .08); }
+               background: var(--card); box-shadow: 0 2px 8px rgba(50, 42, 31, .08);
+               transition: box-shadow .15s ease, transform .15s ease; }
+  .tt-course:hover { box-shadow: 0 3px 12px rgba(50, 42, 31, .14);
+                     transform: translateY(-1px); }
   .tt-course.now { box-shadow: 0 0 0 1px var(--accent), 0 2px 8px rgba(50, 42, 31, .08); }
   .tt-course-name { font-family: var(--kai); font-size: 14px; font-weight: 600; line-height: 1.35;
                     overflow-wrap: anywhere; }

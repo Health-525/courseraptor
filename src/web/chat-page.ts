@@ -133,15 +133,28 @@ export function chatPage(options: { demo?: boolean } = {}): string {
              padding: 9px 8px 9px 11px; border-left: 2px solid transparent;
              border-radius: 0 4px 4px 0; cursor: pointer;
              transition: background .15s ease, border-color .15s ease; }
-  .sess li:hover { background: var(--card); }
+  /* 悬停浮现浅朱砂竖线（「可进入」记号的浅一档），选中项保持实朱砂——
+     两级一眼可分；写在 .on 之前，同特异性下选中态优先 */
+  .sess li:hover { background: var(--card); border-left-color: var(--accent-soft); }
   .sess li.on { border-left-color: var(--accent); background: var(--card);
                 box-shadow: var(--shadow-sm); }
+  /* 时间分组题注：档案按日期归档（置顶组独立在最前）；不可点、不吃 hover */
+  .sess li.sgroup { display: block; cursor: default;
+                    padding: 12px 8px 4px 11px; border-left-color: transparent;
+                    font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
+                    color: var(--ink-3); }
+  .sess li.sgroup:hover { background: none; border-left-color: transparent; }
+  .sess li.sgroup:first-child { padding-top: 2px; }
   .sess .st { font-size: 14px; color: var(--ink-2); overflow: hidden;
               text-overflow: ellipsis; white-space: nowrap; }
   .sess li.on .st { color: var(--ink); font-weight: 600; }
   .sess .sm { grid-column: 1; font-family: var(--mono); font-size: 12px;
               color: var(--ink-3); letter-spacing: .03em; }
-  .sess .spin { color: var(--accent); margin-right: 5px; font-size: 11px; }
+  .sess .spin { display: inline-flex; align-items: center; gap: 3px;
+                color: var(--accent); margin-right: 5px; font-size: 11px; }
+  .sess .spin svg { width: 10px; height: 10px; flex: none; fill: none;
+                    stroke: currentColor; stroke-width: 2;
+                    stroke-linecap: round; stroke-linejoin: round; }
   .sess .sedit { grid-column: 1 / -1; width: 100%; border: 1px solid var(--ink-3);
                  background: var(--card); color: var(--ink); padding: 5px 7px;
                  font-size: 13px; outline: none; }
@@ -165,8 +178,23 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   /* 两步删除的确认态：常驻红底（对齐待办/知识页的 armed 习惯） */
   .smenu button.armed { background: var(--accent); color: #fff; }
   .smenu .ssep { height: 1px; margin: 4px 6px; background: var(--rule); }
-  .sess .snone { display: block; color: var(--ink-3); font-size: 14px;
-                 padding: 6px 2px; cursor: default; }
+  .sess .snone { display: flex; flex-direction: column; align-items: flex-start;
+                 gap: 2px; color: var(--ink-3); font-size: 13px; line-height: 1.7;
+                 padding: 14px 4px 6px 11px; cursor: default; }
+  .sess li.snone:hover { background: none; border-left-color: transparent; }
+  .sess .snone svg { width: 24px; height: 24px; margin: 2px 0 6px; fill: none;
+                     stroke: var(--rule-2); stroke-width: 1.5;
+                     stroke-linecap: round; stroke-linejoin: round; }
+  .sess .snone .snone-t { color: var(--ink-2); font-weight: 600; font-size: 14px; }
+  .sess .snone .snone-hint { font-size: 12.5px; }
+  /* 搜索无果的一键出路：清空关键词回到全部（比让人自己删字省事） */
+  .sess .snone .sclear { margin-top: 6px; border: 1px solid var(--rule);
+                         background: var(--card); color: var(--ink-2);
+                         font-family: var(--mono); font-size: 11px;
+                         border-radius: 3px; padding: 4px 10px; min-height: 27px;
+                         cursor: pointer;
+                         transition: border-color .15s ease, color .15s ease; }
+  .sess .snone .sclear:hover { border-color: var(--accent); color: var(--accent); }
 
   .tbtn { background: none; border: 1px solid var(--rule-2); color: var(--ink-2);
           min-height: 38px; font-size: 14px; padding: 7px 14px; border-radius: 4px;
@@ -195,8 +223,12 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   #log { flex: 1; min-height: 0; overflow-y: auto; padding: 44px 40px 36px; }
   .inner { width: min(100%, 800px); min-height: 100%; margin: 0 auto; }
 
-  /* 对话按「往来文书」排版：一行题注 + 正文，不做聊天气泡 */
-  .turn { margin: 0 0 40px; }
+  /* 对话按「往来文书」排版：一行题注 + 正文，不做聊天气泡。
+     新一轮落到纸上时给一记很轻的淡入上移：流式期间只有 append 触发一次，
+     不随 Markdown 重渲重放；reduced-motion 下全局已禁用 */
+  .turn { margin: 0 0 40px; animation: turnIn .18s ease; }
+  @keyframes turnIn { from { opacity: 0; transform: translateY(4px); }
+                      to { opacity: 1; transform: none; } }
   .cap { display: flex; align-items: baseline; gap: 10px; margin-bottom: 7px;
          font-family: var(--mono); font-size: 12px; letter-spacing: .1em;
          color: var(--ink-3); }
@@ -214,6 +246,9 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .tl { flex-direction: column; gap: 4px; margin-bottom: 9px; }
   .tl:not(:empty) { display: flex; }
   .tl:empty { display: none; }
+  .tl > * { animation: tlIn .15s ease; }
+  @keyframes tlIn { from { opacity: 0; transform: translateY(3px); }
+                    to { opacity: 1; transform: none; } }
   .tool { border: 1px solid var(--rule); background: var(--card); }
   .tool summary { display: flex; align-items: center; gap: 9px;
                   padding: 4px 10px; cursor: pointer; list-style: none;
@@ -221,10 +256,13 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                   color: var(--ink-2); }
   .tool summary::-webkit-details-marker { display: none; }
   .tool summary:hover .tname { color: var(--accent); }
-  /* 行首恒为一枚描线齿轮（不随状态换字形），状态交给行尾等宽小字说明 */
+  /* 行首恒为一枚描线齿轮（不随状态换字形），状态交给行尾等宽小字说明；
+     执行中让齿轮匀速转起来——机器在干活的直观反馈，完成/失败自然停转 */
   .tool .tw { flex: none; width: 12px; display: flex; align-items: center;
               color: var(--ink-3); }
   .tool .tw svg { display: block; }
+  .tool.run .tw svg { animation: spin 2.4s linear infinite; }
+  @keyframes spin { to { transform: rotate(1turn); } }
   .tool .tname { flex: none; }
   .tool .tsum { flex: 1; min-width: 0; overflow: hidden;
                 text-overflow: ellipsis; white-space: nowrap;
@@ -334,6 +372,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                     object-fit: cover; }
   .hero h2 { margin: 0 0 10px; font-family: var(--kai); font-weight: 400;
              font-size: 34px; letter-spacing: 1.5px; }
+  /* 首屏日期戳：与 /today 页 lead-kicker 同一语言的 mono 眉批 */
+  .hero .hero-kicker { margin: 0 0 12px; font-family: var(--mono);
+                       font-size: 12px; letter-spacing: .18em;
+                       color: var(--accent-deep); }
   .hero p { margin: 0 auto; max-width: 560px; font-size: 16px;
             color: var(--ink-2); line-height: 1.95; }
   .hero .hint { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
@@ -375,12 +417,13 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   /* ── 底部：快速提问常驻 + 档案「留言」栏 ── */
   form { flex: none; border-top: 1px solid var(--rule); background: var(--paper-deep);
          padding: 14px 32px 13px; }
-  .quickbar { display: flex; align-items: center; gap: 10px;
+  /* 桌面放得下就全部展示（wrap 两行内），不藏进横向滚动——
+     用户看得见全部快捷问题才会去点；窄屏退回单排横滚，不挤输入区 */
+  .quickbar { display: flex; align-items: flex-start; gap: 10px;
               max-width: 800px; margin: 0 auto 9px; }
-  .qlabel { flex: none; font-family: var(--mono); font-size: 12px;
+  .qlabel { flex: none; margin-top: 8px; font-family: var(--mono); font-size: 12px;
             letter-spacing: .14em; color: var(--ink-3); }
-  .qchips { display: flex; min-width: 0; flex-wrap: nowrap; gap: 8px;
-            overflow-x: auto; scrollbar-width: none; }
+  .qchips { display: flex; min-width: 0; flex-wrap: wrap; gap: 8px; }
   .qchips::-webkit-scrollbar { display: none; }
   .chip { border: 1px solid var(--rule-2); background: var(--card);
           flex: none; min-height: 34px; color: var(--ink-2); font-size: 13px;
@@ -601,10 +644,15 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-card:hover::before { opacity: 1; }
   .hall-card:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .hall-card-top { display: flex; align-items: center; gap: 9px; }
+  /* 图标换成与工具卡齿轮同一族的 1.8px 描线 SVG：emoji 是彩色卡通，
+     在墨色纸面上跳戏；单一朱砂使整套界面更像一份竖排卷宗 */
   .hall-ico { flex: none; width: 28px; height: 28px; display: inline-flex;
               align-items: center; justify-content: center;
-              background: var(--accent-soft);
-              border-radius: 4px; font-size: 15px; line-height: 1; }
+              background: var(--accent-soft); color: var(--accent-deep);
+              border-radius: 4px; }
+  .hall-ico svg { display: block; width: 15px; height: 15px; fill: none;
+                  stroke: currentColor; stroke-width: 1.8;
+                  stroke-linecap: round; stroke-linejoin: round; }
   .hall-card b { flex: 1; min-width: 0; font-size: 15px; font-weight: 600;
                  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hall-go { flex: none; color: var(--rule-2); font-size: 14px;
@@ -805,7 +853,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .demo-banner { padding: 10px 16px; }
     #log { padding: 28px 20px 24px; }
     form { padding: 11px 16px 10px; }
-    .quickbar { margin-bottom: 8px; }
+    /* 窄屏快捷问题回单排横滚：wrap 三四行会挤压输入区 */
+    .quickbar { align-items: center; margin-bottom: 8px; }
+    .qlabel { margin-top: 0; }
+    .qchips { flex-wrap: nowrap; overflow-x: auto; }
     .fhint { display: none; }
     #toBottom { right: 14px; bottom: 96px; }
   }
@@ -921,7 +972,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   <div id="log"><div class="inner" id="inner">
     <div class="hero" id="hero">
       <div class="seal" aria-hidden="true"><img src="/logo.png" alt="" width="80" height="80"></div>
-      <h2>同学，你好。</h2>
+      <p class="hero-kicker" id="heroKicker">TODAY</p>
+      <h2 id="heroGreet">同学，你好。</h2>
       <p>课表、成绩、考试、通知——直接用一句话问。<br>
       <span class="hint">${demo ? "点击下方常用问题体验示例；演示会话在服务重启后清空。" : "会话保存在本机；提问与所需查询结果会发送至配置的 AI 服务。"}</span></p>
     </div>

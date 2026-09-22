@@ -56,7 +56,7 @@ export function knowledgePage(
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--paper); color: var(--ink);
          font-family: var(--sans); font-size: 16px; line-height: 1.7;
-         -webkit-font-smoothing: antialiased; }
+         -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
   ::selection { background: var(--accent-soft); }
   a { color: inherit; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -136,9 +136,12 @@ export function knowledgePage(
   .empty { margin: 0; padding: 24px 8px; border: 1px dashed var(--rule-2); text-align: center;
            color: var(--ink-3); font-size: 14px; }
 
-  /* 知识条目：标题行 + 正文，纸质卡片；长文默认折叠可展开 */
+  /* 知识条目：标题行 + 正文，纸质卡片；长文默认折叠可展开。
+     悬停微浮起：提示这张纸可以读（长文可展开），也给长列表一点反馈手感 */
   .k-entry { padding: 12px 14px; border: 1px solid var(--rule); background: var(--paper);
-             display: grid; gap: 0; }
+             display: grid; gap: 0;
+             transition: border-color .15s ease, box-shadow .15s ease; }
+  .k-entry:hover { border-color: var(--rule-2); box-shadow: 0 2px 10px rgba(50, 42, 31, .07); }
   .k-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
   .k-title { margin: 0; font-family: var(--kai); font-size: 17px; font-weight: 600;
              overflow-wrap: anywhere; }
