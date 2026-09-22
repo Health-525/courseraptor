@@ -842,6 +842,19 @@ function hallItem(title, meta, hot) {
   if (meta) item.appendChild(el2("hm", meta));
   return item;
 }
+/* 带动作按钮的条目：标题/说明在 main 区，右侧「原文」等按钮独立点击不与条目冲突 */
+function hallItemAct(title, meta, action, actLabel) {
+  const item = el("hall-item has-act");
+  const main = el("hall-item-main");
+  main.appendChild(el2("ht", title));
+  if (meta) main.appendChild(el2("hm", meta));
+  item.appendChild(main);
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "hall-del"; b.textContent = actLabel || "打开";
+  b.addEventListener("click", (e) => { e.stopPropagation(); action(); });
+  item.appendChild(b);
+  return item;
+}
 function hallNote(text) { return el2("hall-note", text); }
 /* 空态引导：一键回到输入框并预填话术（纯前端，不调后端） */
 function hallFocusChat(preset) {
@@ -1461,7 +1474,8 @@ function buildNews() {
       return wrap;
     }
     if (d.gradeBasis) wrap.appendChild(hallNote("已按你所在「" + d.gradeBasis + " 级」标记相关性，需行动的置顶。"));
-    items.forEach((n) => {
+    /* 稳定排序把 high 挪到最前（组内保持日期新旧序），兑现提示里的「置顶」 */
+    items.slice().sort((a, b) => (b.relevance === "high" ? 1 : 0) - (a.relevance === "high" ? 1 : 0)).forEach((n) => {
       wrap.appendChild(hallItemAct(n.title,
         [n.category, n.date, n.relevance === "high" ? "需本人行动" : n.relevance === "medium" ? "视个人情况" : ""].filter(Boolean).join(" · "),
         () => { window.open(n.url, "_blank", "noopener"); }, "原文"));
