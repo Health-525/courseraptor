@@ -82,3 +82,38 @@ test("空代码与超长代码礼貌拒绝", () => {
   assert.equal(r.ok, false);
   assert.match(r.error ?? "", /超过/);
 });
+
+// ── 加固回归：宿主对象零入沙箱 ───────────────────────────────
+
+test("constructor 链拿 Function 编译被 EvalError 挡住", () => {
+  // 经典逃逸姿势：console.log.constructor.constructor === 宿主 Function。
+  // 现在 console 是沙箱内函数，且 strings:false 下字符串编译一律 EvalError
+  const r = runSandboxedJs('console.log.constructor.constructor("return 123")()');
+  assert.equal(r.ok, false);
+  assert.match(r.error ?? "", /code generation|disallowed|eval error/i);
+});
+
+test("黑名单被拼接绕过后，裸上下文里没有宿主环境对象可拿", () => {
+  // BANNED 正则挡 "process" 字面量，字符串拼接写法（拼接发生在沙箱内）可绕过——
+  // vm 边界兜底：裸上下文里这些名字本来就是 undefined（this 在顶层指向沙箱全局）
+  const parts = ['"proc"+"ess"', '"req"+"uire"', '"Buf"+"fer"', '"set"+"Timeout"'];
+  const r = runSandboxedJs(`[${parts.join(",")}].map((n)=>typeof this[n]).join(",")`);
+  assert.equal(r.ok, true, r.error ?? "");
+  assert.equal(r.result ?? "", "undefined,undefined,undefined,undefined");
+});
+
+test("沙箱内覆写 console 不影响日志取回通道", () => {
+  // 日志缓冲在闭包里，沙箱代码改掉全局 console 也偷不走/烧不掉已写入的日志
+  const r = runSandboxedJs(
+    'console.log("a"); console = { log: function(){} }; console.log("b"); "ok"',
+  );
+  assert.equal(r.ok, true, r.error ?? "");
+  assert.deepEqual(r.logs, ["a"]);
+});
+
+test("console.log 行数上限 200：刷屏循环不撑爆内存", () => {
+  const r = runSandboxedJs('for (var i = 0; i < 5000; i++) console.log("line" + i); "done"');
+  assert.equal(r.ok, true);
+  assert.equal(r.logs?.length, 200);
+  assert.equal(r.logs?.[199] ?? "", "line199");
+});

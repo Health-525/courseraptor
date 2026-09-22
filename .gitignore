@@ -18,3 +18,7 @@ update-data/
 .tmp-banner/
 .openai/
 .zcode/
+# 本地临时产物（Playwright MCP 抓取、UI 截图、大厅主图快照）
+.playwright-mcp/
+outputs/ui-shots/
+hall-main.png

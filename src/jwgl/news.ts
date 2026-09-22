@@ -82,8 +82,11 @@ function parseNewsList(html: string, baseUrl: string): NewsItem[] {
   if (!listMatch) return items;
 
   const liRegex = /<li>([\s\S]*?)<\/li>/gi;
-  let liMatch: RegExpExecArray | null;
-  while ((liMatch = liRegex.exec(listMatch[1])) !== null) {
+  for (
+    let liMatch = liRegex.exec(listMatch[1]);
+    liMatch !== null;
+    liMatch = liRegex.exec(listMatch[1])
+  ) {
     const aMatch = liMatch[1].match(/<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
     if (!aMatch) continue;
     const title = aMatch[2].replace(/<[^>]+>/g, "").trim();
@@ -210,8 +213,7 @@ function extractDivBlock(html: string, openRe: RegExp): string | null {
   const tokenRe = /<div\b|<\/div\s*>/gi;
   tokenRe.lastIndex = start;
   let depth = 1;
-  let t: RegExpExecArray | null;
-  while ((t = tokenRe.exec(html)) !== null) {
+  for (let t = tokenRe.exec(html); t !== null; t = tokenRe.exec(html)) {
     depth += t[0].toLowerCase().startsWith("</") ? -1 : 1;
     if (depth === 0) return html.slice(start, t.index);
   }

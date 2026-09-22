@@ -73,16 +73,32 @@ function isValid(s: unknown): s is ChatSession {
   return !!o && typeof o.id === "string" && Array.isArray(o.messages);
 }
 
-/** 每次现读（本地小文件，读盘代价可忽略）；读坏按 .corrupt- 备份后当空处理 */
+/**
+ * 进程内读缓存（按 storePath 键控，写穿）：readSessions 是热路径——一轮
+ * 对话至少读 3 次（contextMessages / appendRound / 自动命名），列表接口
+ * 在上限规模（30×200 条）下每读一次都是全量 parse。缓存返回同一引用，
+ * 调用方的就地修改随 writeSessions 写穿；写盘失败不回滚（改动留在内存，
+ * 下次写盘带上——与调用方视角一致，磁盘在成功补写前暂时落后）。
+ * 不做写去抖：守住「每轮原子写盘、重启不丢」的承诺，写仅每轮 1-2 次，
+ * 不是热路径。RAPTOR_DATA_DIR 变化时键跟着变，测试隔离不受影响。
+ */
+const readCache = new Map<string, ChatSession[]>();
+
+/** 读坏按 .corrupt- 备份后当空处理；无文件不算错误也不入缓存 */
 export function readSessions(): ChatSession[] {
-  if (!fs.existsSync(storePath())) return [];
+  const file = storePath();
+  const cached = readCache.get(file);
+  if (cached) return cached;
+  if (!fs.existsSync(file)) return [];
   try {
-    const parsed = JSON.parse(fs.readFileSync(storePath(), "utf8")) as {
+    const parsed = JSON.parse(fs.readFileSync(file, "utf8")) as {
       sessions?: unknown[];
     };
-    return (Array.isArray(parsed.sessions) ? parsed.sessions : []).filter(isValid);
+    const list = (Array.isArray(parsed.sessions) ? parsed.sessions : []).filter(isValid);
+    readCache.set(file, list);
+    return list;
   } catch {
-    quarantineCorruptFileSync(storePath());
+    quarantineCorruptFileSync(file);
     return [];
   }
 }
@@ -93,6 +109,8 @@ function writeSessions(list: ChatSession[]): void {
       storePath(),
       JSON.stringify({ savedAt: Date.now(), sessions: list }, null, 2),
     );
+    // 写穿：落盘成功才更新缓存，读方与磁盘始终一致
+    readCache.set(storePath(), list);
   } catch (e) {
     console.error("[chat-sessions] 保存失败:", e);
   }

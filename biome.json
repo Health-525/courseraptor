@@ -21,22 +21,7 @@
     "rules": {
       "recommended": true,
       "suspicious": {
-        "noExplicitAny": "off",
-        "noEmptyBlockStatements": "off",
-        "noArrayIndexKey": "off",
-        "noAssignInExpressions": "off",
-        "noImplicitAnyLet": "off",
-        "noControlCharactersInRegex": "off"
-      },
-      "style": {
-        "noNonNullAssertion": "off",
-        "useImportType": "off",
-        "noParameterProperties": "off",
-        "useConsistentArrayType": "off"
-      },
-      "complexity": {
-        "noBannedTypes": "off",
-        "noForEach": "off"
+        "noExplicitAny": "warn"
       },
       "correctness": {
         "noUnusedVariables": "warn"
@@ -53,11 +38,23 @@
   },
   "overrides": [
     {
+      "includes": ["src/web/assets/**"],
+      "linter": {
+        "enabled": false
+      },
+      "formatter": {
+        "enabled": false
+      }
+    },
+    {
       "includes": ["tests/**"],
       "linter": {
         "rules": {
           "suspicious": {
             "noExplicitAny": "off"
+          },
+          "style": {
+            "noNonNullAssertion": "off"
           },
           "correctness": {
             "noUnusedVariables": "off"

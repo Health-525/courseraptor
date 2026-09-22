@@ -401,6 +401,9 @@ export function createDemoServer(): http.Server {
         });
       } else if (req.method === "GET" && url === "/api/reminders") {
         json(res, { reminders: [] });
+      } else if (req.method === "GET" && url === "/api/today") {
+        // 功能大厅的今日日程/课表/考试/待办/知识面板都吃这份简报（与 /today 页同源）
+        json(res, demoTodayBrief());
       } else if (req.method === "GET" && url === "/api/data") {
         const sessionValues = [...sessions.values()];
         const demoEntries = demoKnowledge(new Date());

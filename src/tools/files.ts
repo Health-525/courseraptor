@@ -14,7 +14,13 @@ import {
 } from "../attachment-store";
 import { openLocalFile } from "../attachments";
 import { runSandboxedJs } from "../sandbox-js";
-import { distinctValues, loadWorkbook, querySheet, sheetOverview } from "../spreadsheet";
+import {
+  distinctValues,
+  loadWorkbook,
+  querySheet,
+  sheetOverview,
+  type TableSheet,
+} from "../spreadsheet";
 
 export const filesTools = {
   /** 读取本机文件（用户给路径） */
@@ -94,7 +100,7 @@ export const filesTools = {
       if (!sheets) {
         return { error: `「${meta.filename}」不是可解析的表格文件（支持 xlsx/xls/csv/tsv）` };
       }
-      let sheet;
+      let sheet: TableSheet | undefined;
       if (input.sheet?.trim()) {
         const q = input.sheet.trim().toLowerCase();
         sheet =

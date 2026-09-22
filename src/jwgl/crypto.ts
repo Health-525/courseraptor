@@ -39,13 +39,10 @@ export function encryptJwglPassword(pwd: string, modulusB64: string, exponentB64
   const seq = Buffer.concat([derInt(mb), derInt(eb)]);
   const der = Buffer.concat([Buffer.from([0x30]), derLength(seq.length), seq]);
 
-  const pem =
-    "-----BEGIN RSA PUBLIC KEY-----\n" +
-    der
-      .toString("base64")
-      .match(/.{1,64}/g)!
-      .join("\n") +
-    "\n-----END RSA PUBLIC KEY-----";
+  // base64 逐 64 字符分行包 PEM；match 一定命中（非空字符串），仍给空数组兜底
+  const b64 = der.toString("base64");
+  const pemLines = b64.match(/.{1,64}/g) ?? [b64];
+  const pem = `-----BEGIN RSA PUBLIC KEY-----\n${pemLines.join("\n")}\n-----END RSA PUBLIC KEY-----`;
 
   return crypto
     .publicEncrypt(

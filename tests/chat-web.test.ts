@@ -846,11 +846,17 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
   assert.match(chat, /id="hallSettings"/, "设置面板应常驻在功能大厅抽屉里");
   assert.ok(!chat.includes('id="openSettings"'), "侧栏不应再有独立的设置按钮");
   assert.match(chat, /today: \(\) => briefOf\(\)\.then\(buildToday\)/, "面板注册表应包含今日日程");
-  assert.match(chat, /const TOOL_PANEL = \{/, "应有工具→面板联动映射");
-  assert.match(chat, /get_schedule: "schedule"/, "课表工具应联动课表面板");
+  assert.match(chat, /const TOOL_PANEL = \{/, "应有工具→面板刷新映射");
+  assert.match(chat, /get_schedule: "schedule"/, "课表工具应映射课表面板（开着才刷新）");
   assert.match(chat, /open_settings: "settings"/, "agent 应可通过 open_settings 工具打开设置");
-  assert.match(chat, /get_grades: "grades"/, "成绩工具应联动成绩面板");
-  assert.match(chat, /get_news: "news"/, "通知工具应联动通知面板");
+  assert.match(chat, /get_grades: "grades"/, "成绩工具应映射成绩面板（开着才刷新）");
+  assert.match(chat, /get_news: "news"/, "通知工具应映射通知面板（开着才刷新）");
+  assert.match(
+    chat,
+    /panel === "settings" && !hallAutoMuted\) openHall/,
+    "数据查询工具不得自动推出：只有 open_settings 才允许对话联动打开",
+  );
+  assert.ok(!chat.includes("对应面板会自动从右边推出"), "大厅文案不应再承诺查询自动推出");
   assert.match(chat, /\{ id: "grades"/, "宫格应有成绩卡片");
   assert.match(chat, /\{ id: "news"/, "宫格应有通知卡片");
   assert.match(

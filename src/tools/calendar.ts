@@ -183,8 +183,8 @@ export const calendarTools = {
       const links: Array<Record<string, string>> = [];
       const failed: Array<{ platform: string; error: string }> = [];
 
-      if (wanted.includes("gitee")) {
-        const r = await publishCalendarToGitee({ token: config.giteeToken!, ics, repoName });
+      if (config.giteeToken) {
+        const r = await publishCalendarToGitee({ token: config.giteeToken, ics, repoName });
         if (r.ok) {
           links.push({
             platform: "gitee",
@@ -198,8 +198,8 @@ export const calendarTools = {
         }
       }
 
-      if (wanted.includes("github")) {
-        const r = await publishCalendarToGithub({ token: config.githubToken!, ics, repoName });
+      if (config.githubToken) {
+        const r = await publishCalendarToGithub({ token: config.githubToken, ics, repoName });
         if (r.ok) {
           const d = r.data;
           links.push({
