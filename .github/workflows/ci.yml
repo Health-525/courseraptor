@@ -38,3 +38,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm test
+      # 覆盖率只收集不设阈值（可视化基线）；报告在 job 日志里
+      - run: npm run test:coverage
+      # critical 阻断，high 及以下仅体现在输出里
+      # 已知项：image-size（pptxgenjs 传递依赖）2 个 high DoS，等上游出修复版即可消除
+      - run: npm run audit:prod
