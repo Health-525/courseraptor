@@ -71,6 +71,25 @@ function fmtWhen(ts) {
     ? clock(ts) : (d.getMonth() + 1) + "月" + d.getDate() + "日";
 }
 
+/* ── 首屏问候：按当下时段换招呼语，配 mono 日期戳（TODAY · 9月22日 周二）。
+   startFresh 恢复首屏时重算，隔午后再回来不穿帮 ── */
+function heroGreeting() {
+  const greet = document.getElementById("heroGreet");
+  const kick = document.getElementById("heroKicker");
+  const n = new Date();
+  if (greet) {
+    const h = n.getHours();
+    const word = h < 6 ? "夜深了" : h < 11 ? "早上好"
+      : h < 14 ? "中午好" : h < 18 ? "下午好" : "晚上好";
+    greet.textContent = "同学，" + word + "。";
+  }
+  if (kick) {
+    const wd = ["日", "一", "二", "三", "四", "五", "六"][n.getDay()];
+    kick.textContent = "TODAY · " + (n.getMonth() + 1) + "月" + n.getDate() + "日 周" + wd;
+  }
+}
+heroGreeting();
+
 /* ── 快速提问：常驻在输入框上方 ── */
 const QUESTIONS = ["今天有什么安排", "这周课表", "教务处最近有什么通知", "我的成绩和 GPA", "最近的考试安排", "通识学分还缺哪些", "导出课表到手机日历"];
 const qchips = document.getElementById("qchips");
@@ -483,20 +502,79 @@ function restorePomoCard() {
 
 /* ── 会话档案：列表 / 打开 / 删除 / 新会话 ── */
 const sessList = document.getElementById("sessList");
+/* 描线小图标：置顶图钉与空态档案盒（与齿轮、大厅宫格图标同一族） */
+const PIN_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true">'
+  + '<path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24'
+  + 'V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15'
+  + ' 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1z"/></svg>';
+const ARCHIVE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true">'
+  + '<rect x="2" y="3" width="20" height="5" rx="1"/>'
+  + '<path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/>'
+  + '<path d="M10 12h4"/></svg>';
+
+/* 会话归档分组：置顶独立成组在最前，其余按最后活跃时间归位。
+   服务端已按置顶 + 最近活跃排好序，这里顺序遍历、组名变化处插题注 */
+function sessionGroup(s) {
+  if (s.pinned) return "置顶";
+  const n = new Date();
+  const todayStart = new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
+  if (s.updatedAt >= todayStart) return "今天";
+  if (s.updatedAt >= todayStart - 86400000) return "昨天";
+  if (s.updatedAt >= todayStart - 7 * 86400000) return "7 天内";
+  return "更早";
+}
+
 function renderSessList() {
   sessList.innerHTML = "";
   document.getElementById("sessCount").textContent =
     lastSessions.length ? lastSessions.length + " 个" : "";
+  /* 档案室空着时搜索框一并收起：没东西可搜，空态直接引导去开问 */
+  document.getElementById("sessSearch").style.display = lastSessions.length ? "" : "none";
   const visible = lastSessions.filter((s) =>
     !sessionQuery || String(s.title || "").toLowerCase().includes(sessionQuery.toLowerCase()));
   if (!visible.length) {
     const li = document.createElement("li");
     li.className = "snone";
-    li.textContent = lastSessions.length ? "没有匹配的会话" : "暂无历史会话";
+    if (lastSessions.length) {
+      li.appendChild(el2("snone-t", "没有匹配的会话"));
+      const clear = document.createElement("button");
+      clear.type = "button";
+      clear.className = "sclear";
+      clear.textContent = "清空搜索 · 看全部 " + lastSessions.length + " 个";
+      clear.addEventListener("click", () => {
+        sessionQuery = "";
+        const box = document.getElementById("sessSearch");
+        box.value = "";
+        renderSessList();
+        box.focus();
+      });
+      li.appendChild(clear);
+    } else {
+      const ico = el("");
+      ico.innerHTML = ARCHIVE_SVG;
+      li.appendChild(ico);
+      li.appendChild(el2("snone-t", "档案室还空着"));
+      li.appendChild(el2("snone-hint", "在右侧开问一句，这轮对话就会归档到这里，重启也不丢。"));
+    }
     sessList.appendChild(li);
     return;
   }
+  /* 分组题注带计数（与待办分组同一语言）；置顶组内不再按时间细分 */
+  const counts = {};
   visible.forEach((s) => {
+    const g = sessionGroup(s);
+    counts[g] = (counts[g] || 0) + 1;
+  });
+  let lastGroup = "";
+  visible.forEach((s) => {
+    const group = sessionGroup(s);
+    if (group !== lastGroup) {
+      lastGroup = group;
+      const head = document.createElement("li");
+      head.className = "sgroup";
+      head.appendChild(document.createTextNode(group + " · " + counts[group]));
+      sessList.appendChild(head);
+    }
     const li = document.createElement("li");
     li.dataset.id = s.id;
     if (s.id === activeId) li.className = "on";
@@ -513,7 +591,12 @@ function renderSessList() {
       setTimeout(() => { edit.focus(); edit.select(); }, 0);
     } else {
       const title = el("st");
-      if (s.pinned) title.appendChild(el2("spin", "置顶"));
+      if (s.pinned) {
+        const pin = el("spin");
+        pin.innerHTML = PIN_SVG;
+        pin.appendChild(document.createTextNode("置顶"));
+        title.appendChild(pin);
+      }
       title.appendChild(document.createTextNode(s.title || "新会话"));
       li.appendChild(title);
     }
@@ -615,6 +698,7 @@ function startFresh() {
   msgs = [];
   clearTurns();
   hero.style.display = "";
+  heroGreeting();
   renderSessList();
   input.focus();
 }
@@ -689,17 +773,52 @@ document.getElementById("openDrawerM").addEventListener("click", openDrawer);
 document.getElementById("drawerBackdrop").addEventListener("click", closeDrawer);
 
 /* ── 功能大厅：右侧 push 抽屉。宫格是主页，各面板按需取数；
-   对话过程中 agent 调到对应工具（TOOL_PANEL）时自动推出该面板。 ── */
+    对话过程中 agent 调到对应工具（TOOL_PANEL）时自动推出该面板。 ── */
+/* 宫格图标：与工具卡齿轮同一族的 1.8px 描线 SVG（24 viewBox）。
+    emoji 是彩色卡通，在墨色纸面上跳戏——单一朱砂让整套界面更像一份竖排卷宗 */
+const HALL_ICONS = {
+  today: '<svg viewBox="0 0 24 24" aria-hidden="true">'
+    + '<rect x="3" y="4" width="18" height="18" rx="2"/>'
+    + '<path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+  schedule: '<svg viewBox="0 0 24 24" aria-hidden="true">'
+    + '<rect x="3" y="4" width="18" height="18" rx="2"/>'
+    + '<path d="M16 2v4M8 2v4M3 10h18"/>'
+    + '<path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/></svg>',
+  exams: '<svg viewBox="0 0 24 24" aria-hidden="true">'
+    + '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/>'
+    + '<path d="M14 2v4a2 2 0 0 0 2 2h4"/>'
+    + '<path d="M10 9H8M16 13H8M16 17H8"/></svg>',
+  grades: '<svg viewBox="0 0 24 24" aria-hidden="true">'
+    + '<path d="M3 3v18h18"/>'
+    + '<path d="M18 17V9M13 17V5M8 17v-3"/></svg>',
+  news: '<svg viewBox="0 0 24 24" aria-hidden="true">'
+    + '<path d="m3 11 18-5v12L3 14v-3z"/>'
+    + '<path d="M11.6 16.8a3 3 0 0 1-3.5-1.5L3 14v3l5.1 1.4a3 3 0 0 0 3.5-1.6z"/></svg>',
+  todos: '<svg viewBox="0 0 24 24" aria-hidden="true">'
+    + '<path d="m3 17 2 2 4-4"/><path d="m3 7 2 2 4-4"/>'
+    + '<path d="M13 6h8M13 12h8M13 18h8"/></svg>',
+  knowledge: '<svg viewBox="0 0 24 24" aria-hidden="true">'
+    + '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>'
+    + '<path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>',
+  pomodoro: '<svg viewBox="0 0 24 24" aria-hidden="true">'
+    + '<line x1="10" y1="2" x2="14" y2="2"/>'
+    + '<line x1="12" y1="14" x2="15" y2="11"/>'
+    + '<circle cx="12" cy="14" r="8"/></svg>',
+  settings: GEAR,
+};
 const HALL_CARDS = [
-  { id: "today", t: "今日日程", d: "下一节课、今日安排与本周概览", icon: "📅", group: "学习安排" },
-  { id: "schedule", t: "课表", d: "本周每天的课与调休安排", icon: "🗓️", group: "学习安排" },
-  { id: "exams", t: "考试", d: "临近考试的时间、地点与座位", icon: "📝", group: "学习安排" },
-  { id: "grades", t: "成绩", d: "GPA、学分与最近学期成绩速览", icon: "📊", group: "学习安排" },
-  { id: "news", t: "教务通知", d: "教务处官网最新通知，标记需要行动的", icon: "📣", group: "学习安排" },
-  { id: "todos", t: "待办", d: "逾期置顶，按今天 / 明天分组", icon: "✅", group: "效率工具" },
-  { id: "knowledge", t: "知识库", d: "按课程归类，可搜可展开全文", icon: "📚", group: "效率工具" },
-  { id: "pomodoro", t: "番茄钟", d: "进行中实时倒计时与最近记录", icon: "🍅", group: "效率工具" },
-  { id: "settings", t: "设置", d: "教务账号、AI 模型、QQ 与本地数据", icon: "⚙️", group: "系统" },
+  { id: "today", t: "今日日程", d: "下一节课、今日安排与本周概览", group: "学习安排" },
+  { id: "schedule", t: "课表", d: "本周每天的课与调休安排", group: "学习安排" },
+  { id: "exams", t: "考试", d: "临近考试的时间、地点与座位", group: "学习安排" },
+  { id: "grades", t: "成绩", d: "GPA、学分与最近学期成绩速览", group: "学习安排" },
+  { id: "news", t: "教务通知", d: "教务处官网最新通知，标记需要行动的", group: "学习安排" },
+  { id: "todos", t: "待办", d: "逾期置顶，按今天 / 明天分组", group: "效率工具" },
+  { id: "knowledge", t: "知识库", d: "按课程归类，可搜可展开全文", group: "效率工具" },
+  /* 大厅入口按需求下架（2026-09-22）：宫格不再展示番茄钟；对话里说「来一个番茄钟」
+     照常可用——manage_pomodoro 工具、SSE 事件、对话内 .pomo 倒计时卡与
+     buildPomodoro 面板逻辑全部保留，恢复展示只需去掉 hidden 标记 */
+  { id: "pomodoro", t: "番茄钟", d: "进行中实时倒计时与最近记录", group: "效率工具", hidden: true },
+  { id: "settings", t: "设置", d: "教务账号、AI 模型、QQ 与本地数据", group: "系统" },
 ];
 const HALL_GROUPS = ["学习安排", "效率工具", "系统"];
 const HALL_TITLES = Object.fromEntries(HALL_CARDS.map((c) => [c.id, c.t]));
@@ -747,7 +866,7 @@ let hallKnowCat = "";
 /* 知识条目：标题 + 分类·日期·摘要，可展开看全文（main 区是热区，删除按钮在外不冲突），
    删除乐观更新（先移除节点，失败重刷恢复） */
 function hallKnowledgeItem(k) {
-  const full = String(k.content || "").replace(/\\s+/g, " ").trim();
+  const full = String(k.content || "").replace(/\s+/g, " ").trim();
   const snippet = full.slice(0, 60);
   const date = hallKDate(k.updatedAt);
   const head = (k.category || "未分类") + (date ? " · " + date + " · " : " · ");
@@ -1174,7 +1293,7 @@ function buildKnowledge(b) {
       const date = hallKDate(k.updatedAt);
       wrap.appendChild(hallItem(k.title,
         (k.category || "未分类") + (date ? " · " + date : "") + " · "
-        + String(k.content || "").replace(/\\s+/g, " ").slice(0, 60)));
+        + String(k.content || "").replace(/\s+/g, " ").slice(0, 60)));
     });
     return wrap;
   }
@@ -1556,7 +1675,7 @@ function renderHall(force) {
     hallTitle.textContent = "功能大厅";
     /* 主页按分组排布：学习安排 / 效率工具 / 系统，扫一眼就能定位 */
     HALL_GROUPS.forEach((g) => {
-      const cards = HALL_CARDS.filter((c) => c.group === g);
+      const cards = HALL_CARDS.filter((c) => c.group === g && !c.hidden);
       if (!cards.length) return;
       const sec = el("hall-sec");
       sec.appendChild(el2("", g));
@@ -1567,7 +1686,7 @@ function renderHall(force) {
         card.type = "button"; card.className = "hall-card"; card.dataset.panel = c.id;
         card.setAttribute("aria-label", c.t + "：" + c.d);
         const top = el("hall-card-top");
-        top.appendChild(el2("hall-ico", c.icon || "·"));
+        top.appendChild(iconSpan("hall-ico", HALL_ICONS[c.id] || GEAR));
         const t = document.createElement("b"); t.textContent = c.t; top.appendChild(t);
         top.appendChild(el2("hall-go", "→"));
         card.appendChild(top);
@@ -2074,7 +2193,7 @@ document.getElementById("saveSettings").addEventListener("click", () => {
     saveBtn.disabled = false;
     saveBtn.textContent = "保存设置";
     setMsg.className = "setmsg" + (ok ? " good" : "");
-    setMsg.textContent = (d.results || []).map((x) => x.message).join("\\n");
+    setMsg.textContent = (d.results || []).map((x) => x.message).join("\n");
     if (ok && d.status) {
       setStatus = d.status; sUser.value = ""; sPass.value = ""; sKey.value = "";
       renderSetStatus(d.status);
@@ -2183,6 +2302,16 @@ function handleFiles(files) {
 }
 document.getElementById("attachBtn").addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", () => { handleFiles(fileInput.files || []); fileInput.value = ""; });
+/* Ctrl+V 粘贴文件：从文件管理器/别的应用复制后可直接贴进输入框，
+   走同一套上传队列；纯文本粘贴保持原生行为不受影响 */
+input.addEventListener("paste", (e) => {
+  if (document.body.dataset.demo === "true") return;
+  const files = [...((e.clipboardData && e.clipboardData.files) || [])];
+  if (files.length) {
+    e.preventDefault();
+    handleFiles(files);
+  }
+});
 ["dragenter", "dragover"].forEach((name) => cwrap.addEventListener(name, (e) => {
   e.preventDefault(); if (!document.body.dataset.demo.includes("true")) cwrap.classList.add("drag");
 }));
@@ -2235,7 +2364,7 @@ async function send(text) {
       const { done, value } = await reader.read();
       if (done) break;
       buf += dec.decode(value, { stream: true });
-      const lines = buf.split("\\n");
+      const lines = buf.split("\n");
       buf = lines.pop();
       for (const line of lines) {
         if (!line.startsWith("data: ")) continue;
