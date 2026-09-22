@@ -711,7 +711,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-search input::placeholder { color: var(--ink-3); }
   /* 面板条目：与待办列表同一语言，等信息以两行表达（标题 + 等宽小字） */
   .hall-item { border: 1px solid var(--rule); background: var(--card);
-               padding: 9px 11px; margin-bottom: 6px; border-radius: 2px; }
+               padding: 9px 11px; margin-bottom: 6px; border-radius: 4px;
+               transition: border-color .15s ease, box-shadow .15s ease; }
+  .hall-item:hover, .hall-item:focus-within { border-color: var(--rule-2);
+                                              box-shadow: 0 2px 10px rgba(50, 42, 31, .07); }
   /* 面板内容淡入：切换/刷新时给 0.16s 过渡（reduced-motion 下全局已禁用） */
   .hall-dyn-in { animation: hallFade .16s ease; }
   @keyframes hallFade { from { opacity: .2; } to { opacity: 1; } }
@@ -735,8 +738,20 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .todo-form .tbtn { min-height: 32px; padding: 3px 12px; font-size: 12px; }
   .todo-form .tbtn.primary { background: var(--accent); border-color: var(--accent);
                              color: var(--card); font-weight: 600; }
-  .hall-done { flex: none; width: 20px; height: 20px; margin: 2px 0 0;
-               accent-color: var(--accent); cursor: pointer; }
+   /* 勾选框：自绘纸片方框（与 /today 页 .todo-chk 同一套），选中朱砂底 + 纸色勾 */
+   .hall-done { appearance: none; -webkit-appearance: none; position: relative;
+                flex: none; width: 18px; height: 18px; margin: 2px 0 0;
+                border: 1.5px solid var(--rule-2); border-radius: 4px;
+                background: var(--card); cursor: pointer;
+                transition: border-color .15s ease, background .15s ease; }
+   .hall-done:hover { border-color: var(--accent); }
+   .hall-done:checked { background: var(--accent); border-color: var(--accent); }
+   .hall-done:checked::after { content: ""; position: absolute; left: 5px; top: 1.5px;
+                               width: 4px; height: 9px;
+                               border: solid var(--paper); border-width: 0 2px 2px 0;
+                               transform: rotate(45deg); }
+   .hall-done:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+   .hall-done:disabled { cursor: default; }
    .hall-del { flex: none; border: 0; background: none; padding: 4px 8px;
                min-height: 28px; color: var(--ink-3); font-family: var(--mono);
                font-size: 12px; cursor: pointer; border-radius: 3px;
