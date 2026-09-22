@@ -113,6 +113,82 @@ const LOGO_PNG = path.resolve(
   "courseraptor-logo.png",
 );
 
+/** 静态资源进程启动后不会变，读一次常驻内存即可——请求路径上不再碰盘，
+ * 同进程还挂着 SSE 流式对话，同步 IO 阻塞事件循环会放大流式延迟 */
+const staticCache = new Map<string, Buffer | null>();
+
+function loadStaticOnce(absolutePath: string): Buffer | null {
+  if (!staticCache.has(absolutePath)) {
+    try {
+      staticCache.set(absolutePath, fs.readFileSync(absolutePath));
+    } catch {
+      // 读取失败也缓存住（null），避免后续请求反复重试丢盘
+      staticCache.set(absolutePath, null);
+    }
+  }
+  return staticCache.get(absolutePath) ?? null;
+}
+
+interface ScoredNewsItem {
+  title: string;
+  date: string;
+  category: string | undefined;
+  relevance: "high" | "medium" | "low";
+  relevanceReason: string | undefined;
+  url: string;
+}
+
+interface ScoredNewsSnapshot {
+  items: ScoredNewsItem[];
+  gradeBasis: string | null;
+  fetchedAt: number;
+}
+
+/**
+ * 教务处通知的服务端缓存：官网三页现场抓取要数秒，功能大厅每次
+ * 开面板都会打一次 /api/news，5 分钟内复用同一份快照即可。
+ * 空结果与异常一律不缓存——不把网络抖动固化成「近期没有通知」。
+ * in-flight 复用挡住并发请求下的重复抓取。
+ */
+const NEWS_CACHE_TTL_MS = 5 * 60 * 1000;
+let newsCache: ScoredNewsSnapshot | null = null;
+let newsInflight: Promise<ScoredNewsSnapshot> | null = null;
+
+async function scoredNewsSnapshot(): Promise<ScoredNewsSnapshot> {
+  if (newsCache && Date.now() - newsCache.fetchedAt < NEWS_CACHE_TTL_MS) {
+    return newsCache;
+  }
+  if (newsInflight) return newsInflight;
+  newsInflight = (async () => {
+    const items = await fetchJwcNews([], 30);
+    const grade = await loadUserGrade();
+    const scored = items.slice(0, 10).map((i) => {
+      const { level, reason } = relevanceOf(i.title, grade);
+      return {
+        title: i.title,
+        date: i.date,
+        category: i.category,
+        relevance: level,
+        relevanceReason: reason,
+        url: i.url,
+      };
+    });
+    // 只有一页都没有才视为「本轮无数据」不缓存；部分成功的结果照常缓存
+    const snapshot: ScoredNewsSnapshot = {
+      items: scored,
+      gradeBasis: grade,
+      fetchedAt: Date.now(),
+    };
+    if (scored.length > 0) newsCache = snapshot;
+    return snapshot;
+  })();
+  try {
+    return await newsInflight;
+  } finally {
+    newsInflight = null;
+  }
+}
+
 /** 与 agent.ts 的 ToolLoopAgent 对齐的最小接口：网页端每轮都带全量历史，
  * 所以只声明 messages 分支（ToolLoopAgent.stream 的 prompt/messages 是
  * 二选一的判别联合，两边都可选反而匹配不上） */
@@ -734,6 +810,16 @@ function applySettings(body: Record<string, unknown>): {
   };
 }
 
+/**
+ * 页面模板缓存：正式服务渲染的三个页面都是纯模板（动态数据全走 /api/*，
+ * CSRF 由 withCsrf 每次后注入），首次拼接后缓存字符串。chatPage() 单次
+ * 拼接即 16 万字节级，每请求重来一遍纯属浪费。要往页面注入动态真值时，
+ * 改这里换成「以真值为键」的缓存。
+ */
+let chatPageHtml: string | null = null;
+let todayPageHtml: string | null = null;
+let knowledgePageHtml: string | null = null;
+
 async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   const url = req.url ?? "";
   if (req.method === "GET") {
@@ -742,23 +828,25 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return;
     }
     if (url === "/vendor/marked.min.js") {
-      try {
+      const buf = loadStaticOnce(MARKED_UMD);
+      if (buf) {
         res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
-        res.end(fs.readFileSync(MARKED_UMD));
-      } catch {
+        res.end(buf);
+      } else {
         res.writeHead(404);
         res.end("// marked 不可用，页面会退回纯文本渲染");
       }
       return;
     }
     if (url === "/logo.png" || url === "/favicon.ico") {
-      try {
+      const buf = loadStaticOnce(LOGO_PNG);
+      if (buf) {
         res.writeHead(200, {
           "content-type": "image/png",
           "cache-control": "public, max-age=86400",
         });
-        res.end(fs.readFileSync(LOGO_PNG));
-      } catch {
+        res.end(buf);
+      } else {
         // 图没了也只是没图标，不能连累页面
         res.writeHead(404);
         res.end();
@@ -767,14 +855,16 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     }
     if (url === "/today" || url === "/today/") {
       // 独立日程页：下一节课/今日/本周/考试，纯本地缓存渲染
+      todayPageHtml ??= todayPage();
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(withCsrf(todayPage()));
+      res.end(withCsrf(todayPageHtml));
       return;
     }
     if (url === "/knowledge" || url === "/knowledge/") {
       // 独立知识库页：对话中沉淀的知识条目，纯本地存储渲染
+      knowledgePageHtml ??= knowledgePage();
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end(withCsrf(knowledgePage()));
+      res.end(withCsrf(knowledgePageHtml));
       return;
     }
     if (url === "/api/knowledge") {
@@ -787,22 +877,14 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return;
     }
     if (url === "/api/news") {
-      // 教务处官网公开页，无需登录；现场抓取（可能要几秒），失败如实降级
+      // 教务处官网公开页，无需登录；TTL 缓存见 scoredNewsSnapshot，失败如实降级
       try {
-        const items = await fetchJwcNews([], 30);
-        const grade = await loadUserGrade();
-        const scored = items.slice(0, 10).map((i) => {
-          const { level, reason } = relevanceOf(i.title, grade);
-          return {
-            title: i.title,
-            date: i.date,
-            category: i.category,
-            relevance: level,
-            relevanceReason: reason,
-            url: i.url,
-          };
+        const snapshot = await scoredNewsSnapshot();
+        json(res, {
+          items: snapshot.items,
+          gradeBasis: snapshot.gradeBasis ?? undefined,
+          fetchedAt: snapshot.fetchedAt,
         });
-        json(res, { items: scored, gradeBasis: grade ?? undefined, fetchedAt: Date.now() });
       } catch (e) {
         json(res, { items: [], error: e instanceof Error ? e.message : String(e) });
       }
@@ -922,7 +1004,8 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return;
     }
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    res.end(withCsrf(chatPage()));
+    chatPageHtml ??= chatPage();
+    res.end(withCsrf(chatPageHtml));
     return;
   }
   if (req.method === "POST") {
@@ -943,9 +1026,10 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       const r = applySettings(body ?? {});
       if (r.modelChanged) {
         // 串行重建：并发保存时不能让两个 agent 互相覆盖
-        const note = await (refreshChain = refreshChain
+        refreshChain = refreshChain
           .then(refreshChatAgent)
-          .catch(() => "；即时切换失败，旧模型继续可用，重启后生效"));
+          .catch(() => "；即时切换失败，旧模型继续可用，重启后生效");
+        const note = await refreshChain;
         const line = r.results.find((item) => item.field === "model");
         if (line) line.message += note;
       }
