@@ -20,19 +20,14 @@ import { currentWeekOf } from "../jwgl/term-dates";
 import { loadScheduleCache, saveScheduleCache } from "../schedule-cache";
 import { startChatWeb } from "../web/chat-web";
 import { listReminders } from "../workspace-data";
+import { dim, header } from "./color";
 
 declare global {
   // eslint-disable-next-line no-var
   var __raptorWelcome: string[] | undefined;
 }
 
-const CYAN = "\x1b[36m";
-const DIM = "\x1b[2m";
-const RESET = "\x1b[0m";
 const DAY_MS = 86_400_000;
-
-const header = (s: string) => `${CYAN}【${s}】${RESET}`;
-const dim = (s: string) => `${DIM}${s}${RESET}`;
 
 /** JS 的周日=0 转成教学周 weekday（周一=1 … 周日=7） */
 function todayWeekday(): number {

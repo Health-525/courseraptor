@@ -37,7 +37,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
      暖纸底 + 墨色字 + 单一朱砂红；报头楷体、数据等宽小字、正文系统黑体。
      没有渐变、没有光斑、没有玻璃——所有颜色只在这一个 :root 里定义。 */
   :root {
-    color-scheme: light;
+    color-scheme: light dark;
     --paper: #F6F4ED;   /* 纸面 */
     --paper-deep: #F0EDE4;
     --card: #FCFBF7;    /* 浮起的纸片 */
@@ -848,6 +848,46 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                padding: 6px 10px; }
     .set-tab.on { border-bottom-color: var(--accent); box-shadow: none; }
     .set-main { padding-right: 0; }
+  }
+  /* ── 暗色模式：夜班编辑部 —— 深墨底纸 + 提亮朱砂 + 暖白墨字。
+     不是简单反色：纸面换深褐墨底（不是纯黑，保留「纸」的质感），
+     朱砂红提亮到 #D14A3C 以在深底上保持辨识度，墨字反成暖白。
+     所有覆盖值已按 WCAG AA 校过对比度（正文 ≥4.5:1，大字 ≥3:1）。 ── */
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #1F1D1A;
+      --paper-deep: #1A1815;
+      --card: #2A2722;
+      --shade: #23211D;
+      --ink: #EDE9DF;
+      --ink-2: #B8B0A0;
+      --ink-3: #8E8674;
+      --rule: #3A362F;
+      --rule-2: #4A453C;
+      --accent: #D14A3C;
+      --accent-deep: #B83A2E;
+      --accent-soft: #3A2520;
+      --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.28);
+    }
+    /* 原生滚动条在暗底下默认是深灰，显式给一层与纸底区分的-thumb */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: var(--paper-deep); }
+    ::-webkit-scrollbar-thumb {
+      background: var(--rule-2); border: 2px solid transparent;
+      background-clip: content-box; border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: var(--ink-3); background-clip: content-box; }
+    /* 主按钮在暗底上用浅暖白字而非纯白，避免过曝 */
+    #b { color: #FBF7EE; }
+    .mastbtns .tbtn.primary { color: #FBF7EE; }
+    /* 朱砂浅底按钮在暗底下文字色 */
+    .mastbtns .tbtn.hall-btn { color: #E8A89E; }
+    .mastbtns .tbtn.hall-btn:hover { color: #FBF7EE; }
+    /* 会话列表选中项的工具卡阴影在暗底下要更深才看得见 */
+    .sess li.on { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); }
+    /* 代码块/预览区在暗底下底色要跟纸面拉开一级 */
+    .md pre { background: var(--paper-deep); }
+    .tool pre { background: var(--paper-deep); }
   }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important;
