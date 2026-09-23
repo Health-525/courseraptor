@@ -7,16 +7,17 @@
 **大学教务对话式 Agent**  
 课表 · 成绩 · 考试 · 学籍 · 教务通知 · 待办 · 知识库 · 记忆，一句话搞定。
 
+[![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
 [![下载最新版](https://img.shields.io/github/v/release/Health-525/courseraptor?label=%E4%B8%8B%E8%BD%BD%E6%9C%80%E6%96%B0%E7%89%88&color=orange)](https://github.com/Health-525/courseraptor/releases/latest)
-[![License: ISC](https://img.shields.io/badge/license-ISC-blue.svg)](#)
+[![License: ISC](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
 [![Vercel AI SDK](https://img.shields.io/badge/Vercel%20AI%20SDK-v7-black.svg)](https://ai-sdk.dev)
 [![LLM](https://img.shields.io/badge/LLM-DeepSeek-4D6BFE.svg)](https://www.deepseek.com)
 
 [![教务系统](https://img.shields.io/badge/%E6%95%99%E5%8A%A1-%E6%AD%A3%E6%96%B9%E6%96%B0%E7%89%88-success.svg)](#-技术栈)
-[![Last Commit](https://img.shields.io/github/last-commit/Health-525/courseraptor?color=orange)](https://github.com/Health-525/courseraptor/commits/master)
+[![Last Commit](https://img.shields.io/github/last-commit/Health-525/courseraptor?color=orange)](https://github.com/Health-525/courseraptor/commits/main)
 [![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social)](https://github.com/Health-525/courseraptor)
 
-**[🚀 快速开始](#-快速开始) · [✨ 核心能力](#-核心能力) · [📡 已知状态](#-已知状态-2026-09) · [🏗️ 技术栈](#-技术栈) · [⚠️ 免责声明](#️-免责声明与使用建议) · [📖 完整文档](docs/capabilities.md)**
+**[🚀 快速开始](#-快速开始) · [🖥️ 界面预览](#️-界面预览) · [✨ 核心能力](#-核心能力) · [🔒 隐私承诺](#-隐私承诺) · [🏗️ 技术栈](#-技术栈) · [⚠️ 免责声明](#️-免责声明与使用建议) · [📖 完整文档](docs/capabilities.md)**
 
 </div>
 
@@ -36,26 +37,12 @@
 
 ---
 
-## 🎯 适用人群
+## 🚀 快速开始
 
-- **南京工业大学在校学生**：想用对话方式查课表、看成绩、订考试日历、记待办、沉淀知识点
-- **想体验本地化 AI Agent 的开发者**：Vercel AI SDK + DeepSeek + 自研教务协议的完整工程样例
-- **关注隐私的用户**：**全本地运行，数据不出设备**，凭证 AES-256-GCM 加密落盘，无任何遥测上报
+同一个 agent，两种入口：终端里敲 `raptor` 直接对话，或浏览器打开 `http://localhost:3210` 用网页版。思考过程、工具调用、每轮问答都会归档进会话历史。
 
----
-
-## 🔒 隐私承诺
-
-| 承诺 | 实现方式 |
-|------|----------|
-| 数据不出设备 | 所有教务查询、文件解析、文档生成、记忆存储均在本机完成 |
-| 凭证加密存储 | 教务密码、API Key、QQ 机器人密钥均经 AES-256-GCM 加密写入 `credentials.enc` |
-| 无遥测/上报 | 代码中无任何统计埋点、错误上报、使用情况收集逻辑 |
-| 可审计 | 完全开源，`src/` 下所有网络请求、文件读写、加密逻辑均可直接阅读 |
-
----
-
-## 💻 系统要求
+<details>
+<summary><b>💻 系统要求</b>（点开查看）</summary>
 
 | 项目 | 要求 |
 |------|------|
@@ -65,11 +52,7 @@
 | **磁盘** | ≥ 300 MB（含运行时、依赖、本地数据） |
 | **网络** | 首次配置需联网拉取 DeepSeek API、教务系统；之后可离线使用已缓存数据 |
 
----
-
-## 🚀 快速开始
-
-同一个 agent，两种入口：终端里敲 `raptor` 直接对话，或浏览器打开 `http://localhost:3210` 用网页版。思考过程、工具调用、每轮问答都会归档进会话历史。
+</details>
 
 ### 方式一：下载安装包（推荐给同学，无需任何开发环境）
 
@@ -108,6 +91,25 @@ raptor **每 24 小时检查一次新版本**。有新版时标题栏会出现 `
 即一键完成：下载新版 → 覆盖安装（你的凭证 / 记忆 / 会话 / QQ 授权名单不受影响）→ 自动装依赖，然后重启 raptor 即可。
 
 不想要提醒：`.env` 里加 `RAPTOR_NO_UPDATE_CHECK=1`。
+
+---
+
+## 🎯 适用人群
+
+- **南京工业大学在校学生**：想用对话方式查课表、看成绩、订考试日历、记待办、沉淀知识点
+- **想体验本地化 AI Agent 的开发者**：Vercel AI SDK + DeepSeek + 自研教务协议的完整工程样例
+- **关注隐私的用户**：**全本地运行，数据不出设备**，凭证 AES-256-GCM 加密落盘，无任何遥测上报
+
+---
+
+## 🔒 隐私承诺
+
+| 承诺 | 实现方式 |
+|------|----------|
+| 数据不出设备 | 所有教务查询、文件解析、文档生成、记忆存储均在本机完成 |
+| 凭证加密存储 | 教务密码、API Key、QQ 机器人密钥均经 AES-256-GCM 加密写入 `credentials.enc` |
+| 无遥测/上报 | 代码中无任何统计埋点、错误上报、使用情况收集逻辑 |
+| 可审计 | 完全开源，`src/` 下所有网络请求、文件读写、加密逻辑均可直接阅读 |
 
 ---
 
@@ -151,7 +153,7 @@ Agent 默认可调用 **31 个工具**，覆盖十大能力线。完整参数表
     ├── config.ts       # 配置加载
     ├── jwgl/           # 教务协议层
     ├── web/            # 网页版 (聊天/大厅/日程/知识库)
-    ├── tools/          # 30 个 Agent 工具
+    ├── tools/          # 31 个 Agent 工具
     └── ...             # 记忆/待办/知识库/番茄钟/QQ/天气等引擎
 ```
 
