@@ -939,6 +939,11 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
   assert.ok(!chat.includes("对应面板会自动从右边推出"), "大厅文案不应再承诺查询自动推出");
   assert.match(chat, /\{ id: "grades"/, "宫格应有成绩卡片");
   assert.match(chat, /\{ id: "news"/, "宫格应有通知卡片");
+  // 主页封面简报条：填上标题横线与首个分组之间的空档（日期周次 + 下节课 + 要紧事）
+  assert.match(chat, /function hallBriefStrip/, "主页封面应渲染今日简报条");
+  assert.match(chat, /dyn\.appendChild\(hallBriefStrip\(\)\)/, "简报条应打头挂在分组目录之前");
+  assert.match(chat, /className = "hb-next"/, "下节课一行应是可点开今日日程的按钮");
+  assert.match(chat, /\.hb-next:hover/, "下节课一行应有悬停的可进入态");
   assert.match(
     chat,
     /ev\.panel && !hallAutoMuted\) openHall/,

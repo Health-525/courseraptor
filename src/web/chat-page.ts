@@ -627,10 +627,13 @@ export function chatPage(options: { demo?: boolean } = {}): string {
      窄屏（≤960px）推不动，退回右侧滑入的浮层 + 遮罩。 ── */
   .hall-backdrop { display: none; position: fixed; inset: 0; z-index: 44;
                    background: rgba(38, 35, 29, .35); }
+  /* padding/gap/border-right 归零：#hall 也是 aside，左栏那条全局 aside
+     规则（27px 顶垫 + 28px 缝隙 + 右边框）会漏进来把顶部撑空 */
   .hall { grid-column: 3; min-width: 0; min-height: 0;
           display: flex; flex-direction: column; overflow: hidden;
+          padding: 0; gap: 0; border-right: 0;
           background: var(--paper); border-left: 1px solid var(--rule-2); }
-  .hall-head { display: flex; align-items: center; gap: 10px; padding: 12px 20px 8px; }
+  .hall-head { display: flex; align-items: center; gap: 10px; padding: 9px 20px 5px; }
   .hall-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
                 white-space: nowrap; font-family: var(--kai); font-size: 18px;
                 color: var(--accent); letter-spacing: 2px; }
@@ -699,6 +702,38 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-badge.warn { background: var(--accent); color: var(--card); font-weight: 600; }
   .hall-note { margin: 14px 2px 0; font-family: var(--mono); font-size: 12px;
                color: var(--ink-3); line-height: 1.7; }
+  /* 主页封面简报条：横线下到首个分组之间收紧成两行——下节课是封面
+     的一句话论点占主行（可点进今日日程），日期周次与逾期待办、临近
+     考试、放假调休并成一行说明垫底。日期用本地时钟先上（打开即有，
+     不闪空），其余等 /api/today 到位后补，失败就只剩日期行。
+     负 margin 把整条往横线上提：body 顶垫不吃（粘性工具条 top 值
+     与它耦合），只在简报条自身收这块间距 */
+  .hall-brief { margin: -4px 2px 0; }
+  .hb-date { font-family: var(--mono); font-size: 12px; letter-spacing: .04em;
+             color: var(--ink-3); line-height: 1.7; }
+  .hb-date .warn { color: var(--accent-deep); }
+  .hb-next { position: relative; display: flex; align-items: center; gap: 8px;
+             width: 100%; text-align: left; border: 0; background: none;
+             padding: 5px 6px 5px 15px; cursor: pointer;
+             font-family: inherit; transition: background .15s ease; }
+  .hb-next::before { content: ""; position: absolute; left: 0; top: 7px; bottom: 7px;
+                     width: 3px; background: var(--accent);
+                     opacity: 0; transition: opacity .15s ease; }
+  .hb-next:hover { background: var(--paper-deep); }
+  .hb-next:hover::before { opacity: 1; }
+  .hb-next:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  /* 眉标与徽标同一配方（浅朱砂底等宽小字），只是长在大厅封面上 */
+  .hb-eyebrow { flex: none; font-family: var(--mono); font-size: 11px;
+                letter-spacing: .04em; color: var(--accent-deep);
+                background: var(--accent-soft); padding: 1px 8px; border-radius: 2px;
+                white-space: nowrap; }
+  .hb-next b { flex: 1; min-width: 0; font-size: 14px; font-weight: 600;
+               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hb-meta { flex: none; max-width: 55%; font-family: var(--mono); font-size: 12px;
+             color: var(--ink-3); overflow: hidden; text-overflow: ellipsis;
+             white-space: nowrap; }
+  /* 简报条紧贴首个分组：封面收完就该进目录，不再留大口气 */
+  .hall-brief + .hall-sec { margin-top: 10px; }
   /* 主页页脚的仓库入口：与 .hall-note 同语言的等宽小字，描线 GitHub 标随文字同色；
      宫格的「可进入」记号是行首朱砂竖线，这里换成语义最直白的外链染朱砂。
      块级 flex（而非 inline-flex）：仓库链接与求星行各占一行，
