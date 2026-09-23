@@ -243,6 +243,36 @@ test("会话接口支持改名与置顶", async () => {
   assert.equal(list.sessions[0].id, "manage111", "置顶会话应排在最前");
 });
 
+test("会话归档：带标记返回、沉到列表尾部、可恢复", async () => {
+  const url = (await startChatWeb())!;
+  await post(url, { message: "要归档的会话", sessionId: "arch111" });
+  await post(url, { message: "留在主列表的会话", sessionId: "keep111" });
+  const patch = await wfetch(`${url}/api/sessions/arch111`, {
+    method: "PATCH",
+    body: JSON.stringify({ archived: true }),
+  });
+  assert.equal(patch.status, 200);
+  assert.equal((await patch.json()).session.archived, true, "PATCH 应回显归档状态");
+  const list = await (await fetch(`${url}/api/sessions`)).json();
+  const item = list.sessions.find((s: { id: string }) => s.id === "arch111");
+  assert.equal(item.archived, true, "列表应带 archived 标记");
+  assert.equal(list.sessions[list.sessions.length - 1].id, "arch111", "归档会话应沉到尾部");
+  const idx = (id: string) => list.sessions.findIndex((s: { id: string }) => s.id === id);
+  assert.ok(idx("keep111") < idx("arch111"), "未归档会话应排在归档会话之前");
+  // 恢复：标记清除
+  const restore = await wfetch(`${url}/api/sessions/arch111`, {
+    method: "PATCH",
+    body: JSON.stringify({ archived: false }),
+  });
+  assert.equal(restore.status, 200);
+  const list2 = await (await fetch(`${url}/api/sessions`)).json();
+  const item2 = list2.sessions.find((s: { id: string }) => s.id === "arch111");
+  assert.equal(item2.archived, false);
+  // 归档不吞消息：详情照常读出完整历史
+  const detail = await (await fetch(`${url}/api/sessions/arch111`)).json();
+  assert.equal(detail.messages[0].text, "要归档的会话");
+});
+
 test("模型自动命名：落盘后覆盖首问兜底，人工改过名不再覆盖", async () => {
   setChatAgent({
     stream() {

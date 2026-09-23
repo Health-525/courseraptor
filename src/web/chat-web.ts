@@ -1159,13 +1159,19 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       const updated = updateSession(raw, {
         ...(typeof body.title === "string" ? { title: body.title } : {}),
         ...(typeof body.pinned === "boolean" ? { pinned: body.pinned } : {}),
+        ...(typeof body.archived === "boolean" ? { archived: body.archived } : {}),
       });
       json(
         res,
         updated
           ? {
               ok: true,
-              session: { id: updated.id, title: updated.title, pinned: !!updated.pinned },
+              session: {
+                id: updated.id,
+                title: updated.title,
+                pinned: !!updated.pinned,
+                archived: !!updated.archived,
+              },
             }
           : { error: "会话不存在或标题无效" },
         updated ? 200 : 404,
