@@ -90,8 +90,10 @@ import {
 import { chatPage } from "./chat-page";
 import { knowledgePage } from "./knowledge-page";
 import { effectiveQuickQuestions, normalizeQuickQuestions } from "./quick-questions";
+import { schedulePage } from "./schedule-page";
 import { buildTodayBrief } from "./today-brief";
 import { todayPage } from "./today-page";
+import { todosPage } from "./todos-page";
 
 /** 前端 Markdown 渲染器（marked 的 UMD 构建，静态吐给浏览器） */
 const MARKED_UMD = path.resolve(
@@ -812,6 +814,8 @@ function applySettings(body: Record<string, unknown>): {
 let chatPageHtml: string | null = null;
 let todayPageHtml: string | null = null;
 let knowledgePageHtml: string | null = null;
+let schedulePageHtml: string | null = null;
+let todosPageHtml: string | null = null;
 
 async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   const url = req.url ?? "";
@@ -847,10 +851,24 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return;
     }
     if (url === "/today" || url === "/today/") {
-      // 独立日程页：下一节课/今日/本周/考试，纯本地缓存渲染
+      // 独立日程页：今日头条/今日速览/临近考试，纯本地缓存渲染
       todayPageHtml ??= todayPage();
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
       res.end(withCsrf(todayPageHtml));
+      return;
+    }
+    if (url === "/schedule" || url === "/schedule/") {
+      // 独立课表页：教学周导航 + 周课表网格，纯本地缓存渲染
+      schedulePageHtml ??= schedulePage();
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(withCsrf(schedulePageHtml));
+      return;
+    }
+    if (url === "/todos" || url === "/todos/") {
+      // 独立待办页：分组清单与勾选/删除，纯本地存储渲染
+      todosPageHtml ??= todosPage();
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end(withCsrf(todosPageHtml));
       return;
     }
     if (url === "/knowledge" || url === "/knowledge/") {

@@ -5,8 +5,10 @@ import type { KnowledgeEntry } from "../knowledge";
 import { chatPage } from "./chat-page";
 import { knowledgePage } from "./knowledge-page";
 import { DEFAULT_QUESTIONS } from "./quick-questions";
+import { schedulePage } from "./schedule-page";
 import type { BriefCourse, BriefDay, TodayBrief } from "./today-brief";
 import { todayPage } from "./today-page";
+import { todosPage } from "./todos-page";
 
 interface DemoMessage {
   role: "user" | "assistant";
@@ -442,12 +444,12 @@ export function demoReply(message: string): string {
   if (/待办/.test(message))
     return (
       prefix +
-      "### 待办功能示例\n\n正式模式直接说出你的安排即可，例如：**我这周要交高数作业，周五交实验报告**。我会先调时间工具把「明天/下周五」换算成具体日期，再把待办存到本地。\n\n待办会显示在课表页（/today）下方的「待办」卡片和对话页「设置 → 截止日期待办」里，可勾选完成或删除。演示模式的 /today 页展示的是虚构待办。"
+      "### 待办功能示例\n\n正式模式直接说出你的安排即可，例如：**我这周要交高数作业，周五交实验报告**。我会先调时间工具把「明天/下周五」换算成具体日期，再把待办存到本地。\n\n待办会显示在独立的待办页（/todos）和对话页「设置 → 截止日期待办」里，可勾选完成或删除。演示模式的 /todos 页展示的是虚构待办。"
     );
   if (/知识|记住|笔记/.test(message))
     return (
       prefix +
-      "### 知识库功能示例\n\n正式模式里可以把我当笔记本：**「记住：洛必达法则用来求 0/0 型极限」**。我会判断这是值得沉淀的知识并存入本地知识库；能对应上课表里的课程会自动归类（如归入「高等数学」），对不上课程的会按 subject 建自定义分类（如「编程技术」），完全无归属才留在「未分类」。\n\n知识在课表页（/today）下方的「知识」卡片和独立的 /knowledge 页都能看到，可按分类筛选、搜索、删除。演示模式展示的是虚构知识。"
+      "### 知识库功能示例\n\n正式模式里可以把我当笔记本：**「记住：洛必达法则用来求 0/0 型极限」**。我会判断这是值得沉淀的知识并存入本地知识库；能对应上课表里的课程会自动归类（如归入「高等数学」），对不上课程的会按 subject 建自定义分类（如「编程技术」），完全无归属才留在「未分类」。\n\n知识集中在独立的知识库页（/knowledge），可按分类筛选、搜索、删除。演示模式展示的是虚构知识。"
     );
   if (/今天.*(安排|怎么样)|今日日程|今天有什么/.test(message))
     return (
@@ -481,6 +483,14 @@ export function createDemoServer(): http.Server {
         // 独立日程页的演示版：数据内嵌虚构课表，不发任何请求
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(todayPage({ demo: true, demoData: demoTodayBrief() }));
+      } else if (req.method === "GET" && (url === "/schedule" || url === "/schedule/")) {
+        // 独立课表页的演示版：数据内嵌虚构课表，不发任何请求
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(schedulePage({ demo: true, demoData: demoTodayBrief() }));
+      } else if (req.method === "GET" && (url === "/todos" || url === "/todos/")) {
+        // 独立待办页的演示版：数据内嵌虚构待办，不发任何请求
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(todosPage({ demo: true, demoData: demoTodayBrief() }));
       } else if (req.method === "GET" && (url === "/knowledge" || url === "/knowledge/")) {
         // 独立知识库页的演示版：数据内嵌虚构知识，不发任何请求
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });

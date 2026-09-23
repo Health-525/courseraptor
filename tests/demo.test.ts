@@ -79,14 +79,58 @@ test("演示模式的今日日程页：内嵌虚构数据，不发请求", async
     assert.match(html, /const DEMO_DATA = \{/);
     assert.match(html, /示例高等数学/);
     assert.match(html, /if \(!DEMO_DATA\) \{/, "自动刷新与取数都必须被演示守卫挡住");
-    // 待办卡：虚构待办内嵌展示，交互被演示守卫挡住
+    // 课表/待办/知识已拆独立页：今日页只留头条与考试，左栏导航直达
+    assert.match(html, /href="\/schedule"/);
+    assert.match(html, /href="\/todos"/);
+    assert.match(html, /href="\/knowledge"/);
+    assert.ok(!html.includes('id="todoCard"'), "待办卡应拆到 /todos 页");
+    assert.ok(!html.includes('id="knowledgeCard"'), "知识卡应拆到 /knowledge 页");
+    assert.ok(!html.includes("week-timetable"), "周课表网格应拆到 /schedule 页");
+  } finally {
+    server.close();
+  }
+});
+
+test("演示模式的课表页：内嵌虚构周课表，不发请求", async () => {
+  const server = createDemoServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const base = `http://127.0.0.1:${address.port}`;
+  try {
+    const res = await fetch(`${base}/schedule`);
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /课表/);
+    assert.doesNotMatch(html, /demo-banner/, "演示横幅已移除，演示页与正式页同视觉");
+    // 演示数据内嵌（DEMO_DATA 非空），页面不依赖 /api/today
+    assert.match(html, /const DEMO_DATA = \{/);
+    assert.match(html, /示例高等数学/);
+    assert.match(html, /week-timetable/, "应使用节次 × 星期的周课表网格");
+    assert.match(html, /if \(!DEMO_DATA\) \{/, "自动刷新与取数都必须被演示守卫挡住");
+  } finally {
+    server.close();
+  }
+});
+
+test("演示模式的待办页：内嵌虚构待办，交互被守卫挡住", async () => {
+  const server = createDemoServer();
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  assert.ok(address && typeof address === "object");
+  const base = `http://127.0.0.1:${address.port}`;
+  try {
+    const res = await fetch(`${base}/todos`);
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /待办/);
+    assert.doesNotMatch(html, /demo-banner/, "演示横幅已移除，演示页与正式页同视觉");
+    // 演示数据内嵌（DEMO_DATA 非空），页面不依赖 /api/today
+    assert.match(html, /const DEMO_DATA = \{/);
     assert.match(html, /id="todoCard"/);
     assert.match(html, /交示例实验报告/);
     assert.match(html, /chk\.disabled = true/, "演示模式不勾选完成");
-    // 知识卡：虚构知识内嵌展示，「查看全部」链去 /knowledge 演示页
-    assert.match(html, /id="knowledgeCard"/);
-    assert.match(html, /洛必达法则/);
-    assert.match(html, /more\.href = "\/knowledge"/);
+    assert.match(html, /if \(!DEMO_DATA\) \{/, "自动刷新与取数都必须被演示守卫挡住");
   } finally {
     server.close();
   }
