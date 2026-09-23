@@ -707,8 +707,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-badge.warn { background: var(--accent); color: var(--card); font-weight: 600; }
   .hall-note { margin: 14px 2px 0; font-family: var(--mono); font-size: 12px;
                color: var(--ink-3); line-height: 1.7; }
-  /* 面板工具条：条数在左，刷新与完整页在右；粘在面板顶部方便长列表回看 */
-  .hall-toolbar { position: sticky; top: -16px; display: flex; align-items: center;
+  /* 面板工具条：条数在左，刷新与完整页在右；粘在面板顶部方便长列表回看。
+     z-index 必须显式给：行内动作按钮（原文/删除/.ics）带 opacity .45 各自成合成组，
+     光靠 sticky 的默认绘制顺序压不住，滚动时会从工具条上穿模 */
+  .hall-toolbar { position: sticky; top: -16px; z-index: 1; display: flex; align-items: center;
                   gap: 8px; margin: 0 -2px 10px; padding: 4px 2px 8px;
                   background: var(--paper); }
   .hall-count { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
