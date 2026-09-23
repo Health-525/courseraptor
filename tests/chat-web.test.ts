@@ -899,11 +899,16 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
   const html = await res.text();
   assert.match(html, /今日日程/, "页面标题应为今日日程");
   assert.match(html, /api\/today/, "页面应从 /api/today 取数据");
-  assert.match(html, /week-timetable/, "本周概览应使用节次 × 星期的周课表网格");
+  assert.match(html, /id="leadCard"/, "今日头条卡片应保留");
+  assert.match(html, /id="examCard"/, "临近考试卡片应保留");
+  assert.ok(!html.includes("week-timetable"), "周课表网格应拆到 /schedule 页");
+  assert.ok(!html.includes("todoCard"), "待办清单应拆到 /todos 页");
+  assert.ok(!html.includes("knowledgeCard"), "知识速览应拆到 /knowledge 页");
+  assert.match(html, /href="\/schedule"/, "左栏应直达课表独立页");
+  assert.match(html, /href="\/todos"/, "左栏应直达待办独立页");
+  assert.match(html, /href="\/knowledge"/, "左栏应直达知识库独立页");
   assert.match(html, /返回对话/, "应有返回对话页的链接");
   assert.match(html, /const DEMO_DATA = null;/, "正式页不内嵌数据，运行时从 /api/today 取");
-  assert.match(html, /id="knowledgeCard"/, "课表页应有知识卡片");
-  assert.match(html, /more\.href = "\/knowledge"/, "知识卡片应链到 /knowledge 页");
   // todayPage 同样是外层模板串：对求值产物做语法检查（源码切片会漏判）
   const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
   assert.ok(blocks.length >= 1, "页面应有内联脚本");
@@ -944,6 +949,65 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
     "首屏不应再展示今日日程 chip",
   );
   assert.match(chat, /默认进入新的空会话/, "每次打开网页应默认新建空会话");
+});
+
+test("GET /schedule 返回独立课表页：语法自检 + 教学周导航", async () => {
+  const url = (await startChatWeb())!;
+  const res = await fetch(`${url}/schedule`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get("content-type") ?? "", /text\/html/);
+  const html = await res.text();
+  assert.match(html, /课表/, "页面标题应为课表");
+  assert.match(html, /api\/today/, "页面应从 /api/today 取数据");
+  assert.match(html, /week-timetable/, "应使用节次 × 星期的周课表网格");
+  assert.match(html, /id="weekJumpSel"/, "应有教学周直达选择器");
+  assert.match(html, /返回对话/, "应有返回对话页的链接");
+  assert.match(html, /const DEMO_DATA = null;/, "正式页不内嵌数据，运行时从 /api/today 取");
+  // schedulePage 同样是外层模板串：对求值产物做语法检查（源码切片会漏判）
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  assert.ok(blocks.length >= 1, "页面应有内联脚本");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-schedule-page-"));
+  blocks.forEach((code, i) => {
+    const f = path.join(dir, `chunk-${i}.js`);
+    fs.writeFileSync(f, code, "utf8");
+    execFileSync(process.execPath, ["--check", f], { stdio: "pipe" });
+  });
+});
+
+test("GET /todos 返回独立待办页：语法自检 + 勾选删除走 /api/reminders", async () => {
+  const url = (await startChatWeb())!;
+  const res = await fetch(`${url}/todos`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get("content-type") ?? "", /text\/html/);
+  const html = await res.text();
+  assert.match(html, /待办/, "页面标题应为待办");
+  assert.match(html, /api\/today/, "页面应从 /api/today 取待办数据");
+  assert.match(html, /api\/reminders\//, "勾选/删除应走 /api/reminders 接口");
+  assert.match(html, /\.ics/, "每条待办应可导出 .ics");
+  assert.match(html, /返回对话/, "应有返回对话页的链接");
+  assert.match(html, /const DEMO_DATA = null;/, "正式页不内嵌数据，运行时从 /api/today 取");
+  // todosPage 同样是外层模板串：对求值产物做语法检查（源码切片会漏判）
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  assert.ok(blocks.length >= 1, "页面应有内联脚本");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-todos-page-"));
+  blocks.forEach((code, i) => {
+    const f = path.join(dir, `chunk-${i}.js`);
+    fs.writeFileSync(f, code, "utf8");
+    execFileSync(process.execPath, ["--check", f], { stdio: "pipe" });
+  });
+  // 大厅面板的「完整页」应指向各自独立页，不再挤在 /today
+  const chat = await (await fetch(url)).text();
+  assert.match(
+    chat,
+    /panel === "schedule"\) return "\/schedule"/,
+    "课表面板完整页应指向 /schedule",
+  );
+  assert.match(chat, /panel === "todos"\) return "\/todos"/, "待办面板完整页应指向 /todos");
+  assert.match(
+    chat,
+    /panel === "knowledge"\) return "\/knowledge"/,
+    "知识库面板完整页应指向 /knowledge",
+  );
 });
 
 test("GET /api/grades 纯缓存读取（无缓存时 savedAt=null，绝不登录教务）", async () => {

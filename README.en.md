@@ -89,7 +89,7 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
     │   ├── grades.ts     # Grades + GPA + gen-ed categories
     │   ├── news.ts       # Announcements & attachments
     │   └── xk.ts         # Course selection protocol
-    ├── web/              # Web UI: chat, hall, /today, /knowledge
+    ├── web/              # Web UI: chat, hall, /today, /schedule, /todos, /knowledge
     ├── tools/            # 30 agent tools (schemas + implementations)
     ├── memory/           # Dual-layer memory (session + long-term facts)
     ├── qq/               # QQ Official Bot bridge

@@ -881,7 +881,7 @@ const HALL_ICONS = {
   settings: GEAR,
 };
 const HALL_CARDS = [
-  { id: "today", t: "今日日程", d: "下一节课、今日安排与本周概览", group: "学习安排" },
+  { id: "today", t: "今日日程", d: "下一节课与今日课程安排", group: "学习安排" },
   { id: "schedule", t: "课表", d: "本周每天的课与调休安排", group: "学习安排" },
   { id: "exams", t: "考试", d: "临近考试的时间、地点与座位", group: "学习安排" },
   { id: "grades", t: "成绩", d: "GPA、学分与最近学期成绩速览", group: "学习安排" },
@@ -1039,8 +1039,11 @@ function hallSkel() {
   return sk;
 }
 function hallFullPage(panel) {
+  /* 课表/待办/知识各有独立完整页；今日日程/考试合用 /today；
+     番茄钟/成绩/通知没有独立完整页：工具条不挂「完整页」链接 */
+  if (panel === "schedule") return "/schedule";
+  if (panel === "todos") return "/todos";
   if (panel === "knowledge") return "/knowledge";
-  /* 番茄钟/成绩/通知没有独立完整页：工具条不挂「完整页」链接 */
   if (panel === "pomodoro" || panel === "grades" || panel === "news") return "";
   return "/today";
 }
@@ -1265,7 +1268,7 @@ function buildTodoList(data) {
       HALL_DEMO ? "" : "去记第一条",
       HALL_DEMO ? null : () => hallFocusChat("提醒我：")));
   }
-  /* 分组：逾期 / 今天 / 明天 / 以后（与 /today 页同口径，逾期自然置顶） */
+  /* 分组：逾期 / 今天 / 明天 / 以后（与 /todos 页同口径，逾期自然置顶） */
   const groups = [
     { name: "逾期", overdue: true, items: [] },
     { name: "今天", overdue: false, items: [] },
