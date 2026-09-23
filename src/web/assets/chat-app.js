@@ -881,6 +881,10 @@ const HALL_ICONS = {
 const GH_MARK = '<svg viewBox="0 0 24 24" aria-hidden="true">'
   + '<path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/>'
   + '</svg>';
+/* 五角星描线：同一族图标；求 Star 一行里常亮朱砂 */
+const STAR_MARK = '<svg viewBox="0 0 24 24" aria-hidden="true">'
+  + '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>'
+  + '</svg>';
 const HALL_CARDS = [
   { id: "today", t: "今日日程", d: "下一节课与今日课程安排", group: "学习安排" },
   { id: "schedule", t: "课表", d: "本周每天的课与调休安排", group: "学习安排" },
@@ -1797,6 +1801,14 @@ function renderHall(force) {
     gh.setAttribute("aria-label", "GitHub 仓库页面（新窗口打开）");
     gh.innerHTML = GH_MARK + "<span>GitHub 仓库</span>";
     dyn.appendChild(gh);
+    /* 仓库链接下面再嗷一嗓子：迅猛龙拟声词求 Star，点进仓库页即可点亮 */
+    const star = document.createElement("a");
+    star.className = "hall-gh gh-star";
+    star.href = "https://github.com/Health-525/courseraptor";
+    star.target = "_blank"; star.rel = "noopener noreferrer";
+    star.setAttribute("aria-label", "去 GitHub 点亮 Star（新窗口打开）");
+    star.innerHTML = "<span>嗷呜！顺手点个</span>" + STAR_MARK + "<span>Star 喂饱小恐龙</span>";
+    dyn.appendChild(star);
     settle();
     hallBadges(dyn);
     return;
