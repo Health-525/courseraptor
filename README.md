@@ -28,11 +28,11 @@
 
 **终端卡片 TUI** —— 敲 `raptor` 直接开聊,启动首屏即见今日课表、一周待办、临近考试与最新通知:
 
-![终端 TUI 首屏](docs/screenshots/tui.png)
+<p align="center"><img src="docs/screenshots/tui.png" width="800" alt="终端 TUI 首屏:今日课表、待办、考试与通知速览(虚构示例数据)"></p>
 
 **网页对话** —— 浏览器打开 `http://localhost:3210` 即聊,思考过程与工具调用全程可见:
 
-![网页对话](docs/screenshots/gui.png)
+<p align="center"><img src="docs/screenshots/gui.png" width="800" alt="网页对话:思考卡片、工具调用与课表回复(虚构示例数据)"></p>
 
 ---
 

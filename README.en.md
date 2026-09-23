@@ -38,11 +38,11 @@ Both screenshots use fictional demo data.
 
 **Terminal TUI** — type `raptor` to chat; the first screen shows today's classes, todos, upcoming exams, and latest notices:
 
-![Terminal TUI welcome panel](docs/screenshots/tui.png)
+<p align="center"><img src="docs/screenshots/tui.png" width="800" alt="Terminal TUI welcome panel: classes, todos, exams and notices (fictional demo data)"></p>
 
 **Web chat** — open `http://localhost:3210` in a browser; reasoning and tool calls are visible in the conversation:
 
-![Web chat](docs/screenshots/gui.png)
+<p align="center"><img src="docs/screenshots/gui.png" width="800" alt="Web chat: reasoning card, tool calls and timetable reply (fictional demo data)"></p>
 
 ## Try it without credentials
 
