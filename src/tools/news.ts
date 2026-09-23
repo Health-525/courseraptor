@@ -111,6 +111,8 @@ export const newsTools = {
           relevance: level,
           relevanceReason: reason,
           url: i.url,
+          /** true=官网设置了访问权限：原文页与 read_notice 匿名都打不开，向用户如实说明，别当成工具故障 */
+          restricted: i.restricted || undefined,
         };
       });
       const mustSee = scored.filter((i) => i.relevance === "high").length;

@@ -102,7 +102,14 @@ function parseNewsList(html: string, baseUrl: string): NewsItem[] {
       fullUrl = baseUrl.replace(/\/[^/]*$/, "") + aMatch[1].replace(/^\.\./, "");
     }
 
-    items.push({ title, url: fullUrl, date });
+    items.push({
+      title,
+      url: fullUrl,
+      date,
+      // 未静态化、设置了浏览权限的文章只有 article.jsp 动态入口，匿名打开
+      // 一律 302 到 auth.htm「您无权访问此页面」；静态 info/*.htm 则全站可看
+      restricted: /article\.jsp\?.*urltype=news\.NewsContentUrl/i.test(fullUrl) || undefined,
+    });
   }
 
   // Deduplicate by URL
@@ -166,6 +173,11 @@ export interface JwcArticle {
  */
 export async function fetchJwcArticle(url: string): Promise<JwcArticle> {
   const html = await fetchHtml(url);
+  // 权限文章匿名访问 302 到 auth.htm 后返回的仍是 HTTP 200 的鉴权提示页，
+  // 不拦住的话这段「您无权访问此页面」会被当成正文往上转
+  if (/您无权访问此页面/.test(html)) {
+    throw new Error("该通知在官网设置了访问权限，匿名状态下读不到正文");
+  }
   const title =
     html
       .match(/<title>([^<]*)<\/title>/i)?.[1]

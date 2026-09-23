@@ -136,6 +136,8 @@ interface ScoredNewsItem {
   relevance: "high" | "medium" | "low";
   relevanceReason: string | undefined;
   url: string;
+  /** 官网设置了访问权限的文章：原文页匿名打开是「您无权访问此页面」 */
+  restricted: boolean | undefined;
 }
 
 interface ScoredNewsSnapshot {
@@ -171,6 +173,7 @@ async function scoredNewsSnapshot(): Promise<ScoredNewsSnapshot> {
         relevance: level,
         relevanceReason: reason,
         url: i.url,
+        restricted: i.restricted ?? undefined,
       };
     });
     // 只有一页都没有才视为「本轮无数据」不缓存；部分成功的结果照常缓存

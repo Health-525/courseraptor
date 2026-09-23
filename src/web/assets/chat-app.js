@@ -564,19 +564,22 @@ const ARCHIVE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true">'
   + '<path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/>'
   + '<path d="M10 12h4"/></svg>';
 
-/* 会话归档分组：置顶独立成组在最前，其余按最后活跃时间归位。
-   服务端已按置顶 + 最近活跃排好序，这里顺序遍历、组名变化处插题注 */
+/* 会话归档分组：置顶独立成组在最前，其余按最后活跃时间归位（近 7 天不再
+   细分今天/昨天，免得组越切越碎）。服务端已按置顶 + 最近活跃排好序，
+   这里顺序遍历、组名变化处插题注 */
 function sessionGroup(s) {
   if (s.pinned) return "置顶";
   const n = new Date();
   const todayStart = new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
-  if (s.updatedAt >= todayStart) return "今天";
-  if (s.updatedAt >= todayStart - 86400000) return "昨天";
   if (s.updatedAt >= todayStart - 7 * 86400000) return "7 天内";
   return "更早";
 }
 
 function renderSessList() {
+  /* 菜单挂在 body 上，sessList.innerHTML 清不到它：每次重绘先摘掉旧菜单，
+     本轮仍要显示的话循环里会重建并重新定位 */
+  const staleMenu = document.querySelector("body > .smenu");
+  if (staleMenu) staleMenu.remove();
   sessList.innerHTML = "";
   document.getElementById("sessCount").textContent =
     lastSessions.length ? lastSessions.length + " 个" : "";
@@ -630,7 +633,8 @@ function renderSessList() {
     const li = document.createElement("li");
     li.dataset.id = s.id;
     if (s.id === activeId) li.className = "on";
-    li.title = s.title || "新会话";
+    /* 名称与时间同一行：时间不常显，悬停原生 tooltip 里第二行给出 */
+    li.title = (s.title || "新会话") + "\n" + fmtWhen(s.updatedAt);
     if (editingSessionId === s.id) {
       const edit = document.createElement("input");
       edit.className = "sedit"; edit.value = s.title || "新会话"; edit.maxLength = 60;
@@ -662,9 +666,9 @@ function renderSessList() {
     x.setAttribute("aria-expanded", sessionActionsId === s.id ? "true" : "false");
     x.textContent = "⋯";
     li.appendChild(x);
-    li.appendChild(el2("sm", fmtWhen(s.updatedAt) + " · " + s.count + " 条"));
+    let menu = null;
     if (sessionActionsId === s.id && editingSessionId !== s.id) {
-      const menu = el("smenu");
+      menu = el("smenu");
       menu.setAttribute("role", "menu");
       const action = (label, key, danger) => {
         const button = document.createElement("button");
@@ -684,9 +688,22 @@ function renderSessList() {
         delBtn.textContent = "确认删除";
         delBtn.classList.add("armed");
       }
-      li.appendChild(menu);
     }
     sessList.appendChild(li);
+    if (menu) {
+      /* 菜单挂 body 走 fixed：侧栏列表是滚动容器，藏在 li 里会被裁剪；
+         贴着 ⋯ 按钮右侧弹出。须等 li 入文档后才有真实 rect */
+      document.body.appendChild(menu);
+      const r = x.getBoundingClientRect();
+      let left = r.right + 6;
+      if (left + menu.offsetWidth > window.innerWidth - 8)
+        left = window.innerWidth - menu.offsetWidth - 8;
+      let top = r.top;
+      if (top + menu.offsetHeight > window.innerHeight - 8)
+        top = Math.max(8, window.innerHeight - menu.offsetHeight - 8);
+      menu.style.left = left + "px";
+      menu.style.top = top + "px";
+    }
   });
 }
 
@@ -755,7 +772,9 @@ function startFresh() {
   input.focus();
 }
 
-sessList.addEventListener("click", (e) => {
+/* 会话菜单挂 body 走 fixed，菜单按钮点不到 sessList 的委托：委托挂 document，
+   li 分支限定 .sess 内的条目，免得大厅里的节点被误认成会话 */
+document.addEventListener("click", (e) => {
   const del = e.target.closest("button[data-del]");
   if (del) {
     const id = del.dataset.del;
@@ -786,15 +805,21 @@ sessList.addEventListener("click", (e) => {
   if (rename) { editingSessionId = rename.dataset.rename; sessionActionsId = ""; renderSessList(); return; }
   const actions = e.target.closest("button[data-actions]");
   if (actions) {
-    e.stopPropagation();
     sessionActionsId = sessionActionsId === actions.dataset.actions ? "" : actions.dataset.actions;
     renderSessList(); return;
   }
-  const li = e.target.closest("li[data-id]");
+  const li = e.target.closest(".sess li[data-id]");
   if (li && !busy) { sessionActionsId = ""; openSession(li.dataset.id); }
 });
 
-/* 浮层菜单点外面任意处收起（⋯ 按钮自身已在上面 stopPropagation） */
+/* 菜单 fixed 挂 body，不跟列表滚动/窗口缩放走：与其让它悬在半空错位，直接收起 */
+function dismissSessionMenu() {
+  if (sessionActionsId) { sessionActionsId = ""; renderSessList(); }
+}
+sessList.addEventListener("scroll", dismissSessionMenu, { passive: true });
+window.addEventListener("resize", dismissSessionMenu);
+
+/* 浮层菜单点外面任意处收起（菜单自身与 ⋯ 按钮在上面各自处理） */
 document.addEventListener("click", (e) => {
   if (!sessionActionsId) return;
   if (e.target.closest(".smenu") || e.target.closest("button[data-actions]")) return;
@@ -1105,157 +1130,6 @@ function buildExams(b) {
   });
   return wrap;
 }
-/* 待办表单字段组：标题 + 截止时间 + 快捷时间 + 备注（可选）+ 错误行。
-   添加与编辑同一套字段与校验语言；快捷 chip 一键填常用截止点 */
-function todoFields() {
-  const title = document.createElement("input");
-  title.type = "text"; title.placeholder = "要做什么事（必填）"; title.maxLength = 100;
-  title.setAttribute("aria-label", "待办标题");
-  const due = document.createElement("input");
-  due.type = "datetime-local"; due.title = "截止时间（必填）";
-  due.setAttribute("aria-label", "截止时间");
-  const notes = document.createElement("input");
-  notes.type = "text"; notes.placeholder = "备注（可选）"; notes.maxLength = 500;
-  notes.setAttribute("aria-label", "待办备注");
-  const quick = el("hall-quick");
-  const toLocal = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate())
-    + "T" + pad(d.getHours()) + ":" + pad(d.getMinutes());
-  /* ISO 截止 -> datetime-local 预填值（编辑行用） */
-  const toLocalValue = (iso) => toLocal(new Date(iso));
-  /* 快捷时间：今晚 22:00 / 明早 9:00 / 三天后 18:00，直接填进 datetime-local */
-  const quicks = [
-    ["今晚 22:00", () => { const d = new Date(); d.setHours(22, 0, 0, 0); if (d.getTime() < Date.now()) d.setDate(d.getDate() + 1); return d; }],
-    ["明早 9:00", () => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); return d; }],
-    ["三天后 18:00", () => { const d = new Date(); d.setDate(d.getDate() + 3); d.setHours(18, 0, 0, 0); return d; }],
-  ];
-  quicks.forEach(([label, make]) => {
-    const q = document.createElement("button");
-    q.type = "button"; q.textContent = label;
-    q.addEventListener("click", () => { due.value = toLocal(make()); due.focus(); });
-    quick.appendChild(q);
-  });
-  const err = el2("hall-err", "");
-  err.setAttribute("role", "alert");
-  const setErr = (msg) => {
-    err.textContent = msg || "";
-    err.classList.toggle("show", !!msg);
-  };
-  return { title, due, notes, quick, err, setErr, toLocalValue };
-}
-/* 待办表单校验：标题必填、截止时间有效；不过就 inline 提示并聚焦，返回 null */
-function todoReadForm(f) {
-  const text = f.title.value.trim();
-  const dueAt = new Date(f.due.value);
-  if (!text) { f.setErr("请先填写要做什么事。"); f.title.focus(); return null; }
-  if (!f.due.value || Number.isNaN(dueAt.getTime())) {
-    f.setErr("请选择有效的截止时间，或点上面的快捷时间。"); f.due.focus(); return null;
-  }
-  return { title: text, dueAt: dueAt.toISOString(), notes: f.notes.value.trim() || "" };
-}
-/* 待办添加行：折叠的内联小表单（标题 + 截止时间 + 快捷时间 + 备注），POST /api/reminders 后就地刷新。
-   校验失败 inline 提示不吞错；回车保存、Esc 收起；快捷 chip 一键填常用截止点 */
-function todoAddRow() {
-  const row = el("todo-add");
-  const btn = document.createElement("button");
-  btn.type = "button"; btn.className = "tbtn"; btn.textContent = "+ 添加待办";
-  btn.setAttribute("aria-expanded", "false");
-  const form = el("todo-form");
-  form.hidden = true;
-  const f = todoFields();
-  const save = document.createElement("button");
-  save.type = "button"; save.className = "tbtn primary"; save.textContent = "保存";
-  const cancel = document.createElement("button");
-  cancel.type = "button"; cancel.className = "tbtn"; cancel.textContent = "取消";
-  form.append(f.title, f.due, f.quick, f.notes, f.err, save, cancel);
-  const close = () => { form.hidden = true; f.setErr(""); btn.setAttribute("aria-expanded", "false"); btn.focus(); };
-  btn.addEventListener("click", () => {
-    form.hidden = !form.hidden;
-    btn.setAttribute("aria-expanded", form.hidden ? "false" : "true");
-    if (!form.hidden) { f.setErr(""); f.title.focus(); }
-  });
-  cancel.addEventListener("click", close);
-  f.title.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); save.click(); }
-    if (e.key === "Escape") { e.stopPropagation(); close(); }
-  });
-  f.due.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); save.click(); }
-    if (e.key === "Escape") { e.stopPropagation(); close(); }
-  });
-  f.title.addEventListener("input", () => { if (f.err.textContent) f.setErr(""); });
-  f.due.addEventListener("input", () => { if (f.err.textContent) f.setErr(""); });
-  const doSave = () => {
-    const body = todoReadForm(f);
-    if (!body) return;
-    f.setErr("");
-    save.disabled = true;
-    save.textContent = "保存中…";
-    fetch("/api/reminders", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    }).then((r) => {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      renderHall(true);
-    }).catch(() => {
-      save.disabled = false;
-      save.textContent = "保存";
-      f.setErr("保存失败，检查本地服务后重试。");
-    });
-  };
-  save.addEventListener("click", doSave);
-  row.appendChild(btn);
-  row.appendChild(form);
-  row.openForm = () => {
-    if (form.hidden) btn.click();
-    else f.title.focus();
-  };
-  return row;
-}
-/* 待办编辑行：与添加行同一字段语言，预填现值，PATCH 成功后整面板重排（分组可能变化）。
-   保存中禁用防重复提交；Esc/取消还原条目，不丢焦点外的面板状态 */
-function todoEditRow(t, item) {
-  const form = el("todo-form");
-  const f = todoFields();
-  f.title.value = t.title;
-  f.due.value = f.toLocalValue(t.dueAt);
-  if (t.notes) f.notes.value = t.notes;
-  const save = document.createElement("button");
-  save.type = "button"; save.className = "tbtn primary"; save.textContent = "保存修改";
-  const cancel = document.createElement("button");
-  cancel.type = "button"; cancel.className = "tbtn"; cancel.textContent = "取消";
-  form.append(f.title, f.due, f.quick, f.notes, f.err, save, cancel);
-  const close = () => { form.remove(); item.hidden = false; f.setErr(""); };
-  cancel.addEventListener("click", close);
-  [f.title, f.due].forEach((input) => {
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { e.preventDefault(); save.click(); }
-      if (e.key === "Escape") { e.stopPropagation(); close(); }
-    });
-    input.addEventListener("input", () => { if (f.err.textContent) f.setErr(""); });
-  });
-  save.addEventListener("click", () => {
-    const body = todoReadForm(f);
-    if (!body) return;
-    f.setErr("");
-    save.disabled = true;
-    save.textContent = "保存中…";
-    fetch("/api/reminders/" + encodeURIComponent(t.id), {
-      method: "PATCH", headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    }).then((r) => {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      renderHall(true);
-    }).catch(() => {
-      save.disabled = false;
-      save.textContent = "保存修改";
-      f.setErr("保存失败，检查本地服务后重试。");
-    });
-  });
-  item.hidden = true;
-  item.after(form);
-  f.title.focus();
-  return form;
-}
 /* 分组题注计数同步：条目被就地移除/恢复后改写「组名 · N」，组空时连同题注一起收掉 */
 function hallRetitleGroup(group) {
   if (!group || !group.classList.contains("hall-todo-group")) return;
@@ -1320,16 +1194,6 @@ function todoHallItem(t) {
   main.appendChild(hm);
   item.appendChild(main);
   if (!HALL_DEMO && t.id) {
-    /* 原地编辑：条目暂时让位给编辑行，取消即还原（与侧栏会话「改名」同一语言） */
-    const edit = document.createElement("button");
-    edit.type = "button"; edit.className = "hall-edit"; edit.textContent = "编辑";
-    edit.title = "修改标题、截止时间或备注";
-    edit.setAttribute("aria-label", "编辑待办：" + t.title);
-    edit.addEventListener("click", () => {
-      if (item.hidden) return;
-      todoEditRow(t, item);
-    });
-    item.appendChild(edit);
     const ics = document.createElement("a");
     ics.className = "hall-ics";
     ics.href = "/api/reminders/" + encodeURIComponent(t.id) + ".ics";
@@ -1396,12 +1260,10 @@ function buildTodoList(data) {
   data = data || {};
   const list = data.items || [];
   const doneList = data.done || [];
-  const addRow = HALL_DEMO ? null : todoAddRow();
-  if (addRow) wrap.appendChild(addRow);
   if (!list.length) {
-    wrap.appendChild(hallEmpty("✅", "暂无待办", "在对话框里说「提醒我……」就能记录，也可点下面直接加一条。",
-      addRow ? "+ 添加第一条待办" : "",
-      addRow ? () => addRow.openForm() : null));
+    wrap.appendChild(hallEmpty("✅", "暂无待办", "在对话框里说「提醒我……」，我会帮你记录并排进分组。",
+      HALL_DEMO ? "" : "去记第一条",
+      HALL_DEMO ? null : () => hallFocusChat("提醒我：")));
   }
   /* 分组：逾期 / 今天 / 明天 / 以后（与 /today 页同口径，逾期自然置顶） */
   const groups = [
@@ -1679,7 +1541,7 @@ function buildNews() {
     /* 稳定排序把 high 挪到最前（组内保持日期新旧序），兑现提示里的「置顶」 */
     items.slice().sort((a, b) => (b.relevance === "high" ? 1 : 0) - (a.relevance === "high" ? 1 : 0)).forEach((n) => {
       wrap.appendChild(hallItemAct(n.title,
-        [n.category, n.date, n.relevance === "high" ? "需本人行动" : n.relevance === "medium" ? "视个人情况" : ""].filter(Boolean).join(" · "),
+        [n.category, n.date, n.relevance === "high" ? "需本人行动" : n.relevance === "medium" ? "视个人情况" : "", n.restricted ? "原文限校内权限访问" : ""].filter(Boolean).join(" · "),
         () => { window.open(n.url, "_blank", "noopener"); }, "原文"));
       const item = wrap.lastChild;
       if (n.relevance === "high") item.classList.add("hot");
