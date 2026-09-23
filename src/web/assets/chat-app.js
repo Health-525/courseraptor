@@ -1734,19 +1734,18 @@ function hallBadges(dyn) {
     else card.appendChild(badge);
   }).catch(() => {});
 }
-/* 主页封面简报条：填上标题横线与首个分组之间的空档。日期行本地时钟先上
-   （打开即有，不闪空），下节课与要紧事等 brief 到位后再补，失败就只剩日期行。
-   「下节」一行可点进今日日程：朱砂竖线 + 悬停浮底，与目录卡同一「可进入」语言 */
+/* 主页封面简报条：收紧横线到首个分组之间的地带，只占两行——
+   下节课一行（可点进今日日程：朱砂竖线 + 悬停浮底，与目录卡同一
+   「可进入」语言），日期周次与要紧事并成一行说明垫底。日期行本地
+   时钟先上（打开即有，不闪空），其余等 brief 到位后再补，失败就只剩日期 */
 function hallBriefStrip() {
   const box = el("hall-brief");
   const now = new Date();
   const wd = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][now.getDay()];
-  const date = el2("hb-date", (now.getMonth() + 1) + "月" + now.getDate() + "日 " + wd);
-  box.appendChild(date);
+  const cap = el2("hb-date", (now.getMonth() + 1) + "月" + now.getDate() + "日 " + wd);
+  box.appendChild(cap);
   briefOf().then((b) => {
     if (hallPanel !== "" || !box.isConnected) return;
-    const head = [b.dateLabel, b.term && b.term.weekLabel].filter(Boolean);
-    if (head.length) date.textContent = head.join(" · ");
     const sched = b.schedule || {};
     const row = document.createElement("button");
     row.type = "button"; row.className = "hb-next";
@@ -1772,31 +1771,30 @@ function hallBriefStrip() {
       row.appendChild(el2("hb-meta", "对话框里说「课表」"));
       row.addEventListener("click", () => openHall("schedule"));
     }
-    box.appendChild(row);
-    /* 要紧事一行：逾期置顶（朱砂），今天/明天有考试同档要紧，其余平铺；
-       没有任何要紧事就不占行——空白也是信息 */
-    const sig = [];
+    box.insertBefore(row, cap);
+    /* 说明行：日期周次打头，逾期朱砂置顶、今天/明天有考试同档要紧，
+       放假调休说明随后；全都接在同行，装不下自然折行 */
+    const parts = [b.dateLabel, b.term && b.term.weekLabel].filter(Boolean)
+      .map((text) => ({ text }));
     const todos = (b.todos && b.todos.items) || [];
     const overdueN = todos.filter((t) => t.overdue).length;
-    if (overdueN) sig.push({ text: "⚠ " + overdueN + " 条逾期待办", warn: true });
-    if (sched.available && sched.note) sig.push({ text: sched.note });
+    if (overdueN) parts.push({ text: "⚠ " + overdueN + " 条逾期待办", warn: true });
+    if (sched.available && sched.note) parts.push({ text: sched.note });
     const ex = (b.exams && b.exams.upcoming) || [];
     if (ex.length) {
-      const soon = ex[0].isToday || ex[0].inDays === 1;
-      sig.push({
+      parts.push({
         text: ex[0].isToday ? "今天有考试" : ex[0].inDays === 1 ? "明天有考试" : ex[0].inDays + " 天后有考试",
-        warn: soon,
+        warn: ex[0].isToday || ex[0].inDays === 1,
       });
     }
-    if (sig.length) {
-      const line = el("hb-signals");
-      sig.forEach((s, i) => {
-        if (i) line.appendChild(document.createTextNode(" · "));
-        if (s.warn) { const sp = document.createElement("span"); sp.className = "warn"; sp.textContent = s.text; line.appendChild(sp); }
-        else line.appendChild(document.createTextNode(s.text));
-      });
-      box.appendChild(line);
-    }
+    cap.textContent = "";
+    parts.forEach((p, i) => {
+      if (i) cap.appendChild(document.createTextNode(" · "));
+      if (p.warn) {
+        const sp = document.createElement("span"); sp.className = "warn"; sp.textContent = p.text;
+        cap.appendChild(sp);
+      } else cap.appendChild(document.createTextNode(p.text));
+    });
   }).catch(() => {});
   return box;
 }
