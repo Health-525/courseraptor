@@ -164,6 +164,17 @@ async function refreshWebUrl() {
 
 async function refreshNews() {
   try {
+    // 截图/演示开关：RAPTOR_DEMO_NEWS=1 时用虚构通知，不请求教务处网站
+    if (process.env.RAPTOR_DEMO_NEWS === "1") {
+      const demoNews = [
+        { title: "关于 2026-2027-1 学期期中教学检查安排的通知（示例）", date: "2026-09-22" },
+        { title: "关于国庆节放假及调休调课的通知（示例）", date: "2026-09-19" },
+        { title: "关于开展本科生学业预警与帮扶工作的通知（示例）", date: "2026-09-18" },
+      ];
+      panel.newsLines = demoNews.map((n) => `• ${n.title} ${dim(n.date.slice(5))}`);
+      render();
+      return;
+    }
     const news = await fetchJwcNews([], 3);
     panel.newsLines = news.length
       ? news.map((n) => `• ${n.title} ${dim(String(n.date).slice(5))}`)

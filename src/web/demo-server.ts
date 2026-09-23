@@ -125,9 +125,14 @@ function demoTodayBrief(): TodayBrief {
     [
       { title: "示例高等数学", periods: "1-2节", location: "示例教学楼 101", teacher: "王老师" },
       { title: "示例大学英语", periods: "3-4节", location: "示例教学楼 202", teacher: "李老师" },
+      { title: "示例通识选修", periods: "7-8节", location: "示例教学楼 303" },
     ],
     [{ title: "示例程序设计", periods: "3-4节", location: "示例机房", teacher: "陈老师" }],
-    [{ title: "示例通识选修", periods: "7-8节", location: "示例教学楼 303" }],
+    [
+      { title: "示例高等数学", periods: "1-2节", location: "示例教学楼 101", teacher: "王老师" },
+      { title: "示例大学英语", periods: "3-4节", location: "示例教学楼 202", teacher: "李老师" },
+      { title: "示例程序设计", periods: "5-6节", location: "示例机房", teacher: "陈老师" },
+    ],
     [{ title: "示例体育课", periods: "5-6节", location: "示例体育馆" }],
     [{ title: "示例大学英语（口语）", periods: "1-2节", location: "示例语音室" }],
     [{ title: "示例高等数学", periods: "1-2节", location: "示例教学楼 101", teacher: "王老师" }],
@@ -305,7 +310,108 @@ function demoTodayBrief(): TodayBrief {
   };
 }
 
-/** 固定剧本明确标注示例；不伪造工具调用、通知链接或已生成文件。 */
+/* ── 模拟 Agent 过程：思考一段 + 若干工具调用（名称与正式工具一致，参数与结果均为示例）── */
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+interface DemoToolCall {
+  name: string;
+  brief: string;
+  out: string;
+}
+
+interface DemoScript {
+  think: string;
+  tools: DemoToolCall[];
+}
+
+/** 按问题类型给出与正式 Agent 同形的剧本；未知问题不带工具，只回固定文案 */
+function demoScript(message: string): DemoScript | null {
+  if (/今天.*(安排|怎么样)|今日日程|今天有什么/.test(message))
+    return {
+      think: "用户问今天的安排。先取当前日期和教学周，再查今日课表和待办，最后综合成一份简报。",
+      tools: [
+        {
+          name: "get_time",
+          brief: "2026-09-23 周三 · 第 2 周（示例）",
+          out: '{ "date": "2026-09-23", "weekday": 3, "week": 2 }',
+        },
+        {
+          name: "get_schedule",
+          brief: "今天 3 节课（示例）",
+          out: '{ "courses": [ "示例高等数学", "示例大学英语", "示例程序设计" ] }',
+        },
+        {
+          name: "manage_todos",
+          brief: "3 条未完成，其中 1 条已逾期（示例）",
+          out: '{ "open": 3, "overdue": 1 }',
+        },
+      ],
+    };
+  if (/日历|导出|ics/i.test(message))
+    return {
+      think: "导出日历前需要课表与考试数据，先查课表。",
+      tools: [
+        { name: "get_schedule", brief: "本学期课表已缓存（示例）", out: '{ "cached": true }' },
+      ],
+    };
+  if (/通识|学分/.test(message))
+    return {
+      think: "通识修读情况要从成绩里按类别汇总。",
+      tools: [
+        {
+          name: "get_grades",
+          brief: "已按通识类别汇总（示例）",
+          out: '{ "人文类": 2, "自然类": 2 }',
+        },
+      ],
+    };
+  if (/成绩|GPA|绩点|挂科|学业/i.test(message))
+    return {
+      think: "查全量成绩，再计算必修 GPA、已获学分与未通过清单。",
+      tools: [
+        {
+          name: "get_grades",
+          brief: "GPA 3.30 · 已获 42 学分（示例）",
+          out: '{ "gpa": 3.3, "credits": 42 }',
+        },
+      ],
+    };
+  if (/通知|公告/.test(message))
+    return {
+      think: "拉取教务处通知列表，按年级标注相关度。",
+      tools: [{ name: "get_news", brief: "3 条通知（示例）", out: '{ "count": 3 }' }],
+    };
+  if (/考试/.test(message))
+    return {
+      think: "读考试安排缓存，筛选近期场次。",
+      tools: [{ name: "get_exams", brief: "2 场考试（示例）", out: '{ "count": 2 }' }],
+    };
+  if (/待办/.test(message))
+    return {
+      think: "读本地待办清单，按截止时间排序。",
+      tools: [{ name: "manage_todos", brief: "3 条未完成（示例）", out: '{ "open": 3 }' }],
+    };
+  if (/知识|记住|笔记/.test(message))
+    return {
+      think: "在本地知识库里检索相关条目。",
+      tools: [{ name: "manage_knowledge", brief: "命中 5 条（示例）", out: '{ "hits": 5 }' }],
+    };
+  if (/课表|上课|这周|今天|明天/.test(message))
+    return {
+      think: "查本学期课表，结合教学周与调休安排按星期整理。",
+      tools: [
+        {
+          name: "get_schedule",
+          brief: "本周 10 门次课，周六调休补课（示例）",
+          out: '{ "week": 2, "days": 6 }',
+        },
+      ],
+    };
+  return null;
+}
+
+/** 固定剧本明确标注示例；思考与工具调用为同形模拟（见 demoScript），不伪造通知链接或已生成文件。 */
 export function demoReply(message: string): string {
   const prefix = "> 离线演示：以下内容均为虚构示例，不代表你的个人数据或学校通知。\n\n";
   if (/日历|导出|ics/i.test(message))
@@ -346,12 +452,12 @@ export function demoReply(message: string): string {
   if (/今天.*(安排|怎么样)|今日日程|今天有什么/.test(message))
     return (
       prefix +
-      "### 今日简报示例（日程 + 待办结合分析）\n\n**今天（示例）3 节课：**\n- 08:10 信息安全技术 @仁智楼416\n- 10:20 操作系统原理 @同和楼212\n- 14:00 习概 @仁智楼301，15:40 下课\n\n**结合你的 2 条待办：**\n- ⏰ 高数作业今晚 23:59 截止——14:00 那节下课后到晚饭前是整块时间，建议先做\n- 📌 实验报告周五 14:00 截止，今天不急，明天课后处理\n\n今天课到 15:40 就结束，晚上没有安排；要的话我现在给你来一个 90 分钟番茄钟赶高数作业。\n\n正式模式下我会先查时间、课表和你的真实待办再给这份分析。"
+      "### 今日简报示例（日程 + 待办结合分析）\n\n**今天（示例）3 节课：**\n- 08:10 示例高等数学 @示例教学楼 101\n- 10:20 示例大学英语 @示例教学楼 202\n- 14:00 示例程序设计 @示例机房，15:40 下课\n\n**结合你的待办：**\n- ⏰ 复习示例高等数学第 3 章今晚 22:00 截止——14:00 那节下课后到晚饭前是整块时间，建议先做\n- ⚠️ 交示例实验报告已逾期（昨天 23:59），尽快补上\n- 📌 示例英语 quiz 还有 4 天，周末集中准备即可\n\n今天课到 15:40 就结束，晚上没有安排；要的话我现在给你开一个 90 分钟番茄钟。\n\n正式模式下我会先查时间、课表和你的真实待办再给这份分析。"
     );
   if (/课表|上课|这周|今天|明天/.test(message))
     return (
       prefix +
-      "### 一周课表示例\n\n| 星期 | 节次 | 课程 | 地点 |\n|---|---|---|---|\n| 周一 | 1–2 | 示例高等数学 | 示例教学楼 101 |\n| 周三 | 3–4 | 示例大学英语 | 示例教学楼 202 |\n| 周五 | 7–8 | 示例程序设计 | 示例机房 |\n\n正式模式会根据教学周、单双周及已记录的调休安排查询你的课表。也可以问：**导出课表到手机日历**。"
+      "### 一周课表示例\n\n| 星期 | 节次 | 课程 | 地点 |\n|---|---|---|---|\n| 周一 | 1–2 | 示例高等数学 | 示例教学楼 101 |\n| 周一 | 3–4 | 示例大学英语 | 示例教学楼 202 |\n| 周二 | 3–4 | 示例程序设计 | 示例机房 |\n| 周三 | 1–2 / 3–4 / 5–6 | 示例高等数学 / 示例大学英语 / 示例程序设计 | 见今日简报 |\n| 周四 | 5–6 | 示例体育课 | 示例体育馆 |\n| 周五 | 1–2 | 示例大学英语（口语） | 示例语音室 |\n| 周六 | 1–2 | 示例高等数学（调休补课） | 示例教学楼 101 |\n\n正式模式会根据教学周、单双周及已记录的调休安排查询你的课表。也可以问：**导出课表到手机日历**。"
     );
   return (
     prefix +
@@ -509,13 +615,47 @@ export function createDemoServer(): http.Server {
         session.updatedAt = now;
         sessions.set(id, session);
         if (sessions.size > 30) sessions.delete(sessions.keys().next().value!);
+
+        // 与正式 /api/chat 同形的 SSE 事件流：思考一段 → 工具卡（示例数据）→ 正文分段
+        const script = demoScript(message);
+        const t0 = Date.now();
         res.writeHead(200, {
           "content-type": "text/event-stream; charset=utf-8",
           "cache-control": "no-cache",
         });
-        res.end(
-          `data: ${JSON.stringify({ t: "text", v: reply })}\n\ndata: ${JSON.stringify({ t: "end", sid: id })}\n\n`,
-        );
+        const send = (payload: Record<string, unknown>) => {
+          res.write(`data: ${JSON.stringify(payload)}\n\n`);
+        };
+        if (script) {
+          await sleep(300);
+          send({ t: "think", v: script.think });
+          await sleep(450);
+          send({ t: "think", phase: "end" });
+          await sleep(200);
+          for (const tool of script.tools) {
+            const toolId = `demo-${tool.name}-${Math.random().toString(36).slice(2, 8)}`;
+            send({ t: "tool", phase: "start", id: toolId, name: tool.name, args: "{}" });
+            await sleep(420);
+            send({
+              t: "tool",
+              phase: "end",
+              id: toolId,
+              name: tool.name,
+              dur: 380 + Math.floor(Math.random() * 120),
+              brief: tool.brief,
+              out: tool.out,
+            });
+            await sleep(160);
+          }
+        }
+        // 正文按行流出，营造打字机节奏；前端逐段渲染 markdown
+        const lines = reply.split("\n");
+        for (const line of lines) {
+          send({ t: "text", v: `${line}\n` });
+          await sleep(70);
+        }
+        send({ t: "end", dur: Date.now() - t0, sid: id });
+        res.end();
       } else json(res, { error: "演示模式不支持此操作" }, 404);
     } catch (error) {
       json(

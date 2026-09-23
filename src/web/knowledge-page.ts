@@ -33,7 +33,7 @@ export function knowledgePage(
 <style>
   /* 与 today-page 同源的设计令牌：红头档案（编辑部排版风） */
   :root {
-    color-scheme: light dark;
+    color-scheme: light;
     --paper: #F6F4ED;
     --paper-deep: #F0EDE4;
     --card: #FCFBF7;
@@ -85,9 +85,6 @@ export function knowledgePage(
                         letter-spacing: .1em; }
   .ph-right { display: flex; align-items: center; gap: 10px; }
 
-  .demo-banner { padding: 10px 28px; border-bottom: 1px solid var(--rule);
-                 background: var(--accent-soft); color: var(--accent-deep); font-size: 14px; }
-  .demo-banner span { color: var(--ink-2); }
 
   /* ── 正文：左栏分类导航 + 右栏条目列表 ── */
   main { max-width: 1240px; margin: 0 auto; padding: 30px 22px 64px;
@@ -180,7 +177,7 @@ export function knowledgePage(
   }
   @media print {
     body { background: #fff; }
-    .ph-right, .demo-banner, .kw-box, .kw-hint, .sort-row, .rail-meta,
+    .ph-right, .kw-box, .kw-hint, .sort-row, .rail-meta,
     .k-del, .k-toggle, .k-more { display: none !important; }
     .cat-nav { flex-direction: row; flex-wrap: wrap; }
     .k-content.clamp { display: block; -webkit-line-clamp: unset; }
@@ -188,32 +185,7 @@ export function knowledgePage(
     .card { box-shadow: none; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
-  /* 暗色模式：与 chat-page 同源的「夜班编辑部」调色板 */
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --paper: #1F1D1A;
-      --paper-deep: #1A1815;
-      --card: #2A2722;
-      --shade: #23211D;
-      --ink: #EDE9DF;
-      --ink-2: #B8B0A0;
-      --ink-3: #8E8674;
-      --rule: #3A362F;
-      --rule-2: #4A453C;
-      --accent: #D14A3C;
-      --accent-deep: #B83A2E;
-      --accent-soft: #3A2520;
-      --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.28);
-    }
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: var(--paper-deep); }
-    ::-webkit-scrollbar-thumb {
-      background: var(--rule-2); border: 2px solid transparent;
-      background-clip: content-box; border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover { background: var(--ink-3); background-clip: content-box; }
-  }
-  @media (prefers-reduced-motion: reduce) {
+    @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
   }
 </style>
@@ -230,7 +202,6 @@ export function knowledgePage(
     <a class="tbtn" href="/">返回对话</a>
   </div>
 </header>
-${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 虚构数据</strong><span>不连接教务或 AI。正式使用请在终端运行 npm start。</span></div>' : ""}
 <main>
   <aside class="kn-rail" aria-label="知识分类">
     <p class="rail-kicker">KNOWLEDGE BASE</p>
