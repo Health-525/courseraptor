@@ -70,6 +70,12 @@ function fmtWhen(ts) {
   return d.toDateString() === n.toDateString()
     ? clock(ts) : (d.getMonth() + 1) + "月" + d.getDate() + "日";
 }
+/* 档案行悬停时间戳：不做「今天/昨天」换算，一律全量标准格式，
+   等宽字体定宽——悬停浮现时行内布局不跳 */
+function fmtStamp(ts) {
+  const d = new Date(ts);
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " + clock(ts);
+}
 
 /* ── 首屏问候：按当下时段换招呼语，配 mono 日期戳（TODAY · 9月22日 周二）。
    startFresh 恢复首屏时重算，隔午后再回来不穿帮 ── */
@@ -90,17 +96,23 @@ function heroGreeting() {
 }
 heroGreeting();
 
-/* ── 快速提问：常驻在输入框上方 ── */
-const QUESTIONS = ["今天有什么安排", "这周课表", "教务处最近有什么通知", "我的成绩和 GPA", "最近的考试安排", "通识学分还缺哪些", "导出课表到手机日历"];
+/* ── 快速提问：常驻在输入框上方。默认清单先渲染（页面秒开），启动后再用
+   服务端保存的自定义清单（/api/settings.quickQuestions）刷新一遍 ── */
+const DEFAULT_QUESTIONS = ["今天有什么安排", "这周课表", "教务处最近有什么通知", "我的成绩和 GPA", "最近的考试安排", "通识学分还缺哪些", "导出课表到手机日历"];
+let quickQuestions = DEFAULT_QUESTIONS.slice();
 const qchips = document.getElementById("qchips");
-QUESTIONS.forEach((q) => {
-  const c = document.createElement("button");
-  c.type = "button";
-  c.className = "chip";
-  c.dataset.q = q;
-  c.textContent = q;
-  qchips.appendChild(c);
-});
+function renderQchips() {
+  qchips.innerHTML = "";
+  quickQuestions.forEach((q) => {
+    const c = document.createElement("button");
+    c.type = "button";
+    c.className = "chip";
+    c.dataset.q = q;
+    c.textContent = q;
+    qchips.appendChild(c);
+  });
+}
+renderQchips();
 qchips.addEventListener("click", (e) => {
   const c = e.target.closest("button[data-q]");
   if (c && !busy) send(c.dataset.q);
@@ -564,17 +576,6 @@ const ARCHIVE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true">'
   + '<path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/>'
   + '<path d="M10 12h4"/></svg>';
 
-/* 会话归档分组：置顶独立成组在最前，其余按最后活跃时间归位（近 7 天不再
-   细分今天/昨天，免得组越切越碎）。服务端已按置顶 + 最近活跃排好序，
-   这里顺序遍历、组名变化处插题注 */
-function sessionGroup(s) {
-  if (s.pinned) return "置顶";
-  const n = new Date();
-  const todayStart = new Date(n.getFullYear(), n.getMonth(), n.getDate()).getTime();
-  if (s.updatedAt >= todayStart - 7 * 86400000) return "7 天内";
-  return "更早";
-}
-
 function renderSessList() {
   /* 菜单挂在 body 上，sessList.innerHTML 清不到它：每次重绘先摘掉旧菜单，
      本轮仍要显示的话循环里会重建并重新定位 */
@@ -614,27 +615,15 @@ function renderSessList() {
     sessList.appendChild(li);
     return;
   }
-  /* 分组题注带计数（与待办分组同一语言）；置顶组内不再按时间细分 */
-  const counts = {};
+  /* 不再按时间分组题注：服务端已按置顶 + 最近活跃排好序，直接平铺；
+     置顶靠行内图钉徽标区分 */
   visible.forEach((s) => {
-    const g = sessionGroup(s);
-    counts[g] = (counts[g] || 0) + 1;
-  });
-  let lastGroup = "";
-  visible.forEach((s) => {
-    const group = sessionGroup(s);
-    if (group !== lastGroup) {
-      lastGroup = group;
-      const head = document.createElement("li");
-      head.className = "sgroup";
-      head.appendChild(document.createTextNode(group + " · " + counts[group]));
-      sessList.appendChild(head);
-    }
     const li = document.createElement("li");
     li.dataset.id = s.id;
     if (s.id === activeId) li.className = "on";
-    /* 名称与时间同一行：时间不常显，悬停原生 tooltip 里第二行给出 */
-    li.title = (s.title || "新会话") + "\n" + fmtWhen(s.updatedAt);
+    /* tooltip 只给完整标题：悬停时时间戳在行内浮现，标题过长被渐隐，
+       完整名称靠原生 tooltip 兜底 */
+    li.title = s.title || "新会话";
     if (editingSessionId === s.id) {
       const edit = document.createElement("input");
       edit.className = "sedit"; edit.value = s.title || "新会话"; edit.maxLength = 60;
@@ -655,6 +644,9 @@ function renderSessList() {
       }
       title.appendChild(document.createTextNode(s.title || "新会话"));
       li.appendChild(title);
+      /* 标准时间戳：绝对定位浮在 ⋯ 左侧，悬停才淡入；与标题撞车时
+         标题右侧渐隐让位（见 chat-page.ts 里 .sess li:hover .st 的 mask） */
+      li.appendChild(el2("stime", fmtStamp(s.updatedAt)));
     }
     const x = document.createElement("button");
     x.type = "button";
@@ -698,6 +690,8 @@ function renderSessList() {
       let left = r.right + 6;
       if (left + menu.offsetWidth > window.innerWidth - 8)
         left = window.innerWidth - menu.offsetWidth - 8;
+      /* 窄屏抽屉收起时按钮整个在屏幕外（rect 为负）：夹回左缘兜底 */
+      if (left < 8) left = 8;
       let top = r.top;
       if (top + menu.offsetHeight > window.innerHeight - 8)
         top = Math.max(8, window.innerHeight - menu.offsetHeight - 8);
@@ -895,7 +889,7 @@ const HALL_CARDS = [
      照常可用——manage_pomodoro 工具、SSE 事件、对话内 .pomo 倒计时卡与
      buildPomodoro 面板逻辑全部保留，恢复展示只需去掉 hidden 标记 */
   { id: "pomodoro", t: "番茄钟", d: "进行中实时倒计时与最近记录", group: "效率工具", hidden: true },
-  { id: "settings", t: "设置", d: "教务账号、AI 模型、QQ 与本地数据", group: "系统" },
+  { id: "settings", t: "设置", d: "教务账号、AI 模型、QQ、常用问题与本地数据", group: "系统" },
 ];
 const HALL_GROUPS = ["学习安排", "效率工具", "系统"];
 const HALL_TITLES = Object.fromEntries(HALL_CARDS.map((c) => [c.id, c.t]));
@@ -1882,6 +1876,10 @@ function closeHall() {
       return;
     }
     disarmSettingsClose();
+    /* 常用问题的编辑随二次确认一并丢弃：下次打开回到已保存基线，
+       不因残留编辑一直卡在「未保存修改」的拦截里 */
+    quickDraft = quickSaved.slice();
+    renderQuickList();
   }
   document.body.classList.remove("hall-open");
   document.getElementById("hall").inert = true;
@@ -1999,6 +1997,69 @@ const setMsg = document.getElementById("setMsg");
 let setStatus = null;
 /* 设置弹窗关闭后焦点回到触发按钮（键盘用户不丢位置） */
 let settingsReturnFocus = null;
+
+/* ── 常用问题栏目：编辑的是副本 quickDraft，点「保存设置」才随 /api/settings
+   落库；quickSaved 是最近一次服务端返回的基线，dirty 判断与丢弃复位都靠它 ── */
+const quickList = document.getElementById("quickList");
+const quickNewInput = document.getElementById("quickNewInput");
+let quickSaved = DEFAULT_QUESTIONS.slice();
+let quickDraft = quickSaved.slice();
+function quickChanged() {
+  return JSON.stringify(quickDraft) !== JSON.stringify(quickSaved);
+}
+function renderQuickList() {
+  quickList.innerHTML = "";
+  if (!quickDraft.length) {
+    const empty = el("qq-empty");
+    empty.textContent = "清单为空：保存后输入框上方将恢复默认快捷问题";
+    quickList.appendChild(empty);
+    return;
+  }
+  quickDraft.forEach((q) => {
+    const item = el("qq-item");
+    const span = document.createElement("span");
+    span.textContent = q;
+    const del = document.createElement("button");
+    del.type = "button";
+    del.textContent = "✕";
+    del.title = "删除该问题";
+    del.setAttribute("aria-label", "删除：" + q);
+    del.addEventListener("click", () => {
+      quickDraft = quickDraft.filter((x) => x !== q);
+      renderQuickList();
+    });
+    item.appendChild(span);
+    item.appendChild(del);
+    quickList.appendChild(item);
+  });
+}
+function quickAddFromInput() {
+  const q = quickNewInput.value.trim().slice(0, 60);
+  quickNewInput.value = "";
+  if (!q || quickDraft.includes(q) || quickDraft.length >= 12) return;
+  quickDraft.push(q);
+  renderQuickList();
+  quickNewInput.focus();
+}
+document.getElementById("quickAdd").addEventListener("click", quickAddFromInput);
+quickNewInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); quickAddFromInput(); }
+});
+document.getElementById("resetQuick").addEventListener("click", () => {
+  quickDraft = DEFAULT_QUESTIONS.slice();
+  renderQuickList();
+});
+/* 服务端清单到位（启动拉取 / 打开设置 / 保存成功）的统一落点：
+   基线与编辑副本同步，主界面 chips 一并刷新 */
+function applyQuickQuestions(list) {
+  quickSaved = Array.isArray(list) && list.length ? list.slice() : DEFAULT_QUESTIONS.slice();
+  quickDraft = quickSaved.slice();
+  renderQuickList();
+  quickQuestions = quickSaved.slice();
+  renderQchips();
+}
+renderQuickList();
+
 /* ── 未保存修改保护：凭证类字段填了内容（未保存）就是 dirty。
     closeHall 拦一次 + 「关闭」按钮武装二次确认，与清理按钮的两步删除同一语言 ── */
 let settingsCloseArmed = false;
@@ -2006,7 +2067,7 @@ let settingsCloseTimer = 0;
 function settingsDirty() {
   if (document.body.dataset.demo === "true") return false;
   return !!(sUser.value.trim() || sPass.value || sKey.value.trim() || sModel.value ||
-    sQQAppId.value.trim() || sQQSecret.value || sQQPass.value.trim());
+    sQQAppId.value.trim() || sQQSecret.value || sQQPass.value.trim()) || quickChanged();
 }
 function armSettingsClose() {
   settingsCloseArmed = true;
@@ -2155,7 +2216,7 @@ function setTab(name) {
   for (const pane of document.querySelectorAll(".set-pane")) {
     pane.classList.toggle("on", pane.dataset.pane === name);
   }
-  document.getElementById("saveSettings").hidden = !["account", "model", "qq"].includes(name);
+  document.getElementById("saveSettings").hidden = !["account", "model", "qq", "quick"].includes(name);
 }
 for (const tab of setTabs) tab.addEventListener("click", () => setTab(tab.dataset.pane));
 /* 方向键在栏目间移动焦点：大厅里目录是横排（左右）+ 窄屏也是横排，竖排同样支持上下 */
@@ -2167,15 +2228,17 @@ document.getElementById("setTabs").addEventListener("keydown", (e) => {
   const step = (e.key === "ArrowDown" || e.key === "ArrowRight") ? 1 : -1;
   setTabs[(i + step + setTabs.length) % setTabs.length].focus();
 });
-/* 状态总览：四栏配置一眼看完，点 chip 直达栏目（数据来自 showSettings 那次 /api/settings） */
+/* 状态总览：各栏配置一眼看完，点 chip 直达栏目（数据来自 showSettings 那次 /api/settings） */
 function renderSetStatus(d) {
   const host = document.getElementById("setStatus");
   if (!host || !d) return;
   host.innerHTML = "";
+  const quickCount = Array.isArray(d.quickQuestions) ? d.quickQuestions.length : 0;
   const chips = [
     { pane: "account", label: "教务", ok: !!(d.jwgl && d.jwgl.configured), warn: true },
     { pane: "model", label: "模型", ok: !!(d.deepseek && d.deepseek.configured), warn: true },
     { pane: "qq", label: "QQ", ok: !!(d.qq && d.qq.configured), warn: false },
+    { pane: "quick", label: "常用", ok: true, warn: false, note: quickCount + " 条" },
     { pane: "data", label: "数据", ok: true, warn: false },
   ];
   chips.forEach((c) => {
@@ -2187,10 +2250,15 @@ function renderSetStatus(d) {
     dot.className = "dot";
     dot.setAttribute("aria-hidden", "true");
     b.appendChild(dot);
-    b.appendChild(document.createTextNode(c.label + " · " + (c.pane === "data" ? "本地" : (c.ok ? "已配" : "未配"))));
-    const state = c.pane === "data" ? "本地数据，点此查看与清理" : (c.ok ? "已配置，点此查看或修改" : "尚未配置，点此去填写");
-    b.title = c.label + "：" + state;
-    b.setAttribute("aria-label", c.label + "栏目：" + (c.pane === "data" ? "本地数据" : (c.ok ? "已配置" : "未配置")) + "，点击直达");
+    const state = c.pane === "data" ? "本地"
+      : c.pane === "quick" ? c.note
+      : (c.ok ? "已配" : "未配");
+    b.appendChild(document.createTextNode(c.label + " · " + state));
+    const hint = c.pane === "data" ? "本地数据，点此查看与清理"
+      : c.pane === "quick" ? "常用快捷问题，点此增删"
+      : (c.ok ? "已配置，点此查看或修改" : "尚未配置，点此去填写");
+    b.title = c.label + "：" + hint;
+    b.setAttribute("aria-label", c.label + "栏目：" + state + "，点击直达");
     b.addEventListener("click", () => setTab(c.pane));
     host.appendChild(b);
   });
@@ -2245,6 +2313,7 @@ function showSettings() {
     sKey.placeholder = "sk-…；留空不修改";
     qqApplyStatus(d.qq);
     fillModels(d.models, d.model, "");
+    applyQuickQuestions(d.quickQuestions);
   }).catch(() => { setMsg.textContent = "无法读取设置，请确认本地服务正在运行。"; });
   // 清单以该 Key 实际可用的型号为准；服务端 10 分钟内走缓存，不重复联网
   fetch("/api/models").then((r) => r.json()).then((m) => {
@@ -2326,6 +2395,7 @@ document.getElementById("saveSettings").addEventListener("click", () => {
     body.qqAppId = qa; body.qqAppSecret = qs;
   }
   if (qp) body.qqPasscode = qp;
+  if (quickChanged()) body.quickQuestions = quickDraft;
   if (sModel.value) body.model = sModel.value;
   if (!Object.keys(body).length) {
     setMsg.className = "setmsg";
@@ -2367,6 +2437,7 @@ document.getElementById("saveSettings").addEventListener("click", () => {
       qqApplyStatus(d.status.qq);
       pickModel("");
       fillModels(d.status.models, d.status.model, "");
+      applyQuickQuestions(d.status.quickQuestions);
       /* 凭证已落库：dirty 归零，「关闭」不必再二次确认；按钮短暂亮一下完成感 */
       disarmSettingsClose();
       saveBtn.textContent = "已保存 ✓";
@@ -2384,6 +2455,14 @@ document.getElementById("saveSettings").addEventListener("click", () => {
 refreshSessions().then(() => {
   startFresh();
 });
+/* 快捷问题以服务端保存的自定义清单为准（设置里自选过的话）；
+   拉不到就保持默认，不挡页面启动 */
+fetch("/api/settings").then((r) => r.json()).then((d) => {
+  if (Array.isArray(d.quickQuestions) && d.quickQuestions.length) {
+    quickQuestions = d.quickQuestions.slice();
+    renderQchips();
+  }
+}).catch(() => {});
 /* 有在走的番茄钟就先恢复倒计时卡片（查不到不报错、不挡启动） */
 restorePomoCard();
 

@@ -47,6 +47,8 @@ export interface CredentialsStore {
   qqBotAppSecret?: string;
   /** QQ 授权暗号：首次给机器人发它即完成白名单激活 */
   qqBotPasscode?: string;
+  /** 网页「常用」快捷问题（用户在设置面板自选；空/缺失即回默认清单） */
+  webQuickQuestions?: string[];
   savedAt: string;
 }
 
