@@ -502,12 +502,19 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .set-frame { display: flex; flex: 1; min-height: 0; gap: 22px; }
   .set-tabs { flex: none; width: 138px; display: flex; flex-direction: column; gap: 2px;
               overflow-y: auto; }
-  .set-tab { display: block; text-align: left; border: 0;
+  .set-tab { display: flex; align-items: center; gap: 7px; border: 0;
              border-left: 2px solid transparent; border-radius: 0 4px 4px 0;
              background: none; cursor: pointer; padding: 8px 8px 8px 12px;
              font-family: var(--mono); font-size: 12.5px; letter-spacing: .06em;
              color: var(--ink-3);
              transition: color .15s ease, background .15s ease, border-color .15s ease; }
+  /* 栏目状态点：并进目录本身——未配是朱砂实心（要行动），已配是空心细圈；
+     QQ 选配，未配时不亮。取代旧的状态总览 chips 行：420px 抽屉里五枚 chip
+     会 2+2+1 落单换行，且与目录导航重复 */
+  .set-tab .sdot { flex: none; width: 6px; height: 6px; border-radius: 50%;
+                   border: 1px solid transparent; background: transparent; }
+  .set-tab .sdot.warn { background: var(--accent); border-color: var(--accent); }
+  .set-tab .sdot.ok { border-color: var(--ink-3); }
   .set-tab:hover { color: var(--ink-2); background: var(--card); }
   .set-tab.on { border-left-color: var(--accent); background: var(--card);
                 color: var(--ink); font-weight: 600; box-shadow: var(--shadow-sm); }
@@ -573,7 +580,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                  background: var(--card); color: var(--ink-3);
                  font-size: 13px; text-align: center; padding: 16px 10px; }
 
-  /* 常用问题栏目：添加行 + 可删 chip 清单，语言与主界面 .chip 一致 */
+  /* 提示词模板面板：添加行 + 可删 chip 清单，语言与主界面 .chip 一致 */
   .qq-add { display: flex; gap: 8px; margin: 2px 0 12px; }
   .qq-add input { flex: 1; min-width: 0; border: 1px solid var(--rule-2);
                   background: var(--card); color: var(--ink);
@@ -613,19 +620,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   /* 保存结果逐条展示：成功行墨色、失败行朱砂，一眼分清 */
   .setmsg.good .setmsg-line { margin: 0; }
   .setmsg.good .setmsg-line.bad { color: var(--accent-deep); }
-  /* 设置状态总览：四栏配置一览（已配/未配），点 chip 直达对应栏目 */
-  .set-status { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
-                gap: 8px; margin: 0 0 12px; }
-  .set-status:empty { display: none; }
-  .set-chip { display: flex; align-items: center; gap: 7px;
-              border: 1px solid var(--rule); background: var(--card); border-radius: 3px;
-              padding: 8px 12px; cursor: pointer; font-family: var(--mono); font-size: 12px;
-              color: var(--ink-2); white-space: nowrap; }
-  .set-chip:hover { border-color: var(--accent); color: var(--accent); }
-  .set-chip .dot { flex: none; width: 7px; height: 7px; border-radius: 50%;
-                   border: 1px solid var(--rule-2); background: transparent; }
-  .set-chip.ok .dot { border-color: var(--accent); background: var(--accent); }
-  .set-chip.warn { color: var(--accent-deep); border-color: var(--rule-2); }
   /* 两步确认的 armed 态：朱砂底白字（与 .hall-del.armed 同一语言，免原生 confirm） */
   .data-actions .tbtn.armed { color: var(--card); background: var(--accent);
                               border-color: var(--accent); }
@@ -866,6 +860,11 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall .set-tab.on { border-bottom-color: var(--accent); box-shadow: none; }
   .hall .set-main { padding-right: 0; }
   .hall #hallSettings .setmsg { margin: 10px 2px 0; }
+  /* 提示词模板面板（#hallPrompts）：与设置同一套字段语言，
+     即改即存，没有「保存设置」——底部一行是恢复默认（两步确认）+ 状态小字 */
+  .hall #hallPrompts .setmsg { margin: 0; }
+  .prompts-foot { justify-content: space-between; align-items: center; }
+  .prompts-foot .setmsg { flex: 1; min-width: 0; text-align: right; }
   .hall-settings-foot { display: flex; justify-content: flex-end; gap: 8px;
                         margin-top: 12px; padding-top: 12px;
                         border-top: 1px dashed var(--rule); }
@@ -1037,12 +1036,12 @@ export function chatPage(options: { demo?: boolean } = {}): string {
       <p class="hero-kicker" id="heroKicker">TODAY</p>
       <h2 id="heroGreet">同学，你好。</h2>
       <p>课表、成绩、考试、通知——直接用一句话问。<br>
-      <span class="hint">${demo ? "点击下方常用问题体验示例；演示会话在服务重启后清空。" : "会话保存在本机；提问与所需查询结果会发送至配置的 AI 服务。"}</span></p>
+      <span class="hint">${demo ? "点击下方提示词体验示例；演示会话在服务重启后清空。" : "会话保存在本机；提问与所需查询结果会发送至配置的 AI 服务。"}</span></p>
     </div>
   </div></div>
   <form id="f">
     <div class="quickbar">
-      <span class="qlabel">常用</span>
+      <span class="qlabel">提示词</span>
       <span class="qchips" id="qchips"></span>
     </div>
     <div class="composer">
@@ -1068,13 +1067,11 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   <div class="hall-body" id="hallBody">
     <div id="hallDyn" aria-live="polite"></div>
     <div id="hallSettings" hidden>
-      <div class="set-status" id="setStatus" aria-label="各栏目配置状态"></div>
       <div class="set-frame">
         <nav class="set-tabs" id="setTabs" role="tablist" aria-label="设置栏目">
-          <button class="set-tab on" type="button" role="tab" id="setTabAccount" aria-controls="setPaneAccount" aria-selected="true" data-pane="account">教务账号</button>
-          <button class="set-tab" type="button" role="tab" id="setTabModel" aria-controls="setPaneModel" aria-selected="false" data-pane="model">AI 模型</button>
-          <button class="set-tab" type="button" role="tab" id="setTabQQ" aria-controls="setPaneQQ" aria-selected="false" data-pane="qq">QQ 机器人</button>
-          <button class="set-tab" type="button" role="tab" id="setTabQuick" aria-controls="setPaneQuick" aria-selected="false" data-pane="quick">常用问题</button>
+          <button class="set-tab on" type="button" role="tab" id="setTabAccount" aria-controls="setPaneAccount" aria-selected="true" data-pane="account"><i class="sdot" aria-hidden="true"></i>教务账号</button>
+          <button class="set-tab" type="button" role="tab" id="setTabModel" aria-controls="setPaneModel" aria-selected="false" data-pane="model"><i class="sdot" aria-hidden="true"></i>AI 模型</button>
+          <button class="set-tab" type="button" role="tab" id="setTabQQ" aria-controls="setPaneQQ" aria-selected="false" data-pane="qq"><i class="sdot" aria-hidden="true"></i>QQ 机器人</button>
           <button class="set-tab" type="button" role="tab" id="setTabData" aria-controls="setPaneData" aria-selected="false" data-pane="data">本地数据</button>
         </nav>
         <div class="set-main">
@@ -1101,17 +1098,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             <label class="fld"><span>激活暗号</span><input id="sQQPass" type="text" autocomplete="off" placeholder="首次激活用的暗号（自定）" ${demo ? "disabled" : ""}></label>
             <div class="cur" id="curQQ">未配置；到 q.qq.com 创建机器人后填入，保存后即可在 QQ 里使用</div>
           </section>
-          <section class="set-pane" id="setPaneQuick" role="tabpanel" aria-labelledby="setTabQuick" data-pane="quick">
-            <p class="dlg-intro">管理输入框上方「常用」快捷问题：删掉用不上的，加入你常问的。改动需点「保存设置」生效；每条最多 60 字、最多 12 条，清空后恢复默认清单。</p>
-            <div class="qq-add">
-              <input id="quickNewInput" type="text" maxlength="60" autocomplete="off" placeholder="想常问的问题，如：下周三有什么课" ${demo ? "disabled" : ""} aria-label="新增常用问题">
-              <button class="tbtn" id="quickAdd" type="button" ${demo ? "disabled" : ""}>添加</button>
-            </div>
-            <div class="qq-list" id="quickList" aria-label="常用问题清单"></div>
-            <div class="data-actions">
-              <button class="tbtn" id="resetQuick" type="button" ${demo ? "disabled" : ""}>恢复默认</button>
-            </div>
-          </section>
           <section class="set-pane" id="setPaneData" role="tabpanel" aria-labelledby="setTabData" data-pane="data">
             <p class="dlg-intro">会话、附件、生成文件与待办都保存在本机，可导出或按需清理。此栏目的操作即时生效，无需点「保存设置」。</p>
             <div class="data-grid" id="dataGrid"></div>
@@ -1127,6 +1113,18 @@ export function chatPage(options: { demo?: boolean } = {}): string {
       <div class="hall-settings-foot">
         <button class="tbtn" id="cancelSettings" type="button">关闭</button>
         <button class="tbtn primary" id="saveSettings" ${demo ? "disabled" : ""}>保存设置</button>
+      </div>
+    </div>
+    <div id="hallPrompts" hidden>
+      <p class="dlg-intro">输入框上方「提示词」一排就是这份模板清单，点一下即发送。删掉用不上的、加入你常问的，改动即时保存；每条最多 60 字、最多 12 条，清空后恢复默认清单。</p>
+      <div class="qq-add">
+        <input id="quickNewInput" type="text" maxlength="60" autocomplete="off" placeholder="想常问的问题，如：下周三有什么课" ${demo ? "disabled" : ""} aria-label="新增提示词模板">
+        <button class="tbtn" id="quickAdd" type="button" ${demo ? "disabled" : ""}>添加</button>
+      </div>
+      <div class="qq-list" id="quickList" aria-label="提示词模板清单"></div>
+      <div class="hall-settings-foot prompts-foot">
+        <button class="tbtn" id="resetQuick" type="button" ${demo ? "disabled" : ""} title="清空自定义清单，恢复默认模板">恢复默认</button>
+        <span class="setmsg good" id="promptsMsg" role="status" aria-live="polite"></span>
       </div>
     </div>
   </div>
