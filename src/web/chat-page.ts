@@ -96,11 +96,12 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             letter-spacing: .14em; color: var(--ink-3);
             border-bottom: 1px solid var(--rule); }
   .sec h2 span { letter-spacing: .04em; font-weight: 400; }
-  .sess-search { flex: none; width: 100%; margin: 0 0 8px; padding: 7px 9px;
-                 border: 1px solid var(--rule); border-radius: 3px;
-                 background: rgba(252, 251, 247, .55); color: var(--ink);
-                 font-size: 13px; outline: none; }
-  .sess-search:focus { border-color: var(--ink-3); }
+  /* h2 右侧一组：计数 + 归档入口（没有归档过时按钮整个隐去） */
+  .sec h2 .hside { display: inline-flex; align-items: baseline; gap: 10px; }
+  #sessArchiveToggle { border: 0; background: none; padding: 0; cursor: pointer;
+                       font-family: var(--mono); font-size: 11px; font-weight: 400;
+                       letter-spacing: .04em; color: var(--ink-3); }
+  #sessArchiveToggle:hover { color: var(--accent); }
   /* 竖排：新会话主按钮在上，今日日程 / 知识库入口各占一行在其下 */
   .mastbtns { display: flex; flex-direction: column; gap: 8px; }
   /* 竖排 flex 会把子项块化：链接里的文字水平居中要用 text-align，不是 justify-content */
@@ -155,6 +156,9 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .sess .st { font-size: 14px; color: var(--ink-2); overflow: hidden;
               text-overflow: ellipsis; white-space: nowrap; }
   .sess li.on .st { color: var(--ink); font-weight: 600; }
+  /* 已归档的条目整体退一档灰，与主列表一眼可分 */
+  .sess li[data-arch="1"] .st { color: var(--ink-3); }
+  .sess li[data-arch="1"].on .st { color: var(--ink-2); }
   .sess .spin { display: inline-flex; align-items: center; gap: 3px;
                 color: var(--accent); margin-right: 5px; font-size: 11px; }
   .sess .spin svg { width: 10px; height: 10px; flex: none; fill: none;
@@ -1015,8 +1019,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     <button class="tbtn hall-btn" id="openHall" title="今日日程、课表、考试、待办、知识库、番茄钟" aria-haspopup="dialog" aria-expanded="false" aria-controls="hall">功能大厅</button>
   </div>
   <section class="sec">
-    <h2>会话档案<span id="sessCount"></span></h2>
-    <input class="sess-search" id="sessSearch" type="search" placeholder="搜索会话" aria-label="搜索会话">
+    <h2><span id="sessTitle">会话档案</span><span class="hside"><span id="sessCount"></span><button id="sessArchiveToggle" type="button" hidden></button></span></h2>
     <ul class="sess" id="sessList"></ul>
   </section>
 </aside>

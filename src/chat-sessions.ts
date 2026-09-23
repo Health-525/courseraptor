@@ -43,6 +43,8 @@ export interface ChatSession {
   /** 标题已定（人工改名或模型命名过）：此后不再被自动命名覆盖 */
   titleSet?: boolean;
   pinned?: boolean;
+  /** 已归档：不出现在主列表，进归档视图，可随时恢复 */
+  archived?: boolean;
   createdAt: number;
   updatedAt: number;
   messages: StoredMessage[];
@@ -53,6 +55,7 @@ export interface SessionMeta {
   id: string;
   title: string;
   pinned: boolean;
+  archived: boolean;
   updatedAt: number;
   count: number;
 }
@@ -116,8 +119,12 @@ function writeSessions(list: ChatSession[]): void {
   }
 }
 
+/* 排序：置顶最前、按最近活跃；归档的沉到末尾（主列表在前端按标记过滤，
+   全量返回时也让归档条目天然落在列表尾部） */
 const byRecent = (a: ChatSession, b: ChatSession): number =>
-  Number(!!b.pinned) - Number(!!a.pinned) || b.updatedAt - a.updatedAt;
+  Number(!!a.archived) - Number(!!b.archived) ||
+  Number(!!b.pinned) - Number(!!a.pinned) ||
+  b.updatedAt - a.updatedAt;
 
 /** 一行标题：压成空格并截断（24 字，侧栏两行内可见全）；渠道前缀（如「QQ」）拼在最前面 */
 function titleOf(text: string, prefix?: string): string {
@@ -141,6 +148,7 @@ export function listSessions(): SessionMeta[] {
       id: s.id,
       title: s.title || "新会话",
       pinned: !!s.pinned,
+      archived: !!s.archived,
       updatedAt: s.updatedAt,
       count: s.messages.length,
     }));
@@ -158,10 +166,10 @@ export function deleteSession(id: string): boolean {
   return true;
 }
 
-/** 修改会话的人工标题或置顶状态。空标题不会覆盖现有标题。 */
+/** 修改会话的人工标题、置顶或归档状态。空标题不会覆盖现有标题。 */
 export function updateSession(
   id: string,
-  patch: { title?: string; pinned?: boolean },
+  patch: { title?: string; pinned?: boolean; archived?: boolean },
 ): ChatSession | null {
   const list = readSessions();
   const session = list.find((s) => s.id === id);
@@ -173,6 +181,7 @@ export function updateSession(
     session.titleSet = true; // 人工命名优先级最高，自动命名从此让位
   }
   if (typeof patch.pinned === "boolean") session.pinned = patch.pinned;
+  if (typeof patch.archived === "boolean") session.archived = patch.archived;
   writeSessions(list.sort(byRecent));
   return session;
 }

@@ -14,7 +14,7 @@ const ACTIVE_KEY = document.body.dataset.demo === "true" ? "raptor-demo-active-s
 let activeId = "";
 let msgs = [];
 let lastSessions = [];
-let sessionQuery = "";
+let viewingArchived = false;
 let sessionActionsId = "";
 /* 会话删除的两步确认态：armed 的那条 3 秒内再点才执行（对齐待办/知识页） */
 let delArmId = "";
@@ -582,36 +582,27 @@ function renderSessList() {
   const staleMenu = document.querySelector("body > .smenu");
   if (staleMenu) staleMenu.remove();
   sessList.innerHTML = "";
-  document.getElementById("sessCount").textContent =
-    lastSessions.length ? lastSessions.length + " 个" : "";
-  /* 档案室空着时搜索框一并收起：没东西可搜，空态直接引导去开问 */
-  document.getElementById("sessSearch").style.display = lastSessions.length ? "" : "none";
-  const visible = lastSessions.filter((s) =>
-    !sessionQuery || String(s.title || "").toLowerCase().includes(sessionQuery.toLowerCase()));
+  const archivedCount = lastSessions.filter((s) => s.archived).length;
+  /* 兜底：归档视图里把最后一条也恢复/删掉时，自动切回主列表 */
+  if (viewingArchived && !archivedCount) viewingArchived = false;
+  const shownCount = viewingArchived ? archivedCount : lastSessions.length - archivedCount;
+  document.getElementById("sessTitle").textContent = viewingArchived ? "已归档" : "会话档案";
+  document.getElementById("sessCount").textContent = shownCount ? shownCount + " 个" : "";
+  /* 主列表里有归档过才给入口；进了归档视图常驻「返回」 */
+  const toggle = document.getElementById("sessArchiveToggle");
+  toggle.hidden = !viewingArchived && !archivedCount;
+  toggle.textContent = viewingArchived ? "返回" : "归档 " + archivedCount;
+  const visible = lastSessions.filter((s) => !!s.archived === viewingArchived);
   if (!visible.length) {
     const li = document.createElement("li");
     li.className = "snone";
-    if (lastSessions.length) {
-      li.appendChild(el2("snone-t", "没有匹配的会话"));
-      const clear = document.createElement("button");
-      clear.type = "button";
-      clear.className = "sclear";
-      clear.textContent = "清空搜索 · 看全部 " + lastSessions.length + " 个";
-      clear.addEventListener("click", () => {
-        sessionQuery = "";
-        const box = document.getElementById("sessSearch");
-        box.value = "";
-        renderSessList();
-        box.focus();
-      });
-      li.appendChild(clear);
-    } else {
-      const ico = el("");
-      ico.innerHTML = ARCHIVE_SVG;
-      li.appendChild(ico);
-      li.appendChild(el2("snone-t", "档案室还空着"));
-      li.appendChild(el2("snone-hint", "在右侧开问一句，这轮对话就会归档到这里，重启也不丢。"));
-    }
+    const ico = el("");
+    ico.innerHTML = ARCHIVE_SVG;
+    li.appendChild(ico);
+    li.appendChild(el2("snone-t", "档案室还空着"));
+    li.appendChild(el2("snone-hint", archivedCount
+      ? "会话都归档了，点右上「归档 " + archivedCount + "」可以找回。"
+      : "在右侧开问一句，这轮对话就会归档到这里，重启也不丢。"));
     sessList.appendChild(li);
     return;
   }
@@ -620,6 +611,7 @@ function renderSessList() {
   visible.forEach((s) => {
     const li = document.createElement("li");
     li.dataset.id = s.id;
+    if (s.archived) li.dataset.arch = "1";
     if (s.id === activeId) li.className = "on";
     /* tooltip 只给完整标题：悬停时时间戳在行内浮现，标题过长被渐隐，
        完整名称靠原生 tooltip 兜底 */
@@ -636,7 +628,7 @@ function renderSessList() {
       setTimeout(() => { edit.focus(); edit.select(); }, 0);
     } else {
       const title = el("st");
-      if (s.pinned) {
+      if (s.pinned && !viewingArchived) {
         const pin = el("spin");
         pin.innerHTML = PIN_SVG;
         pin.appendChild(document.createTextNode("置顶"));
@@ -670,8 +662,14 @@ function renderSessList() {
         menu.appendChild(button);
         return button;
       };
-      action(s.pinned ? "取消置顶" : "置顶", "pin");
-      action("改名", "rename");
+      /* 归档视图只留恢复与删除；主列表给全套人工动作 */
+      if (viewingArchived) {
+        action("取消归档", "unarchive");
+      } else {
+        action(s.pinned ? "取消置顶" : "置顶", "pin");
+        action("改名", "rename");
+        action("归档", "archive");
+      }
       menu.appendChild(el("ssep"));
       const delBtn = action("删除", "del", true);
       /* 两步确认：已 armed 的那条直接渲染成确认态 */
@@ -797,6 +795,18 @@ document.addEventListener("click", (e) => {
   }
   const rename = e.target.closest("button[data-rename]");
   if (rename) { editingSessionId = rename.dataset.rename; sessionActionsId = ""; renderSessList(); return; }
+  const archive = e.target.closest("button[data-archive]");
+  if (archive) {
+    sessionActionsId = "";
+    patchSession(archive.dataset.archive, { archived: true }).then(refreshSessions).catch(() => {});
+    return;
+  }
+  const unarchive = e.target.closest("button[data-unarchive]");
+  if (unarchive) {
+    sessionActionsId = "";
+    patchSession(unarchive.dataset.unarchive, { archived: false }).then(refreshSessions).catch(() => {});
+    return;
+  }
   const actions = e.target.closest("button[data-actions]");
   if (actions) {
     sessionActionsId = sessionActionsId === actions.dataset.actions ? "" : actions.dataset.actions;
@@ -821,21 +831,11 @@ document.addEventListener("click", (e) => {
   renderSessList();
 });
 
-document.getElementById("sessSearch").addEventListener("input", (e) => {
-  sessionQuery = e.target.value.trim(); renderSessList();
-});
-/* 部分浏览器点搜索框原生 × 只发 search 不发 input，兜底同步一次 */
-document.getElementById("sessSearch").addEventListener("search", (e) => {
-  sessionQuery = e.target.value.trim(); renderSessList();
-});
-/* Esc 清空搜索（对齐知识库页）；有内容时吞掉事件，别冒泡去关抽屉 */
-document.getElementById("sessSearch").addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && e.target.value) {
-    e.stopPropagation();
-    e.target.value = "";
-    sessionQuery = "";
-    renderSessList();
-  }
+/* 归档视图切换：标题、计数与菜单动作整套跟着换（renderSessList 内取景） */
+document.getElementById("sessArchiveToggle").addEventListener("click", () => {
+  viewingArchived = !viewingArchived;
+  sessionActionsId = "";
+  renderSessList();
 });
 
 function openDrawer() { document.body.classList.add("drawer-open"); }

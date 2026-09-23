@@ -18,6 +18,7 @@ interface DemoSession {
   id: string;
   title: string;
   pinned?: boolean;
+  archived?: boolean;
   createdAt: number;
   updatedAt: number;
   messages: DemoMessage[];
@@ -441,7 +442,12 @@ export function createDemoServer(): http.Server {
       } else if (req.method === "GET" && url === "/api/sessions") {
         json(res, {
           sessions: [...sessions.values()]
-            .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.updatedAt - a.updatedAt)
+            .sort(
+              (a, b) =>
+                Number(!!a.archived) - Number(!!b.archived) ||
+                Number(!!b.pinned) - Number(!!a.pinned) ||
+                b.updatedAt - a.updatedAt,
+            )
             .map(({ messages, ...s }) => ({ ...s, count: messages.length })),
         });
       } else if (url.startsWith("/api/sessions/")) {
@@ -458,6 +464,7 @@ export function createDemoServer(): http.Server {
           if (typeof body.title === "string" && body.title.trim())
             session.title = body.title.trim().slice(0, 60);
           if (typeof body.pinned === "boolean") session.pinned = body.pinned;
+          if (typeof body.archived === "boolean") session.archived = body.archived;
           json(res, { ok: true, session });
         } else if (req.method === "DELETE" && sessions.delete(id)) json(res, { ok: true });
         else json(res, { error: "会话不存在" }, 404);
