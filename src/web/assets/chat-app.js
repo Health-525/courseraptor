@@ -1734,70 +1734,6 @@ function hallBadges(dyn) {
     else card.appendChild(badge);
   }).catch(() => {});
 }
-/* 主页封面简报条：收紧横线到首个分组之间的地带，只占两行——
-   下节课一行（可点进今日日程：朱砂竖线 + 悬停浮底，与目录卡同一
-   「可进入」语言），日期周次与要紧事并成一行说明垫底。日期行本地
-   时钟先上（打开即有，不闪空），其余等 brief 到位后再补，失败就只剩日期 */
-function hallBriefStrip() {
-  const box = el("hall-brief");
-  const now = new Date();
-  const wd = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][now.getDay()];
-  const cap = el2("hb-date", (now.getMonth() + 1) + "月" + now.getDate() + "日 " + wd);
-  box.appendChild(cap);
-  briefOf().then((b) => {
-    if (hallPanel !== "" || !box.isConnected) return;
-    const sched = b.schedule || {};
-    const row = document.createElement("button");
-    row.type = "button"; row.className = "hb-next";
-    if (b.next) {
-      row.setAttribute("aria-label", "查看今日日程：下一节 " + b.next.course.title);
-      row.appendChild(el2("hb-eyebrow", "下节"));
-      const t = document.createElement("b"); t.textContent = b.next.course.title; row.appendChild(t);
-      const meta = [];
-      if (b.next.dateLabel !== "今天") meta.push(b.next.dateLabel);
-      if (b.next.course.time) meta.push(b.next.course.time.split("-")[0]);
-      if (b.next.course.location) meta.push(b.next.course.location);
-      if (meta.length) row.appendChild(el2("hb-meta", meta.join(" · ")));
-      row.addEventListener("click", () => openHall("today"));
-    } else if (sched.available) {
-      row.setAttribute("aria-label", "查看今日日程");
-      row.appendChild(el2("hb-eyebrow", "日程"));
-      const t = document.createElement("b"); t.textContent = "近期没有排课"; row.appendChild(t);
-      row.addEventListener("click", () => openHall("today"));
-    } else {
-      row.setAttribute("aria-label", "还没有课表，查看配置指引");
-      row.appendChild(el2("hb-eyebrow", "课表"));
-      const t = document.createElement("b"); t.textContent = "还没有课表"; row.appendChild(t);
-      row.appendChild(el2("hb-meta", "对话框里说「课表」"));
-      row.addEventListener("click", () => openHall("schedule"));
-    }
-    box.insertBefore(row, cap);
-    /* 说明行：日期周次打头，逾期朱砂置顶、今天/明天有考试同档要紧，
-       放假调休说明随后；全都接在同行，装不下自然折行 */
-    const parts = [b.dateLabel, b.term && b.term.weekLabel].filter(Boolean)
-      .map((text) => ({ text }));
-    const todos = (b.todos && b.todos.items) || [];
-    const overdueN = todos.filter((t) => t.overdue).length;
-    if (overdueN) parts.push({ text: "⚠ " + overdueN + " 条逾期待办", warn: true });
-    if (sched.available && sched.note) parts.push({ text: sched.note });
-    const ex = (b.exams && b.exams.upcoming) || [];
-    if (ex.length) {
-      parts.push({
-        text: ex[0].isToday ? "今天有考试" : ex[0].inDays === 1 ? "明天有考试" : ex[0].inDays + " 天后有考试",
-        warn: ex[0].isToday || ex[0].inDays === 1,
-      });
-    }
-    cap.textContent = "";
-    parts.forEach((p, i) => {
-      if (i) cap.appendChild(document.createTextNode(" · "));
-      if (p.warn) {
-        const sp = document.createElement("span"); sp.className = "warn"; sp.textContent = p.text;
-        cap.appendChild(sp);
-      } else cap.appendChild(document.createTextNode(p.text));
-    });
-  }).catch(() => {});
-  return box;
-}
 function renderHall(force) {
   const dyn = document.getElementById("hallDyn");
   const staticSettings = document.getElementById("hallSettings");
@@ -1832,8 +1768,6 @@ function renderHall(force) {
   }
   if (!hallPanel) {
     hallTitle.textContent = "功能大厅";
-    /* 封面简报条打头：日期与下节课先说，再进分组目录 */
-    dyn.appendChild(hallBriefStrip());
     /* 主页按分组排布：学习安排 / 效率工具 / 系统，扫一眼就能定位 */
     HALL_GROUPS.forEach((g) => {
       const cards = HALL_CARDS.filter((c) => c.group === g && !c.hidden);
