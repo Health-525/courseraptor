@@ -633,6 +633,43 @@ test("QQ 凭证可经设置面板保存：成对校验、脱敏回显、保存�
   setQQBridgeLauncher(null);
 });
 
+test("常用问题可经设置面板保存：归一化落盘、清空回默认", async () => {
+  const url = (await startChatWeb())!;
+  const readQuick = async () =>
+    (await (await fetch(`${url}/api/settings`)).json()).quickQuestions as string[];
+
+  // 未自定义：GET 必须回默认清单，页面永远有快捷问题可点
+  const before = await readQuick();
+  assert.ok(Array.isArray(before) && before.length >= 5, "未自定义时必须回默认清单");
+  assert.ok(before.includes("这周课表"));
+
+  // 自定义保存：空串/非字符串剔除、两侧空白 trim、重复去重、超长截断到 60 字
+  const long = "查".repeat(80);
+  const save = await wfetch(`${url}/api/settings`, {
+    method: "POST",
+    body: JSON.stringify({
+      quickQuestions: ["明天有啥课", "  明天有啥课  ", "", 123, long],
+    }),
+  });
+  assert.equal(save.status, 200);
+  const body = await save.json();
+  assert.equal(body.ok, true);
+  assert.deepEqual(await readQuick(), ["明天有啥课", "查".repeat(60)]);
+
+  // 加密落盘：保存的就是归一化后的清单
+  const { loadCredentialsStore } = await import("../src/credentials");
+  assert.deepEqual(loadCredentialsStore()?.webQuickQuestions, ["明天有啥课", "查".repeat(60)]);
+
+  // 清空清单 = 恢复默认（不靠单独的「重置」协议）
+  const clear = await wfetch(`${url}/api/settings`, {
+    method: "POST",
+    body: JSON.stringify({ quickQuestions: [] }),
+  });
+  assert.equal(clear.status, 200);
+  assert.deepEqual(await readQuick(), before);
+  assert.deepEqual(loadCredentialsStore()?.webQuickQuestions, []);
+});
+
 /** 桩 agent 收到的 messages，供「思考不进上下文」那条测试回看 */
 const thinkCalls: unknown[][] = [];
 

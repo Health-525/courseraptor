@@ -4,6 +4,7 @@ import http from "node:http";
 import type { KnowledgeEntry } from "../knowledge";
 import { chatPage } from "./chat-page";
 import { knowledgePage } from "./knowledge-page";
+import { DEFAULT_QUESTIONS } from "./quick-questions";
 import type { BriefCourse, BriefDay, TodayBrief } from "./today-brief";
 import { todayPage } from "./today-page";
 
@@ -400,6 +401,7 @@ export function createDemoServer(): http.Server {
           qq: { configured: false, passcodeSet: false, source: "unset", sourceLabel: "演示模式" },
           model: "离线固定回答",
           models: [],
+          quickQuestions: DEFAULT_QUESTIONS,
         });
       } else if (req.method === "GET" && url.startsWith("/api/models")) {
         json(res, {

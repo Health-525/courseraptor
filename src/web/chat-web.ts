@@ -43,7 +43,7 @@ import {
   updateSession,
 } from "../chat-sessions";
 import { config } from "../config";
-import { saveCredentialsStore } from "../credentials";
+import { loadCredentialsStore, saveCredentialsStore } from "../credentials";
 import { generatedDir } from "../document/save";
 import { loadGradesCache } from "../grades-cache";
 import { fetchJwcNews } from "../jwgl/news";
@@ -89,6 +89,7 @@ import {
 } from "../workspace-data";
 import { chatPage } from "./chat-page";
 import { knowledgePage } from "./knowledge-page";
+import { effectiveQuickQuestions, normalizeQuickQuestions } from "./quick-questions";
 import { cleanTitle, type TitleMaker } from "./session-titles";
 import { buildTodayBrief } from "./today-brief";
 import { todayPage } from "./today-page";
@@ -641,6 +642,8 @@ function settingsPayload() {
     model: config.model,
     /** 下拉候选：只读同步缓存/兜底清单，联网刷新走 GET /api/models，别卡住弹窗 */
     models: cachedModelOptions(),
+    /** 输入框上方「常用」快捷问题的当前生效清单（未自定义时为默认） */
+    quickQuestions: effectiveQuickQuestions(loadCredentialsStore()?.webQuickQuestions),
   };
 }
 
@@ -782,6 +785,19 @@ function applySettings(body: Record<string, unknown>): {
   if (qqPatch.appId || qqPatch.appSecret || qqPatch.passcode) {
     const r = setQQBotCredentials(qqPatch);
     results.push({ field: "qq", ok: r.ok, message: r.message.replace(/^[✅❌]\s*/, "") });
+  }
+  // 「常用」快捷问题：数组整体替换（设置面板按清单编辑后一次提交）；
+  // 空/形状不对按空清单处理——空清单即恢复默认，不用单独的「重置」协议
+  if (body.quickQuestions !== undefined) {
+    const normalized = normalizeQuickQuestions(body.quickQuestions);
+    saveCredentialsStore({ webQuickQuestions: normalized });
+    results.push({
+      field: "quickQuestions",
+      ok: true,
+      message: normalized.length
+        ? `常用问题已保存（${normalized.length} 条），输入框上方已同步更新`
+        : "常用问题已清空，恢复默认清单",
+    });
   }
   let modelChanged = false;
   const requestedModel = typeof body.model === "string" ? body.model.trim() : "";

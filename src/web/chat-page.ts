@@ -131,20 +131,27 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   }
   .sess li { display: grid; grid-template-columns: 1fr auto; column-gap: 6px;
              padding: 9px 8px 9px 11px; border-left: 2px solid transparent;
-             border-radius: 0 4px 4px 0; cursor: pointer;
+             border-radius: 0 4px 4px 0; cursor: pointer; position: relative;
              transition: background .15s ease, border-color .15s ease; }
   /* 悬停浮现浅朱砂竖线（「可进入」记号的浅一档），选中项保持实朱砂——
      两级一眼可分；写在 .on 之前，同特异性下选中态优先 */
   .sess li:hover { background: var(--card); border-left-color: var(--accent-soft); }
   .sess li.on { border-left-color: var(--accent); background: var(--card);
                 box-shadow: var(--shadow-sm); }
-  /* 时间分组题注：档案按日期归档（置顶组独立在最前）；不可点、不吃 hover */
-  .sess li.sgroup { display: block; cursor: default;
-                    padding: 12px 8px 4px 11px; border-left-color: transparent;
-                    font-family: var(--mono); font-size: 11px; letter-spacing: .12em;
-                    color: var(--ink-3); }
-  .sess li.sgroup:hover { background: none; border-left-color: transparent; }
-  .sess li.sgroup:first-child { padding-top: 2px; }
+  /* 悬停时间戳：绝对定位浮在 ⋯ 左侧，不占网格轨道——不悬停时标题吃满整行；
+     等宽定宽（YYYY-MM-DD HH:MM），淡入淡出不引起行内回流 */
+  .sess .stime { position: absolute; right: 36px; top: 50%;
+                 transform: translateY(-50%); white-space: nowrap;
+                 font-family: var(--mono); font-size: 11px;
+                 color: var(--ink-3); pointer-events: none; opacity: 0;
+                 background: inherit; transition: opacity .15s ease; }
+  .sess li:hover .stime { opacity: 1; }
+  /* 悬停时标题右侧渐隐让位：只有长到撞上时间戳的标题会被淡出
+     （时间戳约 106px + 右缘 36px 偏移，透明区从行内右侧 110px 起兜住它），
+     短标题落在渐变区外、完全不受影响 */
+  .sess li:hover .st {
+    -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 132px), transparent calc(100% - 108px));
+    mask-image: linear-gradient(90deg, #000 calc(100% - 132px), transparent calc(100% - 108px)); }
   .sess .st { font-size: 14px; color: var(--ink-2); overflow: hidden;
               text-overflow: ellipsis; white-space: nowrap; }
   .sess li.on .st { color: var(--ink); font-weight: 600; }
@@ -561,6 +568,32 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .model-empty { border: 1px dashed var(--rule-2); border-radius: 3px;
                  background: var(--card); color: var(--ink-3);
                  font-size: 13px; text-align: center; padding: 16px 10px; }
+
+  /* 常用问题栏目：添加行 + 可删 chip 清单，语言与主界面 .chip 一致 */
+  .qq-add { display: flex; gap: 8px; margin: 2px 0 12px; }
+  .qq-add input { flex: 1; min-width: 0; border: 1px solid var(--rule-2);
+                  background: var(--card); color: var(--ink);
+                  font-family: var(--mono); font-size: 14px; padding: 9px 10px;
+                  border-radius: 2px; outline: none; }
+  .qq-add input:focus { border-color: var(--accent);
+                        box-shadow: 0 0 0 3px rgba(173, 57, 44, .09); }
+  .qq-add input::placeholder { color: var(--ink-3); opacity: .75; }
+  .qq-add .tbtn { flex: none; align-self: stretch; min-height: 0; }
+  .qq-list { display: flex; flex-wrap: wrap; gap: 8px; min-height: 38px;
+             margin: 0 0 12px; align-content: flex-start; }
+  .qq-list .qq-empty { border: 1px dashed var(--rule-2); border-radius: 3px;
+                       background: var(--card); color: var(--ink-3);
+                       font-size: 13px; padding: 8px 12px; }
+  .qq-item { display: inline-flex; align-items: center; gap: 8px;
+             border: 1px solid var(--rule-2); background: var(--card);
+             color: var(--ink-2); font-size: 13px; padding: 5px 8px 5px 12px;
+             border-radius: 4px; max-width: 100%; }
+  .qq-item span { overflow-wrap: anywhere; }
+  .qq-item button { flex: none; border: 0; background: none; cursor: pointer;
+                    color: var(--ink-3); font-size: 12px; line-height: 1;
+                    padding: 2px; transition: color .15s ease; }
+  .qq-item button:hover { color: var(--accent-deep); }
+  .qq-item button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
   .data-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; align-items: stretch; }
   .data-cell { border: 1px solid var(--rule); background: var(--card); padding: 10px 8px;
@@ -1038,6 +1071,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
           <button class="set-tab on" type="button" role="tab" id="setTabAccount" aria-controls="setPaneAccount" aria-selected="true" data-pane="account">教务账号</button>
           <button class="set-tab" type="button" role="tab" id="setTabModel" aria-controls="setPaneModel" aria-selected="false" data-pane="model">AI 模型</button>
           <button class="set-tab" type="button" role="tab" id="setTabQQ" aria-controls="setPaneQQ" aria-selected="false" data-pane="qq">QQ 机器人</button>
+          <button class="set-tab" type="button" role="tab" id="setTabQuick" aria-controls="setPaneQuick" aria-selected="false" data-pane="quick">常用问题</button>
           <button class="set-tab" type="button" role="tab" id="setTabData" aria-controls="setPaneData" aria-selected="false" data-pane="data">本地数据</button>
         </nav>
         <div class="set-main">
@@ -1063,6 +1097,17 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             <label class="fld"><span>AppSecret</span><span class="fld-row"><input id="sQQSecret" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyeQQSecret" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
             <label class="fld"><span>激活暗号</span><input id="sQQPass" type="text" autocomplete="off" placeholder="首次激活用的暗号（自定）" ${demo ? "disabled" : ""}></label>
             <div class="cur" id="curQQ">未配置；到 q.qq.com 创建机器人后填入，保存后即可在 QQ 里使用</div>
+          </section>
+          <section class="set-pane" id="setPaneQuick" role="tabpanel" aria-labelledby="setTabQuick" data-pane="quick">
+            <p class="dlg-intro">管理输入框上方「常用」快捷问题：删掉用不上的，加入你常问的。改动需点「保存设置」生效；每条最多 60 字、最多 12 条，清空后恢复默认清单。</p>
+            <div class="qq-add">
+              <input id="quickNewInput" type="text" maxlength="60" autocomplete="off" placeholder="想常问的问题，如：下周三有什么课" ${demo ? "disabled" : ""} aria-label="新增常用问题">
+              <button class="tbtn" id="quickAdd" type="button" ${demo ? "disabled" : ""}>添加</button>
+            </div>
+            <div class="qq-list" id="quickList" aria-label="常用问题清单"></div>
+            <div class="data-actions">
+              <button class="tbtn" id="resetQuick" type="button" ${demo ? "disabled" : ""}>恢复默认</button>
+            </div>
           </section>
           <section class="set-pane" id="setPaneData" role="tabpanel" aria-labelledby="setTabData" data-pane="data">
             <p class="dlg-intro">会话、附件、生成文件与待办都保存在本机，可导出或按需清理。此栏目的操作即时生效，无需点「保存设置」。</p>
