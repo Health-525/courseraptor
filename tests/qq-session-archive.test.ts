@@ -179,3 +179,40 @@ test("桥的落盘入口 archiveQQRound：写对档案，认不出归属时一�
   archiveQQRound({ kind: "c2c", content: "没人认领的一句" }, "回答", console);
   assert.equal(S.listSessions().length, before + 1, "无归属消息不应新增档案");
 });
+
+test("桥落盘后由模型定侧栏标题：保留 QQ 前缀、人工命名让位、失败保首问兜底", async () => {
+  const { archiveQQRound } = await import("../src/qq/bridge");
+  const { setTitleMaker } = await import("../src/session-titles");
+
+  // 注入替身命名 maker（不联网）：QQ 会话标题应换成模型定的主题
+  setTitleMaker(async () => "高数答疑");
+  await archiveQQRound(c2c("C2C_TITLE", "这周的高数课在第几节"), "周四第 3 节", console);
+  const slot = qqArchiveSlot(c2c("C2C_TITLE"))!;
+  const row = S.listSessions().find((m) => m.id === slot.id);
+  assert.ok(row, "命名测试的 QQ 档案应存在");
+  assert.equal(row.title, "QQ｜高数答疑", "模型命名应保留渠道前缀");
+
+  // 人工改名（titleSet 置位）后：再落盘模型命名也让位
+  S.updateSession(slot.id, { title: "我自己的名字" });
+  await archiveQQRound(c2c("C2C_TITLE", "再问一句"), "回答", console);
+  assert.equal(
+    S.listSessions().find((m) => m.id === slot.id)?.title,
+    "我自己的名字",
+    "人工命名优先级高于模型自动命名",
+  );
+
+  // maker 抛错：标题必须保持首问兜底，绝不静默清空
+  setTitleMaker(async () => {
+    throw new Error("网络挂了");
+  });
+  const slot2 = qqArchiveSlot(c2c("C2C_TITLE_FAIL"))!;
+  await archiveQQRound(c2c("C2C_TITLE_FAIL", "群里问的考试安排"), "周五第 2 节", console);
+  assert.equal(
+    S.listSessions().find((m) => m.id === slot2.id)?.title,
+    "QQ｜群里问的考试安排",
+    "命名失败保留首问兜底",
+  );
+
+  // 还原默认 maker，避免影响后续用例
+  setTitleMaker(null);
+});

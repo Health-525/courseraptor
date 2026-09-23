@@ -40,7 +40,7 @@ export interface StoredMessage {
 export interface ChatSession {
   id: string;
   title: string;
-  /** 标题已定（人工改名或模型命名过）：此后不再被自动命名覆盖 */
+  /** 人工命名后置位：此后自动命名让位（模型命名不置位，标题随话题每轮可更新） */
   titleSet?: boolean;
   pinned?: boolean;
   /** 已归档：不出现在主列表，进归档视图，可随时恢复 */
@@ -232,15 +232,17 @@ export function appendRound(
 }
 
 /**
- * 模型命名写入：只在会话尚未定题（titleSet 未置）时生效。
- * 兜底规则：agent 还没就绪、命名失败或返回空时，标题保持「首问截断」，
+ * 模型命名写入：只在会话尚未人工定题（titleSet 未置）时生效，模型命名
+ * 不置位——话题演进后下一轮还能跟着更新。prefix 给非网页渠道保留标记
+ * （QQ 桥传「QQ」/「QQ群」）：标题形如「QQ｜高数答疑」。
+ * 兜底规则：命名失败或返回空时不被调用，标题保持「首问截断」，
  * 绝不静默清空已有标题；置顶过的会话同样尊重 titleSet。
  */
-export function setAutoTitle(id: string, title: string): ChatSession | null {
+export function setAutoTitle(id: string, title: string, prefix?: string): ChatSession | null {
   const list = readSessions();
   const s = list.find((x) => x.id === id);
   if (!s || s.titleSet) return null;
-  const t = titleOf(title);
+  const t = titleOf(title, prefix);
   if (!t) return null;
   s.title = t;
   writeSessions(list.sort(byRecent));

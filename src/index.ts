@@ -79,6 +79,11 @@ if (config.deepseekApiKey) {
   }
 }
 
+// 会话自动命名 maker：直调模型 API（不带工具），失败静默——标题还有首问
+// 兜底。网页与 QQ 桥落的是同一份档案，注册表也共用（src/session-titles.ts），
+// 装配赶在 QQ 桥启动之前
+await import("./session-titles").then(({ installDefaultTitleMaker }) => installDefaultTitleMaker());
+
 // QQ 渠道：日志写 qq-bridge.log，不干扰终端渲染
 if (config.qqBotAppId && config.qqBotAppSecret) {
   const { startQQBridge } = await import("./qq/bridge");
@@ -91,28 +96,11 @@ if (config.qqBotAppId && config.qqBotAppSecret) {
 const agent = await createRaptorAgent();
 
 // 网页对话窗口：浏览器打开即聊（地址显示在欢迎卡片下方），起不来不影响终端
-const { setChatAgent, setChatAgentRefresher, setTitleMaker, startChatWeb } = await import(
-  "./web/chat-web"
-);
+const { setChatAgent, setChatAgentRefresher, startChatWeb } = await import("./web/chat-web");
 setChatAgent(agent);
 // 换模型即重建 agent 给网页用；终端 TUI 持有的是上面这个实例，重启后才用新模型
 setChatAgentRefresher(async () => {
   setChatAgent(await createRaptorAgent());
-});
-// 会话自动命名：直接调模型 API（不带工具），失败静默——标题还有首问兜底
-setTitleMaker(async (input) => {
-  const { generateText } = await import("ai");
-  const { createDeepSeek } = await import("@ai-sdk/deepseek");
-  const deepseek = createDeepSeek(
-    config.deepseekBaseUrl ? { baseURL: config.deepseekBaseUrl } : {},
-  );
-  const result = await generateText({
-    model: deepseek(config.model),
-    prompt: (await import("./web/session-titles")).buildTitlePrompt(input.messages),
-    maxOutputTokens: 30,
-    abortSignal: AbortSignal.timeout(15_000),
-  });
-  return result.text;
 });
 startChatWeb().catch(() => {});
 
