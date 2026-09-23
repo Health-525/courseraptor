@@ -619,14 +619,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                               border-color: var(--accent); }
   .data-cell.err { color: var(--accent-deep); font-family: var(--mono); font-size: 12px; }
 
-  #toBottom { position: fixed; right: 30px; bottom: 104px; z-index: 5;
-              background: var(--card); border: 1px solid var(--rule-2);
-              color: var(--ink-2); font-size: 13px; padding: 7px 13px;
-              border-radius: 4px; cursor: pointer;
-              box-shadow: 0 2px 10px rgba(38, 35, 29, 0.08); }
-  #toBottom[hidden] { display: none; }
-  #toBottom:hover { border-color: var(--accent); color: var(--accent); }
-
   .drawer-backdrop { display: none; position: fixed; inset: 0; z-index: 39;
                      background: rgba(38, 35, 29, .35); }
 
@@ -915,7 +907,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .qlabel { margin-top: 0; }
     .qchips { flex-wrap: nowrap; overflow-x: auto; }
     .fhint { display: none; }
-    #toBottom { right: 14px; bottom: 96px; }
   }
   @media (max-width: 560px) {
     .topbar { min-height: 54px; padding: 8px 12px; gap: 7px; }
@@ -1086,7 +1077,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   </div>
 </aside>
 <div class="drawer-backdrop" id="drawerBackdrop"></div>
-<button id="toBottom" hidden>↓ 回到底部</button>
 <script>
 ${appJs()}
 </script>
