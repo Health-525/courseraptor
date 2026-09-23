@@ -59,4 +59,9 @@ export interface NewsItem {
   url: string;
   date: string;
   category?: string;
+  /**
+   * 官网设置了浏览权限的文章（webplus 未静态化，列表里只给 article.jsp
+   * 动态链接）：匿名打开原文会被 302 到 auth.htm「您无权访问此页面」
+   */
+  restricted?: boolean;
 }

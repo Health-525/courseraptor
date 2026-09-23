@@ -148,8 +148,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .sess .st { font-size: 14px; color: var(--ink-2); overflow: hidden;
               text-overflow: ellipsis; white-space: nowrap; }
   .sess li.on .st { color: var(--ink); font-weight: 600; }
-  .sess .sm { grid-column: 1; font-family: var(--mono); font-size: 12px;
-              color: var(--ink-3); letter-spacing: .03em; }
   .sess .spin { display: inline-flex; align-items: center; gap: 3px;
                 color: var(--accent); margin-right: 5px; font-size: 11px; }
   .sess .spin svg { width: 10px; height: 10px; flex: none; fill: none;
@@ -163,12 +161,12 @@ export function chatPage(options: { demo?: boolean } = {}): string {
               font-size: 16px; cursor: pointer; padding: 0 4px;
               transition: opacity .15s ease, color .15s ease; }
   .sess .sx:hover, .sess .sx[aria-expanded="true"] { opacity: 1; color: var(--accent); }
-  /* 会话操作菜单：浮在条目右上方的纸片卡片，不再撑开列表行 */
-  .sess li { position: relative; }
-  .smenu { position: absolute; right: 6px; top: calc(100% - 4px); z-index: 30;
-           min-width: 128px; border: 1px solid var(--rule-2); border-radius: 4px;
-           background: var(--card); box-shadow: 0 10px 34px rgba(50, 42, 31, .16);
-           padding: 4px; }
+  /* 会话操作菜单：挂在 body 上、贴着 ⋯ 按钮右侧弹出的纸片卡片——侧栏列表
+     是滚动容器，藏在条目里会被裁剪。fixed + JS 定位，z 压过抽屉/大厅 */
+  .smenu { position: fixed; z-index: 60;
+            min-width: 128px; border: 1px solid var(--rule-2); border-radius: 4px;
+            background: var(--card); box-shadow: 0 10px 34px rgba(50, 42, 31, .16);
+            padding: 4px; }
   .smenu button { display: flex; width: 100%; align-items: center; gap: 8px;
                   border: 0; background: none; cursor: pointer; text-align: left;
                   padding: 7px 10px; font-size: 13px; color: var(--ink-2);
@@ -579,11 +577,12 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .setmsg.good .setmsg-line { margin: 0; }
   .setmsg.good .setmsg-line.bad { color: var(--accent-deep); }
   /* 设置状态总览：四栏配置一览（已配/未配），点 chip 直达对应栏目 */
-  .set-status { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+  .set-status { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+                gap: 8px; margin: 0 0 12px; }
   .set-status:empty { display: none; }
-  .set-chip { flex: 1 1 60px; min-width: 0; display: inline-flex; align-items: center; gap: 6px;
+  .set-chip { display: flex; align-items: center; gap: 7px;
               border: 1px solid var(--rule); background: var(--card); border-radius: 3px;
-              padding: 6px 8px; cursor: pointer; font-family: var(--mono); font-size: 11px;
+              padding: 8px 12px; cursor: pointer; font-family: var(--mono); font-size: 12px;
               color: var(--ink-2); white-space: nowrap; }
   .set-chip:hover { border-color: var(--accent); color: var(--accent); }
   .set-chip .dot { flex: none; width: 7px; height: 7px; border-radius: 50%;
@@ -726,18 +725,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-item-main { flex: 1; min-width: 0; }
   /* 勾选即完成是乐观更新：先变灰 + 标题删除线，后台落盘 */
   .hall-item.done { opacity: .55; }
-  .hall-item.done .ht { text-decoration: line-through; }
-  .todo-add { margin: 0 0 8px; }
-  .todo-add > .tbtn { min-height: 32px; padding: 3px 12px; font-size: 12px; color: var(--ink-3); }
-  .todo-form { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-  .todo-form input { flex: 1 1 150px; min-width: 0;
-                     border: 1px solid var(--rule-2); background: var(--card);
-                     color: var(--ink); font-family: var(--mono); font-size: 13px;
-                     padding: 7px 8px; border-radius: 3px; outline: none; }
-  .todo-form input:focus { border-color: var(--accent); }
-  .todo-form .tbtn { min-height: 32px; padding: 3px 12px; font-size: 12px; }
-  .todo-form .tbtn.primary { background: var(--accent); border-color: var(--accent);
-                             color: var(--card); font-weight: 600; }
+   .hall-item.done .ht { text-decoration: line-through; }
    /* 勾选框：自绘纸片方框（与 /today 页 .todo-chk 同一套），选中朱砂底 + 纸色勾 */
    .hall-done { appearance: none; -webkit-appearance: none; position: relative;
                 flex: none; width: 18px; height: 18px; margin: 2px 0 0;
@@ -757,14 +745,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                font-size: 12px; cursor: pointer; border-radius: 3px;
                transition: color .15s ease, background .15s ease; }
    .hall-del:hover { color: var(--accent); text-decoration: underline; }
-   .hall-del.armed { color: var(--card); background: var(--accent); }
-   /* 条目编辑：与删除同一文字按钮语言，排在 .ics 前 */
-   .hall-edit { flex: none; border: 0; background: none; padding: 4px 8px;
-                min-height: 28px; color: var(--ink-3); font-family: var(--mono);
-                font-size: 12px; cursor: pointer; border-radius: 3px;
-                transition: color .15s ease; }
-   .hall-edit:hover { color: var(--accent); text-decoration: underline; }
-   /* 待办分组题注：与 /today 页 .todo-group 同一语言（等宽小字 + 计数），只更紧凑 */
+    .hall-del.armed { color: var(--card); background: var(--accent); }
+    /* 待办分组题注：与 /today 页 .todo-group 同一语言（等宽小字 + 计数），只更紧凑 */
    .hall-group { margin: 12px 0 6px; font-family: var(--mono); font-size: 11.5px;
                  letter-spacing: .12em; color: var(--ink-3); }
    .hall-group:first-of-type { margin-top: 2px; }
@@ -779,26 +761,17 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                color: var(--ink-3); text-decoration: none; border: 1px solid var(--rule);
                border-radius: 3px; padding: 2px 7px; white-space: nowrap; }
    .hall-ics:hover { border-color: var(--accent); color: var(--accent); }
-   /* 行内动作（编辑 / .ics / 删除）平时退后半档，悬停或聚焦该行时全显；
-      armed 确认态必须始终可见；触屏无悬停，常显 */
-   .hall-item .hall-edit, .hall-item .hall-ics, .hall-item .hall-del { opacity: .45; }
-   .hall-item:hover .hall-edit, .hall-item:hover .hall-ics, .hall-item:hover .hall-del,
-   .hall-item:focus-within .hall-edit, .hall-item:focus-within .hall-ics,
-   .hall-item:focus-within .hall-del { opacity: 1; }
-   .hall-del.armed { opacity: 1; }
-   @media (hover: none) {
-     .hall-item .hall-edit, .hall-item .hall-ics, .hall-item .hall-del { opacity: 1; }
-   }
-  /* 添加表单校验与快捷时间：错误行是朱砂小字，快捷 chip 是等宽小按钮 */
-  .hall-err { display: none; flex-basis: 100%; font-family: var(--mono); font-size: 12px;
-              color: var(--accent-deep); line-height: 1.6; }
-  .hall-err.show { display: block; }
-  .hall-quick { display: flex; flex-basis: 100%; gap: 6px; flex-wrap: wrap; }
-  .hall-quick button { border: 1px solid var(--rule); background: var(--paper);
-                       color: var(--ink-2); font-family: var(--mono); font-size: 11px;
-                       border-radius: 3px; padding: 2px 8px; cursor: pointer; min-height: 26px; }
-  .hall-quick button:hover { border-color: var(--accent); color: var(--accent); }
-  /* 知识分类筛：横向可滚的一排小 chip，与搜索框叠加过滤 */
+    /* 行内动作（.ics / 删除）平时退后半档，悬停或聚焦该行时全显；
+       armed 确认态必须始终可见；触屏无悬停，常显 */
+    .hall-item .hall-ics, .hall-item .hall-del { opacity: .45; }
+    .hall-item:hover .hall-ics, .hall-item:hover .hall-del,
+    .hall-item:focus-within .hall-ics,
+    .hall-item:focus-within .hall-del { opacity: 1; }
+    .hall-del.armed { opacity: 1; }
+    @media (hover: none) {
+      .hall-item .hall-ics, .hall-item .hall-del { opacity: 1; }
+    }
+   /* 知识分类筛：横向可滚的一排小 chip，与搜索框叠加过滤 */
   .hall-cats { display: flex; gap: 6px; overflow-x: auto; margin: 0 0 10px; padding-bottom: 2px; }
   .hall-cat { flex: none; border: 1px solid var(--rule); background: var(--card);
               color: var(--ink-2); font-family: var(--mono); font-size: 11px;
