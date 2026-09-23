@@ -32,6 +32,7 @@ import { config } from "../config";
 import { drainGeneratedRound, runInDocumentRound } from "../document/save";
 import { ensureCredentials } from "../onboarding";
 import { migratedDataPath } from "../paths";
+import { maybeAutoTitle } from "../session-titles";
 import { localOnlyCommandMessage } from "../tui/slash-menu";
 import { mdToPlain, splitMessage } from "./format";
 import { registerQQPush } from "./push";
@@ -166,12 +167,17 @@ function humanizeError(e: unknown): string {
  * 只写不读：QQ 的模型上下文照旧走上面的内存窗口，网页里删改这些档案
  * 不会反过来影响 QQ 对话。落盘是附加品，写坏了只记日志，绝不让用户在
  * 那头等不到回复。抽成具名函数是为了能被单测钉住「桥确实会写」。
+ *
+ * 落盘后顺手让模型给会话定个像样的侧栏标题（与网页同一套命名）：同步
+ * 部分只有 appendRound，命名在后台尽力而为——调用方不等待也不该等待，
+ * 慢了/败了标题就保持「QQ｜首问截断」兜底。返回 Promise 仅供单测钉住
+ * 「命名确实发生过」。
  */
-export function archiveQQRound(
+export async function archiveQQRound(
   msg: QqArchiveInput,
   answer: string | null,
   log: BridgeLogger = console,
-): void {
+): Promise<void> {
   const slot = qqArchiveSlot(msg);
   if (!slot) return;
   try {
@@ -180,7 +186,9 @@ export function archiveQQRound(
     });
   } catch (e) {
     log.error(`[qq] 历史落盘失败：${(e as Error)?.message ?? e}`);
+    return;
   }
+  await maybeAutoTitle(slot.id, { titlePrefix: slot.titlePrefix });
 }
 
 // ── 主流程 ────────────────────────────────────────────────────
@@ -279,12 +287,14 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
     const userMsg: ModelMessage = { role: "user", content: text };
 
     // 网页侧栏的历史记录：私聊每人一档、群聊每群一档（粒度见 session-archive.ts）。
-    // 一轮只记一次——成功记整轮问答，失败只留「他在 QQ 里问过这句」
+    // 一轮只记一次——成功记整轮问答，失败只留「他在 QQ 里问过这句」。
+    // archiveQQRound 已改异步（落盘后还要让模型定标题），这里不等待：
+    // 同步落盘先行，命名在后台尽力而为，绝不拖住 QQ 回复
     let archived = false;
     const archive = (answer: string | null): void => {
       if (archived) return;
       archived = true;
-      archiveQQRound(msg, answer, log);
+      void archiveQQRound(msg, answer, log);
     };
 
     const stopNotices = startWaitingNotices((t) => bot.sendText(msg.replyTarget, t));
@@ -382,6 +392,11 @@ export async function startStandaloneQQ(
 }
 
 if (isEntry) {
+  // 侧栏会话标题的模型命名：独立跑桥也照常装配（与嵌入模式的 index.ts
+  // 同一个注册表），QQ 落进档案的会话同样有模型定的标题
+  await import("../session-titles").then(({ installDefaultTitleMaker }) =>
+    installDefaultTitleMaker(),
+  );
   await startStandaloneQQ();
   // 独立跑桥时待办提醒照常工作（主入口 index.ts 里另有启动）
   const { startTodoReminderScheduler } = await import("../todo-reminders");

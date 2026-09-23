@@ -39,7 +39,6 @@ import {
   listSessions,
   readSessions,
   resetAll,
-  setAutoTitle,
   updateSession,
 } from "../chat-sessions";
 import { config } from "../config";
@@ -71,6 +70,7 @@ import {
   type PomodoroView,
   toView,
 } from "../pomodoro";
+import { maybeAutoTitle } from "../session-titles";
 import { relevanceOf } from "../tools/news";
 import {
   addReminder,
@@ -90,7 +90,6 @@ import {
 import { chatPage } from "./chat-page";
 import { knowledgePage } from "./knowledge-page";
 import { effectiveQuickQuestions, normalizeQuickQuestions } from "./quick-questions";
-import { cleanTitle, type TitleMaker } from "./session-titles";
 import { buildTodayBrief } from "./today-brief";
 import { todayPage } from "./today-page";
 
@@ -217,34 +216,9 @@ export function setChatAgentRefresher(refresh: () => Promise<void>): void {
   agentRefresher = refresh;
 }
 
-// ── 会话自动命名：落盘后让模型把「首问截断」换成像样的标题 ──────
-
-/** 主程序注入的真实命名实现；null 时（测试/agent 未装配）自动命名静默关闭 */
-let titleMaker: TitleMaker | null = null;
-
-export function setTitleMaker(maker: TitleMaker | null): void {
-  titleMaker = maker;
-}
-
-/**
- * 一轮完整落盘后调用：会话尚未定题（titleSet 未置）才交给模型命名。
- * 尽力而为——maker 缺席、联网失败、输出不合形状都直接放弃，标题保持
- * 首问兜底，绝不影响对话主流程，也不抛错打断落盘链。
- */
-async function maybeAutoTitle(sessionId: string): Promise<void> {
-  if (!titleMaker) return;
-  try {
-    const s = getSession(sessionId);
-    if (!s || s.titleSet || !s.messages.length) return;
-    const raw = await titleMaker({
-      messages: s.messages.map(({ role, text }) => ({ role, text })),
-    });
-    const title = cleanTitle(raw);
-    if (title) setAutoTitle(sessionId, title);
-  } catch {
-    // 命名失败无关紧要：兜底标题还在
-  }
-}
+// ── 会话自动命名：协调器在 src/session-titles.ts（QQ 桥也走同一套）。
+// setTitleMaker 原地转出口：index.ts 与测试的旧装配入口不变。
+export { setTitleMaker } from "../session-titles";
 
 /** 重建串行链：连续保存两次模型也不会并发建两个 agent */
 let refreshChain: Promise<string> = Promise.resolve("");
