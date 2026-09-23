@@ -119,13 +119,10 @@ qchips.addEventListener("click", (e) => {
 });
 
 /* ── 智能滚动：用户上翻（离底 > 60px）就不再自动拽底 ── */
-const toBottom = document.getElementById("toBottom");
 let pinned = true;
 logScroll.addEventListener("scroll", () => {
   pinned = logScroll.scrollHeight - logScroll.scrollTop - logScroll.clientHeight < 60;
-  toBottom.hidden = pinned;
 });
-toBottom.addEventListener("click", () => scroll(true));
 
 const HAS_MARKED = typeof marked !== "undefined";
 /* 只转义 & 和 <：堵住 HTML 标签注入面（标签必须以 < 开头），同时保留
