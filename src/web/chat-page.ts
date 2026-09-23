@@ -699,6 +699,36 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-badge.warn { background: var(--accent); color: var(--card); font-weight: 600; }
   .hall-note { margin: 14px 2px 0; font-family: var(--mono); font-size: 12px;
                color: var(--ink-3); line-height: 1.7; }
+  /* 主页封面简报条：标题横线与首个分组之间不再空着——日期周次、下节课、
+     要紧事三行，都是 /api/today 里的现成数据。日期行用本地时钟先上
+     （打开即有，不闪空），课表/待办等 brief 到位后再补。
+     「下节」一行沿用目录行的语言：朱砂竖线悬停浮现 = 可进入 */
+  .hall-brief { margin: 0 2px; }
+  .hb-date { font-family: var(--mono); font-size: 12px; letter-spacing: .04em;
+             color: var(--ink-3); }
+  .hb-next { position: relative; display: flex; align-items: center; gap: 8px;
+             width: 100%; text-align: left; border: 0; background: none;
+             padding: 9px 6px 9px 15px; margin: 2px 0 0; cursor: pointer;
+             font-family: inherit; transition: background .15s ease; }
+  .hb-next::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px;
+                     width: 3px; background: var(--accent);
+                     opacity: 0; transition: opacity .15s ease; }
+  .hb-next:hover { background: var(--paper-deep); }
+  .hb-next:hover::before { opacity: 1; }
+  .hb-next:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  /* 眉标与徽标同一配方（浅朱砂底等宽小字），只是长在大厅封面上 */
+  .hb-eyebrow { flex: none; font-family: var(--mono); font-size: 11px;
+                letter-spacing: .04em; color: var(--accent-deep);
+                background: var(--accent-soft); padding: 1px 8px; border-radius: 2px;
+                white-space: nowrap; }
+  .hb-next b { flex: 1; min-width: 0; font-size: 14px; font-weight: 600;
+               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hb-meta { flex: none; max-width: 55%; font-family: var(--mono); font-size: 12px;
+             color: var(--ink-3); overflow: hidden; text-overflow: ellipsis;
+             white-space: nowrap; }
+  .hb-signals { margin: 4px 2px 0; font-family: var(--mono); font-size: 12px;
+                color: var(--ink-3); line-height: 1.7; }
+  .hb-signals .warn { color: var(--accent-deep); }
   /* 主页页脚的仓库入口：与 .hall-note 同语言的等宽小字，描线 GitHub 标随文字同色；
      宫格的「可进入」记号是行首朱砂竖线，这里换成语义最直白的外链染朱砂。
      块级 flex（而非 inline-flex）：仓库链接与求星行各占一行，
