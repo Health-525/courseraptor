@@ -10,7 +10,9 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
   const base = `http://127.0.0.1:${address.port}`;
   try {
     const html = await (await fetch(base)).text();
-    assert.match(html, /离线演示 · 全部为虚构数据/);
+    // 演示横幅已按需求移除：演示特征改由输入区提示语与各页内嵌数据体现
+    assert.match(html, /虚构示例，会话仅保留在内存/);
+    assert.doesNotMatch(html, /demo-banner/);
     assert.match(html, /id="hallSettings"/, "设置面板常驻在功能大厅抽屉里");
     assert.match(html, /id="sUser"[^>]+disabled/);
     // 型号改用卡片单选：hidden input 载值，无 disabled 属性可挂，演示拦截由脚本守卫实现
@@ -28,7 +30,8 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
     assert.match(reply, /示例高等数学/);
     // 课表结果卡已移除：演示只回 Markdown 示例课表，不再有 "t":"card"
     assert.doesNotMatch(reply, /"t":"card"/);
-    assert.match(reply, /"t":"end","sid":"demo-a"/);
+    assert.match(reply, /"t":"tool","phase":"start","id":"demo-get_schedule/);
+    assert.match(reply, /"t":"end","dur":\d+,"sid":"demo-a"/);
     await send({ message: "我的成绩和 GPA", sessionId: "demo-b" });
     const first = await (await fetch(`${base}/api/sessions/demo-a`)).json();
     assert.equal(first.messages.length, 2);
@@ -71,7 +74,7 @@ test("演示模式的今日日程页：内嵌虚构数据，不发请求", async
     assert.equal(res.status, 200);
     const html = await res.text();
     assert.match(html, /今日日程/);
-    assert.match(html, /离线演示 · 虚构数据/);
+    assert.doesNotMatch(html, /demo-banner/, "演示横幅已移除，演示页与正式页同视觉");
     // 演示数据内嵌（DEMO_DATA 非空），页面不依赖 /api/today
     assert.match(html, /const DEMO_DATA = \{/);
     assert.match(html, /示例高等数学/);
@@ -100,7 +103,7 @@ test("演示模式的知识库页：内嵌虚构数据，不发请求", async ()
     assert.equal(res.status, 200);
     const html = await res.text();
     assert.match(html, /知识库/);
-    assert.match(html, /离线演示 · 虚构数据/);
+    assert.doesNotMatch(html, /demo-banner/, "演示横幅已移除，演示页与正式页同视觉");
     // 演示数据内嵌（DEMO_DATA 非空），页面不依赖 /api/knowledge
     assert.match(html, /const DEMO_DATA = \[/);
     assert.match(html, /洛必达法则/);

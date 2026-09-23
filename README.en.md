@@ -34,7 +34,15 @@ CourseRaptor brings timetables, grades, exams, academic announcements, and calen
 | Can I use my phone calendar? | Local `.ics` export; optional publication to a public GitHub/Gitee subscription source |
 | Can I turn this material into a document? | Local document/table reading and Word, Excel, PowerPoint, and PDF generation |
 
-![Latest web UI: weekly timetable with todo and knowledge cards (fictional demo data)](docs/screenshot-demo.jpg)
+Both screenshots use fictional demo data.
+
+**Terminal TUI** — type `raptor` to chat; the first screen shows today's classes, todos, upcoming exams, and latest notices:
+
+![Terminal TUI welcome panel](docs/screenshots/tui.png)
+
+**Web chat** — open `http://localhost:3210` in a browser; reasoning and tool calls are visible in the conversation:
+
+![Web chat](docs/screenshots/gui.png)
 
 ## Try it without credentials
 

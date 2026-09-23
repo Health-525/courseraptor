@@ -37,7 +37,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
      暖纸底 + 墨色字 + 单一朱砂红；报头楷体、数据等宽小字、正文系统黑体。
      没有渐变、没有光斑、没有玻璃——所有颜色只在这一个 :root 里定义。 */
   :root {
-    color-scheme: light dark;
+    color-scheme: light;
     --paper: #F6F4ED;   /* 纸面 */
     --paper-deep: #F0EDE4;
     --card: #FCFBF7;    /* 浮起的纸片 */
@@ -223,12 +223,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             border-bottom: 1px solid var(--rule); background: var(--paper-deep); }
   .topbar .tb-title { margin-right: auto; font-size: 18px; }
   .topbar .tbtn { min-height: 34px; padding: 5px 11px; font-size: 13px; }
-  .demo-banner { display: flex; align-items: baseline; gap: 12px;
-                 padding: 12px 32px; border-bottom: 1px solid var(--rule);
-                 background: var(--accent-soft); color: var(--accent-deep);
-                 font-size: 14px; line-height: 1.55; }
-  .demo-banner strong { flex: none; font-size: 14px; }
-  .demo-banner span { color: var(--ink-2); }
   #log { flex: 1; min-height: 0; overflow-y: auto; padding: 44px 40px 36px; }
   .inner { width: min(100%, 800px); min-height: 100%; margin: 0 auto; }
 
@@ -912,7 +906,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     body.drawer-open aside { transform: translateX(0); }
     body.drawer-open .drawer-backdrop { display: block; }
     .topbar { display: flex; }
-    .demo-banner { padding: 10px 16px; }
     #log { padding: 28px 20px 24px; }
     form { padding: 11px 16px 10px; }
     /* 窄屏快捷问题回单排横滚：wrap 三四行会挤压输入区 */
@@ -926,8 +919,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .topbar { min-height: 54px; padding: 8px 12px; gap: 7px; }
     .topbar .tb-title { font-size: 17px; }
     .topbar .tbtn { min-height: 32px; padding: 4px 9px; font-size: 12px; }
-    .demo-banner { display: block; padding: 9px 14px; font-size: 12px; }
-    .demo-banner strong { display: block; margin-bottom: 2px; font-size: 13px; }
     #log { padding: 22px 15px 18px; }
     .hero { justify-content: center; padding: 32px 4px 48px; }
     .hero .seal { width: 92px; height: 92px; margin-bottom: 22px; }
@@ -962,47 +953,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .set-tab.on { border-bottom-color: var(--accent); box-shadow: none; }
     .set-main { padding-right: 0; }
   }
-  /* ── 暗色模式：夜班编辑部 —— 深墨底纸 + 提亮朱砂 + 暖白墨字。
-     不是简单反色：纸面换深褐墨底（不是纯黑，保留「纸」的质感），
-     朱砂红提亮到 #D14A3C 以在深底上保持辨识度，墨字反成暖白。
-     所有覆盖值已按 WCAG AA 校过对比度（正文 ≥4.5:1，大字 ≥3:1）。 ── */
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --paper: #1F1D1A;
-      --paper-deep: #1A1815;
-      --card: #2A2722;
-      --shade: #23211D;
-      --ink: #EDE9DF;
-      --ink-2: #B8B0A0;
-      --ink-3: #8E8674;
-      --rule: #3A362F;
-      --rule-2: #4A453C;
-      --accent: #D14A3C;
-      --accent-deep: #B83A2E;
-      --accent-soft: #3A2520;
-      --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.28);
-    }
-    /* 原生滚动条在暗底下默认是深灰，显式给一层与纸底区分的-thumb */
-    ::-webkit-scrollbar { width: 8px; height: 8px; }
-    ::-webkit-scrollbar-track { background: var(--paper-deep); }
-    ::-webkit-scrollbar-thumb {
-      background: var(--rule-2); border: 2px solid transparent;
-      background-clip: content-box; border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover { background: var(--ink-3); background-clip: content-box; }
-    /* 主按钮在暗底上用浅暖白字而非纯白，避免过曝 */
-    #b { color: #FBF7EE; }
-    .mastbtns .tbtn.primary { color: #FBF7EE; }
-    /* 朱砂浅底按钮在暗底下文字色 */
-    .mastbtns .tbtn.hall-btn { color: #E8A89E; }
-    .mastbtns .tbtn.hall-btn:hover { color: #FBF7EE; }
-    /* 会话列表选中项的工具卡阴影在暗底下要更深才看得见 */
-    .sess li.on { box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3); }
-    /* 代码块/预览区在暗底下底色要跟纸面拉开一级 */
-    .md pre { background: var(--paper-deep); }
-    .tool pre { background: var(--paper-deep); }
-  }
-  @media (prefers-reduced-motion: reduce) {
+    @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important;
                              transition: none !important; }
   }
@@ -1023,7 +974,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   </section>
 </aside>
 <main>
-  ${demo ? '<div class="demo-banner" role="status"><strong>离线演示 · 全部为虚构数据</strong><span>不连接教务或 AI，不保存到磁盘。请勿输入个人信息。正式使用请在终端运行 npm start。</span></div>' : ""}
   <div class="topbar">
     <span class="tb-title wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></span>
     <button class="tbtn" id="openHallM" aria-haspopup="dialog" aria-expanded="false" aria-controls="hall">大厅</button>
@@ -1035,8 +985,12 @@ export function chatPage(options: { demo?: boolean } = {}): string {
       <div class="seal" aria-hidden="true"><img src="/logo.png" alt="" width="80" height="80"></div>
       <p class="hero-kicker" id="heroKicker">TODAY</p>
       <h2 id="heroGreet">同学，你好。</h2>
-      <p>课表、成绩、考试、通知——直接用一句话问。<br>
-      <span class="hint">${demo ? "点击下方提示词体验示例；演示会话在服务重启后清空。" : "会话保存在本机；提问与所需查询结果会发送至配置的 AI 服务。"}</span></p>
+      <p>课表、成绩、考试、通知——直接用一句话问。${
+        demo
+          ? `<br>
+      <span class="hint">点击下方提示词体验示例；演示会话在服务重启后清空。</span>`
+          : ""
+      }</p>
     </div>
   </div></div>
   <form id="f">
