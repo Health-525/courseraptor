@@ -700,8 +700,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-note { margin: 14px 2px 0; font-family: var(--mono); font-size: 12px;
                color: var(--ink-3); line-height: 1.7; }
   /* 主页页脚的仓库入口：与 .hall-note 同语言的等宽小字，描线 GitHub 标随文字同色；
-     宫格的「可进入」记号是行首朱砂竖线，这里换成语义最直白的外链染朱砂 */
-  .hall-gh { display: inline-flex; align-items: center; gap: 7px;
+     宫格的「可进入」记号是行首朱砂竖线，这里换成语义最直白的外链染朱砂。
+     块级 flex（而非 inline-flex）：仓库链接与求星行各占一行，
+     行内盒在抽屉宽屏时会并到同一行去；整行也是热区，好点 */
+  .hall-gh { display: flex; align-items: center; gap: 7px;
              margin: 10px 2px 0; font-family: var(--mono); font-size: 12px;
              letter-spacing: .02em; color: var(--ink-3); text-decoration: none;
              transition: color .15s ease; }
@@ -710,6 +712,11 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-gh svg { flex: none; width: 15px; height: 15px; fill: none;
                  stroke: currentColor; stroke-width: 1.8;
                  stroke-linecap: round; stroke-linejoin: round; }
+  /* 求 Star 的一行：紧贴仓库链接成一组；五角星常亮朱砂（整套 UI 只有墨与朱砂），
+     悬停时星星微微放大——宫格箭头会平移，这里也留一个可发现的小动效 */
+  .hall-gh.gh-star { margin-top: 6px; }
+  .gh-star svg { color: var(--accent); transition: transform .2s ease; }
+  .gh-star:hover svg { transform: scale(1.2); }
   /* 面板工具条：条数在左，刷新与完整页在右；粘在面板顶部方便长列表回看。
      z-index 必须显式给：行内动作按钮（原文/删除/.ics）带 opacity .45 各自成合成组，
      光靠 sticky 的默认绘制顺序压不住，滚动时会从工具条上穿模 */
