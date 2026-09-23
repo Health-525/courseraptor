@@ -875,6 +875,9 @@ const HALL_ICONS = {
     + '<line x1="10" y1="2" x2="14" y2="2"/>'
     + '<line x1="12" y1="14" x2="15" y2="11"/>'
     + '<circle cx="12" cy="14" r="8"/></svg>',
+  prompts: '<svg viewBox="0 0 24 24" aria-hidden="true">'
+    + '<path d="m4 17 6-6-6-6"/>'
+    + '<path d="M12 19h8"/></svg>',
   settings: GEAR,
 };
 const HALL_CARDS = [
@@ -889,7 +892,10 @@ const HALL_CARDS = [
      照常可用——manage_pomodoro 工具、SSE 事件、对话内 .pomo 倒计时卡与
      buildPomodoro 面板逻辑全部保留，恢复展示只需去掉 hidden 标记 */
   { id: "pomodoro", t: "番茄钟", d: "进行中实时倒计时与最近记录", group: "效率工具", hidden: true },
-  { id: "settings", t: "设置", d: "教务账号、AI 模型、QQ、常用问题与本地数据", group: "系统" },
+  /* 提示词模板与设置并列（2026-09-23）：原设置里的「常用问题」栏目拆出来
+     成独立面板——它是内容管理，不是凭证配置，混在设置里连保存语义都变了味 */
+  { id: "prompts", t: "提示词模板", d: "输入框上方「提示词」的自定义清单", group: "系统" },
+  { id: "settings", t: "设置", d: "教务账号、AI 模型、QQ 与本地数据", group: "系统" },
 ];
 const HALL_GROUPS = ["学习安排", "效率工具", "系统"];
 const HALL_TITLES = Object.fromEntries(HALL_CARDS.map((c) => [c.id, c.t]));
@@ -1723,6 +1729,7 @@ function hallBadges(dyn) {
 function renderHall(force) {
   const dyn = document.getElementById("hallDyn");
   const staticSettings = document.getElementById("hallSettings");
+  const staticPrompts = document.getElementById("hallPrompts");
   /* 滚动管理：刷新保持位置（clamp 防内容变短），切面板/回主页复位顶部 */
   const keepScroll = !!force;
   const lastTop = hallBody.scrollTop;
@@ -1736,12 +1743,18 @@ function renderHall(force) {
   dyn.innerHTML = "";
   dyn.setAttribute("aria-busy", "false");
   hallBack.hidden = !hallPanel;
-  const isSettings = hallPanel === "settings";
-  staticSettings.hidden = !isSettings;
-  if (isSettings) {
-    /* 设置是常驻 DOM（字段/栏目不重建），进入时只做状态复位与取数 */
+  /* 设置与提示词模板都是常驻 DOM（字段/清单不重建），进入时只做状态复位与取数 */
+  staticSettings.hidden = hallPanel !== "settings";
+  staticPrompts.hidden = hallPanel !== "prompts";
+  if (hallPanel === "settings") {
     hallTitle.textContent = "设置";
     showSettings();
+    settle();
+    return;
+  }
+  if (hallPanel === "prompts") {
+    hallTitle.textContent = "提示词模板";
+    showPrompts();
     settle();
     return;
   }
@@ -1876,10 +1889,6 @@ function closeHall() {
       return;
     }
     disarmSettingsClose();
-    /* 常用问题的编辑随二次确认一并丢弃：下次打开回到已保存基线，
-       不因残留编辑一直卡在「未保存修改」的拦截里 */
-    quickDraft = quickSaved.slice();
-    renderQuickList();
   }
   document.body.classList.remove("hall-open");
   document.getElementById("hall").inert = true;
@@ -1998,14 +2007,35 @@ let setStatus = null;
 /* 设置弹窗关闭后焦点回到触发按钮（键盘用户不丢位置） */
 let settingsReturnFocus = null;
 
-/* ── 常用问题栏目：编辑的是副本 quickDraft，点「保存设置」才随 /api/settings
-   落库；quickSaved 是最近一次服务端返回的基线，dirty 判断与丢弃复位都靠它 ── */
+/* ── 提示词模板面板（#hallPrompts，2026-09-23 从设置拆出）：即改即存。
+   quickSaved 是服务端最近一次确认的基线；增删/恢复默认后立刻 POST，失败回滚
+   并提示——没有草稿态，也就不需要「保存设置」按钮和关闭拦截 ── */
 const quickList = document.getElementById("quickList");
 const quickNewInput = document.getElementById("quickNewInput");
+const promptsMsg = document.getElementById("promptsMsg");
 let quickSaved = DEFAULT_QUESTIONS.slice();
 let quickDraft = quickSaved.slice();
-function quickChanged() {
-  return JSON.stringify(quickDraft) !== JSON.stringify(quickSaved);
+let quickMsgTimer = 0;
+function quickCountText() {
+  return quickDraft.length
+    ? "共 " + quickDraft.length + " 条 · 上限 12 条"
+    : "清单为空 · 保存后恢复默认模板";
+}
+/* 状态小字：常态是条数，保存后闪一下「已保存」，出错换朱砂 */
+function quickIdleMsg() {
+  window.clearTimeout(quickMsgTimer);
+  promptsMsg.className = "setmsg good";
+  promptsMsg.textContent = quickCountText();
+}
+function quickFlashSaved() {
+  window.clearTimeout(quickMsgTimer);
+  promptsMsg.textContent = "已保存 ✓";
+  quickMsgTimer = window.setTimeout(quickIdleMsg, 1500);
+}
+function quickError(text) {
+  window.clearTimeout(quickMsgTimer);
+  promptsMsg.className = "setmsg";
+  promptsMsg.textContent = text;
 }
 function renderQuickList() {
   quickList.innerHTML = "";
@@ -2022,11 +2052,12 @@ function renderQuickList() {
     const del = document.createElement("button");
     del.type = "button";
     del.textContent = "✕";
-    del.title = "删除该问题";
+    del.title = "删除该模板";
     del.setAttribute("aria-label", "删除：" + q);
     del.addEventListener("click", () => {
       quickDraft = quickDraft.filter((x) => x !== q);
       renderQuickList();
+      saveQuick();
     });
     item.appendChild(span);
     item.appendChild(del);
@@ -2039,26 +2070,81 @@ function quickAddFromInput() {
   if (!q || quickDraft.includes(q) || quickDraft.length >= 12) return;
   quickDraft.push(q);
   renderQuickList();
+  saveQuick();
   quickNewInput.focus();
 }
 document.getElementById("quickAdd").addEventListener("click", quickAddFromInput);
 quickNewInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); quickAddFromInput(); }
 });
-document.getElementById("resetQuick").addEventListener("click", () => {
-  quickDraft = DEFAULT_QUESTIONS.slice();
-  renderQuickList();
-});
-/* 服务端清单到位（启动拉取 / 打开设置 / 保存成功）的统一落点：
-   基线与编辑副本同步，主界面 chips 一并刷新 */
+/* 恢复默认是即时的破坏性操作：两步确认（与清理按钮同一语言），确认后才落盘 */
+(function () {
+  const btn = document.getElementById("resetQuick");
+  let armed = false, timer = 0;
+  btn.addEventListener("click", () => {
+    if (btn.disabled) return;
+    if (!armed) {
+      armed = true;
+      btn.textContent = "确认恢复默认？";
+      btn.classList.add("armed");
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        armed = false;
+        btn.textContent = "恢复默认";
+        btn.classList.remove("armed");
+      }, 3000);
+      return;
+    }
+    window.clearTimeout(timer);
+    armed = false;
+    btn.textContent = "恢复默认";
+    btn.classList.remove("armed");
+    quickDraft = DEFAULT_QUESTIONS.slice();
+    renderQuickList();
+    saveQuick();
+  });
+})();
+/* 增删/恢复默认后的落盘：成功用服务端归一化结果回填基线与主界面 chips */
+function saveQuick() {
+  if (document.body.dataset.demo === "true") return;
+  fetch("/api/settings", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ quickQuestions: quickDraft }),
+  }).then((r) => r.json().then((d) => ({ ok: r.ok, d }))).then(({ ok, d }) => {
+    if (!ok || !d.status) throw new Error("save failed");
+    applyQuickQuestions(d.status.quickQuestions);
+    quickFlashSaved();
+  }).catch(() => {
+    quickDraft = quickSaved.slice();
+    renderQuickList();
+    quickError("保存失败，已还原上次保存的清单。");
+  });
+}
+/* 服务端清单到位（打开面板 / 保存成功）的统一落点：
+   基线与编辑副本同步，主界面 chips 与面板状态小字一并刷新 */
 function applyQuickQuestions(list) {
   quickSaved = Array.isArray(list) && list.length ? list.slice() : DEFAULT_QUESTIONS.slice();
   quickDraft = quickSaved.slice();
   renderQuickList();
   quickQuestions = quickSaved.slice();
   renderQchips();
+  quickIdleMsg();
+}
+/* 打开提示词模板面板：先按已知基线渲染（秒开），再和服务端对一次 */
+function showPrompts() {
+  const hall = document.getElementById("hall");
+  if (!hall.contains(document.activeElement)) settingsReturnFocus = document.activeElement;
+  quickIdleMsg();
+  fetch("/api/settings").then((r) => r.json()).then((d) => {
+    if (hallPanel !== "prompts") return;
+    applyQuickQuestions(d.quickQuestions);
+  }).catch(() => {
+    if (hallPanel === "prompts") quickError("读取清单失败，检查本地服务后重进。");
+  });
 }
 renderQuickList();
+quickIdleMsg();
 
 /* ── 未保存修改保护：凭证类字段填了内容（未保存）就是 dirty。
     closeHall 拦一次 + 「关闭」按钮武装二次确认，与清理按钮的两步删除同一语言 ── */
@@ -2067,7 +2153,7 @@ let settingsCloseTimer = 0;
 function settingsDirty() {
   if (document.body.dataset.demo === "true") return false;
   return !!(sUser.value.trim() || sPass.value || sKey.value.trim() || sModel.value ||
-    sQQAppId.value.trim() || sQQSecret.value || sQQPass.value.trim()) || quickChanged();
+    sQQAppId.value.trim() || sQQSecret.value || sQQPass.value.trim());
 }
 function armSettingsClose() {
   settingsCloseArmed = true;
@@ -2216,7 +2302,7 @@ function setTab(name) {
   for (const pane of document.querySelectorAll(".set-pane")) {
     pane.classList.toggle("on", pane.dataset.pane === name);
   }
-  document.getElementById("saveSettings").hidden = !["account", "model", "qq", "quick"].includes(name);
+  document.getElementById("saveSettings").hidden = !["account", "model", "qq"].includes(name);
 }
 for (const tab of setTabs) tab.addEventListener("click", () => setTab(tab.dataset.pane));
 /* 方向键在栏目间移动焦点：大厅里目录是横排（左右）+ 窄屏也是横排，竖排同样支持上下 */
@@ -2228,40 +2314,19 @@ document.getElementById("setTabs").addEventListener("keydown", (e) => {
   const step = (e.key === "ArrowDown" || e.key === "ArrowRight") ? 1 : -1;
   setTabs[(i + step + setTabs.length) % setTabs.length].focus();
 });
-/* 状态总览：各栏配置一眼看完，点 chip 直达栏目（数据来自 showSettings 那次 /api/settings） */
-function renderSetStatus(d) {
-  const host = document.getElementById("setStatus");
-  if (!host || !d) return;
-  host.innerHTML = "";
-  const quickCount = Array.isArray(d.quickQuestions) ? d.quickQuestions.length : 0;
-  const chips = [
-    { pane: "account", label: "教务", ok: !!(d.jwgl && d.jwgl.configured), warn: true },
-    { pane: "model", label: "模型", ok: !!(d.deepseek && d.deepseek.configured), warn: true },
-    { pane: "qq", label: "QQ", ok: !!(d.qq && d.qq.configured), warn: false },
-    { pane: "quick", label: "常用", ok: true, warn: false, note: quickCount + " 条" },
-    { pane: "data", label: "数据", ok: true, warn: false },
-  ];
-  chips.forEach((c) => {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "set-chip" + (c.ok ? " ok" : "") + (!c.ok && c.warn ? " warn" : "");
-    b.dataset.pane = c.pane;
-    const dot = document.createElement("i");
-    dot.className = "dot";
-    dot.setAttribute("aria-hidden", "true");
-    b.appendChild(dot);
-    const state = c.pane === "data" ? "本地"
-      : c.pane === "quick" ? c.note
-      : (c.ok ? "已配" : "未配");
-    b.appendChild(document.createTextNode(c.label + " · " + state));
-    const hint = c.pane === "data" ? "本地数据，点此查看与清理"
-      : c.pane === "quick" ? "常用快捷问题，点此增删"
-      : (c.ok ? "已配置，点此查看或修改" : "尚未配置，点此去填写");
-    b.title = c.label + "：" + hint;
-    b.setAttribute("aria-label", c.label + "栏目：" + state + "，点击直达");
-    b.addEventListener("click", () => setTab(c.pane));
-    host.appendChild(b);
-  });
+/* 栏目状态点（取代旧的状态总览 chips）：未配=朱砂实心（要行动），已配=空心圈；
+   QQ 选配，未配时不亮。数据来自 showSettings / 保存成功的那次 /api/settings */
+function renderSetDots(d) {
+  if (!d) return;
+  const mark = (pane, ok, optional) => {
+    const dot = document.querySelector('#setTabs .set-tab[data-pane="' + pane + '"] .sdot');
+    if (!dot) return;
+    dot.className = "sdot " + (ok ? "ok" : (optional ? "" : "warn"));
+    dot.title = ok ? "已配置" : (optional ? "" : "未配置，需要填写");
+  };
+  mark("account", !!(d.jwgl && d.jwgl.configured), false);
+  mark("model", !!(d.deepseek && d.deepseek.configured), false);
+  mark("qq", !!(d.qq && d.qq.configured), true);
 }
 
 function qqStatusText(q) {
@@ -2292,7 +2357,6 @@ function showSettings() {
   setTab(setLastTab);
   setMsg.className = "setmsg";
   setMsg.textContent = "";
-  document.getElementById("setStatus").innerHTML = "";
   sPass.value = ""; sKey.value = ""; pickModel("");
   sQQAppId.value = ""; sQQSecret.value = ""; sQQPass.value = "";
   document.getElementById("diagJwgl").textContent = "";
@@ -2300,7 +2364,7 @@ function showSettings() {
   refreshData();
   fetch("/api/settings").then((r) => r.json()).then((d) => {
     setStatus = d;
-    renderSetStatus(d);
+    renderSetDots(d);
     sUser.value = "";
     sUser.placeholder = d.jwgl.username || "请输入教务系统学号";
     sPass.placeholder = d.jwgl.configured ? "已保存；留空不修改" : "请输入教务系统密码";
@@ -2313,7 +2377,6 @@ function showSettings() {
     sKey.placeholder = "sk-…；留空不修改";
     qqApplyStatus(d.qq);
     fillModels(d.models, d.model, "");
-    applyQuickQuestions(d.quickQuestions);
   }).catch(() => { setMsg.textContent = "无法读取设置，请确认本地服务正在运行。"; });
   // 清单以该 Key 实际可用的型号为准；服务端 10 分钟内走缓存，不重复联网
   fetch("/api/models").then((r) => r.json()).then((m) => {
@@ -2395,7 +2458,6 @@ document.getElementById("saveSettings").addEventListener("click", () => {
     body.qqAppId = qa; body.qqAppSecret = qs;
   }
   if (qp) body.qqPasscode = qp;
-  if (quickChanged()) body.quickQuestions = quickDraft;
   if (sModel.value) body.model = sModel.value;
   if (!Object.keys(body).length) {
     setMsg.className = "setmsg";
@@ -2424,7 +2486,7 @@ document.getElementById("saveSettings").addEventListener("click", () => {
     if (!lines.length) setMsg.textContent = ok ? "设置已保存。" : (d.error || "保存失败，请重试。");
     if (ok && d.status) {
       setStatus = d.status; sUser.value = ""; sPass.value = ""; sKey.value = "";
-      renderSetStatus(d.status);
+      renderSetDots(d.status);
       sUser.placeholder = d.status.jwgl.username || "请输入教务系统学号";
       sPass.placeholder = d.status.jwgl.configured ? "已保存；留空不修改" : "请输入教务系统密码";
       document.getElementById("curJwgl").textContent = d.status.jwgl.configured
@@ -2437,7 +2499,6 @@ document.getElementById("saveSettings").addEventListener("click", () => {
       qqApplyStatus(d.status.qq);
       pickModel("");
       fillModels(d.status.models, d.status.model, "");
-      applyQuickQuestions(d.status.quickQuestions);
       /* 凭证已落库：dirty 归零，「关闭」不必再二次确认；按钮短暂亮一下完成感 */
       disarmSettingsClose();
       saveBtn.textContent = "已保存 ✓";
