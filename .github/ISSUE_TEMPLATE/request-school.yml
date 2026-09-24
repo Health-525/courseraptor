@@ -1,0 +1,84 @@
+name: 请求适配我的学校
+description: 希望 CourseRaptor 支持你的学校教务系统
+title: "[适配请求] "
+labels:
+  - "school-adapter"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！学校适配由社区共建，信息越具体越容易被拾起。
+        请勿上传学号、密码、Cookie、API Key 或含个人信息的截图（登录页截图请先打码账号输入框内容）。
+        如果你会 TypeScript 并愿意自己动手，欢迎直接看[学校适配指南](https://github.com/Health-525/courseraptor/blob/main/docs/adapter-guide.md)，PR 一经合并你就是该适配的署名维护者。
+  - type: input
+    id: school_name
+    attributes:
+      label: 学校全名
+      description: 与教务系统/官网上一致的正式名称。
+      placeholder: "例如：南京工业大学"
+    validations:
+      required: true
+  - type: input
+    id: login_url
+    attributes:
+      label: 教务系统登录网址
+      description: 浏览器打开后能登录教务的那个页面地址；如需先过统一身份认证或 WebVPN，也请一并说明。
+      placeholder: "https://jwgl.xxx.edu.cn"
+    validations:
+      required: true
+  - type: dropdown
+    id: vendor
+    attributes:
+      label: 教务系统厂商
+      description: 登录页底部通常有署名；不确定就选「不确定」，社区会帮忙判断。
+      options:
+        - 正方（新版）
+        - 正方（旧版）
+        - 强智
+        - 金智
+        - 超星
+        - 不确定 / 其他
+    validations:
+      required: true
+  - type: checkboxes
+    id: level
+    attributes:
+      label: 在读层次（可多选）
+      options:
+        - label: 本科
+        - label: 专科
+        - label: 研究生
+  - type: checkboxes
+    id: wanted
+    attributes:
+      label: 最希望先支持的能力（可多选）
+      options:
+        - label: 课表查询与日历导出
+        - label: 成绩与绩点
+        - label: 考试安排
+        - label: 教务通知
+        - label: 选课相关
+  - type: dropdown
+    id: contribution
+    attributes:
+      label: 你愿意以什么方式参与？
+      description: 适配主要靠 requester 自己或社区志愿者完成；愿意参与会大大加快进度。
+      options:
+        - 愿意写适配（熟悉 TypeScript）
+        - 愿意学一学再写（有指南和参考实现）
+        - 只愿意提供测试反馈（教务是同一家厂商时几乎零成本）
+        - 暂时只想用
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: 补充信息（可选）
+      description: 登录页脱敏截图、接口特点、特殊限制（如必须校园网/WebVPN）等。
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 隐私检查
+      options:
+        - label: 我已确认内容不包含个人凭证、学号或其他私密数据。
+          required: true

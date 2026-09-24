@@ -109,6 +109,16 @@ npm run njtech -- search-courses 高等数学
 
 ---
 
+## 🏫 已适配学校
+
+| 学校 | 能力面 | 适配维护者 |
+|------|--------|-----------|
+| [南京工业大学](src/adapters/njtech/)（NJTECH） | 全部 10 项能力（课表/成绩/考试/学籍/通知/选课…） | [@Health-525](https://github.com/Health-525) |
+
+你的学校不在列表？两条路：**[请求适配](https://github.com/Health-525/courseraptor/issues/new?template=request-school.yml)**（把学校信息留给社区），或者**[自己动手写一个](docs/adapter-guide.md)**——适配层完全自包含，正方系学校的登录与查询逻辑有现成参考实现，PR 合并后你就是这所学校的署名维护者。
+
+---
+
 ## 🔒 隐私承诺
 
 | 承诺 | 实现方式 |
