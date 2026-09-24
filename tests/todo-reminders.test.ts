@@ -14,9 +14,9 @@ import { test } from "node:test";
 const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-todoremind-"));
 process.env.RAPTOR_DATA_DIR = tmpData;
 
-const { dueWithinWindow, runReminderCheck } = await import("../src/todo-reminders");
-const { addReminder, updateReminder } = await import("../src/workspace-data");
-const { pushQQText, registerQQPush } = await import("../src/qq/push");
+const { dueWithinWindow, runReminderCheck } = await import("../src/core/todo-reminders");
+const { addReminder, updateReminder } = await import("../src/core/workspace-data");
+const { pushQQText, registerQQPush } = await import("../src/channels/qq/push");
 
 /** 注入的通知出口：只记录提醒到的标题 */
 function recorder() {

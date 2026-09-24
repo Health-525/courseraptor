@@ -48,6 +48,6 @@
 
 ## 六、目录与依赖
 
-- 协议层：`src/jwgl/`（http, session, auth, crypto, academics, grades, portal, news, xk, term-dates, term-holidays, types）
-- 工具封装：`src/tools/`（schedule, grades, news, student, course-selection）
+- 协议层：`src/adapters/njtech/`（http, session, auth, crypto, academics, grades, portal, news, xk, term-dates, term-holidays, types）
+- 工具封装：`src/adapters/njtech/tools/`（schedule, grades, news, student, course-selection）
 - 本技能只读封装上述模块，运行依赖 `tsx`（devDependency）与项目内 `node_modules`。

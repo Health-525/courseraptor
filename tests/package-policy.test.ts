@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { shouldPackagePath } from "../scripts/package-policy.mjs";
-import { isProtected } from "../src/updater";
+import { isProtected } from "../src/core/updater";
 
 test("安装包过滤在真实目录复制时不带出会话、文件、凭证或临时截图", () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "raptor-package-"));
@@ -29,7 +29,7 @@ test("安装包过滤在真实目录复制时不带出会话、文件、凭证�
     "unknown-personal-file.txt",
   ];
   const publicFiles = [
-    "src/index.ts",
+    "src/channels/cli/index.ts",
     "scripts/doctor.mjs",
     "docs/student-guide.md",
     "docs/courseraptor-logo.png",
@@ -61,6 +61,6 @@ test("更新保护全部本地数据，同时允许应用源码更新", () => {
   ]) {
     assert.equal(isProtected(file), true, file);
   }
-  assert.equal(isProtected("src/index.ts"), false);
-  assert.equal(isProtected("src/jwgl/term-dates.ts"), false);
+  assert.equal(isProtected("src/channels/cli/index.ts"), false);
+  assert.equal(isProtected("src/adapters/njtech/term-dates.ts"), false);
 });

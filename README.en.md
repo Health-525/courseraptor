@@ -71,7 +71,7 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 - **Agent runtime**: Vercel AI SDK v7 (`ToolLoopAgent` + `runAgentTUI` for terminal)
 - **LLM**: DeepSeek (default `deepseek-flash` / V4.1-Flash)
 - **Academic protocol**: Custom NJTECH 正方新版 adapter (RSA + CSRF login; course selection reverse-engineered from official frontend)
-- **Web UI**: Single-page Node server (`src/web/`) with push-panel layout, session history, and real-time tool result sync
+- **Web UI**: Single-page Node server (`src/channels/web/`) with push-panel layout, session history, and real-time tool result sync
 - **Data storage**: Local JSON files only (`data/`, `session.json`, `memory.json`, `credentials.enc`); no database, no cloud sync
 
 ## Project structure (key directories)
@@ -109,7 +109,7 @@ Share the repository URL or an inspected clean installation package, never your 
 
 ## Build with us
 
-TypeScript, Vercel AI SDK, DeepSeek, and a Node HTTP browser interface. University adapters live in `src/jwgl/`, tool schemas in `src/tools/`, and the production/demo shared view in `src/web/chat-page.ts`.
+TypeScript, Vercel AI SDK, DeepSeek, and a Node HTTP browser interface. School adapters live in `src/adapters/njtech/` behind the `SchoolAdapter` port (`src/core/school.ts`), generic tool schemas in `src/core/tools/`, and the production/demo shared view in `src/channels/web/chat-page.ts`.
 
 ```bash
 npm run typecheck

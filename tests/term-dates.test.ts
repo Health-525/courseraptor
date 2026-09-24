@@ -24,7 +24,7 @@ const {
   recordWeek1Monday,
   termKey,
   loadStore,
-} = await import("../src/jwgl/term-dates");
+} = await import("../src/adapters/njtech/term-dates");
 
 test("2026 秋季第 1 周周一 = 2026-08-31（不是估算的 09-07）", () => {
   // 南工教〔2026〕91号：报到 8-29~8-30、注册 8-31~9-30，第一周从 8-31（周一）开始。

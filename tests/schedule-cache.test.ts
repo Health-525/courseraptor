@@ -16,7 +16,7 @@ import { test } from "node:test";
 const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-schedule-"));
 process.env.RAPTOR_DATA_DIR = tmpData;
 
-const { loadScheduleCache, saveScheduleCache } = await import("../src/schedule-cache");
+const { loadScheduleCache, saveScheduleCache } = await import("../src/core/schedule-cache");
 
 const sampleSchedule = {
   year: 2026,

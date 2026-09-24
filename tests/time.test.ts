@@ -22,7 +22,9 @@ import { test } from "node:test";
 // 必须在导入被测模块之前指向临时数据目录，避免读写真实 data/
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-time-"));
 
-const { getTimeReport, SCHOOL_TIMEZONE } = await import("../src/time");
+await import("../src/adapters");
+const { getTimeReport, schoolTimezone } = await import("../src/core/time");
+const SCHOOL_TIMEZONE = schoolTimezone();
 
 type Ok = Extract<ReturnType<typeof getTimeReport>, { ok: true }>["data"];
 

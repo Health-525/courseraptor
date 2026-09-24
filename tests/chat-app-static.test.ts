@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const APP_JS = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  "../src/web/assets/chat-app.js",
+  "../src/channels/web/assets/chat-app.js",
 );
 
 /** 浏览器与 JS 内置全局（chat-app.js 是浏览器顶层脚本，无 import） */

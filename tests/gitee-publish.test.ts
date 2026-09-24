@@ -12,7 +12,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { publishCalendarToGitee, DEFAULT_CALENDAR_REPO } = await import("../src/gitee-publish");
+const { publishCalendarToGitee, DEFAULT_CALENDAR_REPO } = await import("../src/core/gitee-publish");
 
 interface Route {
   match: string;

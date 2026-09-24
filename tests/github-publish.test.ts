@@ -12,7 +12,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { publishCalendarToGithub, DEFAULT_CALENDAR_REPO } = await import("../src/github-publish");
+const { publishCalendarToGithub, DEFAULT_CALENDAR_REPO } = await import(
+  "../src/core/github-publish"
+);
 
 interface Route {
   match: string;

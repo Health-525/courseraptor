@@ -19,7 +19,7 @@ import {
   parseXkStatus,
   type XkRound,
   type XkSession,
-} from "../src/jwgl/xk";
+} from "../src/adapters/njtech/xk";
 
 // ── parseCourseList（JSON 路径）──────────────────────────────
 

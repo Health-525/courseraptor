@@ -8,27 +8,27 @@
 
 CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web 服务（默认 `http://localhost:3210`），
 浏览器打开即可和终端里的同一个教务 Agent 对话。地址会显示在 TUI 欢迎卡片底部
-（「💬 网页对话：http://localhost:3210」一行，见 `src/tui/welcome.ts`）。
+（「💬 网页对话：http://localhost:3210」一行，见 `src/channels/cli/tui/welcome.ts`）。
 
 ## 二、文件清单（全部改动）
 
 | 文件 | 作用 |
 |---|---|
-| `src/web/chat-web.ts` | HTTP 服务 + SSE 流式接口，连接正式 Agent 与会话存储 |
-| `src/web/chat-page.ts` | 共用前端视图，HTML/CSS/JS 在 `chatPage()` 模板字符串中，正式服务和离线演示共用 |
-| `src/web/today-brief.ts` | 周课表数据组装（纯本地缓存：课表/假期/学期日期），`GET /api/today?week=N` 的数据源 |
-| `src/web/today-page.ts` | 今日日程独立页（`GET /today`）：今日头条（正在上/下一节课倒计时）+ 周课表网格 + 临近考试 + 待办分组 + 知识速览，含演示模式内嵌数据 |
-| `src/web/knowledge-page.ts` | 知识库独立页（`GET /knowledge`）：分类导航 + 搜索高亮 + 排序切换 + 长文折叠 + 两步删除 + 分批渲染，含演示模式内嵌数据 |
+| `src/channels/web/chat-web.ts` | HTTP 服务 + SSE 流式接口，连接正式 Agent 与会话存储 |
+| `src/channels/web/chat-page.ts` | 共用前端视图，HTML/CSS/JS 在 `chatPage()` 模板字符串中，正式服务和离线演示共用 |
+| `src/channels/web/today-brief.ts` | 周课表数据组装（纯本地缓存：课表/假期/学期日期），`GET /api/today?week=N` 的数据源 |
+| `src/channels/web/today-page.ts` | 今日日程独立页（`GET /today`）：今日头条（正在上/下一节课倒计时）+ 周课表网格 + 临近考试 + 待办分组 + 知识速览，含演示模式内嵌数据 |
+| `src/channels/web/knowledge-page.ts` | 知识库独立页（`GET /knowledge`）：分类导航 + 搜索高亮 + 排序切换 + 长文折叠 + 两步删除 + 分批渲染，含演示模式内嵌数据 |
 | `src/knowledge.ts` | 知识库本机持久化（`data/knowledge.json`）：条目 CRUD、同名去重、归类（优先课表课程，subject 对不上时为自定义分类，无归属落未分类） |
 | `src/exam-cache.ts` | 考试本地缓存（`data/exam-cache.json`），get_exams 自动探测时落盘 |
-| `src/web/result-cards.ts` | 把课表、成绩、考试、通知和附件工具结果压成可落盘的结构化展示卡；不让前端解析 Markdown |
-| `src/web/workspace-data.ts` | 网页上传、截止日期待办与查询变化快照的本机持久化，统一路径边界与原子写入 |
-| `src/web/demo-server.ts` | 独立离线演示，虚构数据、内存会话，不加载个人配置 |
+| `src/channels/web/result-cards.ts` | 把课表、成绩、考试、通知和附件工具结果压成可落盘的结构化展示卡；不让前端解析 Markdown |
+| `src/channels/web/workspace-data.ts` | 网页上传、截止日期待办与查询变化快照的本机持久化，统一路径边界与原子写入 |
+| `src/channels/web/demo-server.ts` | 独立离线演示，虚构数据、内存会话，不加载个人配置 |
 | `src/chat-sessions.ts` | 多会话落盘存储（`data/chat-sessions.json`，原子写 + 读坏隔离）。建档/截断/上下文窗口都在这里，网页历史重启不丢。**写入方有两个**：网页（读写）与 QQ 桥（只写，见下两行） |
-| `src/qq/session-archive.ts` | QQ 消息 → 会话档案的映射（纯函数，不引 SDK）：私聊按人、群聊按群、频道按频道，id = `qq-` + sha256 摘要 20 位，群聊提问前补 `[昵称]` |
+| `src/channels/qq/session-archive.ts` | QQ 消息 → 会话档案的映射（纯函数，不引 SDK）：私聊按人、群聊按群、频道按频道，id = `qq-` + sha256 摘要 20 位，群聊提问前补 `[昵称]` |
 | `src/schedule-cache.ts` | 课表本地缓存（`data/schedule-cache.json`）。`get_schedule` 查通即落盘，TUI 启动面板直读免登录；**网页已不展示课表卡**（用户要求删除，问课表走对话） |
-| `src/index.ts` | Agent 创建后调用 `setChatAgent(agent)` + `startChatWeb()` 启动网页服务 |
-| `src/tui/welcome.ts` | 欢迎卡片显示网页地址 |
+| `src/channels/cli/index.ts` | Agent 创建后调用 `setChatAgent(agent)` + `startChatWeb()` 启动网页服务 |
+| `src/channels/cli/tui/welcome.ts` | 欢迎卡片显示网页地址 |
 | `tests/chat-web.test.ts` | 13 个测试：页面渲染、SSE 流式、历史累积、重置、marked 静态路由、多会话隔离/CRUD、工具事件详情、设置端点（读/拒绝路径）、default 档可点击、**think 独立通道、思考落盘不回流上下文、渲染产物语法自检 + 齿轮/思考卡片锚点** |
 | `tests/chat-sessions.test.ts` | 会话存储模块的 7 个测试（建档/标题/截断/上下文形状/删除/**思考挂载与截断/思考不进上下文**） |
 | `tests/qq-session-archive.test.ts` | QQ 对话进历史的 10 个测试：分档粒度、昵称压平、id 落在侧栏白名单、无归属不归档、标题带渠道前缀、**端到端 `/api/sessions` 列得出来点得开**、`archiveQQRound` 接线 |
@@ -60,7 +60,7 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
   - `GET /vendor/marked.min.js` → marked 的 UMD 构建
 - `GET /logo.png` → 项目 logo（仓库 `docs/courseraptor-logo.png` 原样吐出，`image/png` + 一天缓存）；浏览器默认请求的 `/favicon.ico` 同一张图兜住。图缺失只 404，不连累页面打开
 - **多会话历史（chat-sessions.ts）**：一条完整问答（`appendRound`）才落盘，中断/失败的半截不进历史（与旧口径一致）。两级上限：显示存档每会话 ≤200 条、总档案 ≤30 个会话；每轮发给 Agent 的上下文取该会话最后 40 条转成 ModelMessage。空会话不落库（客户端先出 uuid，首条消息到达才建档）。**思考过程**跟着本轮助手消息存成 `think` 字段（单轮 ≤`MAX_THINK_CHARS`=4000 字，超出截断；本轮没有正文时一并丢弃，不单独成条）——`contextMessages` 只读 `text`，思考**绝不回流进模型上下文**（省 token，也防模型复读自己的草稿）。
-- **QQ 对话共用同一份档案**：`src/qq/bridge.ts` 每轮问答调 `archiveQQRound(msg, answer)`（成功记整轮、答砸了只留提问），落点由 `src/qq/session-archive.ts` 算：私聊按人、群聊按群、频道按频道，id = `qq-` + sha256 摘要（必定落在坑 8 的白名单里），标题带「QQ｜」/「QQ群｜」前缀，群聊提问前补 `[昵称]`。**只写不读**：QQ 的模型上下文仍是桥自己那份内存窗口，网页里删改 QQ 档不影响 QQ 对话，反之亦然（要做双向打通得先想清楚：`[昵称]` 前缀会跟着进上下文）。侧栏每 20 秒补拉一次 `/api/sessions`（`busy` 或页面 `hidden` 时跳过），所以 QQ 那边的新对话不用重开页面也能冒出来。QQ 档与网页档**共用** `MAX_SESSIONS=30` 的档案上限。
+- **QQ 对话共用同一份档案**：`src/channels/qq/bridge.ts` 每轮问答调 `archiveQQRound(msg, answer)`（成功记整轮、答砸了只留提问），落点由 `src/channels/qq/session-archive.ts` 算：私聊按人、群聊按群、频道按频道，id = `qq-` + sha256 摘要（必定落在坑 8 的白名单里），标题带「QQ｜」/「QQ群｜」前缀，群聊提问前补 `[昵称]`。**只写不读**：QQ 的模型上下文仍是桥自己那份内存窗口，网页里删改 QQ 档不影响 QQ 对话，反之亦然（要做双向打通得先想清楚：`[昵称]` 前缀会跟着进上下文）。侧栏每 20 秒补拉一次 `/api/sessions`（`busy` 或页面 `hidden` 时跳过），所以 QQ 那边的新对话不用重开页面也能冒出来。QQ 档与网页档**共用** `MAX_SESSIONS=30` 的档案上限。
 - **前后端数据流**：服务端是历史的唯一事实源，前端 `msgs` 只是当前会话的内存镜像；本地 localStorage 只存一个 `raptor-web-active-session`（当前会话 id）。刷新/重启后从 `/api/sessions` 恢复。
 - **流式中断**：关页面或点停止 → abort，半截回复不进历史也不落盘。
 - **安全**：只绑 127.0.0.1；Markdown 渲染前整段转义 `&` 和 `<`（防 HTML 注入，同时不破坏 Markdown 的 `>` 语法——注意别把 `>` 也转义，块引用会坏）；sessionId 过 `/^[0-9A-Za-z_-]{1,64}$/` 白名单（见坑 8）。
@@ -117,7 +117,7 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
 - 每轮发给 Agent 的上下文窗口 40 条：超长会话早期内容会被截出上下文（显示与档案仍完整）。
 - 会话档案总数上限 30 个是**全渠道共享**的：QQ 授权用户/群一多，最久没动的网页档案会被挤出列表（连同正文丢弃）。需要更大留档就调 `MAX_SESSIONS`。
 - QQ 与网页同进程时（`raptor` 一条命令全包）档案写入是串安全的（`appendRound` 全同步 + 网页侧 `turnChain` 串行）。但**分开跑两个进程**（例如一个终端 `raptor`、另一个终端 `npm run qq`）时，两边各自「读全量-改-原子写」：原子写保证文件不花，不保证不丢更新——后写的那一次会覆盖前一次。想两边都留档就统一走 `raptor`。
-- `chat-sessions` 写盘失败只 `console.error`，嵌入模式（卡片 TUI）下这条错误可能花一帧。真在意可改成走 `src/qq/logger.ts` 的文件日志。
+- `chat-sessions` 写盘失败只 `console.error`，嵌入模式（卡片 TUI）下这条错误可能花一帧。真在意可改成走 `src/channels/qq/logger.ts` 的文件日志。
 - `data/schedule-cache.json` 长期不更新时 TUI 启动面板显示的是最后已知课表；在对话里问一次课表即刷新（网页已不直接展示课表）。
 
 ## 八、今日日程独立页（GET /today）与知识库独立页（GET /knowledge）
@@ -126,11 +126,11 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
 
 | 文件 | 作用 |
 |---|---|
-| `src/web/today-brief.ts` | 数据组装（纯函数 + 注入时钟）：按周次过滤课程，放假作废、调休按 follows 换课表；输出今天的课（含 done/current/upcoming 状态）、下一节课（含倒计时分钟）、临近考试（14 天窗）、待办与知识速览，支持指定教学周。只读本地缓存，不登录教务、不调模型 |
-| `src/web/today-page.ts` | 页面本体（`todayPage({demo, demoData})`）：红头档案同套设计令牌；今日头条 → 周课表 → 临近考试 → 待办 → 知识速览 |
-| `src/web/knowledge-page.ts` | 知识库页本体（`knowledgePage({demo, demoData})`）：左栏分类/搜索/排序，右栏条目列表 |
+| `src/channels/web/today-brief.ts` | 数据组装（纯函数 + 注入时钟）：按周次过滤课程，放假作废、调休按 follows 换课表；输出今天的课（含 done/current/upcoming 状态）、下一节课（含倒计时分钟）、临近考试（14 天窗）、待办与知识速览，支持指定教学周。只读本地缓存，不登录教务、不调模型 |
+| `src/channels/web/today-page.ts` | 页面本体（`todayPage({demo, demoData})`）：红头档案同套设计令牌；今日头条 → 周课表 → 临近考试 → 待办 → 知识速览 |
+| `src/channels/web/knowledge-page.ts` | 知识库页本体（`knowledgePage({demo, demoData})`）：左栏分类/搜索/排序，右栏条目列表 |
 | `src/exam-cache.ts` | 考试缓存（`data/exam-cache.json`），与 schedule-cache 同一套约定；`get_exams` 自动探测学期时落盘，日程页据此展示临近考试 |
-| `src/web/demo-server.ts` | 演示模式：`/today` `/knowledge` 内嵌虚构数据（跟真实时钟走），不发任何请求 |
+| `src/channels/web/demo-server.ts` | 演示模式：`/today` `/knowledge` 内嵌虚构数据（跟真实时钟走），不发任何请求 |
 
 接口与行为要点：
 

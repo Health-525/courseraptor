@@ -3,7 +3,7 @@ name: njtech-jwgl
 description: >-
   南京工业大学（NJTech）正方教务系统适配器。当同学要查课表、成绩、GPA、考试、实验成绩、
   学籍信息、已选/可重修课程、教务处通知，或查选课状态/搜课/盯课余量时使用。
-  它封装了 CourseRaptor 项目里的 src/jwgl 教务协议层，提供可无头调用的命令行入口，
+  它封装了 CourseRaptor 项目里的 src/adapters/njtech 教务协议层，提供可无头调用的命令行入口，
   也可驱动交互式 raptor agent。仅适用于 njtech.edu.cn 域名。
 license: ISC
 agent_created: true
@@ -11,7 +11,7 @@ agent_created: true
 
 # NJTech 教务适配器（南京工业大学）
 
-把 **CourseRaptor 项目里的南京工业大学教务部分**（`src/jwgl` 正方教务协议层 + 工具封装）
+把 **CourseRaptor 项目里的南京工业大学教务部分**（`src/adapters/njtech` 正方教务协议层 + 工具封装）
 打包成一个可被同学直接调用的技能。覆盖课表 / 成绩 / 考试 / 实验成绩 / 学籍 / 通知 / 选课 等
 南京工业大学在校生的日常教务查询。
 
@@ -40,7 +40,7 @@ agent_created: true
 
 ### 路径 A：无头命令行（推荐给同学直接使用，最快）
 
-脚本：`scripts/query.ts`，直接复用 `src/jwgl` 的已验证函数，输出 Markdown。
+脚本：`scripts/query.ts`，直接复用 `src/adapters/njtech` 的已验证函数，输出 Markdown。
 
 ```bash
 # 在 courseraptor 项目根目录执行
@@ -82,7 +82,7 @@ agent 已内置 31 个工具，其中 NJTech 教务相关工具的名称与语�
 
 ## 能力与对应实现（速查）
 
-| 能力 | 脚本命令 | 底层函数（src/jwgl） |
+| 能力 | 脚本命令 | 底层函数（src/adapters/njtech） |
 |------|----------|----------------------|
 | 课表 | `schedule` | `academics.fetchScheduleSmart` |
 | 成绩/GPA | `grades` | `grades.fetchAllGrades` |
@@ -117,5 +117,5 @@ agent 已内置 31 个工具，其中 NJTech 教务相关工具的名称与语�
 
 ## 维护提示
 
-- 本技能是 `src/jwgl` 的**只读封装**：不要在本技能里复制教务协议逻辑，改了要同步回 `src/jwgl`。
-- 新增查询能力时，优先在 `src/jwgl` 暴露纯函数，再在 `scripts/query.ts` 加一个薄命令。
+- 本技能是 `src/adapters/njtech` 的**只读封装**：不要在本技能里复制教务协议逻辑，改了要同步回 `src/adapters/njtech`。
+- 新增查询能力时，优先在 `src/adapters/njtech` 暴露纯函数，再在 `scripts/query.ts` 加一个薄命令。

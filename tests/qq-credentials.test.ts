@@ -13,9 +13,9 @@ import { test } from "node:test";
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-qq-cred-"));
 process.env.RAPTOR_CREDENTIALS_FILE = path.join(dataDir, "credentials.enc");
 
-const { config, resolveQQBotCredentials } = await import("../src/config");
-const { loadCredentialsStore } = await import("../src/credentials");
-const { getQQBotStatus, maskQQAppId, setQQBotCredentials } = await import("../src/onboarding");
+const { config, resolveQQBotCredentials } = await import("../src/core/config");
+const { loadCredentialsStore } = await import("../src/core/credentials");
+const { getQQBotStatus, maskQQAppId, setQQBotCredentials } = await import("../src/core/onboarding");
 
 test("resolveQQBotCredentials：env 成对优先，半套 env 整体回退加密存储", () => {
   const envWin = resolveQQBotCredentials({

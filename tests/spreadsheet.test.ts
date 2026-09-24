@@ -19,7 +19,7 @@ import {
   resolveColumn,
   sheetOverview,
   type TableSheet,
-} from "../src/spreadsheet";
+} from "../src/core/spreadsheet";
 
 const require = createRequire(import.meta.url);
 const XLSX = require("xlsx") as typeof import("xlsx");

@@ -18,9 +18,9 @@ const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-pipeline-"));
 const tmpFiles = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-userfiles-"));
 process.env.RAPTOR_DATA_DIR = tmpData;
 
-const { openLocalFile } = await import("../src/attachments");
-const { raptorTools } = await import("../src/tools");
-const { listAttachments, attachmentStats } = await import("../src/attachment-store");
+const { openLocalFile } = await import("../src/core/attachments");
+const { coreTools } = await import("../src/core/tools");
+const { listAttachments, attachmentStats } = await import("../src/core/attachment-store");
 
 const require = createRequire(import.meta.url);
 const XLSX = require("xlsx") as typeof import("xlsx");
@@ -75,7 +75,7 @@ test("缓存命中：二次读取不换 id、不清零索引", async () => {
 
 test("query_table 工具：筛选/排序/去重统计/分页全链路", async () => {
   const { id } = (await openLocalFile(path.join(tmpFiles, "网课目录.xlsx"))) as { id: string };
-  const q = raptorTools.query_table as unknown as {
+  const q = coreTools.query_table as unknown as {
     execute: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
   };
 
@@ -174,7 +174,7 @@ test("错误路径：文件不存在 / 目录 / 不支持的格式落 file 模�
 });
 
 test("manage_attachments 工具：列缓存、删副本、用户原文件无恙", async () => {
-  const m = raptorTools.manage_attachments as unknown as {
+  const m = coreTools.manage_attachments as unknown as {
     execute: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
   };
   const listed = await m.execute({ action: "list" });
@@ -217,7 +217,7 @@ test("GBK 编码的 txt/csv 不再乱码（教务处 Windows 导出的常态）"
   assert.ok(r2.text.includes("信息学院"), "合法 UTF-8 不能被 GBK 兜底改变");
 
   // GBK 的 csv 也要能进表格引擎（decodeTextBuffer 在 loadWorkbook 前面）
-  const { loadWorkbook } = await import("../src/spreadsheet");
+  const { loadWorkbook } = await import("../src/core/spreadsheet");
   const csvFile = path.join(tmpFiles, "成绩单GBK.csv");
   fs.writeFileSync(csvFile, gbkBytes);
   const sheets = loadWorkbook(fs.readFileSync(csvFile), "成绩单GBK.csv");

@@ -23,7 +23,7 @@ const {
   resolveModelDrift,
   resolveStoredModel,
   validateModelChoice,
-} = await import("../src/models");
+} = await import("../src/core/models");
 
 /** 假 Response：listModelOptions 只用到 ok / status / json() */
 function fakeFetch(payload: unknown, options: { ok?: boolean; status?: number } = {}) {

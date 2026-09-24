@@ -15,13 +15,14 @@ import { test } from "node:test";
 const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-today-"));
 process.env.RAPTOR_DATA_DIR = tmpData;
 
-const { buildTodayBrief } = await import("../src/web/today-brief");
-const { saveScheduleCache } = await import("../src/schedule-cache");
-const { saveExamCache } = await import("../src/exam-cache");
-const { addKnowledge } = await import("../src/knowledge");
-const { recordWeek1Monday } = await import("../src/jwgl/term-dates");
-const { recordSpecialDays, removeSpecialDays } = await import("../src/jwgl/term-holidays");
-const { addReminder, listReminders, updateReminder } = await import("../src/workspace-data");
+await import("../src/adapters");
+const { buildTodayBrief } = await import("../src/channels/web/today-brief");
+const { saveScheduleCache } = await import("../src/core/schedule-cache");
+const { saveExamCache } = await import("../src/core/exam-cache");
+const { addKnowledge } = await import("../src/core/knowledge");
+const { recordWeek1Monday } = await import("../src/adapters/njtech/term-dates");
+const { recordSpecialDays, removeSpecialDays } = await import("../src/core/calendar/holidays");
+const { addReminder, listReminders, updateReminder } = await import("../src/core/workspace-data");
 
 // 校准 2026 秋学期：第 1 周从 2026-08-31（周一）开始
 recordWeek1Monday(2026, 3, "2026-08-31", "known", "测试校历");

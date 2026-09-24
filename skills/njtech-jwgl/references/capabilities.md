@@ -8,7 +8,7 @@
 
 ## 一、课表与校历
 
-| 工具 | 语义 | 底层（src/jwgl） | 脚本命令 |
+| 工具 | 语义 | 底层（src/adapters/njtech） | 脚本命令 |
 |------|------|------------------|----------|
 | `get_schedule` | 课表查询，自动探测最新有课表的学期；返回按周预分组的 `byWeek` 索引，并叠加放假/调休 | `academics.fetchScheduleSmart` | `schedule` |
 | `set_holidays` | 把教务处放假/调休安排落盘到本地，后续 `get_schedule` 自动叠加 | `term-holidays.recordSpecialDays` | —（需交互确认来源） |

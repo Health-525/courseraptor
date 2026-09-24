@@ -10,11 +10,16 @@
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import { test } from "node:test";
-import type { SlashCommandSpec } from "../src/tui/keys";
-import { coalesceText, commandsForMode, SLASH_COMMANDS, splitKeys } from "../src/tui/slash-menu";
-import { emitSoftInterrupt, onSoftInterrupt } from "../src/tui/soft-interrupt";
+import type { SlashCommandSpec } from "../src/channels/cli/tui/keys";
+import {
+  coalesceText,
+  commandsForMode,
+  SLASH_COMMANDS,
+  splitKeys,
+} from "../src/channels/cli/tui/slash-menu";
+import { emitSoftInterrupt, onSoftInterrupt } from "../src/channels/cli/tui/soft-interrupt";
 
-const { createKeyProxy } = await import("../src/tui/keys");
+const { createKeyProxy } = await import("../src/channels/cli/tui/keys");
 
 interface Harness {
   stdin: PassThrough;

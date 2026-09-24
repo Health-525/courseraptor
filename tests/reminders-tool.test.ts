@@ -13,10 +13,10 @@ import { test } from "node:test";
 const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-todos-"));
 process.env.RAPTOR_DATA_DIR = tmpData;
 
-const { raptorTools } = await import("../src/tools");
-const { listReminders } = await import("../src/workspace-data");
+const { coreTools } = await import("../src/core/tools");
+const { listReminders } = await import("../src/core/workspace-data");
 
-const manage = raptorTools.manage_todos as unknown as {
+const manage = coreTools.manage_todos as unknown as {
   execute: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
 };
 
