@@ -39,7 +39,7 @@
 
 ## 🚀 快速开始
 
-同一个 agent，两种入口：终端里敲 `raptor` 直接对话，或浏览器打开 `http://localhost:3210` 用网页版。思考过程、工具调用、每轮问答都会归档进会话历史。
+同一个 agent，两种入口：终端里敲 `raptor` 直接对话，或浏览器打开 `http://localhost:3210` 用网页版。思考过程、工具调用、每轮问答都会归档进会话历史。不想开对话、只想脚本化查数据？见下方「方式三」无头命令行。
 
 <details>
 <summary><b>💻 系统要求</b>（点开查看）</summary>
@@ -80,12 +80,12 @@ raptor                 # 全局命令
 npm run dev            # 或项目内开发模式
 ```
 
-### 方式三：作为 WorkBuddy 技能调用（适合同学二次封装 / 自动化）
+### 方式三：无头命令行（适合二次封装 / 自动化，不消耗 token）
 
-本项目已内置一个 WorkBuddy 技能 **`njtech-jwgl`**，把南京工业大学教务查询（课表 / 成绩 / 考试 / 通知 / 学籍 / 选课）封装成可脚本化、可被 agent 直接调用的入口，**无需每次开 LLM 对话，也不消耗 DeepSeek token**。
+不想开对话也能查：仓库内置技能 [`skills/njtech-jwgl/`](skills/njtech-jwgl/SKILL.md)，把南京工业大学教务查询（课表 / 成绩 / 考试 / 通知 / 学籍 / 选课）封装成可脚本化、可被 agent 直接调用的无头 CLI——**不经过 LLM 对话、不消耗 DeepSeek token**。需按方式二克隆源码，并配置好教务账号（无需 DeepSeek Key）。
 
 ```bash
-# 无头查询（最快，无需 DeepSeek Key，只需配置教务账号）
+# 无头查询（在项目根目录执行）
 npx tsx skills/njtech-jwgl/scripts/query.ts schedule
 npx tsx skills/njtech-jwgl/scripts/query.ts grades
 npx tsx skills/njtech-jwgl/scripts/query.ts news 公告通知 5
@@ -95,7 +95,7 @@ npm run njtech -- schedule
 npm run njtech -- search-courses 高等数学
 ```
 
-可用命令：`schedule` · `grades` · `exams` · `lab-grades` · `news` · `student-info` · `enrolled-courses` · `retake-courses` · `selection-status` · `search-courses` · `search-classes` · `watch`。完整说明、协议细节与安全红线见 `skills/njtech-jwgl/`（`SKILL.md` + `references/`）。
+可用命令：`schedule` · `grades` · `exams` · `lab-grades` · `news` · `student-info` · `enrolled-courses` · `retake-courses` · `selection-status` · `search-courses` · `search-classes` · `watch`。完整说明、协议细节与安全红线见 [`skills/njtech-jwgl/SKILL.md`](skills/njtech-jwgl/SKILL.md) 与其 `references/`。
 
 > 抢课 / 退课属真实写操作，**不在此脚本内**，仅走交互式 `raptor` 且需本人二次确认。
 
@@ -154,6 +154,7 @@ Agent 默认可调用 **31 个工具**，覆盖十大能力线。完整参数表
 ```
 ├── bin/raptor.cjs      # 全局命令入口
 ├── docs/               # 文档与素材
+├── skills/njtech-jwgl/ # 教务无头查询技能（SKILL.md + references/ + scripts/query.ts）
 └── src/
     ├── index.ts        # 终端入口
     ├── agent.ts        # Agent 定义
