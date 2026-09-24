@@ -4,7 +4,7 @@
 
 早八在哪上、最近什么时候考试、通识修了哪些类别、教务通知要做什么——可以直接在浏览器或终端里提问。
 
-![CourseRaptor](https://raw.githubusercontent.com/Health-525/courseraptor/master/docs/social-preview.jpg)
+![CourseRaptor](https://raw.githubusercontent.com/Health-525/courseraptor/main/docs/social-preview.jpg)
 
 ## 先体验，再配置
 
@@ -39,6 +39,6 @@ npm run demo
 
 请勿上传学号、成绩单、密码、Key 或完整日志。可复现错误请使用 [Issue 表单](https://github.com/Health-525/courseraptor/issues/new/choose)。
 
-[开始使用](https://github.com/Health-525/courseraptor#readme) · [同学指南](https://github.com/Health-525/courseraptor/blob/master/docs/student-guide.md) · [路线图](https://github.com/Health-525/courseraptor/blob/master/docs/roadmap.md) · [参与贡献](https://github.com/Health-525/courseraptor/blob/master/CONTRIBUTING.md)
+[开始使用](https://github.com/Health-525/courseraptor#readme) · [同学指南](https://github.com/Health-525/courseraptor/blob/main/docs/student-guide.md) · [路线图](https://github.com/Health-525/courseraptor/blob/main/docs/roadmap.md) · [参与贡献](https://github.com/Health-525/courseraptor/blob/main/CONTRIBUTING.md)
 
 如果确实帮到了你，欢迎 Star，或者把仓库地址分享给同学，让对方配置自己的账号。
