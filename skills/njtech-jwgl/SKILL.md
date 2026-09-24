@@ -44,7 +44,7 @@ agent_created: true
 
 ```bash
 # 在 courseraptor 项目根目录执行
-npx tsx .workbuddy/skills/njtech-jwgl/scripts/query.ts <命令> [参数]
+npx tsx skills/njtech-jwgl/scripts/query.ts <命令> [参数]
 
 # 命令一览
 schedule [学期]          # 课表；不填自动探测最新有课表的学期，如 schedule 2026-2027-1
@@ -64,10 +64,10 @@ watch <课程名> [秒]     # 限时监控余量变化（只观察不提交！�
 示例：
 
 ```bash
-npx tsx .workbuddy/skills/njtech-jwgl/scripts/query.ts schedule
-npx tsx .workbuddy/skills/njtech-jwgl/scripts/query.ts grades
-npx tsx .workbuddy/skills/njtech-jwgl/scripts/query.ts news 公告通知 5
-npx tsx .workbuddy/skills/njtech-jwgl/scripts/query.ts search-courses 高等数学
+npx tsx skills/njtech-jwgl/scripts/query.ts schedule
+npx tsx skills/njtech-jwgl/scripts/query.ts grades
+npx tsx skills/njtech-jwgl/scripts/query.ts news 公告通知 5
+npx tsx skills/njtech-jwgl/scripts/query.ts search-courses 高等数学
 ```
 
 ### 路径 B：交互式 agent（适合自然语言多轮对话）

@@ -86,16 +86,16 @@ npm run dev            # 或项目内开发模式
 
 ```bash
 # 无头查询（最快，无需 DeepSeek Key，只需配置教务账号）
-npx tsx .workbuddy/skills/njtech-jwgl/scripts/query.ts schedule
-npx tsx .workbuddy/skills/njtech-jwgl/scripts/query.ts grades
-npx tsx .workbuddy/skills/njtech-jwgl/scripts/query.ts news 公告通知 5
+npx tsx skills/njtech-jwgl/scripts/query.ts schedule
+npx tsx skills/njtech-jwgl/scripts/query.ts grades
+npx tsx skills/njtech-jwgl/scripts/query.ts news 公告通知 5
 
 # 或用 npm 快捷命令（参数跟在 -- 之后）
 npm run njtech -- schedule
 npm run njtech -- search-courses 高等数学
 ```
 
-可用命令：`schedule` · `grades` · `exams` · `lab-grades` · `news` · `student-info` · `enrolled-courses` · `retake-courses` · `selection-status` · `search-courses` · `search-classes` · `watch`。完整说明、协议细节与安全红线见 `.workbuddy/skills/njtech-jwgl/`（`SKILL.md` + `references/`）。
+可用命令：`schedule` · `grades` · `exams` · `lab-grades` · `news` · `student-info` · `enrolled-courses` · `retake-courses` · `selection-status` · `search-courses` · `search-classes` · `watch`。完整说明、协议细节与安全红线见 `skills/njtech-jwgl/`（`SKILL.md` + `references/`）。
 
 > 抢课 / 退课属真实写操作，**不在此脚本内**，仅走交互式 `raptor` 且需本人二次确认。
 
