@@ -18,7 +18,6 @@ const {
   weatherText,
   isWetCode,
   weekdayOf,
-  defaultWeatherCity,
   parseGeoResponse,
   pickCandidate,
   isMajorCity,
@@ -27,7 +26,7 @@ const {
   buildAdvice,
   fetchWeather,
   resetWeatherCache,
-} = await import("../src/weather");
+} = await import("../src/core/weather");
 
 const GEO = {
   name: "南京",
@@ -122,15 +121,6 @@ test("降水类码判定：雨/雪/雷暴算湿，雾和阴不算", () => {
 test("星期按 UTC 解析，不受本机时区影响", () => {
   assert.equal(weekdayOf("2026-08-30"), "周日");
   assert.equal(weekdayOf("2026-08-31"), "周一");
-});
-
-// ── 默认城市按学校判断 ────────────────────────────────────────
-
-test("默认城市跟着教务系统主机名走", () => {
-  assert.equal(defaultWeatherCity("https://jwgl.njtech.edu.cn"), "南京");
-  // 未登记的学校仍退回南京（当前只有 NJTECH 一套教务），但不能默默猜错：
-  // 这里钉住现状，将来多接一所学校时必须显式加映射
-  assert.equal(defaultWeatherCity("https://jwgl.example.edu.cn"), "南京");
 });
 
 // ── 地理编码 ──────────────────────────────────────────────────

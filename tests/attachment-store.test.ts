@@ -28,7 +28,7 @@ const {
   deleteAttachment,
   clearAttachments,
   attachmentStats,
-} = await import("../src/attachment-store");
+} = await import("../src/core/attachment-store");
 
 const URL_A =
   "https://jwc.njtech.edu.cn/system/_content/download.jsp?urltype=news.DownloadAttachUrl&owner=1&wbfileid=ABC";

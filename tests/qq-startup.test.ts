@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { startStandaloneQQ } from "../src/qq/bridge";
+import { startStandaloneQQ } from "../src/channels/qq/bridge";
 
 test("独立 QQ 启动加载凭证后启动桥接", async () => {
   const order: string[] = [];

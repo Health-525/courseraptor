@@ -13,8 +13,8 @@ import https from "node:https";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import type { HttpResponse } from "../src/jwgl/http";
-import { createClient, fetchJson, httpFailure, setRateLimit } from "../src/jwgl/http";
+import type { HttpResponse } from "../src/core/http";
+import { createClient, fetchJson, httpFailure, setRateLimit } from "../src/core/http";
 
 // ── mock：一次 req() 对应一次 respond()，记录请求头供断言 ─────────
 

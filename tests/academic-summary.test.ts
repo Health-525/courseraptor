@@ -4,9 +4,9 @@ import {
   gradeStatus,
   summarizeAcademics,
   summarizeGeneralElectives,
-} from "../src/academic-summary";
-import { deduplicateGrades, isPassFailGrade, toGP } from "../src/jwgl/grades";
-import type { GradeCourse } from "../src/jwgl/types";
+} from "../src/adapters/njtech/academic-summary";
+import { deduplicateGrades, isPassFailGrade, toGP } from "../src/adapters/njtech/grades";
+import type { GradeCourse } from "../src/core/model";
 
 const course = (patch: Partial<GradeCourse> = {}): GradeCourse => ({
   course: "示例课程",

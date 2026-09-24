@@ -11,7 +11,7 @@
  *   npx tsx skills/njtech-jwgl/scripts/query.ts <命令> [参数]
  */
 
-import { getCookie, getXkSession, sleep } from "../../../src/jwgl/session";
+import { getCookie, getXkSession, sleep } from "../../../src/adapters/njtech/session";
 import {
   fetchScheduleSmart,
   fetchExamsSmart,
@@ -19,23 +19,23 @@ import {
   currentWeekOf,
   WEEKDAY_NAMES,
   periodTimeRange,
-} from "../../../src/jwgl/academics";
-import { fetchAllGrades } from "../../../src/jwgl/grades";
+} from "../../../src/adapters/njtech/academics";
+import { fetchAllGrades } from "../../../src/adapters/njtech/grades";
 import {
   fetchProfile,
   fetchEnrolledClasses,
   fetchRetakeCourses,
   fetchLabGradesSmart,
-} from "../../../src/jwgl/portal";
-import { fetchJwcNews } from "../../../src/jwgl/news";
+} from "../../../src/adapters/njtech/portal";
+import { fetchJwcNews } from "../../../src/adapters/njtech/news";
 import {
   inspectXk,
   searchCourses,
   fetchJxbList,
   roundRefOf,
   type XkCourse,
-} from "../../../src/jwgl/xk";
-import { config } from "../../../src/config";
+} from "../../../src/adapters/njtech/xk";
+import { config } from "../../../src/core/config";
 
 // ── 小工具 ────────────────────────────────────────────────
 

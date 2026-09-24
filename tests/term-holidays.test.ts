@@ -22,10 +22,9 @@ const {
   listSpecialDays,
   specialOnDate,
   specialDaysOfWeek,
-  annotateWeekGroups,
   loadHolidayStore,
-} = await import("../src/jwgl/term-holidays");
-const { buildWeekIndex } = await import("../src/jwgl/academics");
+} = await import("../src/core/calendar/holidays");
+const { annotateWeekGroups, buildWeekIndex } = await import("../src/adapters/njtech/academics");
 
 // 2026 秋：第 1 周 2026-08-31（周一）～ 9-06
 const WEEK1_MONDAY = "2026-08-31";

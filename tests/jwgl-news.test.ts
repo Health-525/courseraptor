@@ -14,7 +14,7 @@ import https from "node:https";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { fetchJwcArticle, fetchJwcNews } from "../src/jwgl/news";
+import { fetchJwcArticle, fetchJwcNews } from "../src/adapters/njtech/news";
 
 const httpsMod = https as unknown as { get: unknown };
 

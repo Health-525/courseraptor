@@ -21,22 +21,22 @@ process.env.RAPTOR_DATA_DIR = tmpData;
 
 const require = createRequire(import.meta.url);
 
-import { convertDocument, textToBlocks } from "../src/document/convert";
-import { resolveCjkFont, resolveCjkFontFamily } from "../src/document/font";
+import { convertDocument, textToBlocks } from "../src/core/document/convert";
+import { resolveCjkFont, resolveCjkFontFamily } from "../src/core/document/font";
 import {
   renderDocument,
   renderDocx,
   renderPdf,
   renderPptx,
   renderXlsx,
-} from "../src/document/render";
+} from "../src/core/document/render";
 import {
   drainGeneratedRound,
   generateAndSave,
   generatedDir,
   runInDocumentRound,
-} from "../src/document/save";
-import { loadWorkbook } from "../src/spreadsheet";
+} from "../src/core/document/save";
+import { loadWorkbook } from "../src/core/spreadsheet";
 
 const PK = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 const PDF_MAGIC = Buffer.from("%PDF");
@@ -206,13 +206,13 @@ test("drainGeneratedRound：按 roundId 精确隔离，取后即清", async () =
   assert.equal(drainGeneratedRound("nope").length, 0);
 });
 
-test("工具层接线：raptorTools.generate_document / convert_document 可直接 execute", async () => {
-  const { raptorTools } = await import("../src/tools");
-  assert.ok(raptorTools.generate_document, "generate_document 应注册");
-  assert.ok(raptorTools.convert_document, "convert_document 应注册");
+test("工具层接线：coreTools.generate_document / convert_document 可直接 execute", async () => {
+  const { coreTools } = await import("../src/core/tools");
+  assert.ok(coreTools.generate_document, "generate_document 应注册");
+  assert.ok(coreTools.convert_document, "convert_document 应注册");
 
   const gen = (
-    raptorTools.generate_document as unknown as {
+    coreTools.generate_document as unknown as {
       execute: (i: unknown) => Promise<any>;
     }
   ).execute;
@@ -226,7 +226,7 @@ test("工具层接线：raptorTools.generate_document / convert_document 可直�
   assert.ok(path.resolve(g.path).startsWith(path.resolve(generatedDir())));
 
   const conv = (
-    raptorTools.convert_document as unknown as {
+    coreTools.convert_document as unknown as {
       execute: (i: unknown) => Promise<any>;
     }
   ).execute;

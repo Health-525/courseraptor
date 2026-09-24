@@ -38,7 +38,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/web/assets/**"],
+      "includes": ["src/channels/web/assets/**"],
       "linter": {
         "enabled": false
       },

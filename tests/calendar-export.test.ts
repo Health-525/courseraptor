@@ -19,8 +19,9 @@ import { test } from "node:test";
 // 必须在导入被测模块之前指向临时数据目录（term-holidays 真值源落在这里）
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-ics-"));
 
-const { buildTermICS } = await import("../src/calendar-export");
-const { recordSpecialDays } = await import("../src/jwgl/term-holidays");
+await import("../src/adapters");
+const { buildTermICS } = await import("../src/core/calendar/export");
+const { recordSpecialDays } = await import("../src/core/calendar/holidays");
 
 const NOW = new Date("2026-09-01T00:00:00Z");
 

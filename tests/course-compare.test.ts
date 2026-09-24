@@ -11,7 +11,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { parseSksjSegments, segmentsOverlap, expandWeeks } = await import("../src/jwgl/academics");
+const { parseSksjSegments, segmentsOverlap, expandWeeks } = await import(
+  "../src/adapters/njtech/academics"
+);
 
 test("parseSksjSegments：标准单段解析", () => {
   const segs = parseSksjSegments("星期一第5-6节{2-17周}");

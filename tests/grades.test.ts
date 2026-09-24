@@ -11,7 +11,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { toGP, isPassFailGrade, enrollYearFromStudentId } = await import("../src/jwgl/grades");
+const { toGP, isPassFailGrade, enrollYearFromStudentId } = await import(
+  "../src/adapters/njtech/grades"
+);
 
 // ── 数字制 ────────────────────────────────────────────────────
 

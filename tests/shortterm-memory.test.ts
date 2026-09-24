@@ -17,7 +17,7 @@ process.env.RAPTOR_DATA_DIR = dataDir;
 const sessionFile = path.join(dataDir, "session.json");
 
 const { captureSessionPrompt, flushCapturedSession, loadLastSessionTranscript } = await import(
-  "../src/memory/shortterm"
+  "../src/core/memory/shortterm"
 );
 
 test("未捕获过任何会话：转写为空串，不编造记忆", async () => {

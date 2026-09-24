@@ -63,7 +63,7 @@ const version = pkg.version;
 console.log(`版本号 -> v${version}${notes ? `（${notes}）` : ""}`);
 
 // ── 打包：工作区 -> 暂存目录（排除本机数据/隐私）-> zip ──
-// data/ 全部属于本机运行数据，不能打包。校历公共种子由 src/jwgl/term-dates.ts 分发。
+// data/ 全部属于本机运行数据，不能打包。校历公共种子由 src/adapters/njtech/term-dates.ts 分发。
 // 暂存目录必须放在项目外：cpSync 源目录嵌在项目里会自我嵌套报 ERR_FS_CP_EINVAL
 const publishWork = path.join(tmpdir(), `raptor-publish-${Date.now()}`);
 const stage = path.join(publishWork, "stage");
@@ -78,7 +78,7 @@ cpSync(ROOT, stage, {
 });
 
 // 仅在待发布副本写入更新服务地址；源码本地开发无需配置更新后台。
-const stagedUpdateCheck = path.join(stage, "src", "update-check.ts");
+const stagedUpdateCheck = path.join(stage, "src", "core", "update-check.ts");
 const updateCheckSource = readFileSync(stagedUpdateCheck, "utf8");
 const placeholderLine = 'const DEFAULT_UPDATE_SERVER = "__RAPTOR_RELEASE_SERVER__";';
 if (!updateCheckSource.includes(placeholderLine)) {

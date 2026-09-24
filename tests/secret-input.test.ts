@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import { test } from "node:test";
-import { readSecret } from "../src/secret-input";
+import { readSecret } from "../src/core/secret-input";
 
 test("静音秘密输入显示提示但不回显内容", async () => {
   const input = new PassThrough() as PassThrough & {

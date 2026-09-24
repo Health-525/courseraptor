@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import { test } from "node:test";
 import { runAgentTUI } from "@ai-sdk/tui";
-import { createKeyProxy } from "../src/tui/keys";
+import { createKeyProxy } from "../src/channels/cli/tui/keys";
 
 const waitForIO = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 30));
 

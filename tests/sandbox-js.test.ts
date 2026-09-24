@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { runSandboxedJs } from "../src/sandbox-js";
+import { runSandboxedJs } from "../src/core/sandbox-js";
 
 test("最后表达式的值就是 result（eval 语义）", () => {
   const r = runSandboxedJs("1 + 2");

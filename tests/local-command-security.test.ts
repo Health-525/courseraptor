@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { localOnlyCommandMessage } from "../src/tui/slash-menu";
+import { localOnlyCommandMessage } from "../src/channels/cli/tui/slash-menu";
 
 test("仅本机命令 /key 及其参数写法均不得进入远程渠道", () => {
   assert.match(localOnlyCommandMessage("/key") ?? "", /本机终端/);

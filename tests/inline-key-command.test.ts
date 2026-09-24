@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import { test } from "node:test";
-import { runInlineTUI, type TUIStreamableAgent } from "../src/tui/inline";
+import { runInlineTUI, type TUIStreamableAgent } from "../src/channels/cli/tui/inline";
 
 const nullAgent: TUIStreamableAgent = {
   stream: async () => ({ fullStream: (async function* () {})() }),

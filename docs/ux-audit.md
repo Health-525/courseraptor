@@ -40,7 +40,7 @@
 
 | 位置 | 事实 |
 |---|---|
-| `src/qq/bridge.ts:126` | `await agent.generate(...)` —— 同步阻塞，任务跑完才发消息 |
+| `src/channels/qq/bridge.ts:126` | `await agent.generate(...)` —— 同步阻塞，任务跑完才发消息 |
 | `src/tools/index.ts:579` | `grab_plan` 的 `durationSec` 默认 **600 秒** |
 | `README.md:103` | 「官方机器人为被动回复（约 5 分钟窗口）」 |
 
@@ -68,7 +68,7 @@
 |---|---|
 | `memory.json` · `mmt8dv2mqwbuu` | 「对外展示时不要提及抢课和盯课功能」 |
 | `memory.json` · `mmt8duq46b4ff` | 同上，措辞略异的**重复条目** |
-| `src/qq/bridge.ts:108` | 写死：`"查课表 / 盯课 / 抢课 / 读教务通知"` |
+| `src/channels/qq/bridge.ts:108` | 写死：`"查课表 / 盯课 / 抢课 / 读教务通知"` |
 
 用户把偏好郑重存进了长期记忆，代码里的文案却反着来。这是**已经在线上生效的自相矛盾**。
 
@@ -83,7 +83,7 @@
 
 **现象**：出错时用户看到的是 `❌ 处理失败：SESSION_EXPIRED`。
 
-**证据**：`src/qq/bridge.ts:143`
+**证据**：`src/channels/qq/bridge.ts:143`
 
 ```ts
 await bot.sendText(msg.replyTarget, `❌ 处理失败：${(e as Error).message.slice(0, 120)}`);
@@ -194,7 +194,7 @@ await bot.sendText(msg.replyTarget, `❌ 处理失败：${(e as Error).message.s
 
 审计不该只挑毛病，这几个设计是明显的产品品味，建议在后续迭代中保住并推广：
 
-1. **`src/jwgl/term-dates.ts` 的 `recorded / known / estimated` 三态**
+1. **`src/adapters/njtech/term-dates.ts` 的 `recorded / known / estimated` 三态**
    开学日期查不到时宁可标注「估算」也不装作确定，还会主动提示「把报到注册通知链接发我可校准」。这是**不骗用户**的产品价值观，应该推广到所有不确定数据上。
 
 2. **工具层对「拿不到 ≠ 没有」的严格区分**

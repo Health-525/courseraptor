@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 发版：bump package.json 版本 -> 提交 -> 打 tag -> 推送。
- * 同学端 raptor 启动时对比 GitHub master 上的版本号即会提示更新（src/update-check.ts）。
+ * 同学端 raptor 启动时对比 GitHub master 上的版本号即会提示更新（src/core/update-check.ts）。
  *
  * 用法：npm run release            # patch：0.1.0 -> 0.1.1
  *       npm run release -- minor   # 0.1.0 -> 0.2.0

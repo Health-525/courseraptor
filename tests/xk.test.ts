@@ -11,7 +11,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { parseCourseList, parseChoosedList, parseActionResponse } = await import("../src/jwgl/xk");
+const { parseCourseList, parseChoosedList, parseActionResponse } = await import(
+  "../src/adapters/njtech/xk"
+);
 
 test("parseCourseList：jxbmc 平铺行（njtech_grabber 实测的 PartDisplay 形状）", () => {
   const courses = parseCourseList({

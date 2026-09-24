@@ -18,7 +18,7 @@ import { test } from "node:test";
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-preparse-"));
 process.env.RAPTOR_CREDENTIALS_FILE = path.join(process.env.RAPTOR_DATA_DIR, "credentials.enc");
 
-const { setChatAgent, startChatWeb } = await import("../src/web/chat-web");
+const { setChatAgent, startChatWeb } = await import("../src/channels/web/chat-web");
 
 /** 页面签发的 CSRF token（写请求必须带上） */
 let pageToken: string | null = null;

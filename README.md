@@ -156,13 +156,10 @@ Agent 默认可调用 **31 个工具**，覆盖十大能力线。完整参数表
 ├── docs/               # 文档与素材
 ├── skills/njtech-jwgl/ # 教务无头查询技能（SKILL.md + references/ + scripts/query.ts）
 └── src/
-    ├── index.ts        # 终端入口
-    ├── agent.ts        # Agent 定义
-    ├── config.ts       # 配置加载
-    ├── jwgl/           # 教务协议层
-    ├── web/            # 网页版 (聊天/大厅/日程/课表/待办/知识库)
-    ├── tools/          # 31 个 Agent 工具
-    └── ...             # 记忆/待办/知识库/番茄钟/QQ/天气等引擎
+    ├── core/           # 学校无关内核：agent/记忆/文档/日历/附件/知识库等 + 通用工具
+    ├── adapters/       # 学校适配层：core/school.ts 定义的 SchoolAdapter 端口
+    │   └── njtech/     # 南京工业大学实现（登录/课表/成绩/考试/选课/通知 + 教务工具）
+    └── channels/       # 输出渠道：cli（终端 TUI）、web（网页）、qq（机器人）
 ```
 
 ---

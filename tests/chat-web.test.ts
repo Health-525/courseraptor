@@ -19,10 +19,11 @@ process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-chat
 // QQ 凭证保存走临时文件：测试里绝不碰真机 credentials.enc
 process.env.RAPTOR_CREDENTIALS_FILE = path.join(process.env.RAPTOR_DATA_DIR, "credentials.enc");
 
+await import("../src/adapters");
 const { setChatAgent, setQQBridgeLauncher, setTitleMaker, startChatWeb } = await import(
-  "../src/web/chat-web"
+  "../src/channels/web/chat-web"
 );
-const { generatedDir } = await import("../src/document/save");
+const { generatedDir } = await import("../src/core/document/save");
 
 /** 页面签发的 CSRF token（写请求必须带上；浏览器里由注入的 fetch 包装自动完成） */
 let pageToken: string | null = null;
@@ -457,7 +458,7 @@ test("待办可创建、完成并导出日历，本地数据接口回脱敏概�
 
 test("知识库：页面可打开、接口可列表删除、数据概览与导出携带", async () => {
   const url = (await startChatWeb())!;
-  const { addKnowledge } = await import("../src/knowledge");
+  const { addKnowledge } = await import("../src/core/knowledge");
   const { entry } = addKnowledge({ title: "接口测试知识", content: "正文内容" });
 
   const page = await fetch(`${url}/knowledge`);
@@ -651,7 +652,7 @@ test("QQ 凭证可经设置面板保存：成对校验、脱敏回显、保存�
   assert.ok(!JSON.stringify(body).includes("web-save-secret"), "AppSecret 不得出现在响应任何位置");
 
   // 加密落盘 + GET 状态一致
-  const { loadCredentialsStore } = await import("../src/credentials");
+  const { loadCredentialsStore } = await import("../src/core/credentials");
   const stored = loadCredentialsStore();
   assert.equal(stored?.qqBotAppSecret, "web-save-secret");
   assert.equal(stored?.qqBotPasscode, "raptor-pass");
@@ -687,7 +688,7 @@ test("常用问题可经设置面板保存：归一化落盘、清空回默认",
   assert.deepEqual(await readQuick(), ["明天有啥课", "查".repeat(60)]);
 
   // 加密落盘：保存的就是归一化后的清单
-  const { loadCredentialsStore } = await import("../src/credentials");
+  const { loadCredentialsStore } = await import("../src/core/credentials");
   assert.deepEqual(loadCredentialsStore()?.webQuickQuestions, ["明天有啥课", "查".repeat(60)]);
 
   // 清空清单 = 恢复默认（不靠单独的「重置」协议）

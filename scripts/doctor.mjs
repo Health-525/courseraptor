@@ -15,7 +15,7 @@ for (const name of Object.keys(pkg.dependencies)) {
   try { found = existsSync(fileURLToPath(import.meta.resolve(name))); } catch { /* 按 ESM 条件解析，不执行依赖。 */ }
   record(`dependency:${name}`, found, found ? `${name} 可用` : `${name} 缺失；请在项目目录运行 npm ci。`);
 }
-for (const file of ["src/index.ts", "src/demo.ts", "docs/courseraptor-logo.png", "node_modules/marked/lib/marked.umd.js"]) {
+for (const file of ["src/channels/cli/index.ts", "src/channels/cli/demo.ts", "docs/courseraptor-logo.png", "node_modules/marked/lib/marked.umd.js"]) {
   record(`file:${file}`, existsSync(path.join(root, file)), `${file} ${existsSync(path.join(root, file)) ? "存在" : "缺失，请重新安装或获取完整项目"}`);
 }
 checks.push({ id: "credentials", status: "info", message: existsSync(path.join(root, "credentials.enc"))

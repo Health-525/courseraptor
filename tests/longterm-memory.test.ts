@@ -23,7 +23,7 @@ const {
   loadMemory,
   formatMemoryForPrompt,
   loadUserGrade,
-} = await import("../src/memory/longterm");
+} = await import("../src/core/memory/longterm");
 
 test("addMemory：新增条目进提示词，返回未合并", async () => {
   const r = await addMemory("用户是 2024 级学生", "用户档案");

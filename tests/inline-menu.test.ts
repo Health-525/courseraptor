@@ -1,7 +1,7 @@
 /**
  * 行内模式斜杠菜单集成测试。
  *
- * 行内渲染器（src/tui/inline.ts）的菜单逻辑无法单独导出——它和 readline、
+ * 行内渲染器（src/channels/cli/tui/inline.ts）的菜单逻辑无法单独导出——它和 readline、
  * process.stdin 粘在一起。这里用替身驱动整条链路：PassThrough 顶替 stdin、
  * 内存流接收渲染输出（runInlineTUI 的 output 选项，不劫持全局 stdout，否则
  * test runner 自己的报告会被一起吞掉）、假 agent 提供空流，验证「输入 / 弹
@@ -14,7 +14,7 @@
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import { describe, test } from "node:test";
-import { runInlineTUI, type TUIStreamableAgent } from "../src/tui/inline";
+import { runInlineTUI, type TUIStreamableAgent } from "../src/channels/cli/tui/inline";
 
 /** 不产生任何流事件的假 agent：本测试只关心输入行与菜单的交互 */
 const nullAgent: TUIStreamableAgent = {

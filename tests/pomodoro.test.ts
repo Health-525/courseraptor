@@ -15,13 +15,13 @@ const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-pomo-"));
 process.env.RAPTOR_DATA_DIR = tmpData;
 
 const { activePomodoro, cancelPomodoro, getPomodoro, listPomodoros, startPomodoro, toView } =
-  await import("../src/pomodoro");
-const { raptorTools } = await import("../src/tools");
+  await import("../src/core/pomodoro");
+const { coreTools } = await import("../src/core/tools");
 
-const manage = raptorTools.manage_pomodoro as unknown as {
+const manage = coreTools.manage_pomodoro as unknown as {
   execute: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
 };
-assert.ok(manage, "manage_pomodoro 应已注册进 raptorTools");
+assert.ok(manage, "manage_pomodoro 应已注册进 coreTools");
 
 test("start：时长落盘、默认 label 为专注、剩余约等于全长", () => {
   const item = startPomodoro(25);
@@ -100,7 +100,7 @@ test("工具 list 返回最近记录", async () => {
 });
 
 test("SSE 透出新建番茄钟的 pomodoro 事件，前端才画得出倒计时卡片", async () => {
-  const { setChatAgent, startChatWeb } = await import("../src/web/chat-web");
+  const { setChatAgent, startChatWeb } = await import("../src/channels/web/chat-web");
   const item = startPomodoro(25, "端到端");
   const view = toView(item);
   setChatAgent({

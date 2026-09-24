@@ -14,7 +14,8 @@ import { test } from "node:test";
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-prompt-"));
 process.env.RAPTOR_DATA_DIR = dataDir;
 
-const { writeFileAtomicSync } = await import("../src/atomic-write");
+await import("../src/adapters");
+const { writeFileAtomicSync } = await import("../src/core/atomic-write");
 
 writeFileAtomicSync(
   path.join(dataDir, "term-dates.json"),
@@ -36,7 +37,7 @@ writeFileAtomicSync(
   }),
 );
 
-const { calendarSection } = await import("../src/prompt");
+const { calendarSection } = await import("../src/core/prompt");
 
 test("校历段：开学日期与放假/调休从运行时真值渲染进提示词", () => {
   const s = calendarSection();
@@ -47,7 +48,7 @@ test("校历段：开学日期与放假/调休从运行时真值渲染进提示�
   assert.match(s, /以工具返回为准/, "永远声明运行时真值优先级");
 });
 
-const { basePrompt } = await import("../src/prompt");
+const { basePrompt } = await import("../src/core/prompt");
 
 test("行为准则：今日简报规则要求日程与待办结合分析", () => {
   const s = basePrompt(false);

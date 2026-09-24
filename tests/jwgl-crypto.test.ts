@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import { test } from "node:test";
 
-import { encryptJwglPassword } from "../src/jwgl/crypto";
+import { encryptJwglPassword } from "../src/adapters/njtech/crypto";
 
 function makeKeyPair(modulusLength: 1024 | 2048 = 2048): {
   modulusB64: string;

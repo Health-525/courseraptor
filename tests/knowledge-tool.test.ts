@@ -61,10 +61,10 @@ fs.writeFileSync(
   "utf8",
 );
 
-const { raptorTools } = await import("../src/tools");
-const { listKnowledge } = await import("../src/knowledge");
+const { coreTools } = await import("../src/core/tools");
+const { listKnowledge } = await import("../src/core/knowledge");
 
-const manage = raptorTools.manage_knowledge as unknown as {
+const manage = coreTools.manage_knowledge as unknown as {
   execute: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
 };
 

@@ -14,7 +14,7 @@ import { test } from "node:test";
 // 与真实数据目录隔离
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-sessions-"));
 
-const S = await import("../src/chat-sessions");
+const S = await import("../src/core/chat-sessions");
 
 test("appendRound 自动建档：标题取首问，列表按最近活跃返回", () => {
   S.appendRound("aaaa1111", "第一个问题", "回答一");
