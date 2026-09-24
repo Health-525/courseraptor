@@ -80,6 +80,25 @@ raptor                 # 全局命令
 npm run dev            # 或项目内开发模式
 ```
 
+### 方式三：作为 WorkBuddy 技能调用（适合同学二次封装 / 自动化）
+
+本项目已内置一个 WorkBuddy 技能 **`njtech-jwgl`**，把南京工业大学教务查询（课表 / 成绩 / 考试 / 通知 / 学籍 / 选课）封装成可脚本化、可被 agent 直接调用的入口，**无需每次开 LLM 对话，也不消耗 DeepSeek token**。
+
+```bash
+# 无头查询（最快，无需 DeepSeek Key，只需配置教务账号）
+npx tsx .workbuddy/skills/njtech-jwgl/scripts/query.ts schedule
+npx tsx .workbuddy/skills/njtech-jwgl/scripts/query.ts grades
+npx tsx .workbuddy/skills/njtech-jwgl/scripts/query.ts news 公告通知 5
+
+# 或用 npm 快捷命令（参数跟在 -- 之后）
+npm run njtech -- schedule
+npm run njtech -- search-courses 高等数学
+```
+
+可用命令：`schedule` · `grades` · `exams` · `lab-grades` · `news` · `student-info` · `enrolled-courses` · `retake-courses` · `selection-status` · `search-courses` · `search-classes` · `watch`。完整说明、协议细节与安全红线见 `.workbuddy/skills/njtech-jwgl/`（`SKILL.md` + `references/`）。
+
+> 抢课 / 退课属真实写操作，**不在此脚本内**，仅走交互式 `raptor` 且需本人二次确认。
+
 ---
 
 ## 🎯 适用人群
