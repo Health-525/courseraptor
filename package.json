@@ -6,7 +6,7 @@
     "dev": "tsx src/index.ts",
     "start": "tsx src/index.ts",
     "demo": "tsx src/demo.ts",
-    "njtech": "tsx .workbuddy/skills/njtech-jwgl/scripts/query.ts",
+    "njtech": "tsx skills/njtech-jwgl/scripts/query.ts",
     "doctor": "node scripts/doctor.mjs",
     "preview:readme": "node scripts/preview-readme.mjs",
     "qq": "tsx src/qq/bridge.ts",

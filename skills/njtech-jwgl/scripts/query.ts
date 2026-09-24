@@ -8,10 +8,10 @@
  * - 输出 Markdown，方便直接贴给同学或喂给 agent。
  *
  * 运行（在 courseraptor 项目根目录）：
- *   npx tsx .workbuddy/skills/njtech-jwgl/scripts/query.ts <命令> [参数]
+ *   npx tsx skills/njtech-jwgl/scripts/query.ts <命令> [参数]
  */
 
-import { getCookie, getXkSession, sleep } from "../../../../src/jwgl/session";
+import { getCookie, getXkSession, sleep } from "../../../src/jwgl/session";
 import {
   fetchScheduleSmart,
   fetchExamsSmart,
@@ -19,23 +19,23 @@ import {
   currentWeekOf,
   WEEKDAY_NAMES,
   periodTimeRange,
-} from "../../../../src/jwgl/academics";
-import { fetchAllGrades } from "../../../../src/jwgl/grades";
+} from "../../../src/jwgl/academics";
+import { fetchAllGrades } from "../../../src/jwgl/grades";
 import {
   fetchProfile,
   fetchEnrolledClasses,
   fetchRetakeCourses,
   fetchLabGradesSmart,
-} from "../../../../src/jwgl/portal";
-import { fetchJwcNews } from "../../../../src/jwgl/news";
+} from "../../../src/jwgl/portal";
+import { fetchJwcNews } from "../../../src/jwgl/news";
 import {
   inspectXk,
   searchCourses,
   fetchJxbList,
   roundRefOf,
   type XkCourse,
-} from "../../../../src/jwgl/xk";
-import { config } from "../../../../src/config";
+} from "../../../src/jwgl/xk";
+import { config } from "../../../src/config";
 
 // ── 小工具 ────────────────────────────────────────────────
 
@@ -332,7 +332,7 @@ async function main() {
     case undefined:
       console.log(
         "NJTech 教务查询（njtech-jwgl 技能）\n\n" +
-          "用法：npx tsx .workbuddy/skills/njtech-jwgl/scripts/query.ts <命令> [参数]\n\n" +
+          "用法：npx tsx skills/njtech-jwgl/scripts/query.ts <命令> [参数]\n\n" +
           "命令：schedule [学期] | grades | exams [学期] | lab-grades [学期] | news [板块] [条数]\n" +
           "      student-info | enrolled-courses | retake-courses [关键词] | selection-status\n" +
           "      search-courses <关键词> | search-classes <课程名> | watch <课程名> [秒]\n\n" +
