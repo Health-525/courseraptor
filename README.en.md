@@ -107,6 +107,14 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 
 Share the repository URL or an inspected clean installation package, never your used project directory. See [privacy and security](SECURITY.md).
 
+## Supported schools
+
+| University | Capabilities | Adapter maintainer |
+|---|---|---|
+| [Nanjing Tech University](src/adapters/njtech/) (NJTECH) | All 10 capabilities | [@Health-525](https://github.com/Health-525) |
+
+Your school not listed? [Request an adapter](https://github.com/Health-525/courseraptor/issues/new?template=request-school.yml) with a few details, or [write one yourself](docs/adapter-guide.md) — adapters are self-contained, Zhengfang-based systems have a full reference implementation to copy from, and merged PRs carry your name as that school's maintainer.
+
 ## Build with us
 
 TypeScript, Vercel AI SDK, DeepSeek, and a Node HTTP browser interface. School adapters live in `src/adapters/njtech/` behind the `SchoolAdapter` port (`src/core/school.ts`), generic tool schemas in `src/core/tools/`, and the production/demo shared view in `src/channels/web/chat-page.ts`.
