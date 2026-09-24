@@ -9,7 +9,8 @@ qq-bridge.log
 *.log
 eng.traineddata
 data/
-.workbuddy/
+.workbuddy/*
+!.workbuddy/skills/
 credentials.enc
 # 上游 skills 合集（体积大、仅本地参考，不入库不打包）
 skills/upstream-*/
