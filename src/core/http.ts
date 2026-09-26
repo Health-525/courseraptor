@@ -17,6 +17,8 @@
 
 import https from "node:https";
 
+import { isRaptorError, RaptorError, type RaptorErrorCode } from "./errors";
+
 export interface HttpResponse {
   status: number;
   body: string;
@@ -26,6 +28,10 @@ export interface HttpResponse {
    * 一旦非空，body 不可信——绝不能当「空数据」往上报。
    */
   error?: string;
+  /** error 对应的错误码（httpError() 据此构建类型化错误） */
+  errorCode?: RaptorErrorCode;
+  /** 瞬时故障（网络抖动/5xx）时为 true：重试有意义；重定向异常等确定性失败为 false */
+  errorRetryable?: boolean;
 }
 
 export interface HttpClient {
@@ -155,7 +161,14 @@ export function createClient(baseURL: string, initialCookie = ""): HttpClient {
       );
 
       q.on("error", (e: Error) =>
-        finish({ status: 0, body: "", headers: {}, error: `网络错误：${e.message}` }),
+        finish({
+          status: 0,
+          body: "",
+          headers: {},
+          error: `网络错误：${e.message}`,
+          errorCode: "NETWORK",
+          errorRetryable: true,
+        }),
       );
       q.setTimeout(REQUEST_TIMEOUT_MS, () =>
         q.destroy(new Error(`请求超时（${REQUEST_TIMEOUT_MS}ms）`)),
@@ -178,10 +191,20 @@ export function createClient(baseURL: string, initialCookie = ""): HttpClient {
       const target = Array.isArray(location) ? location[0] : location;
       if (!target) {
         // 302 却不给 Location：正方会话失效的典型表现
-        return { ...resp, error: `重定向 ${status} 缺少 Location（会话可能已失效）` };
+        return {
+          ...resp,
+          error: `重定向 ${status} 缺少 Location（会话可能已失效）`,
+          errorCode: "UPSTREAM",
+          errorRetryable: false,
+        };
       }
       if (hops >= MAX_REDIRECTS) {
-        return { ...resp, error: `重定向次数超过上限（${MAX_REDIRECTS}）` };
+        return {
+          ...resp,
+          error: `重定向次数超过上限（${MAX_REDIRECTS}）`,
+          errorCode: "UPSTREAM",
+          errorRetryable: false,
+        };
       }
       const next = target.startsWith("http") ? target : baseURL + target;
       // 重定向后按浏览器行为降为 GET
@@ -189,7 +212,12 @@ export function createClient(baseURL: string, initialCookie = ""): HttpClient {
     }
 
     if (status >= 500) {
-      return { ...resp, error: `服务端错误 HTTP ${status}` };
+      return {
+        ...resp,
+        error: `服务端错误 HTTP ${status}`,
+        errorCode: "UPSTREAM",
+        errorRetryable: true,
+      };
     }
 
     return resp;
@@ -207,6 +235,123 @@ export function httpFailure(resp: HttpResponse): string | null {
   if (resp.status === 0) return "无响应（连接中断）";
   if (resp.status >= 500) return `服务端错误 HTTP ${resp.status}`;
   return null;
+}
+
+/**
+ * 把失败响应构建成类型化错误（供抛异常风格的调用方使用）。
+ * errorCode / errorRetryable 由传输层在失败点打标，重试决策不再靠文案。
+ */
+export function httpError(resp: HttpResponse): RaptorError | null {
+  const failure = httpFailure(resp);
+  if (failure === null) return null;
+  const code = resp.errorCode ?? (resp.status === 0 ? "NETWORK" : "UPSTREAM");
+  const retryable = resp.errorRetryable ?? (code === "NETWORK" || code === "UPSTREAM");
+  // status===0 且无 error 字段的旧形态（理论上已不存在）按网络错误处理
+  return new RaptorError(code, failure, { retryable });
+}
+
+// ── 统一重试 ──────────────────────────────────────────────────
+// 之前重试散在 session（5 次线性）/ grades（3 次线性）/ webvpn（4 次验证码
+// 驱动）各写各的循环；退避曲线与「什么值得重试」无法统一调整。
+
+export interface RetryOptions {
+  /** 总尝试次数（含首次），默认 3 */
+  attempts?: number;
+  /** 退避基数（毫秒），默认 1000 */
+  baseDelayMs?: number;
+  /** 退避上限（毫秒），默认 8000 */
+  maxDelayMs?: number;
+  /** linear: base*n（登录链用，与旧行为一致）；exponential: base*2^(n-1)（默认） */
+  backoff?: "linear" | "exponential";
+  /** 耗尽后的包装文案前缀；不传则原样抛出最后一次的错误 */
+  label?: string;
+}
+
+/** 计算第 attempt 次失败后的等待毫秒（attempt 从 1 起）
+ *  @internal 仅为测试钉住退避曲线使用 */
+export function backoffDelay(
+  opts: Required<Pick<RetryOptions, "baseDelayMs" | "maxDelayMs" | "backoff">>,
+  attempt: number,
+): number {
+  const raw =
+    opts.backoff === "linear" ? opts.baseDelayMs * attempt : opts.baseDelayMs * 2 ** (attempt - 1);
+  return Math.min(raw, opts.maxDelayMs);
+}
+
+/**
+ * 带类型化分诊的重试：RaptorError 按 retryable 决定是否再试
+ * （凭证错误/结构变化立即上抛），裸 Error（http 层网络异常）视为瞬时故障重试。
+ */
+export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
+  const attempts = options.attempts ?? 3;
+  const backoff = {
+    baseDelayMs: options.baseDelayMs ?? 1000,
+    maxDelayMs: options.maxDelayMs ?? 8000,
+    backoff: options.backoff ?? "exponential",
+  };
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastError = e;
+      if (isRaptorError(e) && !e.retryable) throw e;
+      if (attempt < attempts) {
+        await new Promise((r) => setTimeout(r, backoffDelay(backoff, attempt)));
+      }
+    }
+  }
+  if (options.label) {
+    throw new Error(
+      `${options.label}（已重试 ${attempts} 次）：${(lastError as Error)?.message ?? "未知错误"}`,
+    );
+  }
+  throw lastError;
+}
+
+// ── 统一 fetch 原语（走 global fetch 的模块共用）───────────────
+// weather / news / attachments 各自维护超时与错误翻译的状况在此收敛：
+// 超时/断网抛 RaptorError("NETWORK")，HTTP 状态由调用方按业务判断
+// （jwc 的 483 拦截页需要读 body 签名，不能在这里一刀切 ok/!ok）。
+
+/** 注入点：真实 fetch 或测试替身。init 只承诺这两个字段，返回最小 Response 形状即可 */
+export type TextFetch = (
+  url: string,
+  init?: { signal?: AbortSignal; headers?: Record<string, string> },
+) => Promise<{
+  status: number;
+  text(): Promise<string>;
+}>;
+
+export interface FetchUrlTextOptions {
+  /** 超时毫秒数，默认 15000 */
+  timeoutMs?: number;
+  headers?: Record<string, string>;
+  fetchImpl?: TextFetch;
+}
+
+/** global fetch + 超时 + 类型化网络错误；HTTP 状态不在此判定 */
+export async function fetchUrlText(
+  url: string,
+  opts: FetchUrlTextOptions = {},
+): Promise<{ status: number; text: string }> {
+  const doFetch: TextFetch = opts.fetchImpl ?? ((u, init) => fetch(u, init));
+  const timeoutMs = opts.timeoutMs ?? 15_000;
+  try {
+    // undici 内部重定向跟随有 20 跳上限，A↔B 互跳不会无限循环
+    const res = await doFetch(url, {
+      headers: opts.headers,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return { status: res.status, text: await res.text() };
+  } catch (e) {
+    const err = e as Error;
+    if (err?.name === "TimeoutError" || err?.name === "AbortError") {
+      throw new RaptorError("NETWORK", `请求超时（${Math.round(timeoutMs / 1000)}s）：${url}`);
+    }
+    throw new RaptorError("NETWORK", `网络错误：${err?.message ?? String(e)}`);
+  }
 }
 
 /** 统一的抓取结果：ok=false 时必须把 error 如实上报给模型，不许降级成空列表 */

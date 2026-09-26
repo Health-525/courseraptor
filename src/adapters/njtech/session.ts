@@ -4,7 +4,8 @@
  */
 
 import { config } from "../../core/config";
-import { isRaptorError, RaptorError } from "../../core/errors";
+import { RaptorError } from "../../core/errors";
+import { withRetry } from "../../core/http";
 import { loginJwgl } from "./auth";
 import { openXkSession, type XkSession } from "./xk";
 
@@ -71,38 +72,24 @@ export function invalidateXkSession(): void {
 // ── 带重试的登录 ─────────────────────────────────────────────
 
 async function loginWithRetry(): Promise<{ cookie: string }> {
-  let lastError: Error | null = null;
-  for (let attempt = 1; attempt <= RETRY_MAX; attempt++) {
-    try {
-      return await loginJwgl(config.jwglUsername, config.jwglPassword);
-    } catch (e) {
-      lastError = e as Error;
-      // 凭证错误/结构变化等非瞬时故障：重试无意义，立即上抛
-      if (isRaptorError(e) && !e.retryable) throw lastError;
-      if (attempt < RETRY_MAX) {
-        await sleep(attempt * 2000);
-      }
-    }
-  }
-  throw new Error(`教务登录失败（已重试 ${RETRY_MAX} 次）：${lastError?.message ?? "未知错误"}`);
+  // 线性退避与旧手写循环一致（2/4/6/8s）；凭证错误/结构变化由
+  // withRetry 按 RaptorError.retryable 立即上抛，不再重试
+  const { cookie } = await withRetry(() => loginJwgl(config.jwglUsername, config.jwglPassword), {
+    attempts: RETRY_MAX,
+    baseDelayMs: 2000,
+    backoff: "linear",
+    label: "教务登录失败",
+  });
+  return { cookie };
 }
 
 async function openXkSessionWithRetry(): Promise<XkSession> {
-  let lastError: Error | null = null;
-  for (let attempt = 1; attempt <= RETRY_MAX; attempt++) {
-    try {
-      return await openXkSession(config.jwglUsername, config.jwglPassword);
-    } catch (e) {
-      lastError = e as Error;
-      if (isRaptorError(e) && !e.retryable) throw lastError;
-      if (attempt < RETRY_MAX) {
-        await sleep(attempt * 2000);
-      }
-    }
-  }
-  throw new Error(
-    `选课会话建立失败（已重试 ${RETRY_MAX} 次）：${lastError?.message ?? "未知错误"}`,
-  );
+  return withRetry(() => openXkSession(config.jwglUsername, config.jwglPassword), {
+    attempts: RETRY_MAX,
+    baseDelayMs: 2000,
+    backoff: "linear",
+    label: "选课会话建立失败",
+  });
 }
 
 export function sleep(ms: number): Promise<void> {

@@ -9,8 +9,7 @@
  *   → 上次成功抓取的落盘缓存（前两者都失败时兜底，注明快照时间）。
  */
 
-import http from "node:http";
-import https from "node:https";
+import { fetchUrlText } from "../../core/http";
 import { readJsonCache, writeJsonCache } from "../../core/json-cache";
 import type { NewsItem } from "../../core/model";
 import { jwcUrlToPath, webvpnFetchJwc, webvpnUrlToPublic } from "./webvpn";
@@ -34,58 +33,15 @@ interface NewsCacheEnvelope {
   fetchedAt: number;
 }
 
-// ── HTML 抓取（直连）─────────────────────────────────────────
+// ── HTML 抓取（直连，统一走 core/http 的 fetch 原语）──────────
 
-/** 跟随重定向的上限：A↔B 互跳时没有上限就是无限请求 */
-const MAX_REDIRECTS = 5;
-
-function fetchHtml(url: string, timeout = 15000, hops = 0): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const lib = url.startsWith("https") ? https : http;
-    const req = lib.get(
-      url,
-      {
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "zh-CN,zh;q=0.9",
-          Connection: "keep-alive",
-        },
-      },
-      (res) => {
-        // Handle redirects
-        if ((res.statusCode ?? 0) >= 300 && (res.statusCode ?? 0) < 400 && res.headers.location) {
-          const redirectUrl = res.headers.location.startsWith("http")
-            ? res.headers.location
-            : new URL(res.headers.location, url).href;
-          // 必须把这次响应的数据读完（或销毁），否则 keep-alive 下 socket
-          // 一直挂在半途，重定向链一长就把连接池耗光
-          res.resume();
-          if (hops >= MAX_REDIRECTS) {
-            return reject(new Error(`重定向次数超过上限（${MAX_REDIRECTS}）：${url}`));
-          }
-          return fetchHtml(redirectUrl, timeout, hops + 1)
-            .then(resolve)
-            .catch(reject);
-        }
-        if ((res.statusCode ?? 0) < 200 || (res.statusCode ?? 0) >= 400) {
-          return reject(new Error(`HTTP ${res.statusCode ?? 0} for ${url}`));
-        }
-
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk: Buffer) => chunks.push(chunk));
-        res.on("end", () => {
-          const buf = Buffer.concat(chunks);
-          resolve(buf.toString("utf8"));
-        });
-        res.on("error", reject);
-      },
-    );
-    req.setTimeout(timeout, () => req.destroy(new Error(`Timeout ${url}`)));
-    req.on("error", reject);
-  });
-}
+/** 直连请求头：与浏览器一致，避免被官网 WAF 挡掉 */
+const DIRECT_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "Accept-Language": "zh-CN,zh;q=0.9",
+};
 
 // ── 抓取阶梯 ─────────────────────────────────────────────────
 
@@ -100,10 +56,17 @@ export interface JwcFetch {
  */
 async function fetchJwcHtml(path: string): Promise<JwcFetch> {
   try {
-    const html = await fetchHtml(`${BASE_URL}${path}`);
-    if (!html.includes(CAMPUS_ONLY_SIGNATURE)) return { html, via: "direct" };
+    // 重定向跟随（undici 内置 20 跳上限）与 15s 超时都在 fetchUrlText 里
+    const { status, text } = await fetchUrlText(`${BASE_URL}${path}`, {
+      timeoutMs: 15_000,
+      headers: DIRECT_HEADERS,
+    });
+    // 校外被拦时官网回 483（或 200 拦截页）：按状态与页面签名识别后换通道
+    if (status < 400 && !text.includes(CAMPUS_ONLY_SIGNATURE)) {
+      return { html: text, via: "direct" };
+    }
   } catch {
-    /* 直连失败（校外 483 / 断网）：换 WebVPN 通道 */
+    /* 直连失败（断网/超时，RaptorError NETWORK）：换 WebVPN 通道 */
   }
   const html = await webvpnFetchJwc(path);
   return { html, via: "webvpn" };

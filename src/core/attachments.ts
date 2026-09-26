@@ -25,6 +25,7 @@ import {
   touchAttachment,
 } from "./attachment-store";
 import { config } from "./config";
+import { RaptorError } from "./errors";
 import { isTableFilename, loadWorkbook, sheetOverview, type TableSheet } from "./spreadsheet";
 import { decodeTextBuffer } from "./text-decode";
 
@@ -454,7 +455,8 @@ async function downloadWithCaptcha(url: string): Promise<{ buf: Buffer; contentT
     const html = page.buf.toString("utf8");
     // 2026-09 起教务处官网限制校外 IP：匿名访问只剩拦截页，别当文件解析
     if (html.includes("本网站只能被校内IP地址访问")) {
-      throw new Error(
+      throw new RaptorError(
+        "CAMPUS_ONLY",
         "教务处官网已限制校外 IP 访问，附件暂无法在校外直接下载；请在校园网内获取" +
           "（通知正文可经 WebVPN 通道读取）",
       );

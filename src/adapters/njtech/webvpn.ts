@@ -114,7 +114,9 @@ function rawRequest(
         });
       },
     );
-    req.setTimeout(20_000, () => req.destroy(new Error(`WebVPN 请求超时：${url.slice(0, 80)}`)));
+    req.setTimeout(20_000, () =>
+      req.destroy(new RaptorError("NETWORK", `WebVPN 请求超时：${url.slice(0, 80)}`)),
+    );
     req.on("error", reject);
     if (opts.body) req.write(opts.body);
     req.end();

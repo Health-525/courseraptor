@@ -18,6 +18,7 @@
  */
 
 import type { FetchResult } from "./fetch-result";
+import { fetchUrlText } from "./http";
 
 const GEO_URL = "https://geocoding-api.open-meteo.com/v1/search";
 const FORECAST_URL = "https://api.open-meteo.com/v1/forecast";
@@ -37,10 +38,7 @@ export type WeatherFetch = (
   text(): Promise<string>;
 }>;
 
-const httpFetch: WeatherFetch = async (url, init) => {
-  const res = await fetch(url, init);
-  return { ok: res.ok, status: res.status, text: () => res.text() };
-};
+const httpFetch: WeatherFetch = fetch;
 
 // ── WMO 天气码 → 中文 ─────────────────────────────────────────
 // Open-Meteo 只给数字。0-3 云量，4x 雾，5x 毛毛雨，6x 雨，7x 雪/米雪，
@@ -369,20 +367,19 @@ export function resetWeatherCache(): void {
 
 // ── 网络 ──────────────────────────────────────────────────────
 
+// 超时/断网/HTTP 状态翻译统一走 core/http 的 fetchUrlText（超时抛
+// RaptorError("NETWORK")），这里只保留天气业务的错误前缀与 FetchResult 契约
 async function requestText(url: string, fetchImpl: WeatherFetch): Promise<FetchResult<string>> {
-  let res: Awaited<ReturnType<WeatherFetch>>;
   try {
-    res = await fetchImpl(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+    const { status, text } = await fetchUrlText(url, {
+      timeoutMs: REQUEST_TIMEOUT_MS,
+      fetchImpl,
+    });
+    if (status < 200 || status >= 300) return { ok: false, error: `天气服务返回 HTTP ${status}` };
+    return { ok: true, data: text };
   } catch (e) {
-    const err = e as Error;
-    const msg =
-      err?.name === "TimeoutError" || err?.name === "AbortError"
-        ? `请求超时（${REQUEST_TIMEOUT_MS / 1000}s）`
-        : (err?.message ?? String(e));
-    return { ok: false, error: `天气服务连不上：${msg.slice(0, 100)}` };
+    return { ok: false, error: `天气服务连不上：${(e as Error).message.slice(0, 100)}` };
   }
-  if (!res.ok) return { ok: false, error: `天气服务返回 HTTP ${res.status}` };
-  return { ok: true, data: await res.text() };
 }
 
 async function geoSearch(query: string, fetchImpl: WeatherFetch) {

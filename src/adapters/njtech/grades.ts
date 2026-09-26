@@ -11,7 +11,7 @@
  * 4. 拿不到的学期要报告，不能静默变成「没有这门课的成绩」。
  */
 
-import { createClient, httpFailure } from "../../core/http";
+import { createClient, httpError, withRetry } from "../../core/http";
 import type { GradeCourse, GradeResult } from "../../core/model";
 import { BASE } from "./auth";
 
@@ -91,40 +91,40 @@ export async function fetchAllGrades(cookie: string, username: string): Promise<
   const endYear = new Date().getFullYear();
   const startYear = enrollYearFromStudentId(username);
 
-  // 单学期查询带重试（线路抖动会导致整个学期数据静默丢失）
+  // 单学期查询带重试（线路抖动会导致整个学期数据静默丢失）；
+  // 线性退避 1.5s/3s 与旧手写循环一致，失败学期如实进 failedTerms
   const fetchTerm = async (y: number, q: number): Promise<GradeCourse[] | null> => {
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const resp = await client.req("/cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005", {
-          method: "POST",
-          body: `xnm=${y}&xqm=${q}&_search=false&nd=${Date.now()}&queryModel.showCount=200&queryModel.currentPage=1`,
-        });
-        // 传输层失败要进入重试，而不是被 JSON.parse 吞成「空学期」
-        const failure = httpFailure(resp);
-        if (failure) throw new Error(failure);
+    try {
+      return await withRetry(
+        async () => {
+          const resp = await client.req("/cjcx/cjcx_cxDgXscj.html?doType=query&gnmkdm=N305005", {
+            method: "POST",
+            body: `xnm=${y}&xqm=${q}&_search=false&nd=${Date.now()}&queryModel.showCount=200&queryModel.currentPage=1`,
+          });
+          // 传输层失败要进入重试，而不是被 JSON.parse 吞成「空学期」
+          const failure = httpError(resp);
+          if (failure) throw failure;
 
-        const data = JSON.parse(resp.body) as { items?: Array<Record<string, unknown>> };
-        return (data.items ?? []).map(
-          (g: Record<string, unknown>): GradeCourse => ({
-            course: String(g.kcmc || ""),
-            courseCode: String(g.kch || ""),
-            score: String(g.cj === 0 ? 0 : g.cj || g.bfzcj || ""),
-            credit: String(g.xf || ""),
-            type: String(g.kcxzmc || ""),
-            semester: String(g.xnmmc ?? "") + String(g.xqmmc ?? ""),
-            category: String(g.kcgsmc || ""),
-            courseClass: String(g.kclbmc || ""),
-          }),
-        );
-      } catch (e) {
-        if (attempt === 3) {
-          failedTerms.push(`${y}-${q === 3 ? 1 : 2}：${(e as Error).message.slice(0, 80)}`);
-          return null;
-        }
-        await new Promise((r) => setTimeout(r, attempt * 1500));
-      }
+          const data = JSON.parse(resp.body) as { items?: Array<Record<string, unknown>> };
+          return (data.items ?? []).map(
+            (g: Record<string, unknown>): GradeCourse => ({
+              course: String(g.kcmc || ""),
+              courseCode: String(g.kch || ""),
+              score: String(g.cj === 0 ? 0 : g.cj || g.bfzcj || ""),
+              credit: String(g.xf || ""),
+              type: String(g.kcxzmc || ""),
+              semester: String(g.xnmmc ?? "") + String(g.xqmmc ?? ""),
+              category: String(g.kcgsmc || ""),
+              courseClass: String(g.kclbmc || ""),
+            }),
+          );
+        },
+        { attempts: 3, baseDelayMs: 1500, backoff: "linear" },
+      );
+    } catch (e) {
+      failedTerms.push(`${y}-${q === 3 ? 1 : 2}：${(e as Error).message.slice(0, 80)}`);
+      return null;
     }
-    return null;
   };
 
   // 遍历所有学年学期

@@ -6,7 +6,8 @@
  * 1. 统一认证密码加密与真实浏览器密文逐字节一致（自登录页 bundle 逆向）；
  * 2. 直连被拦时自动降级 WebVPN，通知列表照常解析、链接映射回公网地址；
  * 3. WebVPN 也失败时回退落盘缓存快照，并把 staleAt 如实上报。
- * 全程 https.get / https.request 进程内替身，不联网、不跑真 OCR。
+ * 直连替身走 global fetch（news 直连统一用 core/http 的 fetchUrlText），
+ * WebVPN 登录链替身仍是 https.request。全程进程内替身，不联网、不跑真 OCR。
  */
 
 // 配置在模块加载期就读环境变量（config 是 import 时求值的单例），
@@ -87,22 +88,31 @@ const originalRequest = httpsMod.request;
 function restoreHttp(): void {
   httpsMod.get = originalGet;
   httpsMod.request = originalRequest;
+  restoreDirectFetch();
 }
 
-/** 直连（https.get）一律返回校外拦截页 */
+const originalFetch = globalThis.fetch;
+
+function restoreDirectFetch(): void {
+  globalThis.fetch = originalFetch;
+}
+
+/** 直连（global fetch）一律返回校外拦截页（HTTP 200 + 页面签名） */
 function installDirectBlocked(): void {
-  httpsMod.get = ((_url: unknown, _opts: unknown, cb: (res: EventEmitter) => void) => {
-    const res = new EventEmitter();
-    Object.assign(res, { statusCode: 200, headers: {}, resume: () => {} });
-    const req = new EventEmitter() as EventEmitter & { setTimeout: () => void };
-    req.setTimeout = () => {};
-    queueMicrotask(() => {
-      cb(res);
-      res.emit("data", Buffer.from(BLOCK_PAGE, "utf8"));
-      res.emit("end");
-    });
-    return req;
-  }) as unknown;
+  globalThis.fetch = (async () => ({
+    status: 200,
+    ok: true,
+    text: async () => BLOCK_PAGE,
+  })) as unknown as typeof fetch;
+}
+
+/** 直连（global fetch）正常返回给定页面 */
+function installDirectOk(body: string): void {
+  globalThis.fetch = (async () => ({
+    status: 200,
+    ok: true,
+    text: async () => body,
+  })) as unknown as typeof fetch;
 }
 
 interface ScriptedResp {
@@ -273,18 +283,7 @@ test("直连与 WebVPN 双失败时回退缓存快照并带 staleAt", async () =
 test("直连可用时优先直连，不触发 WebVPN 登录", async () => {
   resetSessionState();
   let webvpnTouched = false;
-  httpsMod.get = ((_url: unknown, _opts: unknown, cb: (res: EventEmitter) => void) => {
-    const res = new EventEmitter();
-    Object.assign(res, { statusCode: 200, headers: {}, resume: () => {} });
-    const req = new EventEmitter() as EventEmitter & { setTimeout: () => void };
-    req.setTimeout = () => {};
-    queueMicrotask(() => {
-      cb(res);
-      res.emit("data", Buffer.from(LIST_HTML, "utf8"));
-      res.emit("end");
-    });
-    return req;
-  }) as unknown;
+  installDirectOk(LIST_HTML);
   installWebvpnScript(() => {
     webvpnTouched = true;
     return { status: 500, body: "" };
