@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "tsx src/channels/cli/index.ts",
     "start": "tsx src/channels/cli/index.ts",
-    "demo": "tsx src/channels/cli/demo.ts",
+    "demo": "tsx src/demo/entry.ts",
+    "demo:live": "tsx src/demo/entry.ts --live",
     "njtech": "tsx skills/njtech-jwgl/scripts/query.ts",
     "doctor": "node scripts/doctor.mjs",
     "preview:readme": "node scripts/preview-readme.mjs",

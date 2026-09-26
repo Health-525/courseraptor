@@ -23,7 +23,7 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
 | `src/exam-cache.ts` | 考试本地缓存（`data/exam-cache.json`），get_exams 自动探测时落盘 |
 | `src/channels/web/result-cards.ts` | 把课表、成绩、考试、通知和附件工具结果压成可落盘的结构化展示卡；不让前端解析 Markdown |
 | `src/channels/web/workspace-data.ts` | 网页上传、截止日期待办与查询变化快照的本机持久化，统一路径边界与原子写入 |
-| `src/channels/web/demo-server.ts` | 独立离线演示，虚构数据、内存会话，不加载个人配置 |
+| `src/demo/server.ts` | 独立离线/实况演示，虚构数据、内存会话，不加载个人配置（原 `src/channels/web/demo-server.ts`，演示代码已集中到 `src/demo/`） |
 | `src/chat-sessions.ts` | 多会话落盘存储（`data/chat-sessions.json`，原子写 + 读坏隔离）。建档/截断/上下文窗口都在这里，网页历史重启不丢。**写入方有两个**：网页（读写）与 QQ 桥（只写，见下两行） |
 | `src/channels/qq/session-archive.ts` | QQ 消息 → 会话档案的映射（纯函数，不引 SDK）：私聊按人、群聊按群、频道按频道，id = `qq-` + sha256 摘要 20 位，群聊提问前补 `[昵称]` |
 | `src/schedule-cache.ts` | 课表本地缓存（`data/schedule-cache.json`）。`get_schedule` 查通即落盘，TUI 启动面板直读免登录；**网页已不展示课表卡**（用户要求删除，问课表走对话） |
@@ -130,7 +130,7 @@ CourseRaptor 的网页对话前端：应用启动时自动在本地起一个 Web
 | `src/channels/web/today-page.ts` | 页面本体（`todayPage({demo, demoData})`）：红头档案同套设计令牌；今日头条 → 周课表 → 临近考试 → 待办 → 知识速览 |
 | `src/channels/web/knowledge-page.ts` | 知识库页本体（`knowledgePage({demo, demoData})`）：左栏分类/搜索/排序，右栏条目列表 |
 | `src/exam-cache.ts` | 考试缓存（`data/exam-cache.json`），与 schedule-cache 同一套约定；`get_exams` 自动探测学期时落盘，日程页据此展示临近考试 |
-| `src/channels/web/demo-server.ts` | 演示模式：`/today` `/knowledge` 内嵌虚构数据（跟真实时钟走），不发任何请求 |
+| `src/demo/server.ts` | 演示模式：`/today` `/knowledge` 内嵌虚构数据（跟真实时钟走），不发任何请求（原 `src/channels/web/demo-server.ts`） |
 
 接口与行为要点：
 

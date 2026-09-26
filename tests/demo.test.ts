@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { createDemoServer, demoReply } from "../src/channels/web/demo-server";
+import { createDemoServer, demoReply } from "../src/demo/server";
 
 test("免账号演示：共用网页、内存会话、拒绝凭证设置与任意文件", async () => {
   const server = createDemoServer();

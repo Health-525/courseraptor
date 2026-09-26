@@ -33,6 +33,19 @@ $env:RAPTOR_DEMO_PORT = "3212"
 npm run demo
 ```
 
+### 演示接入真实模型（`--live`）
+
+`npm run demo` 是零配置离线剧本（不调用 AI）。想让演示回答由真实模型实时生成，改用：
+
+```bash
+npm run demo:live   # 等价于 npm run demo -- --live
+```
+
+- 回答由 DeepSeek 实时生成（真思考、真工具循环、真流式输出，会产生 API 费用），但工具返回的课表/成绩/考试/待办/通知仍是虚构示例，不需要教务账号。
+- Key 来源：先看 shell 环境的 `DEEPSEEK_API_KEY`，没有再从项目根 `.env` 取同名键（仅取 `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE_URL` / `RAPTOR_MODEL` 三个键）；模型默认 `deepseek-flash`，可用 `RAPTOR_MODEL` 覆盖。演示不读取 `credentials.enc`。
+- 找不到 Key 时自动回退离线剧本并在终端提示，页面照常可用。
+- 适合录制演示视频或现场展示 AI 分析能力；正式使用请运行 `npm start` 配置自己的账号。
+
 ## 凭证优先级
 
 - 教务账号：`.env` / 进程环境里的 `JWGL_*` 优先，其次本机 `credentials.enc`，最后首次引导。
