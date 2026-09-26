@@ -5,37 +5,23 @@
  * 名单公示）设置了浏览权限，列表里只给 article.jsp 动态入口，匿名打开
  * 原文一律 302 到 auth.htm「您无权访问此页面」。此前前端点「原文」直接
  * 撞鉴权页被当成故障上报，read_notice 还会把鉴权提示当正文转述。
- * https.get 进程内替身，不联网。
+ * global fetch 进程内替身（直连统一走 core/http 的 fetchUrlText），不联网。
  */
 import assert from "node:assert/strict";
-import { EventEmitter } from "node:events";
 import fs from "node:fs";
-import https from "node:https";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fetchJwcArticle, fetchJwcNews } from "../src/adapters/njtech/news";
 
-const httpsMod = https as unknown as { get: unknown };
-
-function installGet(respond: (url: string) => string) {
-  const original = httpsMod.get;
-  httpsMod.get = ((url: string, _opts: unknown, cb: (res: EventEmitter) => void) => {
-    const res = new EventEmitter();
-    Object.assign(res, { statusCode: 200, headers: {}, resume: () => {} });
-    const req = new EventEmitter() as EventEmitter & {
-      setTimeout: (ms: number, fn: () => void) => void;
-    };
-    req.setTimeout = () => {};
-    queueMicrotask(() => {
-      cb(res);
-      res.emit("data", Buffer.from(respond(url), "utf8"));
-      res.emit("end");
-    });
-    return req;
-  }) as unknown;
+function installFetch(respond: (url: string) => string) {
+  const original = globalThis.fetch;
+  globalThis.fetch = (async (url: unknown) => {
+    const body = respond(typeof url === "string" ? url : String(url));
+    return { status: 200, ok: true, text: async () => body };
+  }) as typeof fetch;
   return () => {
-    httpsMod.get = original;
+    globalThis.fetch = original;
   };
 }
 
@@ -45,7 +31,7 @@ const LIST_HTML = `<ul class="my-list">
 </ul>`;
 
 test("article.jsp 动态链接标 restricted，静态 info 链接不标", async () => {
-  const restore = installGet(() => LIST_HTML);
+  const restore = installFetch(() => LIST_HTML);
   try {
     const items = await fetchJwcNews([], 30);
     assert.ok(items.length >= 2, `应当解析出列表条目，实际 ${items.length}`);
@@ -66,7 +52,7 @@ test("article.jsp 动态链接标 restricted，静态 info 链接不标", async 
 });
 
 test("鉴权提示页不再伪装成正文：fetchJwcArticle 抛出明确的权限错误", async () => {
-  const restore = installGet(
+  const restore = installFetch(
     () => "<html><body>系统提示 抱歉 可能是由下列问题导致的： 您无权访问此页面</body></html>",
   );
   try {
@@ -84,7 +70,7 @@ test("正常文章页照常解析：标题截尾、正文提取、附件识别",
 <div class="v_news_content"><p>2026-2027学年第一学期选课分两轮进行，请各位同学在规定时间内完成选课操作。</p></div>
 <li>附件【<a href="/system/_content/download.jsp?uuid=abc">选课时间表.xlsx</a>】</li>
 </body></html>`;
-  const restore = installGet(() => ARTICLE_HTML);
+  const restore = installFetch(() => ARTICLE_HTML);
   try {
     const article = await fetchJwcArticle("https://jwc.njtech.edu.cn/info/1157/6912.htm");
     assert.equal(article.title, "关于开展选课的通知");
