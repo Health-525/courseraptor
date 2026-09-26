@@ -3,7 +3,7 @@
 // 便携 zip 以 Win32 资源（raptor.portable.zip）嵌在同一 exe 里。
 //
 // 行为：
-//   - 安装目录默认 %LOCALAPPDATA%\CourseRaptor，环境变量 RAPTOR_PORTABLE_HOME 可重定向；
+//   - 安装目录 = exe 旁边（exe 已在 CourseRaptor 文件夹内则直接复用），环境变量 RAPTOR_PORTABLE_HOME 可整体重定向；
 //   - 内置版本号与目录下 .portable-version 标记不同才重新释放 zip（同学本地 data/、
 //     凭证等运行数据不在 zip 里，升级覆盖不影响）；
 //   - 释放后用 runtime\node.exe 启动 app\bin\raptor.cjs（与便携版 start.bat 同一条链路）；
