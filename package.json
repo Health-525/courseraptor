@@ -48,26 +48,26 @@
   },
   "type": "module",
   "dependencies": {
-    "@ai-sdk/deepseek": "^3.0.31",
-    "@ai-sdk/tui": "^1.0.84",
+    "@ai-sdk/deepseek": "^3.0.50",
+    "@ai-sdk/tui": "^1.0.112",
     "@tencent-connect/qqbot-nodejs": "^1.0.4",
     "ai": "^7.0.83",
     "docx": "^9.7.1",
     "fontkit": "^2.0.4",
-    "jszip": "^3.10.1",
-    "mammoth": "^1.12.1",
-    "marked": "^18.0.11",
+    "jszip": "^3.10.2",
+    "mammoth": "^1.12.3",
+    "marked": "^18.0.14",
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.20.2",
     "pptxgenjs": "^4.0.1",
     "tesseract.js": "^7.0.0",
-    "tsx": "^4.23.12",
+    "tsx": "^4.23.15",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^4.4.3"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.11",
-    "@types/node": "^26.2.0",
+    "@biomejs/biome": "^2.5.14",
+    "@types/node": "^26.6.2",
     "typescript": "^7.0.2"
   }
 }
