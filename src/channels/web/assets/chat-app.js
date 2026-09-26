@@ -122,12 +122,18 @@ let quickQuestions = DEFAULT_QUESTIONS.slice();
 const qchips = document.getElementById("qchips");
 function renderQchips() {
   qchips.innerHTML = "";
+  /* 演示页与面板编辑禁用同一语言：chips 只点不发、不换序 */
+  const sortable = document.body.dataset.demo !== "true";
   quickQuestions.forEach((q) => {
     const c = document.createElement("button");
     c.type = "button";
     c.className = "chip";
     c.dataset.q = q;
     c.textContent = q;
+    if (sortable) {
+      c.draggable = true;
+      c.title = "点击发送；按住拖动可调整顺序";
+    }
     qchips.appendChild(c);
   });
 }
@@ -2574,10 +2580,36 @@ function renderQuickList() {
     quickList.appendChild(empty);
     return;
   }
-  quickDraft.forEach((q) => {
+  const sortable = document.body.dataset.demo !== "true";
+  quickDraft.forEach((q, i) => {
     const item = el("qq-item");
+    item.dataset.q = q;
+    if (sortable) item.draggable = true;
+    /* 拖拽把手：只作视觉提示（⠿），拖动源是整条 qq-item */
+    const grip = document.createElement("i");
+    grip.className = "qq-grip";
+    grip.setAttribute("aria-hidden", "true");
+    grip.textContent = "⠿";
     const span = document.createElement("span");
     span.textContent = q;
+    item.appendChild(grip);
+    item.appendChild(span);
+    if (sortable) {
+      const mkMove = (label, dir) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "qq-move";
+        b.textContent = label;
+        b.disabled = dir < 0 ? i === 0 : i === quickDraft.length - 1;
+        const verb = dir < 0 ? "上移" : "下移";
+        b.title = verb;
+        b.setAttribute("aria-label", verb + "：" + q);
+        b.addEventListener("click", () => moveQuick(i, dir));
+        return b;
+      };
+      item.appendChild(mkMove("↑", -1));
+      item.appendChild(mkMove("↓", 1));
+    }
     const del = document.createElement("button");
     del.type = "button";
     del.textContent = "✕";
@@ -2588,7 +2620,6 @@ function renderQuickList() {
       renderQuickList();
       saveQuick();
     });
-    item.appendChild(span);
     item.appendChild(del);
     quickList.appendChild(item);
   });
@@ -2637,6 +2668,84 @@ quickNewInput.addEventListener("keydown", (e) => {
     saveQuick();
   });
 })();
+/* 换序落位（拖拽 drop 与 ↑↓ 按钮共用）：面板清单与输入框上方 chips
+   同步换成新顺序，再走即改即存；顺序没变（拖回原位）就不发请求 */
+function commitQuickOrder(texts) {
+  if (texts.join("\u0000") === quickDraft.join("\u0000")) return;
+  quickDraft = texts.slice();
+  quickQuestions = quickDraft.slice();
+  renderQuickList();
+  renderQchips();
+  saveQuick();
+}
+/* ↑↓ 按钮换序：边界（首条 ↑、末条 ↓）在渲染时已禁用，这里再挡一层 */
+function moveQuick(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= quickDraft.length) return;
+  const next = quickDraft.slice();
+  next.splice(j, 0, next.splice(i, 1)[0]);
+  commitQuickOrder(next);
+}
+/* 拖拽换序：面板清单与输入框上方 chips 共用一套 HTML5 DnD。拖动中
+   dragover 把条目实时插到最近落点前（所见即所拖），drop 时读回 DOM
+   顺序交给 onReorder 落盘。与点击发送不冲突：浏览器拖拽与 click 手势
+   互斥，按住拖完松手不会触发 chip 的 click ── */
+function enableDragSort(container, onReorder) {
+  let dragEl = null;
+  const settle = () => {
+    if (dragEl) dragEl.classList.remove("dragging");
+    dragEl = null;
+  };
+  container.addEventListener("dragstart", (e) => {
+    const item = e.target.closest("[data-q]");
+    if (!item || !container.contains(item)) return;
+    dragEl = item;
+    item.classList.add("dragging");
+    e.dataTransfer.effectAllowed = "move";
+    /* Firefox 要求 dragstart 里 setData 才会真正启动拖拽 */
+    e.dataTransfer.setData("text/plain", item.dataset.q || "");
+  });
+  container.addEventListener("dragover", (e) => {
+    if (!dragEl) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const target = nearestDropTarget(container, dragEl, e.clientX, e.clientY);
+    if (target) container.insertBefore(dragEl, target);
+    else container.appendChild(dragEl);
+  });
+  container.addEventListener("drop", (e) => {
+    if (!dragEl) return;
+    e.preventDefault();
+    settle();
+    onReorder([...container.querySelectorAll("[data-q]")].map((n) => n.dataset.q));
+  });
+  /* 拖出容器取消（拖到页面外松手）不走 drop，这里兜底清态 */
+  container.addEventListener("dragend", settle);
+}
+/* 最近落点：多行 wrap 与窄屏单行横滚都适配——找中心离指针最近的条目，
+   指针越过其中心（右/下方）就插到它后面 */
+function nearestDropTarget(container, dragEl, x, y) {
+  let best = null;
+  let bestDist = Infinity;
+  container.querySelectorAll("[data-q]").forEach((n) => {
+    if (n === dragEl) return;
+    const r = n.getBoundingClientRect();
+    const d = (r.left + r.width / 2 - x) ** 2 + (r.top + r.height / 2 - y) ** 2;
+    if (d < bestDist) {
+      bestDist = d;
+      best = n;
+    }
+  });
+  if (!best) return null;
+  const r = best.getBoundingClientRect();
+  return x > r.left + r.width / 2 || y > r.top + r.height / 2
+    ? best.nextSibling
+    : best;
+}
+if (document.body.dataset.demo !== "true") {
+  enableDragSort(qchips, commitQuickOrder);
+  enableDragSort(quickList, commitQuickOrder);
+}
 /* 增删/恢复默认后的落盘：成功用服务端归一化结果回填基线与主界面 chips */
 function saveQuick() {
   if (document.body.dataset.demo === "true") return;
@@ -2654,6 +2763,9 @@ function saveQuick() {
     .catch(() => {
       quickDraft = quickSaved.slice();
       renderQuickList();
+      /* chips 已按拖后顺序重渲过，一并还原到基线，两处不各说各话 */
+      quickQuestions = quickSaved.slice();
+      renderQchips();
       quickError("保存失败，已还原上次保存的清单。");
     });
 }

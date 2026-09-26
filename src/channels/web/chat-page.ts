@@ -626,13 +626,23 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .qq-item { display: inline-flex; align-items: center; gap: 8px;
              border: 1px solid var(--rule-2); background: var(--card);
              color: var(--ink-2); font-size: 13px; padding: 5px 8px 5px 12px;
-             border-radius: 4px; max-width: 100%; }
+             border-radius: 4px; max-width: 100%; cursor: grab; }
   .qq-item span { overflow-wrap: anywhere; }
+  /* 拖拽把手：纯视觉提示，拖动源是整条 qq-item */
+  .qq-item .qq-grip { flex: none; font-family: var(--mono); font-size: 13px;
+                      font-style: normal; line-height: 1; color: var(--ink-3);
+                      user-select: none; }
   .qq-item button { flex: none; border: 0; background: none; cursor: pointer;
                     color: var(--ink-3); font-size: 12px; line-height: 1;
                     padding: 2px; transition: color .15s ease; }
   .qq-item button:hover { color: var(--accent-deep); }
   .qq-item button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  /* 边界方向按钮（首条 ↑、末条 ↓）：点不动也要看得见为什么 */
+  .qq-item button:disabled { opacity: .35; cursor: default; }
+  .qq-item button:disabled:hover { color: var(--ink-3); }
+  /* 拖动中的原位条目：降透明 + 朱砂虚线，落点一目了然 */
+  .qq-item.dragging, .chip.dragging { opacity: .45; border-color: var(--accent);
+                                      border-style: dashed; }
 
   .data-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; align-items: stretch; }
   .data-cell { border: 1px solid var(--rule); background: var(--card); padding: 10px 8px;
@@ -1119,7 +1129,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
       </div>
     </div>
     <div id="hallPrompts" hidden>
-      <p class="dlg-intro">输入框上方「提示词」一排就是这份模板清单，点一下即发送。删掉用不上的、加入你常问的，改动即时保存；每条最多 60 字、最多 12 条，清空后恢复默认清单。</p>
+      <p class="dlg-intro">输入框上方「提示词」一排就是这份模板清单，点一下即发送。删掉用不上的、加入你常问的，按住拖动条目（或用 ↑↓）还能调整顺序，改动即时保存；每条最多 60 字、最多 12 条，清空后恢复默认清单。</p>
       <div class="qq-add">
         <input id="quickNewInput" type="text" maxlength="60" autocomplete="off" placeholder="想常问的问题，如：下周三有什么课" ${demo ? "disabled" : ""} aria-label="新增提示词模板">
         <button class="tbtn" id="quickAdd" type="button" ${demo ? "disabled" : ""}>添加</button>
