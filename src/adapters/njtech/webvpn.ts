@@ -21,6 +21,7 @@ import crypto from "node:crypto";
 import https from "node:https";
 import { ocrCaptcha } from "../../core/attachments";
 import { config } from "../../core/config";
+import { isSessionExpiredError, RaptorError } from "../../core/errors";
 import { createClient, httpFailure } from "../../core/http";
 import { readJsonCache, writeJsonCache } from "../../core/json-cache";
 
@@ -56,7 +57,7 @@ let sessionInflight: Promise<VpnSession> | null = null;
 /** 统一认证密码加密：DES-ECB-PKCS7，密钥为页面 login-croypto 的 base64 解码 */
 export function encryptCasPassword(saltBase64: string, password: string): string {
   const key = Buffer.from(saltBase64, "base64");
-  if (key.length !== 8) throw new Error(`croypto 盐长度异常（${key.length} 字节）`);
+  if (key.length !== 8) throw new RaptorError("PARSE", `croypto 盐长度异常（${key.length} 字节）`);
   // OpenSSL 3 移除了单 DES：三段同密钥的 3DES-EDE 在数学上退化为单 DES，
   // PKCS7 填充与 crypto-js 的 DES.encrypt(..., {mode: ECB, padding: Pkcs7}) 一致
   const cipher = crypto.createCipheriv("des-ede3-ecb", Buffer.concat([key, key, key]), null);
@@ -176,7 +177,7 @@ async function loginWebvpn(username: string, password: string): Promise<void> {
   const croypto = loginPage.body.match(/id="login-croypto"[^>]*>([^<]*)</)?.[1]?.trim() ?? "";
   const flowkey = loginPage.body.match(/id="login-page-flowkey"[^>]*>([^<]*)</)?.[1]?.trim() ?? "";
   if (!croypto || !flowkey) {
-    throw new Error("统一身份认证登录页结构变化：未找到 croypto/flowkey");
+    throw new RaptorError("PARSE", "统一身份认证登录页结构变化：未找到 croypto/flowkey");
   }
 
   let lastError = "未能登录统一身份认证";
@@ -217,17 +218,21 @@ async function loginWebvpn(username: string, password: string): Promise<void> {
     // 200 = 登录被拒，页面上有原因（可见错误会渲染在响应里）
     const page = post.body;
     if (/密码错误|账号或密码|用户名或密码/.test(page)) {
-      throw new Error(
+      throw new RaptorError(
+        "AUTH_INVALID",
         "统一身份认证密码不正确：WebVPN 需要信息门户密码，与教务系统密码可能不同。" +
           "请在 .env 里配置 CAS_PASSWORD 后重试。",
       );
     }
     if (/锁定/.test(page)) {
-      throw new Error("统一身份认证账号已被锁定，请稍后再试或到信息门户解锁");
+      throw new RaptorError("AUTH_LOCKED", "统一身份认证账号已被锁定，请稍后再试或到信息门户解锁");
     }
     lastError = /验证码/.test(page) ? "验证码识别错误" : `登录被拒（HTTP ${post.status}）`;
   }
-  throw new Error(`WebVPN 登录失败：${lastError}（已重试 ${LOGIN_MAX_ATTEMPTS} 次）`);
+  throw new RaptorError(
+    "UPSTREAM",
+    `WebVPN 登录失败：${lastError}（已重试 ${LOGIN_MAX_ATTEMPTS} 次）`,
+  );
 }
 
 // ── jwc 前缀发现 ─────────────────────────────────────────────
@@ -254,7 +259,8 @@ async function discoverJwcPrefix(): Promise<string> {
       /* 试下一个入口 */
     }
   }
-  throw new Error(
+  throw new RaptorError(
+    "PARSE",
     "未能在 WebVPN 门户定位教务处站点入口，可设置环境变量 WEBVPN_JWC_PREFIX" +
       "（形如 /http/webvpn<64位hex>）手动指定",
   );
@@ -277,7 +283,7 @@ function sessionValid(s: unknown): s is VpnSession {
 
 async function establishSession(): Promise<VpnSession> {
   if (!config.jwglUsername) {
-    throw new Error("尚未配置学号（JWGL_USERNAME），无法登录 WebVPN");
+    throw new RaptorError("AUTH_MISSING", "尚未配置学号（JWGL_USERNAME），无法登录 WebVPN");
   }
   jar.clear();
   await loginWebvpn(config.jwglUsername, casPassword());
@@ -341,16 +347,16 @@ export async function webvpnFetchJwc(path: string): Promise<string> {
     // 两种形态都按「会话失效」处理，触发重登
     const failure = httpFailure(resp);
     if (failure && !/重定向次数超过上限/.test(failure)) {
-      throw new Error(`WebVPN 抓取失败：${failure}`);
+      throw new RaptorError("UPSTREAM", `WebVPN 抓取失败：${failure}`);
     }
-    if (looksLikeLoginPage(body)) throw new Error("WebVPN 会话已失效");
+    if (looksLikeLoginPage(body)) throw new RaptorError("SESSION_EXPIRED", "WebVPN 会话已失效");
     return body;
   };
 
   try {
     return await fetchWith(await getWebvpnSession());
   } catch (e) {
-    if (!(e instanceof Error) || !e.message.includes("会话已失效")) throw e;
+    if (!isSessionExpiredError(e)) throw e;
     invalidateWebvpnSession();
     return fetchWith(await getWebvpnSession(true));
   }

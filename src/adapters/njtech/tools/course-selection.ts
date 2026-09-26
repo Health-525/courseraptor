@@ -9,6 +9,7 @@ import { tool } from "ai";
 import { z } from "zod";
 
 import { config } from "../../../core/config";
+import { isSessionExpiredError, SESSION_EXPIRED_MESSAGE } from "../../../core/errors";
 import { getXkSession, invalidateXkSession, pollDelay } from "../session";
 import {
   type ChoosedCourse,
@@ -90,7 +91,7 @@ class XkSessionLoop {
       this.sessionExpireStreak = 0;
       return courses;
     } catch (e) {
-      if ((e as Error).message === "SESSION_EXPIRED") {
+      if (isSessionExpiredError(e)) {
         // 重登 = 登录 + 入口页 + 每个轮次 Display，本身就有好几个请求；
         // 不延迟的话，会话持续失效会变成无退避热循环，几分钟内把教务系统
         // 打爆（全局令牌桶只限速不限量）。按连续次数线性退避，上限 10s。
@@ -135,7 +136,7 @@ class XkSessionLoop {
 
   /** 提交课程后若返回 SESSION_EXPIRED，重新登录；返回是否确实刷新了 */
   async refreshIfExpired(message: string): Promise<boolean> {
-    if (message === "SESSION_EXPIRED") {
+    if (message === SESSION_EXPIRED_MESSAGE) {
       invalidateXkSession();
       this.session = await getXkSession(true);
       return true;
@@ -513,7 +514,7 @@ export const courseSelectionTools = {
         try {
           return await searchCourses(session, courseName);
         } catch (e) {
-          if ((e as Error).message === "SESSION_EXPIRED") {
+          if (isSessionExpiredError(e)) {
             invalidateXkSession();
             session = await getXkSession(true);
             return await searchCourses(session, courseName);
@@ -546,7 +547,7 @@ export const courseSelectionTools = {
         try {
           list = await fetchJxbList(session, { ...ref, courseCode: course.courseCode });
         } catch (e) {
-          if ((e as Error).message === "SESSION_EXPIRED") {
+          if (isSessionExpiredError(e)) {
             invalidateXkSession();
             session = await getXkSession(true);
             list = await fetchJxbList(session, { ...ref, courseCode: course.courseCode });
@@ -674,7 +675,7 @@ export const courseSelectionTools = {
       try {
         list = await fetchChoosedList(session);
       } catch (e) {
-        if ((e as Error).message !== "SESSION_EXPIRED") throw e;
+        if (!isSessionExpiredError(e)) throw e;
         invalidateXkSession();
         session = await getXkSession(true);
         list = await fetchChoosedList(session);
@@ -710,7 +711,7 @@ export const courseSelectionTools = {
         try {
           return await fetchChoosedList(session);
         } catch (e) {
-          if ((e as Error).message !== "SESSION_EXPIRED") throw e;
+          if (!isSessionExpiredError(e)) throw e;
           invalidateXkSession();
           session = await getXkSession(true);
           return await fetchChoosedList(session);
@@ -749,7 +750,7 @@ export const courseSelectionTools = {
       }
 
       let result = await quitCourse(session, resolved.jxbId);
-      if (result.message === "SESSION_EXPIRED") {
+      if (result.message === SESSION_EXPIRED_MESSAGE) {
         invalidateXkSession();
         session = await getXkSession(true);
         result = await quitCourse(session, resolved.jxbId);

@@ -11,6 +11,7 @@ import readline from "node:readline/promises";
 
 import { config, type DeepSeekApiKeySource, maskDeepSeekApiKey } from "./config";
 import { saveCredentialsStore, saveStoredCredentials } from "./credentials";
+import { isCredentialError } from "./errors";
 import { school } from "./school";
 import { createMutedTerminalOutput } from "./secret-input";
 
@@ -78,7 +79,7 @@ export async function ensureCredentials(
         return "configured";
       } catch (e) {
         const msg = (e as Error).message;
-        if (msg.includes("密码") || msg.includes("学号")) {
+        if (isCredentialError(e)) {
           terminal.write(`❌ ${msg.slice(0, 60)}，请重试`);
         } else {
           terminal.write(`⚠️ 登录异常（${msg.slice(0, 50)}）——多为网络抖动，请重试`);

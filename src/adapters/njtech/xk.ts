@@ -6,6 +6,7 @@
  * `scripts/xk.ts inspect` dump 原始响应进行校准，只需调整常量。
  */
 
+import { RaptorError, SESSION_EXPIRED_MESSAGE } from "../../core/errors";
 import type { HttpClient } from "../../core/http";
 import { createClient } from "../../core/http";
 import { BASE, loginJwgl } from "./auth";
@@ -537,7 +538,7 @@ export async function searchCourses(
     });
 
     if (isSessionExpired(resp.body)) {
-      throw new Error("SESSION_EXPIRED");
+      throw new RaptorError("SESSION_EXPIRED", "选课会话已失效，需重新登录");
     }
 
     const { courses, via } = parseCoursePage(resp.body);
@@ -625,7 +626,7 @@ export async function fetchJxbList(
   });
 
   if (isSessionExpired(resp.body)) {
-    throw new Error("SESSION_EXPIRED");
+    throw new RaptorError("SESSION_EXPIRED", "选课会话已失效，需重新登录");
   }
 
   let data: Array<Record<string, unknown>> | { tmpList?: Array<Record<string, unknown>> };
@@ -636,8 +637,9 @@ export async function fetchJxbList(
   } catch {
     // 响应是 HTML/错误页而非 JSON：教务系统改版或被拦截。这里若静默返空，
     // 调用方会把故障当成「该课程没有教学班」上报给用户，必须抛错区分
-    throw new Error(
-      `XK_PARSE_FAILED: 教学班列表响应不是 JSON（教务系统改版或被拦截），片段：${resp.body.slice(0, 80)}`,
+    throw new RaptorError(
+      "PARSE",
+      `教学班列表响应不是 JSON（教务系统改版或被拦截），片段：${resp.body.slice(0, 80)}`,
     );
   }
   // 官方 JS 中响应直接是数组（data[i].xxx 遍历）；空列表仍属正常数据
@@ -666,7 +668,7 @@ export async function fetchChoosedList(session: XkSession): Promise<ChoosedCours
   });
 
   if (isSessionExpired(resp.body)) {
-    throw new Error("SESSION_EXPIRED");
+    throw new RaptorError("SESSION_EXPIRED", "选课会话已失效，需重新登录");
   }
 
   let raw: unknown;
@@ -676,8 +678,9 @@ export async function fetchChoosedList(session: XkSession): Promise<ChoosedCours
     // 响应是 HTML/错误页而非 JSON：教务系统改版或被拦截。能解析成合法 JSON
     // 的空结果仍走 parseChoosedList 正常返回 []；走到这里说明是真故障，
     // 静默返空会把故障伪装成「本轮已选为空」，必须抛错区分
-    throw new Error(
-      `XK_PARSE_FAILED: 已选课程响应不是 JSON（教务系统改版或被拦截），片段：${resp.body.slice(0, 80)}`,
+    throw new RaptorError(
+      "PARSE",
+      `已选课程响应不是 JSON（教务系统改版或被拦截），片段：${resp.body.slice(0, 80)}`,
     );
   }
   // 合法 JSON 的形状容错仍由纯函数兜底：非列表输入返回空
@@ -703,7 +706,7 @@ export async function quitCourse(session: XkSession, jxbIds: string): Promise<Xk
   });
 
   if (isSessionExpired(resp.body)) {
-    return { ok: false, message: "SESSION_EXPIRED" };
+    return { ok: false, message: SESSION_EXPIRED_MESSAGE };
   }
 
   const parsed = parseActionResponse(resp.body);
@@ -751,7 +754,7 @@ export async function submitCourse(
   });
 
   if (isSessionExpired(resp.body)) {
-    return { ok: false, message: "SESSION_EXPIRED" };
+    return { ok: false, message: SESSION_EXPIRED_MESSAGE };
   }
 
   const parsed = parseActionResponse(resp.body);
@@ -801,7 +804,7 @@ async function submitViaLegacyAction(
         .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
         .join("&"),
     });
-    if (isSessionExpired(resp.body)) return { ok: false, message: "SESSION_EXPIRED" };
+    if (isSessionExpired(resp.body)) return { ok: false, message: SESSION_EXPIRED_MESSAGE };
     return parseActionResponse(resp.body);
   } catch {
     return null;
