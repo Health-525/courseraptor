@@ -21,6 +21,11 @@ export interface RaptorConfig {
   model: string;
   jwglUsername: string;
   jwglPassword: string;
+  /**
+   * 统一身份认证（信息门户/WebVPN）密码，可选：与教务系统密码不同时
+   * 在 .env 配置 CAS_PASSWORD；缺省回退 jwglPassword
+   */
+  casPassword?: string;
   /** 教务凭证来源（诊断用） */
   credentialsSource: "env" | "encrypted" | "unset";
   /** Firecrawl 云解析（通知附件转 markdown），可选 */
@@ -150,6 +155,7 @@ function loadConfig(): RaptorConfig {
     }),
     jwglUsername: env("JWGL_USERNAME") ?? "",
     jwglPassword: env("JWGL_PASSWORD") ?? "",
+    casPassword: env("CAS_PASSWORD"),
     credentialsSource: "env",
     firecrawlApiKey: env("FIRECRAWL_API_KEY"),
     githubToken: env("GITHUB_TOKEN"),

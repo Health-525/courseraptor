@@ -2,14 +2,18 @@
  * NJTECH 教务处通知爬虫
  * 搬自 timetable/scripts/fetch_jwc_news.js，改为 TypeScript 函数化
  *
- * 爬取 https://jwc.njtech.edu.cn 三个页面
- * 无需认证（公开页面）
+ * 抓取 https://jwc.njtech.edu.cn 三个页面，无需认证（公开页面）。
+ * 2026-09 起官网限制仅校内 IP 访问：校外直连只会拿到「本网站只能被
+ * 校内IP地址访问」拦截页（HTTP 483），因此抓取走三级阶梯：
+ *   直连（校内/学校放开限制时）→ WebVPN 代理（校外，需统一身份认证）
+ *   → 上次成功抓取的落盘缓存（前两者都失败时兜底，注明快照时间）。
  */
 
 import http from "node:http";
 import https from "node:https";
-
+import { readJsonCache, writeJsonCache } from "../../core/json-cache";
 import type { NewsItem } from "../../core/model";
+import { jwcUrlToPath, webvpnFetchJwc, webvpnUrlToPublic } from "./webvpn";
 
 const BASE_URL = "https://jwc.njtech.edu.cn";
 
@@ -19,7 +23,18 @@ const TARGETS = [
   { label: "考试排课", url: `${BASE_URL}/jxgl/ksypk.htm` },
 ];
 
-// ── HTML 抓取 ────────────────────────────────────────────────
+/** 校外拦截页签名：命中说明直连被拒，需要换 WebVPN 通道 */
+const CAMPUS_ONLY_SIGNATURE = "本网站只能被校内IP地址访问";
+
+const NEWS_CACHE_FILE = "jwc-news-cache.json";
+
+interface NewsCacheEnvelope {
+  tag: "jwc-news";
+  items: NewsItem[];
+  fetchedAt: number;
+}
+
+// ── HTML 抓取（直连）─────────────────────────────────────────
 
 /** 跟随重定向的上限：A↔B 互跳时没有上限就是无限请求 */
 const MAX_REDIRECTS = 5;
@@ -72,6 +87,28 @@ function fetchHtml(url: string, timeout = 15000, hops = 0): Promise<string> {
   });
 }
 
+// ── 抓取阶梯 ─────────────────────────────────────────────────
+
+export interface JwcFetch {
+  html: string;
+  via: "direct" | "webvpn";
+}
+
+/**
+ * 抓取 jwc 站点的一个页面：先直连，被校外拦截（或网络不通）时降级 WebVPN。
+ * 两条路都失败时抛出后者（WebVPN）的错误——那里带着可操作的指引。
+ */
+async function fetchJwcHtml(path: string): Promise<JwcFetch> {
+  try {
+    const html = await fetchHtml(`${BASE_URL}${path}`);
+    if (!html.includes(CAMPUS_ONLY_SIGNATURE)) return { html, via: "direct" };
+  } catch {
+    /* 直连失败（校外 483 / 断网）：换 WebVPN 通道 */
+  }
+  const html = await webvpnFetchJwc(path);
+  return { html, via: "webvpn" };
+}
+
 // ── HTML 解析 ────────────────────────────────────────────────
 
 function parseNewsList(html: string, baseUrl: string): NewsItem[] {
@@ -121,26 +158,42 @@ function parseNewsList(html: string, baseUrl: string): NewsItem[] {
   });
 }
 
-// ── 主函数 ──────────────────────────────────────────────────
+// ── 列表抓取（主入口）────────────────────────────────────────
+
+export interface JwcNewsResult {
+  items: NewsItem[];
+  /** 本次实际使用的通道；校外被拦时为 webvpn */
+  via: "direct" | "webvpn";
+  /** 非空表示本次返回的是落盘缓存快照（直连与 WebVPN 都失败了） */
+  staleAt?: number;
+}
 
 /**
- * 抓取教务处通知
- * @param existingItems - 已有的通知列表（用于合并去重）
- * @param maxItems - 返回条数上限（默认 20）
+ * 抓取教务处通知（带通道与降级信息）。get_news 工具用这个版本，
+ * 把「经 WebVPN 代理」「缓存快照」如实告诉模型与用户。
  */
-export async function fetchJwcNews(
+export async function fetchJwcNewsDetailed(
   existingItems: NewsItem[] = [],
   maxItems = 20,
-): Promise<NewsItem[]> {
+): Promise<JwcNewsResult> {
   const allItems: NewsItem[] = [];
+  let usedWebvpn = false;
+  let lastError: Error | null = null;
 
   for (const { label, url } of TARGETS) {
     try {
-      const html = await fetchHtml(url);
+      const path = jwcUrlToPath(url) ?? new URL(url).pathname + new URL(url).search;
+      const { html, via } = await fetchJwcHtml(path);
+      if (via === "webvpn") usedWebvpn = true;
       const items = parseNewsList(html, url);
-      for (const item of items) item.category = label;
+      for (const item of items) {
+        item.category = label;
+        // WebVPN 页面里的绝对链接带改写前缀，对外统一映射回公网地址
+        item.url = webvpnUrlToPublic(item.url);
+      }
       allItems.push(...items);
-    } catch {
+    } catch (e) {
+      lastError = e as Error;
       // Skip failed category
     }
   }
@@ -152,14 +205,53 @@ export async function fetchJwcNews(
       ...existingItems.filter((e) => !allItems.some((n) => n.url === e.url)),
     ];
     merged.sort((a, b) => b.date.localeCompare(a.date));
-    return merged.slice(0, maxItems);
+    const items = merged.slice(0, maxItems);
+    writeJsonCache(
+      NEWS_CACHE_FILE,
+      { tag: "jwc-news", items, fetchedAt: Date.now() } satisfies NewsCacheEnvelope,
+      "jwc-news",
+    );
+    return { items, via: usedWebvpn ? "webvpn" : "direct" };
   }
 
-  // No new items - return existing
-  return existingItems;
+  // 全部板块失败：先看有没有可用的历史快照
+  const cached = readJsonCache(NEWS_CACHE_FILE, isValidNewsCache);
+  if (cached) {
+    console.error(`[jwc-news] 直连与 WebVPN 均失败，回退缓存快照：${lastError?.message ?? "?"}`);
+    return { items: cached.items, via: "direct", staleAt: cached.fetchedAt };
+  }
+
+  throw lastError ?? new Error("教务处通知抓取失败（三个板块均无结果）");
 }
 
-// ── 通知正文抓取 ────────────────────────────────────────────
+function isValidNewsCache(parsed: unknown): parsed is NewsCacheEnvelope {
+  const v = parsed as NewsCacheEnvelope | null;
+  return (
+    !!v &&
+    v.tag === "jwc-news" &&
+    Array.isArray(v.items) &&
+    v.items.length > 0 &&
+    typeof v.fetchedAt === "number"
+  );
+}
+
+/**
+ * 抓取教务处通知（兼容原契约：只回列表，不抛错）。
+ * welcome 横幅与网页通知面板走这个入口，失败时按各自 UI 降级展示。
+ */
+export async function fetchJwcNews(
+  existingItems: NewsItem[] = [],
+  maxItems = 20,
+): Promise<NewsItem[]> {
+  try {
+    return (await fetchJwcNewsDetailed(existingItems, maxItems)).items;
+  } catch (e) {
+    console.error(`[jwc-news] 抓取失败：${(e as Error).message}`);
+    return existingItems;
+  }
+}
+
+// ── 通知正文抓取 ──────────────────────────────────────────────
 
 export interface JwcArticle {
   title: string;
@@ -172,7 +264,11 @@ export interface JwcArticle {
  * 时间安排、开学/考试/选课日期都在正文里，列表页只有标题
  */
 export async function fetchJwcArticle(url: string): Promise<JwcArticle> {
-  const html = await fetchHtml(url);
+  const path = jwcUrlToPath(url);
+  if (path === null) {
+    throw new Error("仅支持 jwc.njtech.edu.cn 域名下的文章 URL");
+  }
+  const { html } = await fetchJwcHtml(path);
   // 权限文章匿名访问 302 到 auth.htm 后返回的仍是 HTTP 200 的鉴权提示页，
   // 不拦住的话这段「您无权访问此页面」会被当成正文往上转
   if (/您无权访问此页面/.test(html)) {
@@ -205,7 +301,8 @@ export async function fetchJwcArticle(url: string): Promise<JwcArticle> {
     if (!isDownload && !hasExt) continue;
     if (!text || text.length < 3) continue;
     try {
-      const full = new URL(href, url).href;
+      // 相对链接按公网文章地址拼全，保持对外 URL 的规范形态
+      const full = webvpnUrlToPublic(new URL(href, url).href);
       if (!attachments.some((a) => a.url === full)) {
         attachments.push({ name: text, url: full });
       }
