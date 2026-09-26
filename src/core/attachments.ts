@@ -452,6 +452,13 @@ async function downloadWithCaptcha(url: string): Promise<{ buf: Buffer; contentT
       return { buf: page.buf, contentType: page.type }; // 直链文件
     }
     const html = page.buf.toString("utf8");
+    // 2026-09 起教务处官网限制校外 IP：匿名访问只剩拦截页，别当文件解析
+    if (html.includes("本网站只能被校内IP地址访问")) {
+      throw new Error(
+        "教务处官网已限制校外 IP 访问，附件暂无法在校外直接下载；请在校园网内获取" +
+          "（通知正文可经 WebVPN 通道读取）",
+      );
+    }
     if (!html.includes("createimage.jsp")) {
       return { buf: page.buf, contentType: page.type }; // 非验证码页，走后续逻辑
     }
@@ -479,8 +486,9 @@ async function downloadWithCaptcha(url: string): Promise<{ buf: Buffer; contentT
   );
 }
 
-/** tesseract OCR 验证码（数字+小写字母），worker 由 getOcrWorker 常驻复用 */
-async function ocrCaptcha(buf: Buffer): Promise<string> {
+/** tesseract OCR 验证码（数字+小写字母），worker 由 getOcrWorker 常驻复用。
+ *  webvpn.ts 的统一身份认证登录码也走这里，共用同一开关与 worker。 */
+export async function ocrCaptcha(buf: Buffer): Promise<string> {
   try {
     const worker = await getOcrWorker();
     const { data } = await worker.recognize(buf);
