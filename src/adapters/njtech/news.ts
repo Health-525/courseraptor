@@ -11,6 +11,7 @@
 
 import { fetchUrlText } from "../../core/http";
 import { readJsonCache, writeJsonCache } from "../../core/json-cache";
+import { logger } from "../../core/logger";
 import type { NewsItem } from "../../core/model";
 import { jwcUrlToPath, webvpnFetchJwc, webvpnUrlToPublic } from "./webvpn";
 
@@ -180,7 +181,7 @@ export async function fetchJwcNewsDetailed(
   // 全部板块失败：先看有没有可用的历史快照
   const cached = readJsonCache(NEWS_CACHE_FILE, isValidNewsCache);
   if (cached) {
-    console.error(`[jwc-news] 直连与 WebVPN 均失败，回退缓存快照：${lastError?.message ?? "?"}`);
+    logger.warn("[jwc-news] 直连与 WebVPN 均失败，回退缓存快照", { error: lastError?.message });
     return { items: cached.items, via: "direct", staleAt: cached.fetchedAt };
   }
 
@@ -209,7 +210,7 @@ export async function fetchJwcNews(
   try {
     return (await fetchJwcNewsDetailed(existingItems, maxItems)).items;
   } catch (e) {
-    console.error(`[jwc-news] 抓取失败：${(e as Error).message}`);
+    logger.error("[jwc-news] 抓取失败", { error: (e as Error).message });
     return existingItems;
   }
 }

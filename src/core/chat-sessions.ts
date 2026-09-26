@@ -20,6 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { ModelMessage } from "ai";
 import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
+import { logger } from "./logger";
 import { dataDir } from "./paths";
 
 function storePath(): string {
@@ -115,7 +116,7 @@ function writeSessions(list: ChatSession[]): void {
     // 写穿：落盘成功才更新缓存，读方与磁盘始终一致
     readCache.set(storePath(), list);
   } catch (e) {
-    console.error("[chat-sessions] 保存失败:", e);
+    logger.error("[chat-sessions] 保存失败", { error: (e as Error).message });
   }
 }
 

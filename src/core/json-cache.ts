@@ -9,6 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
+import { logger } from "./logger";
 import { dataDir } from "./paths";
 
 function cacheFile(filename: string): string {
@@ -40,6 +41,6 @@ export function writeJsonCache(filename: string, envelope: unknown, logTag: stri
   try {
     writeFileAtomicSync(cacheFile(filename), JSON.stringify(envelope, null, 2));
   } catch (e) {
-    console.error(`[${logTag}] 保存失败:`, e);
+    logger.error(`[${logTag}] 保存失败`, { error: (e as Error).message });
   }
 }
