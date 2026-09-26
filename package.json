@@ -20,7 +20,7 @@
     "publish": "node scripts/publish-release.mjs",
     "server": "node server/update-server.mjs",
     "test": "node --import tsx --test tests/*.test.ts",
-    "test:coverage": "node --import tsx --test --experimental-test-coverage tests/*.test.ts",
+    "test:coverage": "node --import tsx --test --experimental-test-coverage --test-coverage-lines=80 --test-coverage-branches=78 --test-coverage-functions=75 tests/*.test.ts",
     "audit:prod": "npm audit --omit=dev --audit-level=critical"
   },
   "bin": {

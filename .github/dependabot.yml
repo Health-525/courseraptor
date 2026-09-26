@@ -1,0 +1,27 @@
+# 依赖与 GitHub Actions 自动更新（每周一）：
+# - npm 依赖按 minor/patch 分组提 PR，major 单独评审
+# - actions 全部按 SHA 钉住（ci.yml），这里负责跟进新版
+# - xlsx 走 SheetJS 官方 CDN tarball（npm registry 停在 0.18.x），
+#   dependabot 解析不了 tarball 版本，升级由维护者手工管理
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Shanghai
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "xlsx"
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Shanghai
