@@ -298,6 +298,40 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                  word-break: break-all; }
   .frow a.tbtn { flex: none; text-decoration: none; padding: 3px 14px;
                  font-size: 12px; }
+
+  /* 结构化结果卡：查询结果（课表/成绩/考试/通知…）以红头档案卡片呈现，
+     仍在对话流里，跟在工具卡之后、正文之前（演示模式使用） */
+  .result-card { margin: 4px 0 9px; border: 1px solid var(--rule-2);
+                 border-top: 2px solid var(--accent); background: var(--card);
+                 box-shadow: var(--shadow-sm); }
+  .rc-head { display: flex; align-items: baseline; gap: 10px; padding: 11px 14px 9px;
+             border-bottom: 1px dashed var(--rule); }
+  .rc-title { flex: 1; min-width: 0; font-family: var(--kai); font-size: 18px;
+              letter-spacing: .04em; }
+  .rc-badge { flex: none; font-family: var(--mono); font-size: 12px;
+              color: var(--accent-deep); }
+  .rc-time { flex: none; font-family: var(--mono); font-size: 12px;
+             color: var(--ink-3); }
+  .rc-body { padding: 11px 14px 12px; }
+  .rc-summary { margin: 0 0 10px; font-size: 14px; color: var(--ink-2); }
+  .rc-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+                gap: 10px; margin-bottom: 10px; }
+  .rc-metric { border-left: 2px solid var(--rule-2); padding-left: 9px; }
+  .rc-metric > div:first-child { display: block; font-family: var(--mono);
+                                 font-size: 12px; color: var(--ink-3); }
+  .rc-metric strong { display: block; margin-top: 1px; font-size: 16px;
+                      font-weight: 600; }
+  .rc-row { display: grid; grid-template-columns: minmax(120px, 1fr) auto;
+            gap: 2px 14px; padding: 4px 0; border-top: 1px dashed var(--rule);
+            font-size: 14px; }
+  .rc-row > div:first-child { color: var(--ink); min-width: 0;
+                              overflow: hidden; text-overflow: ellipsis; }
+  .rc-value { color: var(--ink-2); text-align: right; font-family: var(--mono);
+              font-size: 13px; }
+  .rc-meta { grid-column: 1 / -1; font-family: var(--mono); font-size: 12px;
+             color: var(--ink-3); }
+  .rc-source { margin-top: 10px; font-family: var(--mono); font-size: 12px;
+               color: var(--ink-3); }
   .frow a.tbtn:hover { background: var(--accent-soft); }
 
   /* 番茄钟卡片：工具卡下方一条实时倒计时，时间到翻成朱砂底 */

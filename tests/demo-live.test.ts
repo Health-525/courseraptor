@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { type DemoStreamAgent, demoLiveTools, runDemoLiveTurn } from "../src/demo/agent";
+import { demoCardFromTool, demoCardsForMessage, examsCard, scheduleCard } from "../src/demo/cards";
 import { demoExams, demoGrades, demoNews, demoTodayBrief, demoTodos } from "../src/demo/data";
 import { createDemoServer } from "../src/demo/server";
 
@@ -117,6 +118,50 @@ test("manage_knowledge：subject 归课程 / 自定义分类 / 未分类，关�
   assert.equal((hits.entries as Array<{ title: string }>)[0].title, "洛必达法则");
 });
 
+/* ── 结构化结果卡 ── */
+
+test("scheduleCard：每天每门课一行、今天与调休有标注、下一节进摘要", () => {
+  const card = scheduleCard();
+  assert.equal(card.kind, "schedule");
+  const rows = card.rows ?? [];
+  assert.equal(rows.length, 11, "10 门课各一行 + 周日空行");
+  const today = rows.find((r) => r.label.includes("今天"));
+  assert.ok(today, "应有一行标注今天");
+  const makeup = rows.find((r) => r.meta?.includes("调休补课"));
+  assert.ok(makeup?.label.startsWith("周六"), "调休补课应标在周六行");
+  assert.match(String(card.badge), /虚构示例/);
+});
+
+test("examsCard：日期由相对 fixtures 生成，含座位信息", () => {
+  const card = examsCard();
+  assert.equal(card.rows?.length, 2);
+  assert.match(String(card.rows?.[0].meta), /座位 12/);
+  assert.equal(card.metrics?.[0].value, "5 天后");
+});
+
+test("demoCardFromTool：读态查询映射卡片，写操作与未知工具不出卡", () => {
+  assert.equal(demoCardFromTool("get_schedule", {})?.kind, "schedule");
+  assert.equal(demoCardFromTool("get_grades", {})?.kind, "grades");
+  assert.equal(demoCardFromTool("get_exams", {})?.kind, "exams");
+  assert.equal(demoCardFromTool("get_news", {})?.kind, "news");
+  assert.equal(demoCardFromTool("manage_todos", { todos: [] })?.kind, "todos");
+  assert.equal(demoCardFromTool("manage_todos", { ok: true }), null, "写操作不出卡");
+  assert.equal(demoCardFromTool("manage_knowledge", { entries: [{}] })?.kind, "knowledge");
+  assert.equal(demoCardFromTool("get_weather", {}), null);
+});
+
+test("demoCardsForMessage：离线剧本关键词推导，同 kind 去重", () => {
+  const cards = demoCardsForMessage("今天有什么安排");
+  const kinds = cards.map((c) => c.kind);
+  assert.deepEqual(kinds, ["schedule", "todos"], "今日简报出课表+待办两张卡");
+  const grades = demoCardsForMessage("我的成绩和 GPA，顺便看看通识学分");
+  assert.ok(
+    grades.every((c) => c.kind === "grades"),
+    "成绩/通识只出一张成绩卡",
+  );
+  assert.deepEqual(demoCardsForMessage("随便聊聊"), []);
+});
+
 /* ── SSE 翻译循环（桩 agent，验证与正式协议同形）── */
 
 function stubAgent(
@@ -140,12 +185,14 @@ function stubAgent(
   };
 }
 
-test("runDemoLiveTurn：think → tool → text 事件序列与正式 /api/chat 同形", async () => {
+test("runDemoLiveTurn：think → tool → card → text 事件序列与正式 /api/chat 同形", async () => {
   const { agent, calls } = stubAgent([
     { type: "reasoning-delta", delta: "先查时间" },
     { type: "reasoning-end" },
     { type: "tool-call", toolCallId: "t1", toolName: "get_time", input: {} },
     { type: "tool-result", toolCallId: "t1", toolName: "get_time", output: { summary: "第 2 周" } },
+    { type: "tool-call", toolCallId: "t2", toolName: "get_schedule", input: {} },
+    { type: "tool-result", toolCallId: "t2", toolName: "get_schedule", output: { week: {} } },
     { type: "text-delta", text: "你好" },
     { type: "text-delta", text: "！" },
   ]);
@@ -167,7 +214,19 @@ test("runDemoLiveTurn：think → tool → text 事件序列与正式 /api/chat 
   assert.equal(sent[3].phase, "end");
   assert.equal(sent[3].brief, "第 2 周");
   assert.ok(typeof sent[3].dur === "number");
-  assert.deepEqual(sent.slice(4), [
+  assert.deepEqual(sent[4], {
+    t: "tool",
+    phase: "start",
+    id: "t2",
+    name: "get_schedule",
+    args: "{}",
+  });
+  // 课表工具结果之后紧跟结果卡事件；卡片也随轮次返回供会话保存
+  assert.equal(sent[6].t, "card");
+  assert.equal((sent[6].card as { kind: string }).kind, "schedule");
+  assert.equal(result.cards.length, 1);
+  assert.equal(result.cards[0].kind, "schedule");
+  assert.deepEqual(sent.slice(7), [
     { t: "text", v: "你好" },
     { t: "text", v: "！" },
   ]);
@@ -220,8 +279,12 @@ async function readSse(res: Response): Promise<Array<Record<string, unknown>>> {
     .map((line) => JSON.parse(line.slice(6)) as Record<string, unknown>);
 }
 
-test("live /api/chat：先发虚构数据声明，再流模型正文；轮次写回内存会话", async () => {
-  const { agent } = stubAgent([{ type: "text-delta", text: "这是实时生成的回答" }]);
+test("live /api/chat：先发虚构数据声明，工具结果出卡，轮次写回内存会话", async () => {
+  const { agent } = stubAgent([
+    { type: "tool-call", toolCallId: "c1", toolName: "get_schedule", input: {} },
+    { type: "tool-result", toolCallId: "c1", toolName: "get_schedule", output: { week: {} } },
+    { type: "text-delta", text: "这是实时生成的回答" },
+  ]);
   await withServer(agent, async (base) => {
     const res = await fetch(`${base}/api/chat`, {
       method: "POST",
@@ -232,17 +295,21 @@ test("live /api/chat：先发虚构数据声明，再流模型正文；轮次写
     const events = await readSse(res);
     assert.equal(events[0].t, "text");
     assert.match(String(events[0].v), /^> 演示模式：以下回答由 AI 实时生成/);
-    assert.deepEqual(events[1], { t: "text", v: "这是实时生成的回答" });
+    const card = events.find((e) => e.t === "card");
+    assert.ok(card, "工具结果后应下发结果卡");
+    assert.equal((card.card as { kind: string }).kind, "schedule");
+    assert.deepEqual(events.at(-2), { t: "text", v: "这是实时生成的回答" });
     const last = events[events.length - 1];
     assert.equal(last.t, "end");
     assert.equal(last.sid, "live-a");
 
     const session = (await (await fetch(`${base}/api/sessions/live-a`)).json()) as {
-      messages: Array<{ role: string; text: string }>;
+      messages: Array<{ role: string; text: string; cards?: Array<{ kind: string }> }>;
     };
     assert.equal(session.messages.length, 2);
     assert.equal(session.messages[0].role, "user");
     assert.match(session.messages[1].text, /^> 演示模式：[\s\S]*这是实时生成的回答$/);
+    assert.equal(session.messages[1].cards?.[0].kind, "schedule", "卡片随消息保存供重绘");
 
     // 设置面板如实标注 live 模式
     const settings = (await (await fetch(`${base}/api/settings`)).json()) as { model: string };

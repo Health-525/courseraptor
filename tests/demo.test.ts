@@ -28,14 +28,19 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
       });
     const reply = await (await send({ message: "这周课表", sessionId: "demo-a" })).text();
     assert.match(reply, /示例高等数学/);
-    // 课表结果卡已移除：演示只回 Markdown 示例课表，不再有 "t":"card"
-    assert.doesNotMatch(reply, /"t":"card"/);
+    // 结果卡恢复（2026-09-26 要求）：查询类问题在工具卡之后下发结构化卡片
+    assert.match(
+      reply,
+      /"t":"card","card":\{"source":"演示模式（虚构数据）","kind":"schedule","title":"一周课表"/,
+    );
     assert.match(reply, /"t":"tool","phase":"start","id":"demo-get_schedule/);
     assert.match(reply, /"t":"end","dur":\d+,"sid":"demo-a"/);
     await send({ message: "我的成绩和 GPA", sessionId: "demo-b" });
     const first = await (await fetch(`${base}/api/sessions/demo-a`)).json();
     assert.equal(first.messages.length, 2);
     assert.ok(!JSON.stringify(first).includes("学业概览"));
+    // 卡片随会话消息保存，重开会话时重绘
+    assert.equal(first.messages[1].cards[0].kind, "schedule");
     assert.equal((await send(null)).status, 400);
     assert.equal((await send({ message: " " })).status, 400);
     assert.equal((await send({ message: "a".repeat(20000) })).status, 413);

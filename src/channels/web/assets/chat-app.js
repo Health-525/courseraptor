@@ -241,7 +241,7 @@ function addCopyButton(acts, raw) {
 }
 
 /** 定格一条完整助手消息（openSession 重绘历史用）；thinkText 是历史里的思考 */
-function addBotMessage(raw, ts, thinkText) {
+function addBotMessage(raw, ts, thinkText, cards) {
   const shell = addBotShell();
   shell.tm.textContent = clock(ts);
   if (thinkText) {
@@ -251,12 +251,48 @@ function addBotMessage(raw, ts, thinkText) {
     item.st.textContent = "已完成";
     item.det.open = false;
   }
+  (cards || []).forEach((card) => renderResultCard(shell.tl, card));
   const html = renderMd(raw);
   if (html != null) shell.msg.innerHTML = html;
   else shell.msg.textContent = raw;
   addCopyButton(shell.acts, raw);
   scroll(false);
   return shell;
+}
+
+/* ── 结构化结果卡：查询结果以红头档案卡片呈现（演示模式发送 card 事件） ── */
+function renderResultCard(host, card) {
+  if (!card || !card.title) return;
+  const box = el("result-card");
+  const head = el("rc-head");
+  head.appendChild(el2("rc-title", card.title));
+  if (card.badge) head.appendChild(el2("rc-badge", card.badge));
+  if (card.updatedAt) head.appendChild(el2("rc-time", fmtWhen(card.updatedAt)));
+  box.appendChild(head);
+  const body = el("rc-body");
+  if (card.summary) body.appendChild(el2("rc-summary", card.summary));
+  if (card.metrics && card.metrics.length) {
+    const metrics = el("rc-metrics");
+    card.metrics.forEach((m) => {
+      const item = el("rc-metric");
+      item.appendChild(el2("", m.label));
+      const strong = document.createElement("strong");
+      strong.textContent = m.value;
+      item.appendChild(strong);
+      metrics.appendChild(item);
+    });
+    body.appendChild(metrics);
+  }
+  (card.rows || []).forEach((row) => {
+    const line = el("rc-row");
+    line.appendChild(el2("", row.label));
+    if (row.value) line.appendChild(el2("rc-value", row.value));
+    if (row.meta) line.appendChild(el2("rc-meta", row.meta));
+    body.appendChild(line);
+  });
+  if (card.source) body.appendChild(el2("rc-source", "来源 · " + card.source));
+  box.appendChild(body);
+  host.appendChild(box);
 }
 
 /* ── 思考卡片：一段 reasoning 一张卡，流式期间展开、段落收尾自动折叠 ── */
@@ -840,7 +876,7 @@ function openSession(id) {
       /* 重绘历史：渲染函数不写 msgs（它已是服务端数据的镜像） */
       msgs.forEach((m) => {
         if (m.role === "user") addUser(m.text, m.ts, m.attachments);
-        else addBotMessage(m.text, m.ts, m.think);
+        else addBotMessage(m.text, m.ts, m.think, m.cards);
       });
       scroll(true);
       renderSessList();
@@ -3344,6 +3380,10 @@ async function send(text) {
             /* 工具因凭证未配置失败等服务端点名要设置：自动推出（本轮手动关过则不打扰） */
             if (ev.panel && !hallAutoMuted) openHall(ev.panel, { focus: false });
           }
+        } else if (ev.t === "card") {
+          /* 结构化结果卡：跟在对应工具卡之后、正文之前 */
+          thinkClose(shell);
+          if (ev.card) renderResultCard(shell.tl, ev.card);
         } else if (ev.t === "err") {
           thinkClose(shell);
           lineBad(shell.tl, ev.v);
