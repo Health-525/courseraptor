@@ -14,7 +14,8 @@
 | `RAPTOR_TUI_INLINE` | `1` 使用终端行内模式；默认全屏卡片模式 |
 | `RAPTOR_ENABLE_GRAB` | 默认关闭；`1` 启用盯课和真实选课提交工具 |
 | `RAPTOR_DISABLE_CAPTCHA_OCR` | `1` 停用通知附件下载时的本地验证码识别 |
-| `RAPTOR_MAX_RPS` | 请求频率上限只允许下调；尊重学校服务容量 |
+| `RAPTOR_MAX_RPS` | 请求频率上限，1-3 的整数（默认 3，只允许下调，启动时校验）；尊重学校服务容量 |
+| `RAPTOR_BURST` | 限速令牌桶突发容量，1-64 的整数（默认 8，启动时校验） |
 | `FIRECRAWL_API_KEY` | 可选，公开通知附件的云解析兜底；本地解析无需此项 |
 | `RAPTOR_CJK_FONT` | 可选，中文 PDF 使用的本机字体绝对路径 |
 | `QQBOT_APP_ID` / `QQBOT_APP_SECRET` / `QQBOT_PASSCODE` | 可选，QQ 官方机器人凭证与准入暗号；仍共用本机教务身份 |

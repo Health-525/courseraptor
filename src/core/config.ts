@@ -4,6 +4,7 @@
  */
 
 import path from "node:path";
+import { z } from "zod";
 import { loadCredentialsStore } from "./credentials";
 import { resolveStoredModel } from "./models";
 
@@ -42,6 +43,8 @@ export interface RaptorConfig {
   qqBotSource: QQBotSource;
   /** 抢课功能开关（选课季设为 1 才暴露抢课/盯课工具，平时关闭回到日常对话） */
   enableGrab: boolean;
+  /** 教务请求全局限速（zod 校验后的 RAPTOR_MAX_RPS / RAPTOR_BURST） */
+  rateLimit: { rps: number; burst: number };
 }
 
 export type QQBotSource = "env" | "encrypted" | "unset";
@@ -126,6 +129,33 @@ function env(key: string): string | undefined {
   return v?.trim() ? v.trim() : undefined;
 }
 
+// ── 数值型环境变量：zod 校验，坏值启动即报错（不再是 NaN 悄悄进限速桶）────
+
+/** @internal 导出仅供测试钉住校验规则 */
+export const rateLimitSchema = z.object({
+  // 只允许下调：默认 3 rps 是对学校系统的礼貌边界，想调高请改代码并想清楚
+  rps: z.coerce.number().int().min(1).max(3).default(3),
+  burst: z.coerce.number().int().min(1).max(64).default(8),
+});
+
+function parseRateLimit(): { rps: number; burst: number } {
+  const parsed = rateLimitSchema.safeParse({
+    rps: env("RAPTOR_MAX_RPS") ?? 3,
+    burst: env("RAPTOR_BURST") ?? 8,
+  });
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+    const key = issue.path.join(".");
+    throw new Error(
+      `环境变量校验失败：${key === "rps" ? "RAPTOR_MAX_RPS" : "RAPTOR_BURST"} ` +
+        `必须是 1-${key === "rps" ? "3" : "64"} 的整数（当前值：${
+          key === "rps" ? env("RAPTOR_MAX_RPS") : env("RAPTOR_BURST")
+        }），请修正 .env 后重启`,
+    );
+  }
+  return parsed.data;
+}
+
 function loadConfig(): RaptorConfig {
   const stored = loadCredentialsStore();
   const resolvedKey = resolveDeepSeekApiKey({
@@ -165,6 +195,7 @@ function loadConfig(): RaptorConfig {
     qqBotPasscode: resolvedQQ.passcode,
     qqBotSource: resolvedQQ.source,
     enableGrab: env("RAPTOR_ENABLE_GRAB") === "1",
+    rateLimit: parseRateLimit(),
   };
 
   // 凭证解析：教务账号保持 .env 优先，缺失时再解密本地存储。

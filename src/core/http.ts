@@ -17,6 +17,7 @@
 
 import https from "node:https";
 
+import { config } from "./config";
 import { isRaptorError, RaptorError, type RaptorErrorCode } from "./errors";
 
 export interface HttpResponse {
@@ -59,8 +60,9 @@ interface RateLimit {
 }
 
 const rateLimit: RateLimit = {
-  rps: Number(process.env.RAPTOR_MAX_RPS ?? 3),
-  burst: Number(process.env.RAPTOR_BURST ?? 8),
+  // 经 config 的 zod 校验（只允许下调、防 NaN），不再裸读环境变量
+  rps: config.rateLimit.rps,
+  burst: config.rateLimit.burst,
 };
 
 let tokens = rateLimit.burst;
