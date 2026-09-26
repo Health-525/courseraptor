@@ -56,10 +56,14 @@
 
 ### 方式一：下载安装包（推荐给同学，无需任何开发环境）
 
-1. 到 [Releases](https://github.com/Health-525/courseraptor/releases/latest) 下载文件名带 **`portable-win-x64`** 的 zip（约 112 MB，**已内置 Node 运行时，不用装 Node.js、也不用联网装依赖**）。别下页面最底部 GitHub 自动生成的 Source code 包。
-2. 右键 zip →「全部解压缩」，双击解压出来文件夹里的 **`start.bat`**（首次会引导录入教务账号和 DeepSeek API Key，加密存在本机，之后免填；教务账号也可直接回车跳过，之后在网页「功能大厅 → 设置 → 教务账号」里补填）。
+到 [Releases](https://github.com/Health-525/courseraptor/releases/latest) 下载任一安装包（约 110 MB，**已内置 Node 运行时，不用装 Node.js、也不用联网装依赖**）。别下页面最底部 GitHub 自动生成的 Source code 包。
 
-> 双击没反应或被拦截：包里的 `runtime\node.exe` 是 Node 官方运行时、未做代码签名，SmartScreen 弹窗选「更多信息 → 仍要运行」，或把解压出的 `CourseRaptor` 文件夹加入杀软信任区。
+- **`portable-win-x64.exe`（最省事，推荐）**：双击即用。**exe 放哪、程序就装到哪**——首次双击会在 exe 旁边释放出 `CourseRaptor` 文件夹（约 110MB），然后直接进入对话；之后每次双击都是秒开，删除文件夹即卸载。**升级 = 把新版 exe 放进原来的文件夹再双击**，账号、记忆、数据全部保留。
+- **`portable-win-x64.zip`（绿色版）**：右键 →「全部解压缩」，双击文件夹里的 **`start.bat`**。适合 U 盘携带或机房电脑。
+
+首次启动会引导录入教务账号和 DeepSeek API Key，加密存在本机，之后免填；教务账号也可直接回车跳过，之后在网页「功能大厅 → 设置 → 教务账号」里补填。
+
+> 双击没反应或被拦截：安装包未做代码签名（exe 是自释放启动器、zip 里的 `runtime\node.exe` 是 Node 官方运行时），SmartScreen 弹窗选「更多信息 → 仍要运行」，或把安装/解压目录加入杀软信任区。
 
 ### 方式二：git 克隆（开发者）
 

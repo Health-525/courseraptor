@@ -28,7 +28,7 @@ const exec = promisify(execCb);
  */
 const DEFAULT_UPDATE_SERVER = "__RAPTOR_RELEASE_SERVER__";
 
-const RAW_URL = "https://raw.githubusercontent.com/Health-525/courseraptor/master/package.json";
+const RAW_URL = "https://raw.githubusercontent.com/Health-525/courseraptor/main/package.json";
 const CACHE_FILE = path.join(PROJECT_ROOT, "data", "update-check.json");
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 4000;
@@ -130,7 +130,7 @@ async function fetchLatestViaGitTag(): Promise<string | null> {
   }
 }
 
-/** 兜底通道二：公开仓库直接读 master 上的 package.json 版本 */
+/** 兜底通道二：公开仓库直接读 main 上的 package.json 版本 */
 async function fetchLatestViaRaw(): Promise<string | null> {
   try {
     const res = await fetch(RAW_URL, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });

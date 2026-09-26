@@ -45,6 +45,8 @@ npm run demo
 
 发版前检查最终 zip 的文件清单，确认没有私密文件；不要直接压缩已使用的项目目录转发给同学。历史安装包若由旧打包脚本生成，应由维护者检查是否夹带个人文件，再决定撤回或替换。
 
+除便携 zip 外，`node scripts/package-exe.mjs --selftest` 会把同一份 zip 嵌进 .NET 启动器，打成单文件 exe（`courseraptor-vX.Y.Z-portable-win-x64.exe`，用 Windows 自带的 csc.exe 编译，无需第三方打包器）：同学双击后在 **exe 旁边**释放出 `CourseRaptor` 文件夹（exe 已在该文件夹内则直接复用，绿色版可原地升级；`RAPTOR_PORTABLE_HOME` 可整体重定向），版本号变化才重新释放，本地运行数据不在 zip 里、升级不覆盖。`--selftest` 会对同一安装目录跑两遍内置 `--raptor-selftest`（doctor），验证「首释放」与「秒开」两条路径。zip 与 exe 应作为同一版本的两个资产一起传 GitHub Release。
+
 ## 更新后台
 
 后台入口为 `server/update-server.mjs`，数据保存在 `update-data/`。Node 默认监听本机，通过 Nginx 和 HTTPS 对外提供服务；参考 `server/nginx.conf.example`。
