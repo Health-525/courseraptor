@@ -184,3 +184,25 @@ test("chat-app.js 里被调用的函数都有定义或属浏览器内置", () =>
     ].join(", ")}`,
   );
 });
+
+test("提示词模板换序钩子齐全：面板与输入框上方 chips 都可拖，↑↓ 按钮兜底", () => {
+  const src = fs.readFileSync(APP_JS, "utf8");
+  // 通用拖拽排序有定义，且 qchips / quickList 两处都绑定
+  assert.match(src, /function enableDragSort\(/);
+  assert.match(src, /enableDragSort\(qchips, commitQuickOrder\)/);
+  assert.match(src, /enableDragSort\(quickList, commitQuickOrder\)/);
+  // chips 与面板条目都标了可拖，chips 的 title 教用户「能拖」
+  assert.match(src, /c\.draggable = true/);
+  assert.match(src, /item\.draggable = true/);
+  assert.match(src, /按住拖动可调整顺序/);
+  // 键盘/触屏兜底：↑↓ 按钮带 aria-label，首末条对应方向禁用
+  assert.match(src, /aria-label", verb \+ "："/);
+  assert.match(src, /b\.disabled = dir < 0 \? i === 0 : i === quickDraft\.length - 1/);
+  assert.match(src, /function moveQuick\(i, dir\)/);
+  // 换序与增删走同一条即改即存管线：面板与 chips 同步刷新后落盘
+  const fn = src.match(/function commitQuickOrder\(texts\) \{[\s\S]*?\n\}/);
+  assert.ok(fn, "commitQuickOrder 函数存在");
+  assert.match(fn[0], /renderQuickList\(\)/);
+  assert.match(fn[0], /renderQchips\(\)/);
+  assert.match(fn[0], /saveQuick\(\)/);
+});
