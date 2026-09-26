@@ -31,6 +31,7 @@ import { quarantineCorruptFile, writeFileAtomic } from "../../core/atomic-write"
 import { appendRound } from "../../core/chat-sessions";
 import { config } from "../../core/config";
 import { drainGeneratedRound, runInDocumentRound } from "../../core/document/save";
+import { isRaptorError, isSessionExpiredError } from "../../core/errors";
 import { ensureCredentials } from "../../core/onboarding";
 import { migratedDataPath } from "../../core/paths";
 import { maybeAutoTitle } from "../../core/session-titles";
@@ -147,11 +148,15 @@ function startWaitingNotices(send: (text: string) => Promise<unknown>): () => vo
 /**
  * 把技术错误转译成人话，并给出下一步动作。
  * 用户不需要知道 SESSION_EXPIRED 是什么，只需要知道「重试就好」还是「这功能坏了」。
+ * RaptorError 先按 code 精确分诊；裸 Error（http 层网络异常等）再退回文案正则。
  */
 function humanizeError(e: unknown): string {
   const raw = (e as Error)?.message ?? String(e);
-  if (/SESSION_EXPIRED|登录|login|未授权/i.test(raw)) {
+  if (isSessionExpiredError(e) || /SESSION_EXPIRED|登录|login|未授权/i.test(raw)) {
     return "教务登录态掉了，我正在重新登录。稍等几秒再问一次就好。";
+  }
+  if (isRaptorError(e, "NETWORK", "UPSTREAM")) {
+    return "教务系统这会儿连不上，多半是线路抖动。稍等一两分钟再试一次。";
   }
   if (/ETIMEDOUT|ECONN|ENOTFOUND|fetch failed|network|timeout|socket|EOF/i.test(raw)) {
     return "教务系统这会儿连不上，多半是线路抖动。稍等一两分钟再试一次。";

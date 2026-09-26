@@ -4,6 +4,7 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { RaptorError } from "../src/core/errors";
 import { type CredentialSetupIO, ensureCredentials } from "../src/core/onboarding";
 
 interface Script {
@@ -73,7 +74,9 @@ test("连续验证失败后确认保存：保存未验证账号并放行", async
     ask: ["20230001", "20230001", "20230001", "20230001", "20230001", "y"],
     askSecret: ["bad", "bad", "bad", "bad", "bad"],
   });
-  const { saved, services } = fakeServices({ loginError: new Error("学号或密码不正确") });
+  const { saved, services } = fakeServices({
+    loginError: new RaptorError("AUTH_INVALID", "学号或密码不正确"),
+  });
   const outcome = await ensureCredentials(io, services);
   assert.equal(outcome, "configured");
   assert.deepEqual(saved, [{ username: "20230001", password: "bad" }]);
@@ -85,7 +88,9 @@ test("连续验证失败后拒绝保存：跳过并放行，不再抛错拦截�
     ask: ["20230001", "20230001", "20230001", "20230001", "20230001", ""],
     askSecret: ["bad", "bad", "bad", "bad", "bad"],
   });
-  const { saved, services } = fakeServices({ loginError: new Error("学号或密码不正确") });
+  const { saved, services } = fakeServices({
+    loginError: new RaptorError("AUTH_INVALID", "学号或密码不正确"),
+  });
   const outcome = await ensureCredentials(io, services);
   assert.equal(outcome, "skipped");
   assert.equal(saved.length, 0);

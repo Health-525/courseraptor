@@ -4,6 +4,7 @@
  */
 
 import { config } from "../../core/config";
+import { isRaptorError, RaptorError } from "../../core/errors";
 import { loginJwgl } from "./auth";
 import { openXkSession, type XkSession } from "./xk";
 
@@ -15,7 +16,8 @@ const RETRY_MAX = 5;
     文案命中 chat-web 的 NEED_SETUP_RE：网页端会据此自动弹出设置面板 */
 function requireJwglCredentials(): void {
   if (!config.jwglUsername || !config.jwglPassword) {
-    throw new Error(
+    throw new RaptorError(
+      "AUTH_MISSING",
       "尚未配置教务账号：请在设置面板里填写学号和密码（网页端我已自动为你打开）后重试",
     );
   }
@@ -75,9 +77,8 @@ async function loginWithRetry(): Promise<{ cookie: string }> {
       return await loginJwgl(config.jwglUsername, config.jwglPassword);
     } catch (e) {
       lastError = e as Error;
-      const msg = lastError.message;
-      // 密码错误不需要重试
-      if (msg.includes("密码") || msg.includes("学号")) throw lastError;
+      // 凭证错误/结构变化等非瞬时故障：重试无意义，立即上抛
+      if (isRaptorError(e) && !e.retryable) throw lastError;
       if (attempt < RETRY_MAX) {
         await sleep(attempt * 2000);
       }
@@ -93,8 +94,7 @@ async function openXkSessionWithRetry(): Promise<XkSession> {
       return await openXkSession(config.jwglUsername, config.jwglPassword);
     } catch (e) {
       lastError = e as Error;
-      const msg = lastError.message;
-      if (msg.includes("密码") || msg.includes("学号")) throw lastError;
+      if (isRaptorError(e) && !e.retryable) throw lastError;
       if (attempt < RETRY_MAX) {
         await sleep(attempt * 2000);
       }

@@ -75,6 +75,8 @@ src/adapters/<你的学校id>/
 
 用第一步侦察到的登录流程复现：密码加密方式（正方新版是 RSA）、CSRF token、验证码处理（如有）。`login` 成功的标准是后续查询接口能通；`getCookie` 负责会话过期后的静默重登。**内置重试与退避**，参考 `njtech/session.ts`。
 
+**错误请用 `RaptorError`（`src/core/errors.ts`）抛出**：密码错误抛 `AUTH_INVALID`、页面结构变化抛 `PARSE`、会话失效抛 `SESSION_EXPIRED`。code 是 core 判断「重试 / 重登 / 引导配置」的稳定契约，中文文案随便写——反过来，core 侧绝不靠文案子串匹配你的错误。
+
 ### 第四步：实现查询能力
 
 从 `schedule` 开始：把教务接口返回的课程列表翻译成 core 的 `ScheduleResult`（结构见 `src/core/model.ts`）。之后每加一个能力，就在 `capabilities` 里声明一项、补一个模块、（可选）挂一组工具。

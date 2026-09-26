@@ -8,6 +8,7 @@
 
 import { tool } from "ai";
 import { z } from "zod";
+import { isSessionExpiredError } from "../../../core/errors";
 import {
   NJTECH_PERIOD_TIMES,
   parseSksjSegments,
@@ -125,7 +126,7 @@ export const courseCompareTools = {
           try {
             return await searchCourses(session, courseName);
           } catch (e) {
-            if ((e as Error).message === "SESSION_EXPIRED") {
+            if (isSessionExpiredError(e)) {
               invalidateXkSession();
               session = await getXkSession(true);
               return await searchCourses(session, courseName);
@@ -171,7 +172,7 @@ export const courseCompareTools = {
           try {
             list = await fetchJxbList(session, { ...ref, courseCode: course.courseCode });
           } catch (e) {
-            if ((e as Error).message === "SESSION_EXPIRED") {
+            if (isSessionExpiredError(e)) {
               invalidateXkSession();
               session = await getXkSession(true);
               list = await fetchJxbList(session, { ...ref, courseCode: course.courseCode });
