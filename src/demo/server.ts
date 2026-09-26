@@ -13,12 +13,15 @@ import { schedulePage } from "../channels/web/schedule-page";
 import { todayPage } from "../channels/web/today-page";
 import { todosPage } from "../channels/web/todos-page";
 import { type DemoStreamAgent, runDemoLiveTurn } from "./agent";
+import { type DemoCard, demoCardsForMessage } from "./cards";
 import { demoKnowledge, demoTodayBrief } from "./data";
 
 interface DemoMessage {
   role: "user" | "assistant";
   text: string;
   ts: number;
+  /** 本轮随回答展示的结构化结果卡（虚构数据），重开会话时重绘 */
+  cards?: DemoCard[];
 }
 
 interface DemoSession {
@@ -364,7 +367,7 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
                 ? { role: "user" as const, content: m.text }
                 : { role: "assistant" as const, content: m.text },
             );
-          const { text, failure } = await runDemoLiveTurn({
+          const { text, failure, cards } = await runDemoLiveTurn({
             agent: liveAgent,
             history,
             message,
@@ -382,7 +385,12 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
           if (!closed && text.trim()) {
             session.messages.push(
               { role: "user", text: message, ts: now },
-              { role: "assistant", text: LIVE_DISCLAIMER + text, ts: Date.now() },
+              {
+                role: "assistant",
+                text: LIVE_DISCLAIMER + text,
+                ts: Date.now(),
+                ...(cards.length ? { cards } : {}),
+              },
             );
             session.messages = session.messages.slice(-40);
             session.updatedAt = Date.now();
@@ -393,16 +401,18 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
         }
 
         const reply = demoReply(message);
+        // 结果卡与正文同源：按问题关键词推导（课表/成绩/考试/通知/待办/知识）
+        const cards = demoCardsForMessage(message);
         session.messages.push(
           { role: "user", text: message, ts: now },
-          { role: "assistant", text: reply, ts: now },
+          { role: "assistant", text: reply, ts: now, ...(cards.length ? { cards } : {}) },
         );
         session.messages = session.messages.slice(-40);
         session.updatedAt = now;
         sessions.set(id, session);
         if (sessions.size > 30) sessions.delete(sessions.keys().next().value!);
 
-        // 与正式 /api/chat 同形的 SSE 事件流：思考一段 → 工具卡（示例数据）→ 正文分段
+        // 与正式 /api/chat 同形的 SSE 事件流：思考一段 → 工具卡 → 结果卡（示例数据）→ 正文分段
         const script = demoScript(message);
         const t0 = Date.now();
         res.writeHead(200, {
@@ -433,6 +443,10 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
             });
             await sleep(160);
           }
+        }
+        for (const card of cards) {
+          send({ t: "card", card });
+          await sleep(120);
         }
         // 正文按行流出，营造打字机节奏；前端逐段渲染 markdown
         const lines = reply.split("\n");

@@ -9,7 +9,7 @@ import { createDeepSeek } from "@ai-sdk/deepseek";
 import type { ModelMessage } from "ai";
 import { ToolLoopAgent, tool } from "ai";
 import { z } from "zod";
-
+import { type DemoCard, demoCardFromTool } from "./cards";
 import {
   DEMO_PERIOD_TIMES,
   demoExams,
@@ -454,13 +454,14 @@ export async function runDemoLiveTurn(options: {
   message: string;
   send: (obj: Record<string, unknown>) => void;
   signal: AbortSignal;
-}): Promise<{ text: string; think: string; failure: string | null }> {
+}): Promise<{ text: string; think: string; failure: string | null; cards: DemoCard[] }> {
   const { agent, history, message, send, signal } = options;
   const messages: ModelMessage[] = [...history, { role: "user", content: message }];
   const toolStart = new Map<string, { name: string; at: number }>();
   let text = "";
   let think = "";
   let failure: string | null = null;
+  const cards: DemoCard[] = [];
 
   try {
     const stream = await agent.stream({ messages, abortSignal: signal });
@@ -510,6 +511,12 @@ export async function runDemoLiveTurn(options: {
             brief: summarizeResult(p.output),
             out: previewJson(p.output),
           });
+          // 读态查询的结果同时以结构化卡片呈现（同 kind 去重，一轮至多一张）
+          const card = demoCardFromTool(p.toolName, p.output);
+          if (card && !cards.some((c) => c.kind === card.kind)) {
+            cards.push(card);
+            send({ t: "card", card });
+          }
           break;
         }
         case "tool-error": {
@@ -534,5 +541,5 @@ export async function runDemoLiveTurn(options: {
     if (!signal.aborted) failure = e instanceof Error ? e.message : String(e);
   }
 
-  return { text, think, failure };
+  return { text, think, failure, cards };
 }
