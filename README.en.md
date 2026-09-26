@@ -60,6 +60,8 @@ Open the URL printed in the terminal, normally `http://127.0.0.1:3211`.
 
 The demo uses **fictional data and scripted responses**. It does not read personal credentials, contact the university or an AI provider, or persist conversations to disk. It demonstrates the interface, not live AI performance. Press `Ctrl+C` to stop.
 
+To showcase real AI analysis with the same fictional data, run `npm run demo:live` instead. It answers with a real DeepSeek model (requires a `DEEPSEEK_API_KEY` in the environment or the project `.env`; API usage may incur charges) while every tool still returns fictional samples, so no account or personal data is involved. Without a key it falls back to the scripted offline demo.
+
 ## Use your own academic account
 
 Run `npm start`, or double-click `start.bat` on Windows. Follow the prompts to configure your own university credentials and DeepSeek API key. You can also skip the campus account with an empty Enter and fill it in later via the web Settings panel. Provider API usage may incur charges.
