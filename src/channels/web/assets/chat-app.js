@@ -1156,14 +1156,6 @@ function hallFocusChat(preset) {
     /* 输入框不在就只关抽屉 */
   }
 }
-/* 知识日期：今天显示 HH:MM，其余显示 M月d日（与 fmtWhen 同口径，知识页用日精度） */
-function hallKDate(ts) {
-  if (!ts) return "";
-  const d = new Date(ts),
-    n = new Date();
-  if (d.toDateString() === n.toDateString()) return pad(d.getHours()) + ":" + pad(d.getMinutes());
-  return d.getMonth() + 1 + "月" + d.getDate() + "日";
-}
 /* 知识分类筛选中态：搜索框是文本维，这个是分类维，两者叠加 */
 let hallKnowCat = "";
 /* 正文里的长链接自动识别成可点链接：按 URL 切片、纯 DOM 拼 <a>（不走
@@ -1193,25 +1185,17 @@ function linkifyInto(parent, text, cut) {
   }
   if (last < text.length) parent.appendChild(document.createTextNode(text.slice(last)));
 }
-/* 知识条目：标题 + 分类徽标·日期一行 + 摘要另起一段，可展开看全文
-   （main 区是热区，删除按钮在外不冲突），删除乐观更新（先移除节点，失败重刷恢复） */
+/* 知识条目：标题 + 摘要另起一段（分类/日期不上卡——顶部分类 chips 已够辨类），
+   可展开看全文（main 区是热区，删除按钮在外不冲突），删除乐观更新（先移除节点，失败重刷恢复） */
 function hallKnowledgeItem(k) {
   const full = String(k.content || "")
     .replace(/\s+/g, " ")
     .trim();
   const snippet = full.slice(0, 60);
   const truncated = full.length > snippet.length;
-  const date = hallKDate(k.updatedAt);
   const item = el("hall-item has-act know");
-  item.dataset.category = k.category || "未分类";
   const main = el("hall-item-main");
   main.appendChild(el2("ht", k.title));
-  /* 分类徽标与日期独占一行、摘要另起一段：原先三样串成一行等宽小字，
-     长内容一换行就彼此糊在一起（长 URL 尤其没法看） */
-  const meta = el("know-meta");
-  meta.appendChild(el2("know-cat" + (k.category ? "" : " none"), k.category || "未分类"));
-  if (date) meta.appendChild(el2("know-date", date));
-  main.appendChild(meta);
   const text = el2("hm");
   const renderText = (open) => {
     text.textContent = "";

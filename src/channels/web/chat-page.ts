@@ -882,18 +882,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-item.know .hall-item-main { cursor: pointer; }
   .hall-item.know:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .hall-item.know .hm.more { color: var(--ink-2); }
-  /* 知识条目排版：分类徽标 + 日期独占一行、摘要另起一段——原先「分类 · 日期 · 摘要」
-     串成一行等宽小字，长内容一换行三样就糊在一起。徽标与 /knowledge 页 .k-cat 同语言 */
+  /* 知识条目排版：卡片内边距与行距略放宽（分类/日期不上卡，辨类走顶部 chips） */
   .hall-item.know { padding: 11px 13px; margin-bottom: 8px; }
-  .hall-item .know-meta { display: flex; align-items: center; flex-wrap: wrap;
-                          gap: 5px 10px; margin-top: 5px; }
-  .hall-item .know-cat { flex: none; font-family: var(--mono); font-size: 10.5px;
-                         letter-spacing: .04em; color: var(--accent-deep);
-                         background: var(--accent-soft); padding: 1px 7px;
-                         border-radius: 2px; overflow-wrap: anywhere; }
-  .hall-item .know-cat.none { background: var(--shade); color: var(--ink-3); }
-  .hall-item .know-date { flex: none; font-family: var(--mono); font-size: 11px;
-                          color: var(--ink-3); }
   .hall-item.know .hm { margin-top: 6px; line-height: 1.75; }
   /* 知识正文里的自动链接：朱砂深色 + 下划线区分正文，新标签打开不打断对话 */
   .hall-item .hm a { color: var(--accent-deep); text-decoration: underline;
