@@ -1166,6 +1166,33 @@ function hallKDate(ts) {
 }
 /* 知识分类筛选中态：搜索框是文本维，这个是分类维，两者叠加 */
 let hallKnowCat = "";
+/* 正文里的长链接自动识别成可点链接：按 URL 切片、纯 DOM 拼 <a>（不走
+   innerHTML），www. 开头补 https://。URL 字符走 RFC 3986 白名单——
+   黑名单写法会把紧跟其后的中文也吞进链接。cut=true 表示这段文字是
+   被截断的摘要——末尾恰好顶到字符串结尾的 URL 大概率被拦腰切断，
+   宁可不链（链了半截地址只会跳错），展开后自然恢复可点 */
+const KNOW_URL_RE =
+  /(https?:\/\/[A-Za-z0-9._~:\/?#\[\]@!$&'()*+,;=%-]+|www\.[A-Za-z0-9._~:\/?#\[\]@!$&'()*+,;=%-]+)/gi;
+function linkifyInto(parent, text, cut) {
+  let last = 0;
+  for (const m of text.matchAll(KNOW_URL_RE)) {
+    const url = m[0].replace(/[.,;:!?'")\]]+$/, "");
+    const at = m.index;
+    const end = at + url.length;
+    if (end <= at || (cut && end === text.length)) continue;
+    if (at > last) parent.appendChild(document.createTextNode(text.slice(last, at)));
+    const a = document.createElement("a");
+    a.href = /^www\./i.test(url) ? "https://" + url : url;
+    a.textContent = url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    /* main 区是展开热区：点链接该跳转，不该顺手把卡片折叠了 */
+    a.addEventListener("click", (e) => e.stopPropagation());
+    parent.appendChild(a);
+    last = end;
+  }
+  if (last < text.length) parent.appendChild(document.createTextNode(text.slice(last)));
+}
 /* 知识条目：标题 + 分类徽标·日期一行 + 摘要另起一段，可展开看全文
    （main 区是热区，删除按钮在外不冲突），删除乐观更新（先移除节点，失败重刷恢复） */
 function hallKnowledgeItem(k) {
@@ -1173,6 +1200,7 @@ function hallKnowledgeItem(k) {
     .replace(/\s+/g, " ")
     .trim();
   const snippet = full.slice(0, 60);
+  const truncated = full.length > snippet.length;
   const date = hallKDate(k.updatedAt);
   const item = el("hall-item has-act know");
   item.dataset.category = k.category || "未分类";
@@ -1184,7 +1212,13 @@ function hallKnowledgeItem(k) {
   meta.appendChild(el2("know-cat" + (k.category ? "" : " none"), k.category || "未分类"));
   if (date) meta.appendChild(el2("know-date", date));
   main.appendChild(meta);
-  const text = el2("hm", snippet + (full.length > snippet.length ? "…" : ""));
+  const text = el2("hm");
+  const renderText = (open) => {
+    text.textContent = "";
+    linkifyInto(text, open ? full : snippet, !open && truncated);
+    if (!open && truncated) text.appendChild(document.createTextNode("…"));
+  };
+  renderText(false);
   if (k.source) text.title = "来源：" + k.source;
   main.appendChild(text);
   item.appendChild(main);
@@ -1208,13 +1242,14 @@ function hallKnowledgeItem(k) {
     item.title = "点击展开全文";
     const toggle = () => {
       const open = item.classList.toggle("open");
-      text.textContent = open ? full : snippet + "…";
+      renderText(open);
       text.classList.toggle("more", open);
       item.setAttribute("aria-expanded", open ? "true" : "false");
     };
     main.addEventListener("click", toggle);
     item.addEventListener("keydown", (e) => {
-      if ((e.key === "Enter" || e.key === " ") && !e.target.closest("button")) {
+      /* 焦点在链接上时 Enter 是跟链接走，不是折叠展开 */
+      if ((e.key === "Enter" || e.key === " ") && !e.target.closest("button, a")) {
         e.preventDefault();
         toggle();
       }

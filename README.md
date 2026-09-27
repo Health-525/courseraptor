@@ -17,7 +17,7 @@
 [![Last Commit](https://img.shields.io/github/last-commit/Health-525/courseraptor?color=orange)](https://github.com/Health-525/courseraptor/commits/main)
 [![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social)](https://github.com/Health-525/courseraptor)
 
-**[🚀 快速开始](#-快速开始) · [🖥️ 界面预览](#️-界面预览) · [✨ 核心能力](#-核心能力) · [🔒 隐私承诺](#-隐私承诺) · [🏗️ 技术栈](#-技术栈) · [⚠️ 免责声明](#️-免责声明与使用建议) · [📖 完整文档](docs/capabilities.md)**
+**[🚀 快速开始](#-快速开始) · [🖥️ 界面预览](#️-界面预览) · [✨ 核心能力](#-核心能力) · [🔒 隐私承诺](#-隐私承诺) · [🧩 项目架构](#-项目架构) · [🏗️ 技术栈](#-技术栈) · [⚠️ 免责声明](#️-免责声明与使用建议) · [📖 完整文档](docs/capabilities.md)**
 
 </div>
 
@@ -154,6 +154,20 @@ Agent 默认可调用 **31 个工具**，覆盖十大能力线。完整参数表
 - 课表查询自动叠加**放假/调休覆盖**：假期日整周标注「放假」、调休补课日按被换周几的课表补出行；具体安排由 agent 读教务处通知后经 `set_holidays` 落盘到 `data/term-holidays.json`。
 - 教务线路偶发抖动：所有登录内置 5 次线性退避重试（2/4/6/8s，统一走 core/http 的 withRetry），单学期成绩查询带重试。
 - **教务模块覆盖**：已接入 31 个工具；学校侧停用 6 个模块（空闲教室、班级课表等）；申请/流程类 30+ 项暂未接入。详见 [完整文档](docs/capabilities.md#-教务系统模块覆盖清单55-个菜单模块)。
+
+---
+
+## 🧩 项目架构
+
+<p align="center">
+  <!-- GitHub 按用户主题自动换图：暗色模式看深底版，浅色模式看白底版 -->
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/courseraptor-architecture.png">
+    <img src="docs/courseraptor-architecture-white.png" width="880" alt="CourseRaptor 项目架构图：交互入口（终端 TUI / 本地网页 / QQ）、Agent 内核、两层记忆与知识库全部本机运行，教务系统与天气等外部服务按需访问">
+  </picture>
+</p>
+
+**本地优先（Local-first）**：交互入口、Agent 内核、两层记忆与知识库全部跑在本机，数据不出电脑；教务系统、天气等外部服务仅在查询时按需访问。各层用到的技术与模块对照见 [🏗️ 技术栈](#️-技术栈)。
 
 ---
 
