@@ -70,7 +70,7 @@ function App() {
     <>
       <a className="skip" href="#main">跳到正文</a>
       <header className="header wrap">
-        <a className="brand" href="#" aria-label="CourseRaptor 首页"><img src="/courseraptor-logo.png" alt="" width="36" height="36" />CourseRaptor<span className="brand-tag">FOR NJTECH</span></a>
+        <a className="brand" href="#" aria-label="CourseRaptor 首页"><img src="/logo-header.webp" alt="" width="36" height="36" />CourseRaptor<span className="brand-tag">FOR NJTECH</span></a>
         <nav aria-label="主导航"><a href="#features">能做什么</a><a href="#try">看看示例</a><a href="#start">开始使用</a><a className="github-link" href="https://github.com/Health-525/courseraptor">GitHub ↗</a></nav>
       </header>
       <main id="main">
@@ -83,7 +83,7 @@ function App() {
             <p className="hero-note">无需账号即可体验离线演示。正式查询需自行配置教务账号与模型 API Key。</p>
           </div>
           <div className="hero-art">
-            <div className="mascot-frame"><img src="/courseraptor-logo.png" alt="戴着眼镜的绿色小恐龙 CourseRaptor" width="1254" height="1254" fetchPriority="high" /></div>
+            <div className="mascot-frame"><img src="/logo-hero.webp" alt="戴着眼镜的绿色小恐龙 CourseRaptor" width="840" height="840" fetchPriority="high" /></div>
             <div className="floating-note note-top"><span aria-hidden="true">✦</span><div>教务里的小事<br /><strong>交给我就好。</strong></div></div>
             <div className="floating-note note-bottom"><span className="status-dot"></span> Web / CLI / 可选 QQ</div>
             <span className="art-label">YOUR CAMPUS SIDEKICK / 01</span>
@@ -129,8 +129,8 @@ function App() {
         </div></section>
         <section className="section wrap product screen" aria-labelledby="product-title"><div className="section-head"><div><p className="eyebrow">03 / ON YOUR OWN DESK</p><h2 id="product-title">三种打开方式，<br />同一个助手。</h2></div><p>终端 TUI、本地网页与 QQ 机器人共享同一内核与记忆。<br />正式模式支持下载日历和生成的文档。</p></div>
           <div className="figure-grid">
-            <figure><div className="window-bar"><span aria-hidden="true">● ● ●</span><span>CourseRaptor · 功能大厅</span><span aria-hidden="true">↗</span></div><img src="/screenshot-hall.png" alt="CourseRaptor 网页版功能大厅：知识卡与功能卡" width="2548" height="1402" loading="lazy" /><figcaption>网页版功能大厅（/hall），虚构演示数据。</figcaption></figure>
-            <figure><div className="window-bar"><span aria-hidden="true">● ● ●</span><span>CourseRaptor · 终端 TUI</span><span aria-hidden="true">↗</span></div><img src="/screenshot-tui.png" alt="CourseRaptor 终端 TUI 首屏：今日课表、待办、考试与通知速览" width="2548" height="1402" loading="lazy" /><figcaption>终端 TUI 首屏（演示模式数据）。</figcaption></figure>
+            <figure><div className="window-bar"><span aria-hidden="true">● ● ●</span><span>CourseRaptor · 功能大厅</span><span aria-hidden="true">↗</span></div><img src="/screenshot-hall.webp" alt="CourseRaptor 网页版功能大厅：知识卡与功能卡" width="1600" height="881" loading="lazy" /><figcaption>网页版功能大厅（/hall），虚构演示数据。</figcaption></figure>
+            <figure><div className="window-bar"><span aria-hidden="true">● ● ●</span><span>CourseRaptor · 终端 TUI</span><span aria-hidden="true">↗</span></div><img src="/screenshot-tui.webp" alt="CourseRaptor 终端 TUI 首屏：今日课表、待办、考试与通知速览" width="1600" height="881" loading="lazy" /><figcaption>终端 TUI 首屏（演示模式数据）。</figcaption></figure>
           </div>
         </section>
         <section className="start-section screen" id="start" aria-labelledby="start-title"><div className="wrap start-grid"><div><p className="eyebrow">04 / YOUR FIRST CONVERSATION</p><h2 id="start-title">五分钟，<br />认识小恐龙。</h2><p>先体验，再决定要不要配置。<br />演示无需教务账号、API Key，也不会调用 AI。</p><div className="actions"><a className="button primary" href="https://github.com/Health-525/courseraptor/releases/latest/download/courseraptor-v0.3.0-portable-win-x64.exe">下载 v0.3.0 单文件 exe · 112MB <span aria-hidden="true">↓</span></a><a className="button ghost" href="https://github.com/Health-525/courseraptor/releases">绿色 zip · 全部版本 <span aria-hidden="true">↗</span></a></div><p className="small muted">exe 双击即用、内置 Node 运行时；升级把新版 exe 放进原文件夹再双击即可，账号与数据不动。</p></div><div className="setup"><ol><li><span>1</span><div><h3>下载并启动</h3><p>最新版 <a href="https://github.com/Health-525/courseraptor/releases">v0.3.0（2026-09-26 发布）↗</a>：单文件 exe 双击即用，或绿色 zip 解压后双击 start.bat。</p></div></li><li><span>2</span><div><h3>按引导完成配置</h3><p>录入教务账号与 DeepSeek API Key，AES-256-GCM 加密保存在本机；开发者可克隆源码，免账号先跑离线演示。</p><div className="codebox"><div><span>Terminal</span><button type="button" id="copy-command" onClick={copyCommands}>复制命令</button></div><pre><code id="commands" ref={commandsRef}>{START_COMMANDS}</code></pre></div><p id="copy-status" className="small" role="status">{copyStatus}</p></div></li><li><span>3</span><div><h3>打开终端显示的地址</h3><p>网页版默认 <code>http://localhost:3210</code>；终端、网页都能用，QQ 机器人可选开启。</p></div></li></ol><div className="next-step">准备正式使用？按引导配置教务账号与 DeepSeek API Key 即可开始对话，日常成本个位数人民币。<a href="https://github.com/Health-525/courseraptor/blob/main/docs/student-guide.md">阅读同学使用指南 ↗</a></div></div></div></section>
@@ -138,7 +138,7 @@ function App() {
         <section className="community wrap screen" aria-labelledby="community-title">
           <div className="community-inner">
             <div className="community-mascot">
-              <div className="community-mascot-frame"><img src="/courseraptor-logo.png" alt="CourseRaptor 小恐龙" width="1254" height="1254" loading="lazy" /></div>
+              <div className="community-mascot-frame"><img src="/logo-hero.webp" alt="CourseRaptor 小恐龙" width="840" height="840" loading="lazy" /></div>
               <div className="floating-note note-top"><span aria-hidden="true">✦</span><div>教务里的小事<br /><strong>交给我就好。</strong></div></div>
               <div className="floating-note note-bottom"><span className="status-dot"></span> 开源 · Local-first</div>
             </div>

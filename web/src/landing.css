@@ -115,3 +115,5 @@ section{scroll-margin-top:0}
 .community-stats dt{font-size:36px;font-weight:800;color:var(--mint);line-height:1;letter-spacing:-1px}
 .community-stats dd{margin:7px 0 0;font-size:12px;color:var(--muted);letter-spacing:.4px}
 @media(max-width:900px){.community-inner{grid-template-columns:1fr;gap:44px;text-align:center}.community-copy .eyebrow{justify-content:center}.community-stats{justify-content:center}.community-mascot .note-top{right:-10px}.community-mascot .note-bottom{left:-12px}}
+/* 移动端关闭满屏模式（最后声明，覆盖前面的 100vh） */
+@media(max-width:760px){.screen{min-height:0}}
