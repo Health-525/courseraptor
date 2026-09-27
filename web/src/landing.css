@@ -52,3 +52,27 @@
 .feature h3{font-size:21px;margin-bottom:10px}
 .feature p{margin-bottom:12px}
 .feature-number{margin-bottom:14px}
+/* —— 舒适度层：放宽呼吸感，保持一屏节奏 —— */
+.section{padding-block:62px}
+.try-section,.start-section{padding-block:62px}
+.section-head{margin-bottom:32px}
+#features .section-head{margin-bottom:26px}
+.hero{padding-block:60px 68px}
+.hero-desc{margin-bottom:26px;line-height:2.05}
+.feature-grid{gap:16px}
+.feature{padding:24px 26px}
+.feature h3{font-size:23px;margin-bottom:12px}
+.feature p{font-size:14.5px;line-height:1.8;margin-bottom:14px}
+.feature-number{margin-bottom:16px}
+.prompt-pill{padding-top:12px}
+.capability-panel{padding:24px 28px}
+.capability-head{margin-bottom:16px}
+.capability-grid{gap:14px}
+.capability{padding:15px 18px}
+.capability p{line-height:1.75}
+.faq details{padding:2px 4px}
+/* 功能区：舒适与一屏的折中 */
+#features{padding-block:52px}
+#features .section-head{margin-bottom:22px}
+#features .feature{padding:22px 24px}
+#features .feature p{margin-bottom:12px}
