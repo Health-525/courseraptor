@@ -83,7 +83,7 @@ function App() {
             <p className="hero-note">无需账号即可体验离线演示。正式查询需自行配置教务账号与模型 API Key。</p>
           </div>
           <div className="hero-art">
-            <div className="mascot-frame"><img src="/courseraptor-mascot.png" alt="戴着眼镜的绿色小恐龙坐在电脑前敲代码" width="2548" height="1402" fetchPriority="high" /></div>
+            <div className="mascot-frame"><img src="/courseraptor-logo.png" alt="戴着眼镜的绿色小恐龙 CourseRaptor" width="1254" height="1254" fetchPriority="high" /></div>
             <div className="floating-note note-top"><span aria-hidden="true">✦</span><div>教务里的小事<br /><strong>交给我就好。</strong></div></div>
             <div className="floating-note note-bottom"><span className="status-dot"></span> Web / CLI / 可选 QQ</div>
             <span className="art-label">YOUR CAMPUS SIDEKICK / 01</span>
