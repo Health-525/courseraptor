@@ -93,3 +93,25 @@
 
 /* 问答/产品/安装同步放大呼吸 */
 .try-section,.start-section,.product{padding-block:72px}
+/* —— 修正：顶栏只占第一屏，后续区块应为整 100vh，否则底部露缝 —— */
+.screen{min-height:100vh}
+@supports (min-height:100svh){.screen{min-height:100svh}}
+/* 首屏（顶栏+hero）收敛到恰好一屏 */
+.hero{padding-block:56px 58px}
+/* 一屏一区对齐：取消锚点预留的 24px，区块顶边对齐视口顶边 */
+html{scroll-padding-top:0}
+section{scroll-margin-top:0}
+/* —— 重做的尾屏：恐龙收尾 ＋ 亮点数据 ＋ CTA —— */
+.community{text-align:left;padding-block:72px;border:0;border-radius:0;background:transparent}
+.community-inner{display:grid;grid-template-columns:.9fr 1.1fr;gap:64px;align-items:center;width:100%}
+.community-mascot{position:relative;justify-self:center;width:min(340px,78%)}
+.community-mascot-frame{border-radius:45% 45% 18px 18px;overflow:hidden;transform:rotate(3deg);border:1px solid #7abfa957;box-shadow:14px 20px 0 #ffffff05}
+.community-mascot-frame img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
+.community-mascot .note-top{right:-48px;top:-6px}
+.community-mascot .note-bottom{left:-52px;bottom:2px}
+.community-copy .eyebrow{justify-content:flex-start}
+.community-stats{display:flex;gap:40px;margin:28px 0 32px}
+.community-stats div{display:flex;flex-direction:column}
+.community-stats dt{font-size:36px;font-weight:800;color:var(--mint);line-height:1;letter-spacing:-1px}
+.community-stats dd{margin:7px 0 0;font-size:12px;color:var(--muted);letter-spacing:.4px}
+@media(max-width:900px){.community-inner{grid-template-columns:1fr;gap:44px;text-align:center}.community-copy .eyebrow{justify-content:center}.community-stats{justify-content:center}.community-mascot .note-top{right:-10px}.community-mascot .note-bottom{left:-12px}}
