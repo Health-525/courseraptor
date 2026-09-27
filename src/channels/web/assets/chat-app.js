@@ -1166,22 +1166,27 @@ function hallKDate(ts) {
 }
 /* 知识分类筛选中态：搜索框是文本维，这个是分类维，两者叠加 */
 let hallKnowCat = "";
-/* 知识条目：标题 + 分类·日期·摘要，可展开看全文（main 区是热区，删除按钮在外不冲突），
-   删除乐观更新（先移除节点，失败重刷恢复） */
+/* 知识条目：标题 + 分类徽标·日期一行 + 摘要另起一段，可展开看全文
+   （main 区是热区，删除按钮在外不冲突），删除乐观更新（先移除节点，失败重刷恢复） */
 function hallKnowledgeItem(k) {
   const full = String(k.content || "")
     .replace(/\s+/g, " ")
     .trim();
   const snippet = full.slice(0, 60);
   const date = hallKDate(k.updatedAt);
-  const head = (k.category || "未分类") + (date ? " · " + date + " · " : " · ");
   const item = el("hall-item has-act know");
   item.dataset.category = k.category || "未分类";
   const main = el("hall-item-main");
   main.appendChild(el2("ht", k.title));
-  const meta = el2("hm", head + snippet + (full.length > snippet.length ? "…" : ""));
-  if (k.source) meta.title = "来源：" + k.source;
+  /* 分类徽标与日期独占一行、摘要另起一段：原先三样串成一行等宽小字，
+     长内容一换行就彼此糊在一起（长 URL 尤其没法看） */
+  const meta = el("know-meta");
+  meta.appendChild(el2("know-cat" + (k.category ? "" : " none"), k.category || "未分类"));
+  if (date) meta.appendChild(el2("know-date", date));
   main.appendChild(meta);
+  const text = el2("hm", snippet + (full.length > snippet.length ? "…" : ""));
+  if (k.source) text.title = "来源：" + k.source;
+  main.appendChild(text);
   item.appendChild(main);
   if (!HALL_DEMO)
     item.appendChild(
@@ -1203,8 +1208,8 @@ function hallKnowledgeItem(k) {
     item.title = "点击展开全文";
     const toggle = () => {
       const open = item.classList.toggle("open");
-      meta.textContent = head + (open ? full : snippet);
-      meta.classList.toggle("more", open);
+      text.textContent = open ? full : snippet + "…";
+      text.classList.toggle("more", open);
       item.setAttribute("aria-expanded", open ? "true" : "false");
     };
     main.addEventListener("click", toggle);
@@ -1679,20 +1684,8 @@ function buildKnowledge(b) {
       return wrap;
     }
     wrap.dataset.total = String((b.knowledge && b.knowledge.total) || recent.length);
-    recent.forEach((k) => {
-      const date = hallKDate(k.updatedAt);
-      wrap.appendChild(
-        hallItem(
-          k.title,
-          (k.category || "未分类") +
-            (date ? " · " + date : "") +
-            " · " +
-            String(k.content || "")
-              .replace(/\s+/g, " ")
-              .slice(0, 60),
-        ),
-      );
-    });
+    /* 与正式环境同一张卡：标题 + 分类徽标/日期一行 + 摘要（演示无删除按钮） */
+    recent.forEach((k) => wrap.appendChild(hallKnowledgeItem(k)));
     return wrap;
   }
   /* 正式环境：全量列表 + 分类筛 + 两步删除（与 /knowledge 页同一防误删口径）；
