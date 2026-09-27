@@ -35,6 +35,10 @@
 
 <p align="center"><img src="docs/screenshots/gui.png" width="800" alt="网页对话:思考卡片、工具调用与课表回复(虚构示例数据)"></p>
 
+**动态演示** —— 从欢迎页、快捷提问到一句话发起查询的完整流程(虚构示例数据):
+
+<p align="center"><img src="docs/screenshots/gui-demo.gif" width="800" alt="网页端动态演示:快捷提问与一句话查询全流程(虚构示例数据)"></p>
+
 ---
 
 ## 🚀 快速开始
