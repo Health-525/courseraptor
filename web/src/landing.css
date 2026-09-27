@@ -15,3 +15,40 @@
 .capability p{font-size:13px;line-height:1.75;color:var(--muted)}
 @media(max-width:900px){.capability-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.capability-grid{grid-template-columns:1fr}.capability-panel{padding:20px}}
+/* —— 16:9 构图排版：统一节奏，一屏一区块 —— */
+/* 全站垂直节奏统一 */
+.hero{padding-block:56px 64px;min-height:0}
+.section{padding-block:56px}
+.try-section,.start-section{padding-block:56px}
+.section-head{margin-bottom:30px}
+.eyebrow{margin-bottom:14px}
+.hero-desc{margin-bottom:24px}
+
+/* 功能卡：五卡一屏（16:9） */
+.feature-grid{gap:16px}
+.feature{padding:22px 24px}
+.feature h3{font-size:22px;letter-spacing:-.4px;margin-bottom:12px}
+.feature p{font-size:14px;line-height:1.7;margin-bottom:14px}
+.feature-number{font-size:11px;letter-spacing:.8px;margin-bottom:18px}
+.prompt-pill{padding-top:10px}
+
+/* 能力面板：独立规格带 */
+.capability-band{padding-block:8px 56px}
+.capability-panel{margin-top:0;padding:22px 26px;border-radius:16px}
+.capability-head{margin-bottom:14px}
+.capability-head h3{font-size:17px}
+.capability-grid{gap:12px}
+.capability{padding:13px 16px;border-radius:10px}
+.capability span{font-size:13px;margin-bottom:6px}
+.capability p{font-size:12.5px;line-height:1.65}
+
+/* 半屏区块与页脚对齐同一节奏 */
+.community{padding:48px 24px}
+.footer{padding-block:30px}
+/* 功能区收敛到一屏 */
+#features .section-head{margin-bottom:24px}
+.feature-grid{gap:14px}
+.feature{padding:20px 22px}
+.feature h3{font-size:21px;margin-bottom:10px}
+.feature p{margin-bottom:12px}
+.feature-number{margin-bottom:14px}

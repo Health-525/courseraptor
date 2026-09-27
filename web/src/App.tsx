@@ -99,24 +99,27 @@ function App() {
             <article className="feature"><span className="feature-number">04 — 通知替你读</span><h3>长通知，<br />先读与你有关的。</h3><p>按年级自动标注相关度，附件 Excel 结构化筛选，长文分页续读；关键日期藏在附件里也会被拎出来提醒你。</p><div className="prompt-pill">“这条通知需要我做什么？”</div></article>
             <article className="feature"><span className="feature-number">05 — 数据不出本机</span><h3>凭证加密，<br />隐私优先。</h3><p>教务账号与 API Key 以 AES-256-GCM 加密保存在本机，开源可审计；无需服务器，也不用向任何第三方交出密码。</p><div className="prompt-pill">“Local-first · 开源可审计”</div></article>
           </div>
-          <div className="capability-panel">
-            <div className="capability-head">
-              <div>
-                <p className="eyebrow">FULL TOOLBELT / 全景能力</p>
-                <h3>31 个内置工具，十类校园事务，一套内核全包。</h3>
+        </section>
+        <section className="section capability-band" aria-label="全景能力清单">
+          <div className="wrap">
+            <div className="capability-panel">
+              <div className="capability-head">
+                <div>
+                  <p className="eyebrow">FULL TOOLBELT / 全景能力</p>
+                  <h3>31 个内置工具，十类校园事务，一套内核全包。</h3>
+                </div>
+                <p className="capability-note">全部功能在真实教务环境验证可用 · <a href="https://github.com/Health-525/courseraptor/blob/main/docs/capabilities.md">完整清单与使用边界 ↗</a></p>
               </div>
-              <p className="capability-note">全部功能在真实教务环境验证可用</p>
-            </div>
-            <div className="capability-grid">
-              <div className="capability"><span>教务查询 <em>×12</em></span><p>课表（自动叠加放假调休）、成绩与 GPA、考试安排、学籍打码、选课冲突只读对比、搜课与可重修。</p></div>
-              <div className="capability"><span>通知情报 <em>×3</em></span><p>按年级标注相关度、正文全文、附件下载缓存＋Excel 结构化筛选＋长文分页续读。</p></div>
-              <div className="capability"><span>文件与数据 <em>×4</em></span><p>本地文件读取、Excel 筛选查询、沙箱 JS 计算、附件缓存管理。</p></div>
-              <div className="capability"><span>文档写作 <em>×2</em></span><p>Word / Excel / PPT / PDF 一句话生成，支持跨格式转换，网页直接下载。</p></div>
-              <div className="capability"><span>时间日历天气 <em>×5</em></span><p>教学周时间、调休落盘、.ics 日历导出、日历发布订阅、天气与穿衣建议。</p></div>
-              <div className="capability"><span>记忆与效率 <em>×4</em></span><p>两层记忆、待办双通道到期提醒、按课程归类的知识库、番茄钟。</p></div>
+              <div className="capability-grid">
+                <div className="capability"><span>教务查询 <em>×12</em></span><p>课表（自动叠加放假调休）、成绩与 GPA、考试安排、学籍打码、选课冲突只读对比、搜课与可重修。</p></div>
+                <div className="capability"><span>通知情报 <em>×3</em></span><p>按年级标注相关度、正文全文、附件下载缓存＋Excel 结构化筛选＋长文分页续读。</p></div>
+                <div className="capability"><span>文件与数据 <em>×4</em></span><p>本地文件读取、Excel 筛选查询、沙箱 JS 计算、附件缓存管理。</p></div>
+                <div className="capability"><span>文档写作 <em>×2</em></span><p>Word / Excel / PPT / PDF 一句话生成，支持跨格式转换，网页直接下载。</p></div>
+                <div className="capability"><span>时间日历天气 <em>×5</em></span><p>教学周时间、调休落盘、.ics 日历导出、日历发布订阅、天气与穿衣建议。</p></div>
+                <div className="capability"><span>记忆与效率 <em>×4</em></span><p>两层记忆、待办双通道到期提醒、按课程归类的知识库、番茄钟。</p></div>
+              </div>
             </div>
           </div>
-          <a className="text-link" href="https://github.com/Health-525/courseraptor/blob/main/docs/capabilities.md">查看完整能力与使用边界 <span aria-hidden="true">↗</span></a>
         </section>
         <section className="try-section" id="try" aria-labelledby="try-title"><div className="wrap try-grid">
           <div><p className="eyebrow">02 / JUST ASK</p><h2 id="try-title">像问同学一样，<br />直接问它。</h2><p className="muted">点一个问题，看看回答的样子。</p><div className="question-list" aria-label="选择示例问题">{EXAMPLE_KEYS.map((key) => (
