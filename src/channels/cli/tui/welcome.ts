@@ -56,7 +56,12 @@ function render() {
     ...panel.newsLines,
     ...(panel.webUrl ? ["", `💬 网页对话：${panel.webUrl} ${dim("（浏览器打开即聊）")}`] : []),
   );
-  lines.push("", dim("快捷键：滚轮/↑↓ 滚动 · ESC 打断回复 · 输入 / 唤出命令菜单 · Ctrl+C 退出"));
+  // Star 引导带完整 https 前缀，终端才能把 URL 识别成可点击链接
+  lines.push(
+    "",
+    dim("快捷键：滚轮/↑↓ 滚动 · ESC 打断回复 · 输入 / 唤出命令菜单 · Ctrl+C 退出"),
+    dim("⭐ 觉得好用就点个 Star：https://github.com/Health-525/courseraptor"),
+  );
   globalThis.__raptorWelcome = lines;
 }
 

@@ -222,3 +222,7 @@ while (running) {
 
 // 会话历史在每轮已逐轮落盘，这里兜底刷写
 await flushCapturedSession();
+
+// 退出时机是 Star 转化最好的窗口：用户刚用完、且此处的输出两种 UI 模式都可见
+console.log("👋 感谢使用 CourseRaptor！觉得帮到了你，欢迎去 GitHub 点个 ⭐ 再走：");
+console.log("   https://github.com/Health-525/courseraptor");
