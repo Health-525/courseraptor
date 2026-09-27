@@ -78,14 +78,14 @@ function App() {
           <div className="hero-copy">
             <p className="eyebrow"><span className="status-dot"></span> 为南工同学打造 · 开源 · 个人电脑运行</p>
             <h1 id="hero-title">教务琐事，<br /><em>一句话。</em></h1>
-            <p className="hero-desc">课表、成绩、考试、学籍、通知、待办、知识库，<br />十类校园高频事务，Agent 替你一次办完。</p>
+            <p className="hero-desc">早八在哪上，通识修了哪些，考试什么时候。<br />把反复翻找的时间，留给更想做的事。</p>
             <div className="actions"><a className="button primary" href="#start">认识你的小恐龙 <span aria-hidden="true">↗</span></a><a className="button ghost" href="#try">先看看它怎么答 <span aria-hidden="true">↓</span></a></div>
-            <p className="hero-note">无需账号即可体验离线演示。正式使用需自行配置教务账号与模型 API Key，凭证加密保存在本机。</p>
+            <p className="hero-note">无需账号即可体验离线演示。正式查询需自行配置教务账号与模型 API Key。</p>
           </div>
           <div className="hero-art">
             <div className="mascot-frame"><img src="/courseraptor-mascot.png" alt="戴着眼镜的绿色小恐龙坐在电脑前敲代码" width="2548" height="1402" fetchPriority="high" /></div>
             <div className="floating-note note-top"><span aria-hidden="true">✦</span><div>教务里的小事<br /><strong>交给我就好。</strong></div></div>
-            <div className="floating-note note-bottom"><span className="status-dot"></span> 终端 · 网页 · QQ 机器人</div>
+            <div className="floating-note note-bottom"><span className="status-dot"></span> Web / CLI / 可选 QQ</div>
             <span className="art-label">YOUR CAMPUS SIDEKICK / 01</span>
           </div>
         </section>
