@@ -895,6 +895,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-item .know-date { flex: none; font-family: var(--mono); font-size: 11px;
                           color: var(--ink-3); }
   .hall-item.know .hm { margin-top: 6px; line-height: 1.75; }
+  /* 知识正文里的自动链接：朱砂深色 + 下划线区分正文，新标签打开不打断对话 */
+  .hall-item .hm a { color: var(--accent-deep); text-decoration: underline;
+                     text-underline-offset: 2px; overflow-wrap: anywhere; }
+  .hall-item .hm a:hover { color: var(--accent); }
   .hall-item.hot { border-left: 3px solid var(--accent); }
   .hall-item.hot .hm { color: var(--accent-deep); }
   /* 加载骨架：纯色块脉冲（不用渐变，与纸面主题一致），减少取数时的布局跳动 */

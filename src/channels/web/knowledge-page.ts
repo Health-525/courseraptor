@@ -154,6 +154,10 @@ export function knowledgePage(
                  padding: 2px 8px; }
   .k-content { margin: 6px 0 0; font-size: 14px; line-height: 1.7; color: var(--ink-2);
                white-space: pre-wrap; overflow-wrap: anywhere; }
+  /* 正文里的自动链接：朱砂深色 + 下划线区分正文，新标签打开 */
+  .k-content a { color: var(--accent-deep); text-decoration: underline;
+                 text-underline-offset: 2px; }
+  .k-content a:hover { color: var(--accent); }
   .k-content.clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
                      overflow: hidden; }
   .k-toggle { justify-self: start; background: none; border: none; padding: 3px 0;
@@ -257,6 +261,29 @@ function appendMarked(parent, text, kw) {
   }
   parent.appendChild(document.createTextNode(text.slice(i)));
 }
+/* 正文里的长链接自动识别成可点链接（新标签打开）：先按 URL 切片，
+   链接段整段成 <a>、纯文本段再走命中高亮；与大厅知识面板同一套口径。
+   URL 字符走 RFC 3986 白名单，紧跟其后的中文天然终止匹配 */
+const URL_RE =
+  /(https?:\\/\\/[A-Za-z0-9._~:\\/?#\\[\\]@!$&'()*+,;=%-]+|www\\.[A-Za-z0-9._~:\\/?#\\[\\]@!$&'()*+,;=%-]+)/gi;
+function appendRich(parent, text, kw) {
+  let last = 0;
+  for (const m of text.matchAll(URL_RE)) {
+    const url = m[0].replace(/[.,;:!?'")\\]]+$/, "");
+    const at = m.index;
+    const end = at + url.length;
+    if (end <= at) continue;
+    if (at > last) appendMarked(parent, text.slice(last, at), kw);
+    const a = document.createElement("a");
+    a.href = /^www\\./i.test(url) ? "https://" + url : url;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    appendMarked(a, url, kw);
+    parent.appendChild(a);
+    last = end;
+  }
+  if (last < text.length) appendMarked(parent, text.slice(last), kw);
+}
 /* 两步删除：第一次点变身「确认删除」，3 秒内再点才执行，超时还原 */
 function armDelete(btn, onConfirm) {
   if (btn.dataset.armed === "1") { onConfirm(); return; }
@@ -358,7 +385,7 @@ function entryEl(item) {
   card.appendChild(head);
 
   const content = el("p", "k-content");
-  appendMarked(content, item.content, keyword);
+  appendRich(content, item.content, keyword);
   if (item.content.length > CLAMP_LEN) {
     if (!expandedIds.has(item.id)) content.classList.add("clamp");
     card.appendChild(content);
