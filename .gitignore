@@ -22,3 +22,5 @@ update-data/
 .playwright-mcp/
 outputs/
 hall-main.png
+# QMuse CLI 导入后生成的应用绑定文件（本机专属，不入库）
+.qmuse/
