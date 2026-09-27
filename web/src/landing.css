@@ -76,3 +76,29 @@
 #features .section-head{margin-bottom:22px}
 #features .feature{padding:22px 24px}
 #features .feature p{margin-bottom:12px}
+/* —— 满屏居中模式：一区块一屏 —— */
+.screen{min-height:calc(100vh - 95px);display:flex;flex-direction:column;justify-content:center}
+@supports (min-height:100svh){.screen{min-height:calc(100svh - 95px)}}
+@media(max-width:760px){.screen{min-height:0}}
+
+/* 拆屏后功能卡恢复大气尺寸 */
+#features{padding-block:72px}
+.feature-grid{gap:18px}
+.feature{padding:28px 30px}
+.feature h3{font-size:25px;margin-bottom:14px}
+.feature p{font-size:15px;line-height:1.85;margin-bottom:16px}
+.feature-number{font-size:12px;margin-bottom:20px}
+.prompt-pill{font-size:13px;padding-top:14px}
+
+/* 能力带放大成整屏 */
+.capability-band{padding-block:72px}
+.capability-panel{padding:30px 34px;border-radius:20px}
+.capability-head{margin-bottom:20px}
+.capability-head h3{font-size:20px}
+.capability-grid{gap:18px}
+.capability{padding:20px 22px;border-radius:12px}
+.capability span{font-size:14px;margin-bottom:8px}
+.capability p{font-size:13.5px;line-height:1.8}
+
+/* 问答/产品/安装同步放大呼吸 */
+.try-section,.start-section,.product{padding-block:72px}
