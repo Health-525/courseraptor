@@ -117,3 +117,25 @@ section{scroll-margin-top:0}
 @media(max-width:900px){.community-inner{grid-template-columns:1fr;gap:44px;text-align:center}.community-copy .eyebrow{justify-content:center}.community-stats{justify-content:center}.community-mascot .note-top{right:-10px}.community-mascot .note-bottom{left:-12px}}
 /* 移动端关闭满屏模式（最后声明，覆盖前面的 100vh） */
 @media(max-width:760px){.screen{min-height:0}}
+/* —— 中等视口适配（~1100-1350px 宽 / ~700px 高的窗口）：放大文字、收紧留白 —— */
+@media (max-width:1350px) and (min-width:1051px) {
+  .hero{gap:40px;padding-block:44px 48px}
+  .hero-art{max-width:420px}
+  .hero h1{font-size:56px}
+  .hero-desc{font-size:16px}
+  .section,.try-section,.start-section,.product{padding-block:48px}
+  .section-head{margin-bottom:24px}
+  .section-head h2{font-size:34px}
+  .feature h3{font-size:21px}
+  .feature p{font-size:14px}
+  .feature{padding:22px 24px}
+  .prompt-pill{font-size:13px}
+  .capability-panel{padding:22px 26px}
+  .capability{padding:15px 18px}
+  .capability p{font-size:13px;line-height:1.7}
+  .conversation .answer{min-height:300px}
+  .figure-grid{gap:14px}
+  .setup h3{font-size:16px}
+  .community-inner{gap:40px}
+  .community-mascot{width:min(280px,70%)}
+}
