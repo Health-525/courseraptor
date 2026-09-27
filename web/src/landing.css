@@ -76,3 +76,20 @@
 #features .section-head{margin-bottom:22px}
 #features .feature{padding:22px 24px}
 #features .feature p{margin-bottom:12px}
+/* —— 满屏撑满模式：主区块占满一屏并垂直居中 —— */
+.screen{min-height:calc(100vh - 95px);display:flex;flex-direction:column;justify-content:center}
+@supports (min-height:100svh){.screen{min-height:calc(100svh - 95px)}}
+@media(max-width:760px){.screen{min-height:0}}
+
+/* 能力带放大，撑满整屏 */
+.capability-band{padding-block:72px}
+.capability-panel{padding:30px 34px;border-radius:20px}
+.capability-head{margin-bottom:20px}
+.capability-head h3{font-size:20px}
+.capability-grid{gap:18px}
+.capability{padding:20px 22px;border-radius:12px}
+.capability span{font-size:14px;margin-bottom:8px}
+.capability p{font-size:13.5px;line-height:1.8}
+
+/* 问答/产品/安装同步放大呼吸 */
+.try-section,.start-section,.product{padding-block:72px}
