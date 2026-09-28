@@ -589,6 +589,8 @@ test("学生端额度接口与自带 Key 豁免", async (t) => {
     used: number;
     limit: number;
     remaining: number;
+    ownUsed: number;
+    hasOwnKey: boolean;
     ownKeyActive: boolean;
   };
   assert.deepEqual(q1, {
@@ -596,6 +598,8 @@ test("学生端额度接口与自带 Key 豁免", async (t) => {
     used: 3,
     limit: 3,
     remaining: 0,
+    ownUsed: 0,
+    hasOwnKey: false,
     ownKeyActive: false,
     source: "site",
   });
@@ -606,7 +610,7 @@ test("学生端额度接口与自带 Key 豁免", async (t) => {
   });
   assert.equal(blocked.status, 429);
 
-  // 造一个自带 Key 的凭证文件：额度接口翻转为不占额度，对话放行
+  // 造一个自带 Key 的凭证文件：额度接口翻转为不占额度，对话放行且记到自己的账
   await craftCredentials(usersDir, user!.id, true);
   const q2 = (await (await fetch(`${base}/api/quota`, { headers: { cookie } })).json()) as {
     ownKeyActive: boolean;
@@ -614,6 +618,44 @@ test("学生端额度接口与自带 Key 豁免", async (t) => {
   assert.equal(q2.ownKeyActive, true);
   const pass = await fetch(`${base}/api/chat`, { method: "POST", headers: { cookie }, body: "{}" });
   assert.equal(pass.status, 200);
+  assert.equal(await registry.turnsToday(user!.id), 3, "站点账不新增");
+  assert.equal(await registry.ownTurnsToday(user!.id), 1, "自己的 Key 记自己的账");
+
+  // 钉到站点模式（Key 保留不删）：额度恢复拦截，hasOwnKey 仍为真
+  const pin = await fetch(`${base}/api/ds-mode`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ mode: "site" }),
+  });
+  assert.equal(pin.status, 200);
+  const q4 = (await (await fetch(`${base}/api/quota`, { headers: { cookie } })).json()) as {
+    hasOwnKey: boolean;
+    ownKeyActive: boolean;
+  };
+  assert.equal(q4.hasOwnKey, true, "Key 保留未删");
+  assert.equal(q4.ownKeyActive, false, "但不再生效");
+  const blocked2 = await fetch(`${base}/api/chat`, {
+    method: "POST",
+    headers: { cookie },
+    body: "{}",
+  });
+  assert.equal(blocked2.status, 429, "站点额度恢复拦截");
+  assert.equal(await registry.turnsToday(user!.id), 3, "被拦截的请求不计数");
+
+  // 切回跟随模式：立刻恢复用自己的 Key
+  const back = await fetch(`${base}/api/ds-mode`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ mode: "own" }),
+  });
+  assert.equal(back.status, 200);
+  const pass2 = await fetch(`${base}/api/chat`, {
+    method: "POST",
+    headers: { cookie },
+    body: "{}",
+  });
+  assert.equal(pass2.status, 200);
+  assert.equal(await registry.ownTurnsToday(user!.id), 2);
 
   // override=false 的文件（只存了别的字段）：不豁免
   await craftCredentials(usersDir, user!.id, false);
@@ -796,64 +838,4 @@ test("忘记密码全链路：申请→管理员同意出码→同学自设新�
     redirect: "manual",
   });
   assert.equal(newLogin.status, 303);
-});
-
-test("切回站点免费额度：清自己存的 Key 并失效豁免", async (t) => {
-  const backendPort = await startBackend(t);
-  const usersDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-sitekey-"));
-  t.after(() => fs.rmSync(usersDir, { recursive: true, force: true }));
-  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-sitekey-st-"));
-  const registry = createRegistry({ stateDir });
-  const spawner = fakeSpawner(backendPort);
-  const server = createGatewayServer({
-    registry,
-    spawner,
-    secret: "unit-test-secret-0123456789",
-    dailyTurns: 2,
-    usersDir,
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  t.after(() => server.close());
-  const address = server.address();
-  assert.ok(address && typeof address !== "string");
-  const base = `http://127.0.0.1:${address.port}`;
-
-  const [invite] = await registry.createInvites({ count: 1 });
-  const reg = await fetch(`${base}/register`, {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      invite: invite.code,
-      username: "sitemode",
-      password: "password123",
-      password2: "password123",
-    }),
-    redirect: "manual",
-  });
-  const cookie = reg.headers.get("set-cookie") ?? "";
-  const user = await registry.findUserByName("sitemode");
-  await registry.addTurns(user!.id, 2);
-
-  // 存了自己 Key：豁免生效，对话放行
-  await craftCredentials(usersDir, user!.id, true);
-  const pass = await fetch(`${base}/api/chat`, { method: "POST", headers: { cookie }, body: "{}" });
-  assert.equal(pass.status, 200);
-
-  // 切回站点额度：Key 清除、实例被踢，额度恢复拦截
-  const kicked: string[] = [];
-  const origKick = spawner.kick;
-  const switched = await fetch(`${base}/api/use-site-key`, { method: "POST", headers: { cookie } });
-  assert.equal(switched.status, 200);
-  const q = (await (await fetch(`${base}/api/quota`, { headers: { cookie } })).json()) as {
-    ownKeyActive: boolean;
-  };
-  assert.equal(q.ownKeyActive, false, "Key 应已清除");
-  const blocked = await fetch(`${base}/api/chat`, {
-    method: "POST",
-    headers: { cookie },
-    body: "{}",
-  });
-  assert.equal(blocked.status, 429, "站点额度恢复拦截");
-  void kicked;
-  void origKick;
 });

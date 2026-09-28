@@ -141,17 +141,43 @@ export function createRegistry({ stateDir }) {
       });
     },
 
-    /** 当日对话轮数计数：跨网关重启保留，按本地日期自动清零 */
-    async addTurns(id, count = 1) {
+    /**
+     * 当日对话轮数——两本账分开记，跨网关重启保留，按本地日期自动清零：
+     * - site：站点免费额度账（quota 只看这本）
+     * - own：自己 Key 的账（不限额，仅记录）
+     * 历史单账 turns 一并迁移为 site 账。
+     */
+    async addTurns(id, count = 1, ledger = "site") {
       return serialized(async () => {
         const users = (await readUsers()).users;
         const user = users.find((u) => u.id === id);
         if (!user) return 0;
         const today = new Date().toISOString().slice(0, 10);
         if (user.turns?.date !== today) user.turns = { date: today, count: 0 };
-        user.turns.count += count;
+        if (user.ownTurns?.date !== today) user.ownTurns = { date: today, count: 0 };
+        if (ledger === "own") user.ownTurns.count += count;
+        else user.turns.count += count;
         await writeUsers(users);
-        return user.turns.count;
+        return ledger === "own" ? user.ownTurns.count : user.turns.count;
+      });
+    },
+
+    async ownTurnsToday(id) {
+      const user = await this.findUserById(id);
+      if (!user) return 0;
+      const today = new Date().toISOString().slice(0, 10);
+      return user.ownTurns?.date === today ? user.ownTurns.count : 0;
+    },
+
+    /** Key 来源模式："" = 跟随（有自己 Key 即用）；"site" = 钉在站点免费额度（Key 保留不用） */
+    async setDsMode(id, mode) {
+      return serialized(async () => {
+        const users = (await readUsers()).users;
+        const user = users.find((u) => u.id === id);
+        if (!user) throw new Error("用户不存在");
+        if (mode !== "" && mode !== "site") throw new Error("mode 仅支持空串或 site");
+        user.dsMode = mode;
+        await writeUsers(users);
       });
     },
 
@@ -202,6 +228,8 @@ export function createRegistry({ stateDir }) {
         createdAt: u.createdAt,
         turns: u.turns ?? { date: "", count: 0 },
         dailyTurns: Number(u.dailyTurns) || 0,
+        ownTurns: u.ownTurns ?? { date: "", count: 0 },
+        dsMode: u.dsMode ?? "",
       }));
     },
 

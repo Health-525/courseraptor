@@ -4,7 +4,9 @@ export interface RegistryUser {
   disabled: boolean;
   createdAt: string;
   turns: { date: string; count: number };
+  ownTurns: { date: string; count: number };
   dailyTurns: number;
+  dsMode: string;
 }
 
 export interface Registry {
@@ -18,6 +20,8 @@ export interface Registry {
   setPassword(id: string, newPassword: string): Promise<void>;
   setDisabled(id: string, disabled: boolean): Promise<void>;
   setDailyTurns(id: string, turns: number): Promise<void>;
+  ownTurnsToday(id: string): Promise<number>;
+  setDsMode(id: string, mode: string): Promise<void>;
   getSiteSettings(): Promise<{ deepseekKey: string }>;
   setSiteSettings(patch: { deepseekKey?: string }): Promise<void>;
   createResetRequest(userId: string, username: string): Promise<{ id: string }>;

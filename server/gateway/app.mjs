@@ -14,7 +14,7 @@ import { readFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { createAdminUi } from "./admin/ui.mjs";
-import { clearOwnDeepseekKey, ownDeepseekKeyActive } from "./admin/credentials-peek.mjs";
+import { ownDeepseekKeyActive } from "./admin/credentials-peek.mjs";
 
 const COOKIE_NAME = "raptor_sess";
 const SESSION_TTL_MS = 7 * 24 * 3600_000;
@@ -676,13 +676,14 @@ else { input.type = "password"; this.textContent = "显示"; }
         return;
       }
 
-      // 切回站点免费额度：清掉自己存的 Key 并回收实例（下次请求用站点 Key 重启）
-      if (req.method === "POST" && pathname === "/api/use-site-key") {
-        if (usersDir) {
-          await clearOwnDeepseekKey(usersDir, user.id);
-          spawner.kick(user.id);
-        }
-        console.log(`[gw] ${user.username} 切换回站点免费额度`);
+      // Key 来源模式切换：own = 跟随（有自己 Key 就用自己的）；site = 钉在站点免费额度。
+      // 只改模式不删 Key——切回 own 随时可用；踢掉实例让新模式立刻生效。
+      if (req.method === "POST" && pathname === "/api/ds-mode") {
+        const body = await readJsonBody(req);
+        const mode = body.mode === "site" ? "site" : "";
+        await registry.setDsMode(user.id, mode);
+        spawner.kick(user.id);
+        console.log(`[gw] ${user.username} Key 模式 → ${mode === "site" ? "站点免费额度" : "跟随（有自己的 Key 即用）"}`);
         sendJson(res, 200, { ok: true });
         finish(200);
         return;
@@ -691,15 +692,18 @@ else { input.type = "password"; this.textContent = "显示"; }
       // 同学端额度查询：设置弹窗「账号与模型」里展示剩余免费对话次数
       if (req.method === "GET" && pathname === "/api/quota") {
         const limit = user.dailyTurns > 0 ? user.dailyTurns : dailyTurns;
+        const hasOwnKey = usersDir ? await ownDeepseekKeyActive(usersDir, user.id) : false;
+        // 实际生效：有自己的 Key 且未被钉在站点模式
+        const ownKeyActive = hasOwnKey && user.dsMode !== "site";
         const used = await registry.turnsToday(user.id);
-        const ownKeyActive = usersDir
-          ? await ownDeepseekKeyActive(usersDir, user.id)
-          : false;
+        const ownUsed = await registry.ownTurnsToday(user.id);
         sendJson(res, 200, {
           username: user.username,
           used,
           limit,
           remaining: Math.max(0, limit - used),
+          ownUsed,
+          hasOwnKey,
           ownKeyActive,
           source: user.dailyTurns > 0 ? "personal" : "site",
         });
@@ -734,9 +738,8 @@ else { input.type = "password"; this.textContent = "显示"; }
       // 统一 Key 的费用护栏：每日对话轮数（按人限额优先，未设用站点默认）；
       // 已保存自己 DeepSeek Key 的同学不占站点免费额度，仅计数用于展示
       if (req.method === "POST" && pathname === "/api/chat") {
-        const ownKeyActive = usersDir
-          ? await ownDeepseekKeyActive(usersDir, user.id)
-          : false;
+        const hasOwnKey = usersDir ? await ownDeepseekKeyActive(usersDir, user.id) : false;
+        const ownKeyActive = hasOwnKey && user.dsMode !== "site";
         if (!ownKeyActive) {
           const limit = user.dailyTurns > 0 ? user.dailyTurns : dailyTurns;
           const used = await registry.turnsToday(user.id);
@@ -748,7 +751,7 @@ else { input.type = "password"; this.textContent = "显示"; }
             return;
           }
         }
-        await registry.addTurns(user.id, 1);
+        await registry.addTurns(user.id, 1, ownKeyActive ? "own" : "site");
       }
 
       spawner.noteActivity(user.id);

@@ -42,6 +42,9 @@ const spawner = createSpawner({
   deepseekKey: env.GATEWAY_DEEPSEEK_KEY || "",
   // 管理台改站点 Key 后，新拉起的实例即用新值（已在线实例重启后切换）
   getDeepseekKey: () => registry.getSiteSettings().then((s) => s.deepseekKey),
+  // 同学钉在「站点免费额度」模式时，实例禁用其保存的自己 Key（Key 保留不删）
+  getForceSiteKey: (userId) =>
+    registry.findUserById(userId).then((u) => u?.dsMode === "site"),
   maxConcurrent: Number(env.GATEWAY_MAX_CONCURRENT) || 4,
   idleMinutes: Number(env.GATEWAY_IDLE_MINUTES) || 30,
 });
