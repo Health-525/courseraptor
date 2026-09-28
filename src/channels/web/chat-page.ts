@@ -655,6 +655,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .setmsg { font-family: var(--mono); font-size: 12px; min-height: 16px;
             margin: 0 2px 2px; white-space: pre-wrap; color: var(--accent-deep); }
   .setmsg.good { color: var(--ink-2); }
+  /* 我的账号：设置内容下方的独立块（仅托管版显示，不挤横排标签） */
+  .my-account { margin: 14px 2px 4px; padding: 14px 2px 4px; border-top: 1px solid var(--rule-2); }
+  .my-account .ma-title { font-family: var(--mono); font-size: 12px; font-weight: 600;
+                          letter-spacing: .14em; color: var(--ink-3); margin-bottom: 8px; }
   /* 保存结果逐条展示：成功行墨色、失败行朱砂，一眼分清 */
   .setmsg.good .setmsg-line { margin: 0; }
   .setmsg.good .setmsg-line.bad { color: var(--accent-deep); }
@@ -1092,7 +1096,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
           <button class="set-tab on" type="button" role="tab" id="setTabAccount" aria-controls="setPaneAccount" aria-selected="true" data-pane="account"><i class="sdot" aria-hidden="true"></i>教务账号</button>
           <button class="set-tab" type="button" role="tab" id="setTabModel" aria-controls="setPaneModel" aria-selected="false" data-pane="model"><i class="sdot" aria-hidden="true"></i>AI 模型</button>
           <button class="set-tab" type="button" role="tab" id="setTabQQ" aria-controls="setPaneQQ" aria-selected="false" data-pane="qq"><i class="sdot" aria-hidden="true"></i>QQ 机器人</button>
-          <button class="set-tab" type="button" role="tab" id="setTabPass" aria-controls="setPanePass" aria-selected="false" data-pane="pass" hidden>我的账号</button>
           <button class="set-tab" type="button" role="tab" id="setTabData" aria-selected="false" data-pane="data">本地数据</button>
         </nav>
         <div class="set-main">
@@ -1113,14 +1116,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             <div class="cur" id="curModel"></div>
             <div class="diagrow"><button class="tbtn" id="testDeepseek" type="button" ${demo ? "disabled" : ""}>检测模型连接</button><span class="diagstate" id="diagDeepseek"></span></div>
           </section>
-          <section class="set-pane" id="setPanePass" role="tabpanel" aria-labelledby="setTabPass" data-pane="pass" hidden>
-            <p class="dlg-intro">修改本站登录密码（进入这个网站用的账号密码，与教务账号无关）。改完后下次登录用新密码，当前会话不受影响。</p>
-            <label class="fld"><span>当前密码</span><span class="fld-row"><input id="sPassCur" type="password" autocomplete="current-password"><button class="fld-eye" type="button" id="eyePassCur" aria-pressed="false">显示</button></span></label>
-            <label class="fld"><span>新密码</span><span class="fld-row"><input id="sPassNew" type="password" autocomplete="new-password" placeholder="至少 8 位"><button class="fld-eye" type="button" id="eyePassNew" aria-pressed="false">显示</button></span></label>
-            <label class="fld"><span>确认新密码</span><span class="fld-row"><input id="sPassNew2" type="password" autocomplete="new-password"><button class="fld-eye" type="button" id="eyePassNew2" aria-pressed="false">显示</button></span></label>
-            <div class="cur" id="curPassMsg"></div>
-            <div class="diagrow"><button class="tbtn" id="saveMyPass" type="button">修改密码</button></div>
-          </section>
           <section class="set-pane" id="setPaneQQ" role="tabpanel" aria-labelledby="setTabQQ" data-pane="qq">
             <p class="dlg-intro">在 q.qq.com 创建机器人后填入凭证，保存后即可在 QQ 里与本服务对话。凭证仅加密保存在当前电脑，留空即保持不变。</p>
             <label class="fld"><span>AppID</span><input id="sQQAppId" type="text" autocomplete="off" placeholder="q.qq.com 机器人的 AppID" ${demo ? "disabled" : ""}></label>
@@ -1140,6 +1135,15 @@ export function chatPage(options: { demo?: boolean } = {}): string {
         </div>
       </div>
       <div class="setmsg" id="setMsg" role="status" aria-live="polite"></div>
+      <div class="my-account" id="myAccountBox" hidden>
+        <div class="ma-title">我的账号 · 本站登录密码</div>
+        <p class="dlg-intro">修改进入本网站用的账号密码（与教务账号无关）。改完后下次登录用新密码，当前会话不受影响。</p>
+        <label class="fld"><span>当前密码</span><span class="fld-row"><input id="sPassCur" type="password" autocomplete="current-password"><button class="fld-eye" type="button" id="eyePassCur" aria-pressed="false">显示</button></span></label>
+        <label class="fld"><span>新密码</span><span class="fld-row"><input id="sPassNew" type="password" autocomplete="new-password" placeholder="至少 8 位"><button class="fld-eye" type="button" id="eyePassNew" aria-pressed="false">显示</button></span></label>
+        <label class="fld"><span>确认新密码</span><span class="fld-row"><input id="sPassNew2" type="password" autocomplete="new-password"><button class="fld-eye" type="button" id="eyePassNew2" aria-pressed="false">显示</button></span></label>
+        <div class="cur" id="curPassMsg"></div>
+        <div class="diagrow"><button class="tbtn" id="saveMyPass" type="button">修改密码</button></div>
+      </div>
       <div class="hall-settings-foot">
         <button class="tbtn" id="cancelSettings" type="button">关闭</button>
         <button class="tbtn primary" id="saveSettings" ${demo ? "disabled" : ""}>保存设置</button>
