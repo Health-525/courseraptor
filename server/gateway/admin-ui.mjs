@@ -103,6 +103,7 @@ td{padding:9px 12px;border-bottom:1px solid var(--rule);vertical-align:middle}
 tr:last-child td{border-bottom:0}
 tr:hover td{background:var(--paper-deep)}
 .mono{font-family:var(--mono);font-size:13px}
+b.hot,.hot{color:var(--accent-deep)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);
 margin-right:6px;vertical-align:1px}
 .dot.off{background:var(--rule-2)}
@@ -242,6 +243,9 @@ const dashboardHtml = () => `<!doctype html>
 <button type="button" class="nav-item" data-nav="users">
 <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16 3.5a4 4 0 0 1 0 7"/><path d="M17 14c2.8.5 5 3 5 6.2"/></svg>
 同学账号</button>
+<button type="button" class="nav-item" data-nav="site">
+<svg viewBox="0 0 24 24"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>
+站点设置</button>
 </div>
 <div class="nav-group">
 <div class="g-label">发 版 · RELEASES</div>
@@ -290,6 +294,21 @@ const dashboardHtml = () => `<!doctype html>
 <div class="panel" id="pane-release">
 <h2>版本发布<span class="en">RELEASES</span><span class="act mono" style="font-size:11px" id="updCur"></span></h2>
 <div class="card" id="updCard"><p class="empty">加载中…</p></div>
+</div>
+
+<div class="panel" id="pane-site">
+<h2>站点设置<span class="en">SITE</span></h2>
+<div class="card">
+<label>统一 DEEPSEEK KEY（未设置则同学须自带）</label>
+<p class="mono" id="siteKeyState" style="margin:0 0 10px;font-size:12.5px;color:var(--ink-3)">加载中…</p>
+<div class="inv-row">
+<input id="siteKeyInput" placeholder="粘贴新的 sk- 开头 Key" autocomplete="off">
+<button class="act" id="siteKeySave" type="button" style="margin:0;padding:8px 18px">保存</button>
+</div>
+<p style="color:var(--ink-3);font-size:12.5px;margin:12px 0 0">保存后新拉起的实例立即使用新 Key；在线实例下次拉起时切换。同学在网页「设置」里保存自己的 Key 后，优先用自己的，不消耗站点额度。</p>
+<h2>对话限额<span class="en">QUOTA</span></h2>
+<p class="lead" style="margin:4px 0 0">站点默认每人每日 <b class="mono" id="siteDefaultTurns">—</b> 轮；在「同学账号」里可按人单独设限额（0 = 用默认）。同学自带 Key 的同样计数，规则透明。</p>
+</div>
 </div>
 </section>
 </div></main>
@@ -342,15 +361,24 @@ if (!list.length) { el.innerHTML = '<tr><td colspan="6" class="empty">还没有�
 el.innerHTML = list.map(function (u) {
 var status = u.disabled ? '<span class="pill bad">已停用</span>' : '<span class="pill">正常</span>';
 var online = u.online ? '<span class="dot"></span>在线' : '<span class="dot off"></span>—';
-var acts = '';
+var quota = u.dailyTurns > 0 ? u.turns.count + '<b class="hot">/' + u.dailyTurns + '</b>'
+: u.turns.count + '<span style="color:var(--ink-3)">/默认</span>';
+var quotaBtn = '<button class="act" data-do="quota" data-u="' + esc(u.username) + '" data-cur="' + (u.dailyTurns || 0) + '">限额</button>';
+var acts = quotaBtn;
 if (u.disabled) { acts += '<button class="act" data-do="enable" data-u="' + esc(u.username) + '">启用</button>'; }
 else { acts += '<button class="act danger" data-do="disable" data-u="' + esc(u.username) + '">停用</button>'; }
 if (u.online) { acts += '<button class="act" data-do="kick" data-u="' + esc(u.username) + '">踢下线</button>'; }
 acts += '<button class="act" data-do="reset-pass" data-u="' + esc(u.username) + '">重置密码</button>';
 return '<tr><td class="mono">' + esc(u.username) + '</td><td>' + status + '</td><td>' + online +
-'</td><td class="mono">' + fmtDate(u.createdAt) + '</td><td class="mono">' + u.turns.count +
+'</td><td class="mono">' + fmtDate(u.createdAt) + '</td><td class="mono">' + quota +
 '</td><td>' + acts + '</td></tr>';
 }).join("");
+}
+function renderSite(s) {
+if (!s) return;
+document.getElementById("siteKeyState").textContent = s.deepseekKeySet
+? "当前：" + s.deepseekKeyMasked : "未设置（同学须在设置里填自己的 Key）";
+document.getElementById("siteDefaultTurns").textContent = s.defaultDailyTurns;
 }
 function renderInvites(list) {
 if (!list) return;
@@ -399,6 +427,7 @@ renderOverview(b.overview);
 renderUsers(b.users);
 renderInvites(b.invites);
 renderUpdate(b.update.overview, b.update.versions);
+renderSite(b.site);
 });
 }
 document.addEventListener("click", function (e) {
@@ -406,6 +435,16 @@ var t = e.target.closest ? e.target.closest("button,a") : null;
 if (!t) return;
 if (t.id === "refresh") { load(); return; }
 if (t.id === "logout") { api("/admin/logout", {}).then(function () { location.href = "/admin"; }); return; }
+if (t.id === "siteKeySave") {
+var nk = document.getElementById("siteKeyInput").value.trim();
+if (nk && !confirm(nk ? "保存站点统一 DeepSeek Key（新拉起的实例生效），确认？" : "")) return;
+api("/admin/api/site", { deepseekKey: nk }).then(function (r) {
+if (r && r.error) { alert(r.error); return; }
+document.getElementById("siteKeyInput").value = "";
+load();
+});
+return;
+}
 if (t.id === "invGen") {
 api("/admin/api/invite", {
 count: Number(document.getElementById("invCount").value) || 1,
@@ -436,6 +475,15 @@ load();
 return;
 }
 if (!doWhat || !user) return;
+if (doWhat === "quota") {
+var q = prompt("给 " + user + " 设每日对话轮数限额（0 = 用站点默认）：", t.getAttribute("data-cur") || "0");
+if (q === null) return;
+api("/admin/api/user/" + doWhat, { user: user, turns: Number(q) }).then(function (r) {
+if (r && r.error) { alert(r.error); return; }
+load();
+});
+return;
+}
 if (doWhat === "reset-pass") {
 var pw = prompt("给 " + user + " 设置新密码（至少 8 位）：");
 if (!pw) return;
@@ -459,6 +507,7 @@ export function createAdminUi({
   secret,
   password,
   capacity = 0,
+  defaultDailyTurns = 100,
   updateServerUrl = "",
   updateAdminToken = "",
 }) {
@@ -593,6 +642,31 @@ export function createAdminUi({
       if (pathname.startsWith("/admin/api/update/")) {
         return await handleUpdateApi(req, res, pathname);
       }
+      if (pathname === "/admin/api/site") {
+        if (req.method === "GET") {
+          const site = await registry.getSiteSettings();
+          sendJson(res, 200, {
+            deepseekKeySet: Boolean(site.deepseekKey),
+            deepseekKeyMasked: site.deepseekKey
+              ? `${site.deepseekKey.slice(0, 3)}${"•".repeat(8)}${site.deepseekKey.slice(-4)}`
+              : "",
+            defaultDailyTurns: defaultDailyTurns,
+          });
+          return true;
+        }
+        if (req.method === "POST") {
+          const body = await readJsonBody(req);
+          const key = String(body.deepseekKey ?? "").trim();
+          if (body.deepseekKey !== undefined && key !== "" && (!key.startsWith("sk-") || key.length < 20)) {
+            sendJson(res, 400, { error: "DeepSeek Key 应以 sk- 开头且长度足够" });
+            return true;
+          }
+          await registry.setSiteSettings({ deepseekKey: key });
+          console.log(`[gw-admin] 站点 DeepSeek Key 已${key ? "更新" : "清空"}（新拉起的实例生效）`);
+          sendJson(res, 200, { ok: true });
+          return true;
+        }
+      }
       return await handleApi(req, res, pathname);
     }
 
@@ -617,10 +691,11 @@ export function createAdminUi({
   async function handleApi(req, res, pathname) {
     // 一次往返带回全部面板数据：跨公网链路 RTT 大，5 个串行请求是「卡」的主因
     if (req.method === "GET" && pathname === "/admin/api/bootstrap") {
-      const [overview, users, invites, updOverview, updVersions] = await Promise.all([
+      const [overview, users, invites, site, updOverview, updVersions] = await Promise.all([
         ownOverview(),
         registry.listUsers(),
         registry.listInvites(),
+        registry.getSiteSettings(),
         callUpdateApi("GET", "/admin/api/overview"),
         callUpdateApi("GET", "/admin/api/versions"),
       ]);
@@ -628,6 +703,13 @@ export function createAdminUi({
         overview,
         users: users.map((u) => ({ ...u, online: spawner.isRunning(u.id) })),
         invites,
+        site: {
+          deepseekKeySet: Boolean(site.deepseekKey),
+          deepseekKeyMasked: site.deepseekKey
+            ? `${site.deepseekKey.slice(0, 3)}${"•".repeat(8)}${site.deepseekKey.slice(-4)}`
+            : "",
+          defaultDailyTurns,
+        },
         update: { overview: updOverview, versions: updVersions },
       });
       return true;
@@ -665,7 +747,15 @@ export function createAdminUi({
         sendJson(res, 404, { error: "用户不存在" });
         return true;
       }
-      if (action === "disable" || action === "enable") {
+      if (action === "quota") {
+        try {
+          await registry.setDailyTurns(user.id, body.turns);
+          console.log(`[gw-admin] ${user.username} 每日限额 → ${Number(body.turns) || 0}`);
+        } catch (error) {
+          sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+          return true;
+        }
+      } else if (action === "disable" || action === "enable") {
         await registry.setDisabled(user.id, action === "disable");
         console.log(`[gw-admin] ${action} ${user.username}`);
       } else if (action === "kick") {

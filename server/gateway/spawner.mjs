@@ -27,6 +27,8 @@ export function createSpawner({
   projectRoot,
   usersDir,
   deepseekKey = "",
+  /** 每次拉起实例时动态取站点 Key（管理台改 Key 后新实例即生效）；返回空串则回退 deepseekKey */
+  getDeepseekKey = null,
   maxConcurrent = 4,
   idleMinutes = 30,
   reapIntervalMs = 60_000,
@@ -65,7 +67,17 @@ export function createSpawner({
     }
   }
 
-  function spawnInstance(userId, restartCount) {
+  /** 站点 Key 当前值：站点设置（可运行时改）优先，回退构造参数 */
+  async function currentSiteKey() {
+    if (!getDeepseekKey) return "";
+    try {
+      return (await getDeepseekKey()) || "";
+    } catch {
+      return "";
+    }
+  }
+
+  function spawnInstance(userId, restartCount, siteKey = "") {
     const dataDir = path.join(userDataDir(userId), "data");
     const credFile = path.join(userDataDir(userId), "credentials.enc");
     mkdirSync(dataDir, { recursive: true });
@@ -78,9 +90,11 @@ export function createSpawner({
       RAPTOR_NO_UPDATE_CHECK: "1",
       RAPTOR_NO_TODO_REMINDERS: "1",
     };
-    // 混合 Key 模式：默认注入站点统一 Key；同学在网页设置里保存自己的 Key 后，
-    // 凭证文件里的 override 优先级更高（src/core/config.ts 的解析顺序），无需此处感知
-    if (deepseekKey) env.DEEPSEEK_API_KEY = deepseekKey;
+    // 混合 Key 模式：默认注入站点统一 Key（站点设置优先于 env，由调用方取最新值
+    // 传入）；同学在网页设置里保存自己的 Key 后，凭证文件里的 override 优先级
+    // 更高（src/core/config.ts 的解析顺序），无需此处感知
+    const effectiveKey = siteKey || deepseekKey;
+    if (effectiveKey) env.DEEPSEEK_API_KEY = effectiveKey;
 
     const child = spawn(nodeExec, ["--import", tsxUrl, "src/headless/entry.ts"], {
       cwd: projectRoot,
@@ -125,7 +139,7 @@ export function createSpawner({
       const effectiveRestarts =
         Date.now() - instance.startedAt > UPTIME_RESET_MS ? 0 : instance.restarts;
       if (effectiveRestarts < MAX_RESTARTS) {
-        spawnInstance(userId, effectiveRestarts + 1);
+        void currentSiteKey().then((key) => spawnInstance(userId, effectiveRestarts + 1, key));
       }
     });
 
@@ -168,7 +182,7 @@ export function createSpawner({
         err.code = "ECONCURRENCY";
         throw err;
       }
-      instance = spawnInstance(userId, 0);
+      instance = spawnInstance(userId, 0, await currentSiteKey());
       const port = await instance.ready;
       return port;
     },
