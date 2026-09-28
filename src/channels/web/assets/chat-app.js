@@ -2548,10 +2548,8 @@ function refreshQuota() {
       var el = document.getElementById("curQuota");
       if (!el || !q) return;
       el.hidden = false;
-      var passTab = document.getElementById("setTabPass");
-      if (passTab) passTab.hidden = false;
-      var passPane = document.getElementById("setPanePass");
-      if (passPane) passPane.hidden = false;
+      var maBox = document.getElementById("myAccountBox");
+      if (maBox) maBox.hidden = false;
       el.textContent = q.ownKeyActive
         ? "✓ 已使用自己的 DeepSeek Key · 不占站点免费额度"
         : "站点免费对话：今日已用 " + q.used + "/" + q.limit +
