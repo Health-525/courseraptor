@@ -28,3 +28,6 @@ hall-main.png
 .qmuse/
 # 本地语义评审临时产物，不入库
 semantic-review/
+# 多用户网关本地默认状态（用户表/邀请码/各实例数据，仅开发自用时出现）
+server/gateway/state/
+server/gateway/users/
