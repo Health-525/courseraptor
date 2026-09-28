@@ -2548,6 +2548,10 @@ function refreshQuota() {
       var el = document.getElementById("curQuota");
       if (!el || !q) return;
       el.hidden = false;
+      var passTab = document.getElementById("setTabPass");
+      if (passTab) passTab.hidden = false;
+      var passPane = document.getElementById("setPanePass");
+      if (passPane) passPane.hidden = false;
       el.textContent = q.ownKeyActive
         ? "✓ 已使用自己的 DeepSeek Key · 不占站点免费额度"
         : "站点免费对话：今日已用 " + q.used + "/" + q.limit +
@@ -2555,6 +2559,32 @@ function refreshQuota() {
     })
     .catch(function () {});
 }
+
+/* 我的账号：托管版同学自助改本站登录密码（/api/password 由网关提供；
+   本地版无此标签，整块不会出现） */
+document.getElementById("saveMyPass").addEventListener("click", function () {
+  var msg = document.getElementById("curPassMsg");
+  var cur = document.getElementById("sPassCur").value;
+  var nw = document.getElementById("sPassNew").value;
+  var nw2 = document.getElementById("sPassNew2").value;
+  if (!cur || !nw) { msg.textContent = "请填写当前密码和新密码。"; return; }
+  if (nw !== nw2) { msg.textContent = "两次输入的新密码不一致。"; return; }
+  if (nw.length < 8) { msg.textContent = "新密码至少 8 位。"; return; }
+  msg.textContent = "正在修改…";
+  fetch("/api/password", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ current: cur, next: nw }) })
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+    .then(function (res) {
+      if (res.ok && res.d && res.d.ok) {
+        msg.textContent = "✓ 已修改；下次登录请使用新密码。";
+        document.getElementById("sPassCur").value = "";
+        document.getElementById("sPassNew").value = "";
+        document.getElementById("sPassNew2").value = "";
+      } else {
+        msg.textContent = (res.d && res.d.error) || "修改失败，请稍后再试。";
+      }
+    })
+    .catch(function () { msg.textContent = "网络错误，修改失败。"; });
+});
 
 /* ── 设置：常驻在功能大厅抽屉里（见 #hallSettings），教务账号 / DeepSeek API Key
    等凭证仍走后端 /api/settings 同一套加密热生效 ── */

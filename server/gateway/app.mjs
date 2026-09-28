@@ -627,6 +627,30 @@ else { input.type = "password"; this.textContent = "显示"; }
         return;
       }
 
+      // 同学自助改本站登录密码：先验当前密码，再落新密码
+      if (req.method === "POST" && pathname === "/api/password") {
+        const body = await readJsonBody(req);
+        const current = String(body.current ?? "");
+        const next = String(body.next ?? "");
+        const check = await registry.authenticate(user.username, current);
+        if (!check || check.disabled || !check.user) {
+          sendJson(res, 401, { error: "当前密码不正确" });
+          finish(401);
+          return;
+        }
+        try {
+          await registry.setPassword(user.id, next);
+        } catch (error) {
+          sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+          finish(400);
+          return;
+        }
+        console.log(`[gw] ${user.username} 自助修改了登录密码`);
+        sendJson(res, 200, { ok: true });
+        finish(200);
+        return;
+      }
+
       // 统一 Key 的费用护栏：每日对话轮数（按人限额优先，未设用站点默认）；
       // 已保存自己 DeepSeek Key 的同学不占站点免费额度，仅计数用于展示
       if (req.method === "POST" && pathname === "/api/chat") {

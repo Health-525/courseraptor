@@ -615,3 +615,70 @@ test("学生端额度接口与自带 Key 豁免", async (t) => {
   };
   assert.equal(q3.ownKeyActive, false);
 });
+
+test("同学自助修改登录密码", async (t) => {
+  const backendPort = await startBackend(t);
+  const { base, registry } = await startGateway(t, {
+    backendPort,
+    adminPassword: "admin-master-pw",
+  });
+  const [invite] = await registry.createInvites({ count: 1 });
+  const reg = await fetch(`${base}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      invite: invite.code,
+      username: "passuser",
+      password: "password123",
+      password2: "password123",
+    }),
+    redirect: "manual",
+  });
+  const cookie = reg.headers.get("set-cookie") ?? "";
+
+  // 当前密码错 → 401；新密码太短 → 400
+  const wrong = await fetch(`${base}/api/password`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ current: "nope-nope", next: "newpassword99" }),
+  });
+  assert.equal(wrong.status, 401);
+  const short = await fetch(`${base}/api/password`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ current: "password123", next: "short" }),
+  });
+  assert.equal(short.status, 400);
+
+  // 正确流程：改完后旧密码登不上、新密码能登，且当前会话仍有效
+  const ok = await fetch(`${base}/api/password`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ current: "password123", next: "newpassword99" }),
+  });
+  assert.equal(ok.status, 200);
+  const stillValid = await fetch(`${base}/api/quota`, { headers: { cookie } });
+  assert.equal(stillValid.status, 200, "改密码后当前会话不应失效");
+  const oldLogin = await fetch(`${base}/login`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ username: "passuser", password: "password123" }),
+    redirect: "manual",
+  });
+  assert.equal(oldLogin.status, 401);
+  const newLogin = await fetch(`${base}/login`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ username: "passuser", password: "newpassword99" }),
+    redirect: "manual",
+  });
+  assert.equal(newLogin.status, 303);
+
+  // 未登录调用 → 401
+  const anon = await fetch(`${base}/api/password`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ current: "a", next: "b" }),
+  });
+  assert.equal(anon.status, 401);
+});
