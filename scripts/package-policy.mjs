@@ -19,6 +19,8 @@ export function shouldPackagePath(relativePath) {
   if (parts.length === 1) return ROOT_FILES.has(rel) || CODE_DIRS.has(rel) || rel === "docs";
   if (parts[0] === "docs") return parts.length === 2 && DOC_FILES.has(parts[1]);
   if (!CODE_DIRS.has(parts[0])) return false;
+  // admin 面板工程只属于服务器端（node_modules/dist 体积大），不进学生端安装包。
+  if (parts[0] === "server" && parts[1] === "admin") return false;
   // 即使误放在代码目录，也不带出日志、密钥、编辑器备份或环境文件。
   return !parts.some((part) => part.startsWith(".") || /\.(?:log|enc|pem|key|bak)$/.test(part));
 }

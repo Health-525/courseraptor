@@ -44,3 +44,19 @@ jobs:
       # critical 阻断，high 及以下仅体现在输出里
       # 已知项：image-size（pptxgenjs 传递依赖）2 个 high DoS，等上游出修复版即可消除
       - run: npm run audit:prod
+
+  admin-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: server/admin/package-lock.json
+      - run: npm --prefix server/admin ci
+      - run: npm --prefix server/admin run lint
+      - run: npm --prefix server/admin run build

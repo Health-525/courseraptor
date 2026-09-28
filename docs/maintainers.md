@@ -55,6 +55,23 @@ npm run demo
 
 客户端未配置更新服务仍可正常查询。正式安装包的更新地址由发布脚本写入副本；开发时可用 `RAPTOR_UPDATE_SERVER` 覆盖，必须 HTTPS。用户可设置 `RAPTOR_NO_UPDATE_CHECK=1` 关闭检查。
 
+### Admin 管理面板（/admin）
+
+管理面板是 `server/admin/` 下的 React + Vite + TypeScript 应用（基于开源模板 [shadcn-admin](https://github.com/satnaing/shadcn-admin)（MIT）裁剪：保留其侧边栏布局、暗色模式、主题与布局配置、命令面板，替换为 CourseRaptor 的业务页面），构建产物由更新后台同一 Node 服务托管在 `/admin` 路径，共用 `UPDATE_ADMIN_TOKEN` 鉴权：浏览器输入一次后存 Cookie，后续请求自动带 `x-admin-token` 头。
+
+```bash
+# 本地开发：两个终端
+node server/update-server.mjs   # 后端（8787）
+npm run admin:dev               # Vite 开发服务器，/admin/api 与 /publish 自动代理到 8787
+
+# 部署：构建产物在 server/admin/dist/，随代码上传到服务器（或直接在服务器上构建）
+npm run admin:build             # 首次需先 npm --prefix server/admin install
+```
+
+未构建时访问 `/admin/` 只会显示构建指引，不影响 `/publish`、`/latest`、`/download` 等既有接口。面板页面：概览（当前版本 / 版本数 / 磁盘占用 / Node 版本 / 运行时长）、发布新版本（选 zip 上传带进度条，替代 curl 发版；与 `npm run publish` 共用接口）、历史版本列表（一键回滚、删除，均带确认对话框）。前端路由为 history 模式，刷新子路径由后端 SPA fallback 回 index.html。发布历史记录在 `update-data/versions.json`，由 publish / rollback / delete 自动维护，删除历史文件不影响后台运行。
+
+安全：管理员密钥连续 5 次校验失败会按来源 IP 锁定 15 分钟（返回 429），成功后清零，锁定同时覆盖 `/publish` 与全部 admin API；经 Nginx 反代时靠示例配置里已有的 `proxy_set_header X-Real-IP` 区分来源。`/admin` 静态资源不含密钥，数据全部走鉴权 API。
+
 ## 发布命令的副作用
 
 只有维护者决定正式发版、确认目标和内容后才运行：
