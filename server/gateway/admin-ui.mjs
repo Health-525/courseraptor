@@ -133,6 +133,58 @@ border-radius:2px;color:var(--accent-deep);font-size:13.5px;line-height:1.6}
 .inv-row .num{max-width:90px;text-align:center}
 .empty{padding:26px 0;text-align:center;color:var(--ink-3);font-size:13.5px}
 .copy-ok{color:var(--ok);font-family:var(--mono);font-size:11px;margin-left:8px}
+/* ── 管理台应用壳：全高侧栏（主流 admin 结构）+ 滚动内容区，红头档案皮肤 ── */
+body.app{display:grid;grid-template-columns:236px 1fr;place-items:stretch;
+height:100vh;height:100dvh;overflow:hidden;padding:0}
+aside.side{display:flex;flex-direction:column;min-height:0;
+background:var(--paper-deep);border-right:1px solid var(--rule-2)}
+.side-brand{padding:20px 16px 15px;text-align:center;border-bottom:1px solid var(--rule-2);
+position:relative}
+.side-brand::after{content:"";position:absolute;left:14%;right:14%;bottom:3px;height:2px;
+background:var(--accent)}
+.side-brand img{width:42px;height:42px;object-fit:contain;display:block;margin:0 auto 6px}
+.side-brand .wordmark{margin:0;font-size:17px;line-height:1.2;letter-spacing:-.03em;font-weight:500}
+.side-brand .badge{display:inline-block;margin-top:7px;font-family:var(--mono);font-size:9.5px;
+font-weight:600;letter-spacing:.16em;color:var(--accent-deep);background:var(--accent-soft);
+border:1px solid var(--accent-line);border-radius:2px;padding:2px 8px}
+nav.groups{flex:1;min-height:0;overflow-y:auto;padding:16px 12px 10px;
+display:flex;flex-direction:column;gap:20px}
+.g-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.18em;
+color:var(--ink-3);padding:0 10px;margin:0 0 6px}
+.nav-item{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+background:none;border:0;border-left:2px solid transparent;border-radius:2px;
+padding:8px 10px;font-family:var(--sans);font-size:13.5px;color:var(--ink-2);
+cursor:pointer;transition:background .12s ease,color .12s ease}
+.nav-item svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;
+stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.nav-item:hover{background:var(--shade);color:var(--ink)}
+.nav-item.on{background:var(--accent-soft);color:var(--accent-deep);
+border-left-color:var(--accent);font-weight:600}
+.side-uptime{padding:8px 16px;font-family:var(--mono);font-size:10px;
+letter-spacing:.06em;color:var(--ink-3);border-top:1px solid var(--rule)}
+.side-foot{display:flex;gap:8px;padding:10px 12px 14px}
+.side-foot button{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
+background:none;border:1px solid var(--rule-2);border-radius:2px;padding:7px 0;
+font-family:var(--sans);font-size:12px;color:var(--ink-2);cursor:pointer;
+transition:border-color .12s ease,color .12s ease}
+.side-foot button svg{width:13px;height:13px;stroke:currentColor;fill:none;
+stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.side-foot button:hover{border-color:var(--accent);color:var(--accent)}
+main.content{min-width:0;overflow-y:auto;padding:26px 30px 64px}
+.content-inner{max-width:960px}
+section.pane .panel{display:none}
+section.pane .panel.on{display:block}
+@media (max-width:840px){
+body.app{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+aside.side{border-right:0;border-bottom:1px solid var(--rule-2)}
+.side-brand{padding:12px 16px 10px}
+.side-brand img{width:28px;height:28px;display:inline-block;vertical-align:-8px;margin:0 6px 0 0}
+nav.groups{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:8px 12px}
+.g-label{display:none}
+.nav-item{border-left:0;border:1px solid var(--rule-2);padding:6px 12px;white-space:nowrap}
+.nav-item.on{border-color:var(--accent-line)}
+.side-uptime{display:none}
+}
 @media (max-width:720px){.stats{grid-template-columns:repeat(2,1fr)}}
 `;
 
@@ -171,16 +223,62 @@ const disabledHtml = () =>
 <span class="mono">admin.mjs</span> 命令行管理。</p></section>`,
   );
 
-const dashboardHtml = () =>
-  shell(
-    "管理台",
-    `<h2>总览<span class="en">OVERVIEW</span><span class="act"><a id="refresh">刷新</a> · <a id="logout">退出</a></span></h2>
+const dashboardHtml = () => `<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/logo.png">
+<title>管理台 · CourseRaptor</title><style>${CSS}</style></head><body class="app">
+<aside class="side">
+<div class="side-brand">
+<img src="/logo.png" alt="">
+<h1 class="wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></h1>
+<div><span class="badge">ADMIN 管理台</span></div>
+</div>
+<nav class="groups">
+<div class="nav-group">
+<div class="g-label">日 常 · DAILY</div>
+<button type="button" class="nav-item on" data-nav="overview">
+<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+总览</button>
+<button type="button" class="nav-item" data-nav="users">
+<svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16 3.5a4 4 0 0 1 0 7"/><path d="M17 14c2.8.5 5 3 5 6.2"/></svg>
+同学账号</button>
+<button type="button" class="nav-item" data-nav="invites">
+<svg viewBox="0 0 24 24"><path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a3 3 0 0 0 0 6v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a3 3 0 0 0 0-6z"/><path d="M13 5v2M13 11v2M13 17v2"/></svg>
+邀请码</button>
+</div>
+<div class="nav-group">
+<div class="g-label">发 版 · RELEASES</div>
+<button type="button" class="nav-item" data-nav="release">
+<svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+版本发布</button>
+</div>
+</nav>
+<div class="side-uptime" id="uptimeLine">网关运行中…</div>
+<div class="side-foot">
+<button type="button" id="refresh">
+<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+刷新</button>
+<button type="button" id="logout">
+<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+退出</button>
+</div>
+</aside>
+<main class="content"><div class="content-inner">
+<section class="pane">
+<div class="panel on" id="pane-overview">
+<h2>总览<span class="en">OVERVIEW</span></h2>
 <div class="stats" id="stats"></div>
+<h2>运行状态<span class="en">STATUS</span></h2>
+<div class="card" id="statusCard"><p class="empty">加载中…</p></div>
+</div>
 
+<div class="panel" id="pane-users">
 <h2>同学账号<span class="en">USERS</span></h2>
 <table><thead><tr><th>用户名</th><th>状态</th><th>在线</th><th>注册于</th><th>今日轮数</th><th>操作</th></tr></thead>
 <tbody id="users"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table>
+</div>
 
+<div class="panel" id="pane-invites">
 <h2>邀请码<span class="en">INVITES</span></h2>
 <div class="card">
 <div class="inv-row">
@@ -192,11 +290,38 @@ const dashboardHtml = () =>
 <table style="margin-top:14px;box-shadow:none"><thead><tr><th>邀请码</th><th>备注</th><th>状态</th><th></th></tr></thead>
 <tbody id="invites"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody></table>
 </div>
+</div>
 
+<div class="panel" id="pane-release">
 <h2>版本发布<span class="en">RELEASES</span><span class="act mono" style="font-size:11px" id="updCur"></span></h2>
 <div class="card" id="updCard"><p class="empty">加载中…</p></div>
+</div>
+</section>
+</div></main>
 
 <script>
+(function () {
+"use strict";
+var tabs = document.querySelectorAll("nav.groups .nav-item");
+for (var i = 0; i < tabs.length; i++) {
+tabs[i].addEventListener("click", function () {
+for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove("on");
+this.classList.add("on");
+var panels = document.querySelectorAll(".pane .panel");
+for (var k = 0; k < panels.length; k++) panels[k].classList.remove("on");
+var target = document.getElementById("pane-" + this.getAttribute("data-nav"));
+if (target) target.classList.add("on");
+});
+}
+function api(path, body) {
+var opts = body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {};
+return fetch(path, opts).then(function (r) {
+if (r.status === 401) { location.href = "/admin"; return null; }
+return r.json();
+});
+}
+function esc(s) { var d = document.createElement("div"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
+function fmtDate(iso) { return String(iso || "").slice(0, 10); }
 (function () {
 "use strict";
 function api(path, body) {
@@ -217,6 +342,16 @@ el.innerHTML =
 '<div class="stat"><div class="n hot">' + o.online + "/" + o.capacity + '</div><div class="t">在线/并发上限</div></div>' +
 '<div class="stat"><div class="n">' + o.invitesLeft + '</div><div class="t">可用邀请码</div></div>' +
 '<div class="stat"><div class="n hot">' + o.turnsToday + '</div><div class="t">今日对话轮数</div></div>';
+var up = o.uptimeSec || 0;
+var upText = up >= 86400 ? Math.floor(up / 86400) + " 天 " + Math.floor((up % 86400) / 3600) + " 小时"
+: up >= 3600 ? Math.floor(up / 3600) + " 小时 " + Math.floor((up % 3600) / 60) + " 分"
+: Math.floor(up / 60) + " 分钟";
+document.getElementById("uptimeLine").textContent =
+"运行 " + upText + " · " + o.online + "/" + o.capacity + " 在线";
+document.getElementById("statusCard").innerHTML =
+'<p class="lead" style="margin-top:2px"><span class="dot' + (o.online > 0 ? "" : " off") + '"></span>网关已连续运行 ' + esc(upText) +
+'，当前 ' + o.online + ' 个实例在线' + (o.online > 0 ? "" : "（空闲时不占内存）") + '。</p>' +
+'<p style="color:var(--ink-3);font-size:13px;margin:4px 0 0">实例按需拉起、空闲 30 分钟自动回收；每日每人对话限额可在服务器 env 调整（GATEWAY_DAILY_TURNS）。</p>';
 });
 api("/admin/api/users").then(function (list) {
 if (!list) return;
@@ -327,8 +462,8 @@ api("/admin/api/user/" + doWhat, { user: user }).then(load);
 });
 load();
 })();
-</script>`,
-  );
+</script>
+</body></html>`;
 
 export function createAdminUi({
   registry,
