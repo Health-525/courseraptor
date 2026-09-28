@@ -58,7 +58,12 @@ test("admin 面板工程不进学生端安装包，更新后台本体照常分�
   ]) {
     assert.equal(shouldPackagePath(file), false, file);
   }
-  for (const file of ["server", "server/app.mjs", "server/update-server.mjs", "server/nginx.conf.example"]) {
+  for (const file of [
+    "server",
+    "server/app.mjs",
+    "server/update-server.mjs",
+    "server/nginx.conf.example",
+  ]) {
     assert.equal(shouldPackagePath(file), true, file);
   }
 });
