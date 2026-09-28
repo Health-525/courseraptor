@@ -289,6 +289,9 @@ const dashboardHtml = () => `<!doctype html>
 <table style="margin-top:14px;box-shadow:none"><thead><tr><th>邀请码</th><th>备注</th><th>状态</th><th></th></tr></thead>
 <tbody id="invites"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody></table>
 </div>
+
+<h2>密码重置申请<span class="en">RESET REQUESTS</span><span class="act mono" style="font-size:11px">同意后把码发给同学，新密码由同学自己设</span></h2>
+<div id="resetBox"><p class="empty">加载中…</p></div>
 </div>
 
 <div class="panel" id="pane-release">
@@ -368,11 +371,36 @@ var acts = quotaBtn;
 if (u.disabled) { acts += '<button class="act" data-do="enable" data-u="' + esc(u.username) + '">启用</button>'; }
 else { acts += '<button class="act danger" data-do="disable" data-u="' + esc(u.username) + '">停用</button>'; }
 if (u.online) { acts += '<button class="act" data-do="kick" data-u="' + esc(u.username) + '">踢下线</button>'; }
-acts += '<button class="act" data-do="reset-pass" data-u="' + esc(u.username) + '">重置密码</button>';
 return '<tr><td class="mono">' + esc(u.username) + '</td><td>' + status + '</td><td>' + online +
 '</td><td class="mono">' + fmtDate(u.createdAt) + '</td><td class="mono">' + quota +
 '</td><td>' + acts + '</td></tr>';
 }).join("");
+}
+function renderResets(r) {
+if (!r) return;
+var box = document.getElementById("resetBox");
+var pend = r.pending || [];
+var codes = r.codes || [];
+var html = "";
+if (!pend.length && !codes.length) { box.innerHTML = '<p class="empty">暂无申请。同学在登录页点「忘记密码」提交后出现在这里。</p>'; return; }
+if (pend.length) {
+html += '<table style="box-shadow:none"><thead><tr><th>用户名</th><th>申请时间</th><th>操作</th></tr></thead><tbody>' +
+pend.map(function (q) {
+return '<tr><td class="mono">' + esc(q.username) + '</td><td class="mono">' + esc(String(q.requestedAt).replace("T", " ").slice(0, 16)) +
+'</td><td><button class="act" data-approve="' + esc(q.id) + '">同意并生成码</button>' +
+'<button class="act danger" data-reject="' + esc(q.id) + '">拒绝</button></td></tr>';
+}).join("") + '</tbody></table>';
+}
+if (codes.length) {
+html += '<h2 style="margin-top:16px">有效重置码<span class="en">ACTIVE CODES</span></h2>' +
+'<table style="box-shadow:none"><thead><tr><th>用户名</th><th>重置码</th><th>过期时间</th><th></th></tr></thead><tbody>' +
+codes.map(function (c) {
+return '<tr><td class="mono">' + esc(c.username) + '</td><td class="mono"><b class="hot">' + esc(c.code) + '</b></td>' +
+'<td class="mono">' + esc(String(c.expiresAt).replace("T", " ").slice(0, 16)) + '</td>' +
+'<td><button class="act" data-copy="' + esc(c.code) + '" type="button">复制</button></td></tr>';
+}).join("") + '</tbody></table>';
+}
+box.innerHTML = html;
 }
 function renderSite(s) {
 if (!s) return;
@@ -426,6 +454,7 @@ if (!b) return;
 renderOverview(b.overview);
 renderUsers(b.users);
 renderInvites(b.invites);
+renderResets(b.resets);
 renderUpdate(b.update.overview, b.update.versions);
 renderSite(b.site);
 });
@@ -460,6 +489,22 @@ t.textContent = "已复制"; t.className = "copy-ok";
 });
 return;
 }
+var approveId = t.getAttribute("data-approve");
+var rejectId = t.getAttribute("data-reject");
+if (approveId || rejectId) {
+if (approveId) {
+if (!confirm("同意该同学的重置申请并生成一次性码（24 小时有效）？新密码将由同学自己设置。")) return;
+api("/admin/api/reset/approve", { id: approveId }).then(function (r) {
+if (!r || r.error) { alert((r && r.error) || "失败"); return; }
+alert("重置码：" + r.code + "（24 小时内有效）——请发给 " + r.username + "，ta 在登录页用它自设新密码。");
+load();
+});
+} else {
+if (!confirm("拒绝该申请？")) return;
+api("/admin/api/reset/reject", { id: rejectId }).then(load);
+}
+return;
+}
 var doWhat = t.getAttribute("data-do");
 var user = t.getAttribute("data-u");
 var updWhat = t.getAttribute("data-udo");
@@ -481,14 +526,6 @@ if (q === null) return;
 api("/admin/api/user/" + doWhat, { user: user, turns: Number(q) }).then(function (r) {
 if (r && r.error) { alert(r.error); return; }
 load();
-});
-return;
-}
-if (doWhat === "reset-pass") {
-var pw = prompt("给 " + user + " 设置新密码（至少 8 位）：");
-if (!pw) return;
-api("/admin/api/user/reset-pass", { user: user, password: pw }).then(function (r) {
-alert(r && r.ok ? "已重置" : (r && r.error) || "失败"); load();
 });
 return;
 }
@@ -691,11 +728,12 @@ export function createAdminUi({
   async function handleApi(req, res, pathname) {
     // 一次往返带回全部面板数据：跨公网链路 RTT 大，5 个串行请求是「卡」的主因
     if (req.method === "GET" && pathname === "/admin/api/bootstrap") {
-      const [overview, users, invites, site, updOverview, updVersions] = await Promise.all([
+      const [overview, users, invites, site, resets, updOverview, updVersions] = await Promise.all([
         ownOverview(),
         registry.listUsers(),
         registry.listInvites(),
         registry.getSiteSettings(),
+        registry.listResetRequests(),
         callUpdateApi("GET", "/admin/api/overview"),
         callUpdateApi("GET", "/admin/api/versions"),
       ]);
@@ -703,6 +741,7 @@ export function createAdminUi({
         overview,
         users: users.map((u) => ({ ...u, online: spawner.isRunning(u.id) })),
         invites,
+        resets,
         site: {
           deepseekKeySet: Boolean(site.deepseekKey),
           deepseekKeyMasked: site.deepseekKey
@@ -712,6 +751,29 @@ export function createAdminUi({
         },
         update: { overview: updOverview, versions: updVersions },
       });
+      return true;
+    }
+
+    // 密码重置审批：同意即生成一次性码——管理员只经手码，不知道新密码
+    if (req.method === "POST" && pathname === "/admin/api/reset/approve") {
+      const body = await readJsonBody(req);
+      try {
+        const result = await registry.approveResetRequest(String(body.id ?? ""));
+        console.log(`[gw-admin] 同意 ${result.username} 的重置申请，一次性码已生成（24h 有效）`);
+        sendJson(res, 200, { ok: true, ...result });
+      } catch (error) {
+        sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+      }
+      return true;
+    }
+    if (req.method === "POST" && pathname === "/admin/api/reset/reject") {
+      const body = await readJsonBody(req);
+      try {
+        await registry.rejectResetRequest(String(body.id ?? ""));
+        sendJson(res, 200, { ok: true });
+      } catch (error) {
+        sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+      }
       return true;
     }
     if (req.method === "GET" && pathname === "/admin/api/overview") {

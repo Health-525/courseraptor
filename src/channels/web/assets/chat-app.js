@@ -1067,6 +1067,11 @@ const HALL_ICONS = {
     '<path d="m4 17 6-6-6-6"/>' +
     '<path d="M12 19h8"/></svg>',
   settings: GEAR,
+  account:
+    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<circle cx="12" cy="8" r="4"/>'+
+    '<path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>'+
+    '</svg>',
 };
 /* GitHub 描线标：与宫格图标同一族的 1.8px 描线（24 viewBox），主页页脚用 */
 const GH_MARK =
@@ -1093,6 +1098,8 @@ const HALL_CARDS = [
   /* 提示词模板与设置并列（2026-09-23）：原设置里的「常用问题」栏目拆出来
      成独立面板——它是内容管理，不是凭证配置，混在设置里连保存语义都变了味 */
   { id: "prompts", t: "提示词模板", d: "输入框上方「提示词」的自定义清单", group: "系统" },
+  /* 我的账号：托管版专有（改本站登录密码），quota 探测成功后现身 */
+  { id: "account", t: "我的账号", d: "修改本站登录密码", group: "系统", hidden: true },
   { id: "settings", t: "设置", d: "教务账号、AI 模型、QQ 与本地数据", group: "系统" },
 ];
 const HALL_GROUPS = ["学习安排", "效率工具", "系统"];
@@ -2204,6 +2211,7 @@ function renderHall(force) {
   const dyn = document.getElementById("hallDyn");
   const staticSettings = document.getElementById("hallSettings");
   const staticPrompts = document.getElementById("hallPrompts");
+  const staticAccount = document.getElementById("hallAccount");
   /* 滚动管理：刷新保持位置（clamp 防内容变短），切面板/回主页复位顶部 */
   const keepScroll = !!force;
   const lastTop = hallBody.scrollTop;
@@ -2220,9 +2228,16 @@ function renderHall(force) {
   /* 设置与提示词模板都是常驻 DOM（字段/清单不重建），进入时只做状态复位与取数 */
   staticSettings.hidden = hallPanel !== "settings";
   staticPrompts.hidden = hallPanel !== "prompts";
+  staticAccount.hidden = hallPanel !== "account";
   if (hallPanel === "settings") {
     hallTitle.textContent = "设置";
     showSettings();
+    settle();
+    return;
+  }
+  if (hallPanel === "account") {
+    hallTitle.textContent = "我的账号";
+    document.getElementById("curPassMsg").textContent = "";
     settle();
     return;
   }
@@ -2548,8 +2563,13 @@ function refreshQuota() {
       var el = document.getElementById("curQuota");
       if (!el || !q) return;
       el.hidden = false;
-      var maBox = document.getElementById("myAccountBox");
-      if (maBox) maBox.hidden = false;
+      var accEl = document.getElementById("curAccount");
+      if (accEl && q.username) accEl.textContent = "当前登录账号：" + q.username;
+      var cardDef = HALL_CARDS.find(function (c) { return c.id === "account"; });
+      if (cardDef && cardDef.hidden) {
+        cardDef.hidden = false;
+        if (!hallPanel) renderHall();
+      }
       el.textContent = q.ownKeyActive
         ? "✓ 已使用自己的 DeepSeek Key · 不占站点免费额度"
         : "站点免费对话：今日已用 " + q.used + "/" + q.limit +
@@ -2583,6 +2603,8 @@ document.getElementById("saveMyPass").addEventListener("click", function () {
     })
     .catch(function () { msg.textContent = "网络错误，修改失败。"; });
 });
+
+refreshQuota();
 
 /* ── 设置：常驻在功能大厅抽屉里（见 #hallSettings），教务账号 / DeepSeek API Key
    等凭证仍走后端 /api/settings 同一套加密热生效 ── */

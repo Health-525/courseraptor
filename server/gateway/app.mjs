@@ -314,7 +314,33 @@ else { input.type = "password"; this.textContent = "显示"; }
 <button type="button" class="peek">显示</button></div>
 <button type="submit" class="primary">登 录</button>
 </form>
-<div class="alt">还没有账号？<a href="/register">凭邀请码注册</a></div>`,
+<div class="alt">还没有账号？<a href="/register">凭邀请码注册</a> · <a href="/forgot">忘记密码</a></div>`,
+      "",
+    );
+
+  const forgotPage = (error = "", notice = "") =>
+    layout(
+      "找回密码",
+      `${notice ? `<div class="notice" style="background:var(--accent-soft)">${escapeHtml(notice)}</div>` : ""}${errorNotice(error)}
+<h2>申请重置<span class="en">REQUEST</span></h2>
+<form method="post" action="/forgot">
+<label>用户名 USERNAME</label><input name="username" autocomplete="username" required placeholder="你的登录用户名">
+<button type="submit" class="primary">提交申请</button>
+</form>
+<p class="lead" style="margin:10px 2px 0">提交后请到班级群联系管理员；管理员同意后会给你一个一次性重置码。</p>
+<h2>用重置码设新密码<span class="en">RESET</span></h2>
+<form method="post" action="/reset-password">
+<label>用户名 USERNAME</label><input name="username" autocomplete="username" required>
+<label>重置码 CODE</label><input name="code" required autocomplete="one-time-code" placeholder="管理员发给你的一串码">
+<label>新密码 PASSWORD（至少 8 位）</label>
+<div class="pw"><input name="next" type="password" autocomplete="new-password" required placeholder="自己设一个，别告诉任何人">
+<button type="button" class="peek">显示</button></div>
+<label>确认新密码 CONFIRM</label>
+<div class="pw"><input name="next2" type="password" autocomplete="new-password" required>
+<button type="button" class="peek">显示</button></div>
+<button type="submit" class="primary">重置密码</button>
+</form>
+<div class="alt"><a href="/login">返回登录</a></div>`,
       "",
     );
 
@@ -469,7 +495,48 @@ else { input.type = "password"; this.textContent = "显示"; }
       }
 
       if (req.method === "GET" && pathname === "/login") {
-        sendHtml(res, 200, loginPage());
+        const resetDone = url.searchParams.get("reset") === "1";
+        sendHtml(res, 200, loginPage("", resetDone ? "密码已重置，请用新密码登录" : ""));
+        return;
+      }
+
+      // 找回密码：申请（免登录）与用一次性码自设新密码
+      if (req.method === "GET" && pathname === "/forgot") {
+        sendHtml(res, 200, forgotPage());
+        return;
+      }
+      if (req.method === "POST" && pathname === "/forgot") {
+        const form = await readForm(req);
+        const user = await registry.findUserByName(String(form.username ?? ""));
+        if (user && !user.disabled) {
+          await registry.createResetRequest(user.id, user.username);
+          console.log(`[gw] ${user.username} 提交了密码重置申请`);
+        }
+        // 无论用户名是否存在都回同一句话，避免探测已注册用户名
+        sendHtml(res, 200, forgotPage("", "申请已提交。请到班级群联系管理员，同意后会收到一个一次性重置码。"));
+        return;
+      }
+      if (req.method === "POST" && pathname === "/reset-password") {
+        const form = await readForm(req);
+        const username = String(form.username ?? "");
+        const next = String(form.next ?? "");
+        if (next !== String(form.next2 ?? "")) {
+          sendHtml(res, 400, forgotPage("两次输入的新密码不一致"));
+          return;
+        }
+        const userId = await registry.redeemResetCode(username, String(form.code ?? ""));
+        if (!userId) {
+          sendHtml(res, 401, forgotPage("重置码无效或已过期；请向管理员确认"));
+          return;
+        }
+        try {
+          await registry.setPassword(userId, next);
+        } catch (error) {
+          sendHtml(res, 400, forgotPage(error instanceof Error ? error.message : String(error)));
+          return;
+        }
+        console.log(`[gw] ${username} 已用重置码自设新密码`);
+        sendHtml(res, 303, "", { location: "/login?reset=1" });
         return;
       }
 
@@ -617,6 +684,7 @@ else { input.type = "password"; this.textContent = "显示"; }
           ? await ownDeepseekKeyActive(usersDir, user.id)
           : false;
         sendJson(res, 200, {
+          username: user.username,
           used,
           limit,
           remaining: Math.max(0, limit - used),

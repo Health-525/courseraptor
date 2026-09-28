@@ -591,7 +591,14 @@ test("学生端额度接口与自带 Key 豁免", async (t) => {
     remaining: number;
     ownKeyActive: boolean;
   };
-  assert.deepEqual(q1, { used: 3, limit: 3, remaining: 0, ownKeyActive: false, source: "site" });
+  assert.deepEqual(q1, {
+    username: "quotauser2",
+    used: 3,
+    limit: 3,
+    remaining: 0,
+    ownKeyActive: false,
+    source: "site",
+  });
   const blocked = await fetch(`${base}/api/chat`, {
     method: "POST",
     headers: { cookie },
@@ -681,4 +688,112 @@ test("同学自助修改登录密码", async (t) => {
     body: JSON.stringify({ current: "a", next: "b" }),
   });
   assert.equal(anon.status, 401);
+});
+
+test("忘记密码全链路：申请→管理员同意出码→同学自设新密码", async (t) => {
+  const backendPort = await startBackend(t);
+  const { base, registry } = await startGateway(t, {
+    backendPort,
+    adminPassword: "admin-master-pw",
+  });
+  const [invite] = await registry.createInvites({ count: 1 });
+  await fetch(`${base}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      invite: invite.code,
+      username: "forgotuser",
+      password: "password123",
+      password2: "password123",
+    }),
+    redirect: "manual",
+  });
+
+  // 1) 登录页有忘记密码入口；申请接口对存在/不存在的用户名回同样的话
+  const loginHtml = await (await fetch(`${base}/login`)).text();
+  assert.match(loginHtml, /忘记密码/);
+  const req1 = await fetch(`${base}/forgot`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ username: "forgotuser" }),
+  });
+  assert.match(await req1.text(), /申请已提交/);
+  const req2 = await fetch(`${base}/forgot`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ username: "who-no-exist" }),
+  });
+  assert.match(await req2.text(), /申请已提交/, "不存在的用户名也回同一句话");
+
+  // 2) 管理台看到待审申请；同意后拿到一次性码
+  const cookie = (await adminLogin(base, "admin-master-pw")).cookie;
+  const boot = (await (
+    await fetch(`${base}/admin/api/bootstrap`, { headers: { cookie } })
+  ).json()) as {
+    resets: { pending: Array<{ id: string; username: string }>; codes: unknown[] };
+  };
+  const pending = boot.resets.pending.find((r) => r.username === "forgotuser");
+  assert.ok(pending, "申请应出现在管理台");
+  const approve = (await (
+    await fetch(`${base}/admin/api/reset/approve`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ id: pending.id }),
+    })
+  ).json()) as { ok: boolean; code: string };
+  assert.ok(approve.ok && /^[0-9a-f]{8}$/.test(approve.code));
+
+  // 3) 错码 401；正确码改密成功并跳登录页；旧密码失效、新密码可登
+  const wrong = await fetch(`${base}/reset-password`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      username: "forgotuser",
+      code: "deadbeef",
+      next: "new-forgot-1",
+      next2: "new-forgot-1",
+    }),
+    redirect: "manual",
+  });
+  assert.equal(wrong.status, 401);
+  const ok = await fetch(`${base}/reset-password`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      username: "forgotuser",
+      code: approve.code,
+      next: "new-forgot-1",
+      next2: "new-forgot-1",
+    }),
+    redirect: "manual",
+  });
+  assert.equal(ok.status, 303);
+  assert.equal(ok.headers.get("location"), "/login?reset=1");
+  // 码是一次性的：再用应失败
+  const replay = await fetch(`${base}/reset-password`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      username: "forgotuser",
+      code: approve.code,
+      next: "another-pass-9",
+      next2: "another-pass-9",
+    }),
+    redirect: "manual",
+  });
+  assert.equal(replay.status, 401, "重置码用后即焚");
+  const oldLogin = await fetch(`${base}/login`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ username: "forgotuser", password: "password123" }),
+    redirect: "manual",
+  });
+  assert.equal(oldLogin.status, 401);
+  const newLogin = await fetch(`${base}/login`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ username: "forgotuser", password: "new-forgot-1" }),
+    redirect: "manual",
+  });
+  assert.equal(newLogin.status, 303);
 });
