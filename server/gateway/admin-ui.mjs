@@ -242,9 +242,6 @@ const dashboardHtml = () => `<!doctype html>
 <button type="button" class="nav-item" data-nav="users">
 <svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16 3.5a4 4 0 0 1 0 7"/><path d="M17 14c2.8.5 5 3 5 6.2"/></svg>
 同学账号</button>
-<button type="button" class="nav-item" data-nav="invites">
-<svg viewBox="0 0 24 24"><path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a3 3 0 0 0 0 6v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a3 3 0 0 0 0-6z"/><path d="M13 5v2M13 11v2M13 17v2"/></svg>
-邀请码</button>
 </div>
 <div class="nav-group">
 <div class="g-label">发 版 · RELEASES</div>
@@ -276,10 +273,8 @@ const dashboardHtml = () => `<!doctype html>
 <h2>同学账号<span class="en">USERS</span></h2>
 <table><thead><tr><th>用户名</th><th>状态</th><th>在线</th><th>注册于</th><th>今日轮数</th><th>操作</th></tr></thead>
 <tbody id="users"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table>
-</div>
 
-<div class="panel" id="pane-invites">
-<h2>邀请码<span class="en">INVITES</span></h2>
+<h2>邀请码<span class="en">INVITES</span><span class="act mono" style="font-size:11px">发给同学，凭码注册</span></h2>
 <div class="card">
 <div class="inv-row">
 <input class="num" id="invCount" type="number" min="1" max="50" value="5" title="数量">
