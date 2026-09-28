@@ -4,6 +4,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import vm from "node:vm";
 
 const { createGatewayServer } = await import("../server/gateway/app.mjs");
 const { createRegistry } = await import("../server/gateway/registry.mjs");
@@ -409,4 +410,15 @@ test("管理台·bootstrap：一次往返带回全部面板数据", async (t) =>
   assert.equal(boot.update.versions.data?.versions.length, 2);
   // 未登录不给
   assert.equal((await fetch(`${base}/admin/api/bootstrap`)).status, 401);
+});
+
+test("管理台页面：内嵌脚本必须是合法 JavaScript（防编辑事故回归）", async (t) => {
+  const backendPort = await startBackend(t);
+  const { base } = await startGateway(t, { backendPort, adminPassword: "admin-master-pw" });
+  const cookie = (await adminLogin(base, "admin-master-pw")).cookie;
+  const html = await (await fetch(`${base}/admin`, { headers: { cookie } })).text();
+  const match = /<script>([\s\S]*)<\/script>/.exec(html);
+  assert.ok(match, "仪表盘应包含内嵌脚本");
+  // 只编译不执行：语法错误（如括号不闭合）在这里抛出
+  new vm.Script(match[1]);
 });
