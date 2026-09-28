@@ -35,5 +35,7 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
+        # X-Real-IP 同时用于 /admin 管理面板与 /publish 的失败锁定按来源计数，请勿删除。
+        # 管理面板由同一 Node 服务托管在 /admin，无需单独的 location。
     }
 }

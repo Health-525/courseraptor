@@ -1,13 +1,42 @@
 import { createHash } from "node:crypto";
 import http from "node:http";
-import { createReadStream, existsSync, mkdirSync } from "node:fs";
+import {
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  statSync,
+  unlinkSync,
+} from "node:fs";
 import { readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const MAX_PACKAGE_BODY = 200 * 1024 * 1024;
+const MAX_ADMIN_BODY = 64 * 1024;
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+const DEFAULT_ADMIN_DIST_DIR = path.join(ROOT, "admin", "dist");
+const ZIP_RE = /^courseraptor-v(\d+\.\d+\.\d+)\.zip$/;
+const FAILURES_TO_LOCK = 5;
+const LOCK_DURATION_MS = 15 * 60 * 1000;
+const FAILURE_IDLE_MS = 30 * 60 * 1000;
+
+const MIME_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".map": "application/json",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".ico": "image/x-icon",
+  ".txt": "text/plain; charset=utf-8",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+};
 
 function hashToken(token) {
   return createHash("sha256").update(String(token)).digest();
@@ -49,6 +78,11 @@ async function writeAtomic(file, content) {
   await rename(temp, file);
 }
 
+function semverRank(version) {
+  const [major, minor, patch] = version.split(".").map(Number);
+  return major * 1_000_000 + minor * 1_000 + patch;
+}
+
 function requireAdmin(req, res, adminToken) {
   const token = req.headers["x-admin-token"];
   if (typeof token !== "string" || !tokenOk(token, adminToken)) {
@@ -70,15 +104,72 @@ ${meta ? `<p class="ver">当前版本：v${meta.version} · 发布于 ${meta.pub
 <p>启动后会自动检查新版本；对话中输入 <code>/update</code> 可下载并安装更新。</p>
 </body></html>`;
 
-/** 创建可测试、可嵌入的更新 HTTP 服务。 */
+const adminHintHtml = () => `<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CourseRaptor Admin</title><style>
+body{font-family:system-ui,sans-serif;max-width:640px;margin:64px auto;padding:0 16px;line-height:1.8;color:#222}
+code{background:#f2f2f2;padding:1px 6px;border-radius:4px}
+ol{padding-left:24px}
+</style></head><body><h1>🦖 CourseRaptor Admin</h1>
+<p>管理面板前端尚未构建，服务端已就绪。</p>
+<ol><li>在项目根目录执行 <code>npm run admin:build</code>（首次需先 <code>npm --prefix server/admin install</code>）。</li>
+<li>刷新本页即可进入登录界面，密钥为服务器环境变量 <code>UPDATE_ADMIN_TOKEN</code>。</li></ol>
+</body></html>`;
+
+/** 创建可测试、可嵌入的更新 HTTP 服务（含 /admin 管理面板与 admin API）。 */
 export function createUpdateServer({
   dataDir = path.join(ROOT, "..", "update-data"),
   adminToken,
+  adminDistDir = DEFAULT_ADMIN_DIST_DIR,
 } = {}) {
   if (!adminToken) throw new Error("缺少 UPDATE_ADMIN_TOKEN");
   mkdirSync(dataDir, { recursive: true });
+  const distRoot = path.resolve(adminDistDir);
   const metaFile = path.join(dataDir, "meta.json");
+  const versionsFile = path.join(dataDir, "versions.json");
   const zipPath = (version) => path.join(dataDir, `courseraptor-v${version}.zip`);
+
+  // 连续鉴权失败锁定：按客户端 IP 计数，5 次失败锁 15 分钟，成功后清零。
+  const failedLogins = new Map();
+
+  function clientKey(req) {
+    const remote = req.socket.remoteAddress || "unknown";
+    const loopback = remote === "127.0.0.1" || remote === "::1" || remote === "::ffff:127.0.0.1";
+    const realIp = req.headers["x-real-ip"];
+    // Node 服务只监听回环地址；经 nginx 反代时 X-Real-IP 由我们自己的 nginx 设置，可信。
+    return loopback && typeof realIp === "string" && realIp ? realIp : remote;
+  }
+
+  /** 校验管理员令牌并执行防爆破锁定；失败时响应已写出，返回 false。 */
+  function checkAdmin(req, res) {
+    const key = clientKey(req);
+    const now = Date.now();
+    if (failedLogins.size > 500) {
+      for (const [k, v] of failedLogins) {
+        if (now - v.lastAt > FAILURE_IDLE_MS) failedLogins.delete(k);
+      }
+    }
+    const record = failedLogins.get(key);
+    if (record?.lockedUntil && record.lockedUntil > now) {
+      const waitSec = Math.ceil((record.lockedUntil - now) / 1000);
+      sendJson(res, 429, { error: `连续失败次数过多，请 ${waitSec} 秒后再试` });
+      return false;
+    }
+    const token = req.headers["x-admin-token"];
+    if (typeof token === "string" && tokenOk(token, adminToken)) {
+      failedLogins.delete(key);
+      return true;
+    }
+    const count = (record?.count ?? 0) + 1;
+    const lockedUntil = count >= FAILURES_TO_LOCK ? now + LOCK_DURATION_MS : 0;
+    failedLogins.set(key, { count, lockedUntil, lastAt: now });
+    if (lockedUntil) {
+      sendJson(res, 429, { error: "连续失败次数过多，已锁定 15 分钟" });
+    } else {
+      sendJson(res, 401, { error: "管理员密钥无效" });
+    }
+    return false;
+  }
 
   async function readMeta() {
     try {
@@ -88,11 +179,195 @@ export function createUpdateServer({
     }
   }
 
+  async function readVersions() {
+    try {
+      const parsed = JSON.parse(await readFile(versionsFile, "utf8"));
+      if (Array.isArray(parsed?.versions)) {
+        return parsed.versions.filter((v) => v && typeof v.version === "string");
+      }
+    } catch {
+      // 首次使用或历史文件损坏：当作空历史，下写一次写入时重建
+    }
+    return [];
+  }
+
+  const writeVersions = (versions) =>
+    writeAtomic(versionsFile, JSON.stringify({ versions }, null, 2));
+
+  async function upsertVersion(entry) {
+    const versions = await readVersions();
+    const index = versions.findIndex((v) => v.version === entry.version);
+    if (index >= 0) versions[index] = { ...versions[index], ...entry };
+    else versions.push(entry);
+    await writeVersions(versions);
+  }
+
+  /** 合并 versions.json 索引与磁盘上的 zip（手动放置的包也能列出），按版本倒序。 */
+  async function listVersions() {
+    const byVersion = new Map((await readVersions()).map((v) => [v.version, { ...v }]));
+    try {
+      for (const name of readdirSync(dataDir)) {
+        const match = ZIP_RE.exec(name);
+        if (!match) continue;
+        const version = match[1];
+        let info;
+        try {
+          info = statSync(path.join(dataDir, name));
+        } catch {
+          continue;
+        }
+        const existing = byVersion.get(version);
+        if (existing) {
+          existing.sizeBytes = info.size;
+        } else {
+          byVersion.set(version, {
+            version,
+            notes: "",
+            publishedAt: info.mtime.toISOString(),
+            sizeBytes: info.size,
+          });
+        }
+      }
+    } catch {
+      // dataDir 读取失败时退回纯索引视图
+    }
+    const meta = await readMeta();
+    return [...byVersion.values()]
+      .map((v) => ({ ...v, sizeBytes: v.sizeBytes ?? 0, isCurrent: v.version === meta?.version }))
+      .sort((a, b) => semverRank(b.version) - semverRank(a.version));
+  }
+
+  async function rollbackTo(res, version, notes) {
+    if (!existsSync(zipPath(version))) {
+      return sendJson(res, 404, { error: `v${version} 的安装包不存在，无法回滚` });
+    }
+    const entry = (await readVersions()).find((v) => v.version === version);
+    const finalNotes =
+      typeof notes === "string" && notes.trim()
+        ? notes.trim().slice(0, 2000)
+        : typeof entry?.notes === "string"
+          ? entry.notes
+          : "";
+    const meta = { version, notes: finalNotes, publishedAt: new Date().toISOString() };
+    await writeAtomic(metaFile, JSON.stringify(meta, null, 2));
+    await upsertVersion({
+      version,
+      notes: finalNotes,
+      publishedAt: meta.publishedAt,
+      rolledBackAt: meta.publishedAt,
+    });
+    return sendJson(res, 200, { ok: true, ...meta });
+  }
+
+  async function deleteVersion(res, version) {
+    const meta = await readMeta();
+    if (meta?.version === version) {
+      return sendJson(res, 400, { error: "不能删除当前分发中的版本，请先发布或回滚到其他版本" });
+    }
+    const history = await readVersions();
+    let removed = false;
+    if (existsSync(zipPath(version))) {
+      unlinkSync(zipPath(version));
+      removed = true;
+    }
+    const remaining = history.filter((v) => v.version !== version);
+    if (remaining.length !== history.length) {
+      await writeVersions(remaining);
+      removed = true;
+    }
+    if (!removed) return sendJson(res, 404, { error: `v${version} 不存在` });
+    return sendJson(res, 200, { ok: true, version });
+  }
+
+  function serveAdminFile(res, relative) {
+    let decoded;
+    try {
+      decoded = decodeURIComponent(relative);
+    } catch {
+      return sendJson(res, 400, { error: "路径编码不正确" });
+    }
+    const target = path.resolve(distRoot, decoded);
+    if (target !== distRoot && !target.startsWith(distRoot + path.sep)) {
+      return sendJson(res, 403, { error: "路径不合法" });
+    }
+    let info;
+    try {
+      info = statSync(target);
+    } catch {
+      return sendJson(res, 404, { error: "not found" });
+    }
+    if (!info.isFile()) return sendJson(res, 404, { error: "not found" });
+    const ext = path.extname(target).toLowerCase();
+    const isIndex = target === path.join(distRoot, "index.html");
+    res.writeHead(200, {
+      "content-type": MIME_TYPES[ext] ?? "application/octet-stream",
+      "content-length": info.size,
+      "cache-control": isIndex ? "no-cache" : "public, max-age=31536000, immutable",
+    });
+    return createReadStream(target).pipe(res);
+  }
+
   return http.createServer(async (req, res) => {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
+    const pathname = url.pathname;
     try {
-      if (req.method === "POST" && url.pathname === "/publish") {
-        if (!requireAdmin(req, res, adminToken)) return;
+      // ── admin 面板静态资源（SPA 壳本身不带密钥，数据全部走鉴权 API）──
+      if (req.method === "GET" && pathname === "/admin") {
+        res.writeHead(308, { location: "/admin/" });
+        return res.end();
+      }
+      if (req.method === "GET" && (pathname === "/admin/" || pathname === "/admin/index.html")) {
+        if (!existsSync(path.join(distRoot, "index.html"))) {
+          res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+          return res.end(adminHintHtml());
+        }
+        return serveAdminFile(res, "index.html");
+      }
+
+      // ── admin API（与 /publish 共用令牌与防爆破锁定）──
+      if (req.method === "GET" && pathname === "/admin/api/overview") {
+        if (!checkAdmin(req, res)) return;
+        const versions = await listVersions();
+        const meta = await readMeta();
+        return sendJson(res, 200, {
+          current: meta
+            ? { version: meta.version, notes: meta.notes ?? "", publishedAt: meta.publishedAt }
+            : null,
+          stats: {
+            versionCount: versions.length,
+            diskBytes: versions.reduce((sum, v) => sum + (v.sizeBytes || 0), 0),
+            nodeVersion: process.version,
+            uptimeSec: Math.round(process.uptime()),
+            dataDir,
+          },
+        });
+      }
+
+      if (req.method === "GET" && pathname === "/admin/api/versions") {
+        if (!checkAdmin(req, res)) return;
+        return sendJson(res, 200, { versions: await listVersions() });
+      }
+
+      if (
+        req.method === "POST" &&
+        (pathname === "/admin/api/rollback" || pathname === "/admin/api/delete")
+      ) {
+        if (!checkAdmin(req, res)) return;
+        let body;
+        try {
+          body = JSON.parse((await readBody(req, MAX_ADMIN_BODY)).toString("utf8") || "{}");
+        } catch {
+          return sendJson(res, 400, { error: "请求体必须是 JSON" });
+        }
+        const version = String(body?.version ?? "");
+        if (!SEMVER_RE.test(version)) return sendJson(res, 400, { error: "version 必须是 x.y.z" });
+        if (pathname === "/admin/api/rollback") return await rollbackTo(res, version, body?.notes);
+        return await deleteVersion(res, version);
+      }
+
+      // ── 发布（原有命令行链路与面板上传共用）──
+      if (req.method === "POST" && pathname === "/publish") {
+        if (!checkAdmin(req, res)) return;
         const version = String(req.headers["x-version"] ?? "");
         if (!SEMVER_RE.test(version)) return sendJson(res, 400, { error: "x-version 必须是 x.y.z" });
         let notes = "";
@@ -107,16 +382,18 @@ export function createUpdateServer({
         await writeAtomic(zipPath(version), body);
         const meta = { version, notes, publishedAt: new Date().toISOString() };
         await writeAtomic(metaFile, JSON.stringify(meta, null, 2));
+        await upsertVersion({ version, notes, publishedAt: meta.publishedAt });
         return sendJson(res, 200, { ok: true, ...meta });
       }
 
-      if (req.method === "GET" && url.pathname === "/latest") {
+      // ── 学生端 ──
+      if (req.method === "GET" && pathname === "/latest") {
         const meta = await readMeta();
         if (!meta) return sendJson(res, 404, { error: "还没有发布过版本" });
         return sendJson(res, 200, { ...meta, download: "/download" });
       }
 
-      if (req.method === "GET" && url.pathname === "/download") {
+      if (req.method === "GET" && pathname === "/download") {
         const meta = await readMeta();
         if (!meta || !existsSync(zipPath(meta.version))) return sendJson(res, 404, { error: "还没有发布过版本" });
         const size = (await stat(zipPath(meta.version))).size;
@@ -128,9 +405,34 @@ export function createUpdateServer({
         return createReadStream(zipPath(meta.version)).pipe(res);
       }
 
-      if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/index.html")) {
+      if (req.method === "GET" && (pathname === "/" || pathname === "/index.html")) {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         return res.end(landingHtml(await readMeta()));
+      }
+
+      // ── admin 静态资源兜底（/admin/assets/* 与 SPA 前端路由刷新）──
+      if (req.method === "GET" && pathname.startsWith("/admin/")) {
+        const relative = pathname.slice("/admin/".length);
+        if (!relative.startsWith("api/")) {
+          // SPA（TanStack Router history 模式）：dist 内不存在的路径回 index.html；
+          // 解码后越出 dist 的路径不走回退，交给 serveAdminFile 返回 403。
+          let decoded = relative;
+          try {
+            decoded = decodeURIComponent(relative);
+          } catch {
+            // 编码错误按原样处理
+          }
+          const target = path.resolve(distRoot, decoded);
+          const insideDist = target === distRoot || target.startsWith(distRoot + path.sep);
+          if (
+            insideDist &&
+            !existsSync(target) &&
+            existsSync(path.join(distRoot, "index.html"))
+          ) {
+            return serveAdminFile(res, "index.html");
+          }
+        }
+        return serveAdminFile(res, relative);
       }
 
       return sendJson(res, 404, { error: "not found" });

@@ -48,6 +48,26 @@ test("安装包过滤在真实目录复制时不带出会话、文件、凭证�
   for (const file of publicFiles) assert.equal(existsSync(path.join(target, file)), true, file);
 });
 
+test("admin 面板工程不进学生端安装包，更新后台本体照常分发", () => {
+  for (const file of [
+    "server/admin",
+    "server/admin/package.json",
+    "server/admin/src/App.tsx",
+    "server/admin/node_modules/react/index.js",
+    "server/admin/dist/index.html",
+  ]) {
+    assert.equal(shouldPackagePath(file), false, file);
+  }
+  for (const file of [
+    "server",
+    "server/app.mjs",
+    "server/update-server.mjs",
+    "server/nginx.conf.example",
+  ]) {
+    assert.equal(shouldPackagePath(file), true, file);
+  }
+});
+
 test("更新保护全部本地数据，同时允许应用源码更新", () => {
   for (const file of [
     "data",
