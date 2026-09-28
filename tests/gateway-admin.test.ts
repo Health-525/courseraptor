@@ -46,7 +46,12 @@ function fakeSpawner(port: number) {
 
 async function startGateway(
   t: { after: (fn: () => void) => void },
-  options: { backendPort: number; adminPassword?: string },
+  options: {
+    backendPort: number;
+    adminPassword?: string;
+    updateServerUrl?: string;
+    updateAdminToken?: string;
+  },
 ) {
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-admin-"));
   const registry = createRegistry({ stateDir });
@@ -57,6 +62,8 @@ async function startGateway(
     secret: "unit-test-secret-0123456789",
     adminPassword: options.adminPassword,
     maxConcurrent: 4,
+    updateServerUrl: options.updateServerUrl,
+    updateAdminToken: options.updateAdminToken,
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => server.close());
@@ -229,4 +236,141 @@ test("管理台：登录失败五次锁定", async (t) => {
   }
   const locked = await adminLogin(base, "admin-master-pw");
   assert.equal(locked.status, 429);
+});
+
+/** 假更新后台：校验 x-admin-token，提供 overview/versions/rollback/delete */
+async function startFakeUpdateServer(t: { after: (fn: () => void) => void }, token: string) {
+  const seen: string[] = [];
+  const rolledBack: string[] = [];
+  const server = http.createServer((req, res) => {
+    seen.push(`${req.method} ${req.url} token=${req.headers["x-admin-token"]}`);
+    if (req.headers["x-admin-token"] !== token) {
+      res.writeHead(401, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "管理员密钥无效" }));
+      return;
+    }
+    if (req.method === "GET" && req.url === "/admin/api/overview") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          current: { version: "0.3.0", notes: "测试版", publishedAt: "2026-09-28T00:00:00Z" },
+          stats: {},
+        }),
+      );
+      return;
+    }
+    if (req.method === "GET" && req.url === "/admin/api/versions") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          versions: [
+            {
+              version: "0.3.0",
+              notes: "测试版",
+              publishedAt: "2026-09-28T00:00:00Z",
+              sizeBytes: 1048576,
+              isCurrent: true,
+            },
+            {
+              version: "0.2.0",
+              notes: "旧版",
+              publishedAt: "2026-09-01T00:00:00Z",
+              sizeBytes: 2097152,
+              isCurrent: false,
+            },
+          ],
+        }),
+      );
+      return;
+    }
+    if (
+      req.method === "POST" &&
+      (req.url === "/admin/api/rollback" || req.url === "/admin/api/delete")
+    ) {
+      const chunks: Buffer[] = [];
+      req.on("data", (c) => chunks.push(c));
+      req.on("end", () => {
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+        if (req.url === "/admin/api/rollback") rolledBack.push(String(body.version));
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      });
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  return { url: `http://127.0.0.1:${address.port}`, seen, rolledBack };
+}
+
+test("管理台·版本发布：代理到更新后台（带鉴权），回滚动作透传", async (t) => {
+  const backendPort = await startBackend(t);
+  const update = await startFakeUpdateServer(t, "update-token-123");
+  const { base } = await startGateway(t, {
+    backendPort,
+    adminPassword: "admin-master-pw",
+    updateServerUrl: update.url,
+    updateAdminToken: "update-token-123",
+  });
+  const cookie = (await adminLogin(base, "admin-master-pw")).cookie;
+
+  const overview = (await (
+    await fetch(`${base}/admin/api/update/overview`, { headers: { cookie } })
+  ).json()) as {
+    data?: { current?: { version: string } };
+  };
+  assert.equal(overview.data?.current?.version, "0.3.0");
+  assert.ok(
+    update.seen.some((s) => s.includes("GET /admin/api/overview token=update-token-123")),
+    "令牌应原样转发",
+  );
+
+  const versions = (await (
+    await fetch(`${base}/admin/api/update/versions`, { headers: { cookie } })
+  ).json()) as {
+    data?: { versions: Array<{ version: string; isCurrent: boolean }> };
+  };
+  assert.equal(versions.data?.versions.length, 2);
+  assert.equal(versions.data?.versions[0].isCurrent, true);
+
+  const rollback = await fetch(`${base}/admin/api/update/rollback`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ version: "0.2.0" }),
+  });
+  assert.equal(rollback.status, 200);
+  assert.deepEqual(update.rolledBack, ["0.2.0"]);
+});
+
+test("管理台·版本发布：令牌不符时返回可读错误，未配置时返回未接入", async (t) => {
+  const backendPort = await startBackend(t);
+  const update = await startFakeUpdateServer(t, "real-token");
+
+  // 令牌不对：更新后台 401 → 网关转成可读错误
+  const wrong = await startGateway(t, {
+    backendPort,
+    adminPassword: "admin-master-pw",
+    updateServerUrl: update.url,
+    updateAdminToken: "wrong-token",
+  });
+  const wrongCookie = (await adminLogin(wrong.base, "admin-master-pw")).cookie;
+  const wrongResult = (await (
+    await fetch(`${wrong.base}/admin/api/update/overview`, { headers: { cookie: wrongCookie } })
+  ).json()) as { error?: string };
+  assert.match(wrongResult.error ?? "", /令牌/);
+
+  // 完全未配置：unavailable 标记，前端显示「未接入」提示
+  const off = await startGateway(t, { backendPort, adminPassword: "admin-master-pw" });
+  const offCookie = (await adminLogin(off.base, "admin-master-pw")).cookie;
+  const offResult = (await (
+    await fetch(`${off.base}/admin/api/update/overview`, { headers: { cookie: offCookie } })
+  ).json()) as { unavailable?: boolean };
+  assert.equal(offResult.unavailable, true);
+
+  // 未登录依然 401
+  assert.equal((await fetch(`${off.base}/admin/api/update/overview`)).status, 401);
 });

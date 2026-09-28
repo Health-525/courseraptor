@@ -52,6 +52,8 @@ const server = createGatewayServer({
   projectRoot: ROOT,
   adminPassword: env.GATEWAY_ADMIN_PASSWORD || "",
   maxConcurrent: Number(env.GATEWAY_MAX_CONCURRENT) || 4,
+  updateServerUrl: env.GATEWAY_UPDATE_URL || "",
+  updateAdminToken: env.GATEWAY_UPDATE_TOKEN || "",
 });
 
 server.listen(port, host, () => {
