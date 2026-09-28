@@ -322,17 +322,6 @@ return r.json();
 }
 function esc(s) { var d = document.createElement("div"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
 function fmtDate(iso) { return String(iso || "").slice(0, 10); }
-(function () {
-"use strict";
-function api(path, body) {
-var opts = body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {};
-return fetch(path, opts).then(function (r) {
-if (r.status === 401) { location.href = "/admin"; return null; }
-return r.json();
-});
-}
-function esc(s) { var d = document.createElement("div"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
-function fmtDate(iso) { return String(iso || "").slice(0, 10); }
 function renderOverview(o) {
 if (!o) return;
 document.getElementById("stats").innerHTML =
