@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import http from "node:http";
 import fs from "node:fs";
+import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -112,13 +112,19 @@ test("管理台：密码登录→会话→总览/用户/邀请码/动作全链�
 
   const overview = await fetch(`${base}/admin/api/overview`, { headers: { cookie } });
   assert.equal(overview.status, 200);
-  const data = (await overview.json()) as { users: number; invitesLeft: number; turnsToday: number };
+  const data = (await overview.json()) as {
+    users: number;
+    invitesLeft: number;
+    turnsToday: number;
+  };
   assert.equal(data.users, 1);
   assert.equal(data.invitesLeft, 1);
   assert.equal(data.turnsToday, 7);
 
   // 用户列表带在线标记（未访问过 → 不在线）
-  const users = (await (await fetch(`${base}/admin/api/users`, { headers: { cookie } })).json()) as Array<{
+  const users = (await (
+    await fetch(`${base}/admin/api/users`, { headers: { cookie } })
+  ).json()) as Array<{
     username: string;
     online: boolean;
   }>;
@@ -132,7 +138,9 @@ test("管理台：密码登录→会话→总览/用户/邀请码/动作全链�
     body: JSON.stringify({ count: 2, note: "网页生成" }),
   });
   assert.equal(created.status, 200);
-  const invites = (await (await fetch(`${base}/admin/api/invites`, { headers: { cookie } })).json()) as Array<{
+  const invites = (await (
+    await fetch(`${base}/admin/api/invites`, { headers: { cookie } })
+  ).json()) as Array<{
     note: string;
   }>;
   assert.equal(invites.filter((i) => i.note === "网页生成").length, 2);

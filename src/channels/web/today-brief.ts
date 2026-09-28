@@ -489,9 +489,13 @@ export function buildTodayBrief(now: Date = new Date(), requestedWeek?: number):
     1,
     ...schedule.courses.flatMap((course) => terms.expandWeeks(course.weeks)),
   );
+  const requested =
+    typeof requestedWeek === "number" && Number.isInteger(requestedWeek)
+      ? requestedWeek
+      : undefined;
   const selectedWeek =
-    Number.isInteger(requestedWeek) && requestedWeek! >= 1 && requestedWeek! <= maxWeek
-      ? requestedWeek!
+    requested !== undefined && requested >= 1 && requested <= maxWeek
+      ? requested
       : currentWeek?.week;
   const week = selectedWeek && currentWeek ? { ...currentWeek, week: selectedWeek } : null;
   // 假期里 currentWeekOf 返回 null，但周次换算还得有基准（找下一节课要用）
