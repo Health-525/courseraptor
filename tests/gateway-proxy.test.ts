@@ -163,7 +163,7 @@ test("网关：每日轮数限额生效", async (t) => {
     body: "{}",
   });
   assert.equal(second.status, 429);
-  assert.match(String((await second.json()).error), /额度已用完/);
+  assert.match(String((await second.json()).error), /已用完/);
 });
 
 test("网关：登录失败五次锁定，锁定期内正确密码也被拒", async (t) => {

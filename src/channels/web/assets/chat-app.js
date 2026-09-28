@@ -2539,6 +2539,23 @@ async function doNewSession() {
 document.getElementById("newSession").addEventListener("click", doNewSession);
 document.getElementById("newSessionM").addEventListener("click", doNewSession);
 
+/* 站点托管版的免费额度展示：/api/quota 由多用户网关提供；本地版与演示页
+   没有该接口，静默隐藏即可，不影响任何本地行为 */
+function refreshQuota() {
+  fetch("/api/quota")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (q) {
+      var el = document.getElementById("curQuota");
+      if (!el || !q) return;
+      el.hidden = false;
+      el.textContent = q.ownKeyActive
+        ? "✓ 已使用自己的 DeepSeek Key · 不占站点免费额度"
+        : "站点免费对话：今日已用 " + q.used + "/" + q.limit +
+          "，剩余 " + q.remaining + " 次；填自己的 Key 后不占站点额度";
+    })
+    .catch(function () {});
+}
+
 /* ── 设置：常驻在功能大厅抽屉里（见 #hallSettings），教务账号 / DeepSeek API Key
    等凭证仍走后端 /api/settings 同一套加密热生效 ── */
 const sUser = document.getElementById("sUser");
@@ -3085,6 +3102,7 @@ function showSettings() {
           " · " +
           d.model
         : "尚未配置 API Key · 当前模型 " + d.model;
+      refreshQuota();
       sKey.placeholder = "sk-…；留空不修改";
       qqApplyStatus(d.qq);
       fillModels(d.models, d.model, "");
@@ -3252,6 +3270,7 @@ document.getElementById("saveSettings").addEventListener("click", () => {
             " · " +
             d.status.model
           : "尚未配置 API Key · 当前模型 " + d.status.model;
+        refreshQuota();
         sQQAppId.value = "";
         sQQSecret.value = "";
         sQQPass.value = "";

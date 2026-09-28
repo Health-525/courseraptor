@@ -1106,6 +1106,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             <p class="dlg-intro">模型服务使用 DeepSeek API。API Key 与所选型号仅加密保存在当前电脑，留空即保持不变。</p>
             <label class="fld"><span>API Key</span><span class="fld-row"><input id="sKey" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyeKey" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
             <div class="cur" id="curKey"></div>
+            <div class="cur" id="curQuota" hidden></div>
             <div class="model-cards" id="modelCards" role="radiogroup" aria-label="选择 AI 模型"></div>
             <input type="hidden" id="sModel" value="">
             <div class="cur" id="curModel"></div>

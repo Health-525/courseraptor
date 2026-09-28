@@ -515,3 +515,103 @@ test("按人限额与站点 Key 管理", async (t) => {
   );
   assert.equal(site.defaultDailyTurns, 100);
 });
+
+/** 用与 src/core/credentials.ts 相同的派生方式造一个加密凭证文件 */
+async function craftCredentials(usersDir: string, userId: string, override: boolean) {
+  const { scryptSync, createCipheriv, randomBytes } = await import("node:crypto");
+  const os = await import("node:os");
+  const pathMod = await import("node:path");
+  const fsMod = await import("node:fs");
+  const salt = randomBytes(16);
+  const key = scryptSync(`${os.hostname()}|${os.userInfo().username}|courseraptor-v1`, salt, 32);
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const payload = Buffer.concat([
+    cipher.update(
+      JSON.stringify({
+        deepseekApiKey: override ? "sk-own-key-1234567890" : "",
+        deepseekApiKeyOverride: override,
+      }),
+    ),
+    cipher.final(),
+  ]);
+  const dir = pathMod.join(usersDir, userId);
+  fsMod.mkdirSync(dir, { recursive: true });
+  fsMod.writeFileSync(
+    pathMod.join(dir, "credentials.enc"),
+    JSON.stringify({
+      v: 1,
+      salt: salt.toString("base64"),
+      iv: iv.toString("base64"),
+      tag: cipher.getAuthTag().toString("base64"),
+      data: payload.toString("base64"),
+    }),
+  );
+}
+
+test("学生端额度接口与自带 Key 豁免", async (t) => {
+  const backendPort = await startBackend(t);
+  const usersDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-quota-"));
+  t.after(() => fs.rmSync(usersDir, { recursive: true, force: true }));
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-quota-st-"));
+  const registry = createRegistry({ stateDir });
+  const server = createGatewayServer({
+    registry,
+    spawner: fakeSpawner(backendPort),
+    secret: "unit-test-secret-0123456789",
+    dailyTurns: 3,
+    usersDir,
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const base = `http://127.0.0.1:${address.port}`;
+
+  const [invite] = await registry.createInvites({ count: 1 });
+  const reg = await fetch(`${base}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      invite: invite.code,
+      username: "quotauser2",
+      password: "password123",
+      password2: "password123",
+    }),
+    redirect: "manual",
+  });
+  const cookie = reg.headers.get("set-cookie") ?? "";
+  const user = await registry.findUserByName("quotauser2");
+  await registry.addTurns(user!.id, 3);
+
+  // 未自带 Key：额度 0 剩余、对话被拒
+  const q1 = (await (await fetch(`${base}/api/quota`, { headers: { cookie } })).json()) as {
+    used: number;
+    limit: number;
+    remaining: number;
+    ownKeyActive: boolean;
+  };
+  assert.deepEqual(q1, { used: 3, limit: 3, remaining: 0, ownKeyActive: false, source: "site" });
+  const blocked = await fetch(`${base}/api/chat`, {
+    method: "POST",
+    headers: { cookie },
+    body: "{}",
+  });
+  assert.equal(blocked.status, 429);
+
+  // 造一个自带 Key 的凭证文件：额度接口翻转为不占额度，对话放行
+  await craftCredentials(usersDir, user!.id, true);
+  const q2 = (await (await fetch(`${base}/api/quota`, { headers: { cookie } })).json()) as {
+    ownKeyActive: boolean;
+  };
+  assert.equal(q2.ownKeyActive, true);
+  const pass = await fetch(`${base}/api/chat`, { method: "POST", headers: { cookie }, body: "{}" });
+  assert.equal(pass.status, 200);
+
+  // override=false 的文件（只存了别的字段）：不豁免
+  await craftCredentials(usersDir, user!.id, false);
+  const q3 = (await (await fetch(`${base}/api/quota`, { headers: { cookie } })).json()) as {
+    ownKeyActive: boolean;
+  };
+  assert.equal(q3.ownKeyActive, false);
+});

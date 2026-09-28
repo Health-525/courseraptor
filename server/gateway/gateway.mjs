@@ -56,6 +56,7 @@ const server = createGatewayServer({
   maxConcurrent: Number(env.GATEWAY_MAX_CONCURRENT) || 4,
   updateServerUrl: env.GATEWAY_UPDATE_URL || "",
   updateAdminToken: env.GATEWAY_UPDATE_TOKEN || "",
+  usersDir,
 });
 
 // 连接保活拉长到 72s：跨公网 RTT 大、且前端有分钟级轮询，

@@ -10,4 +10,5 @@ export function createGatewayServer(options: {
   maxConcurrent?: number;
   updateServerUrl?: string;
   updateAdminToken?: string;
+  usersDir?: string;
 }): Server;
