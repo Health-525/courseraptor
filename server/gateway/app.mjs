@@ -13,8 +13,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
-import { createAdminUi } from "./admin-ui.mjs";
-import { ownDeepseekKeyActive } from "./credentials-peek.mjs";
+import { createAdminUi } from "./admin/ui.mjs";
+import { ownDeepseekKeyActive } from "./admin/credentials-peek.mjs";
 
 const COOKIE_NAME = "raptor_sess";
 const SESSION_TTL_MS = 7 * 24 * 3600_000;

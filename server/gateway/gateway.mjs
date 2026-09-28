@@ -70,7 +70,7 @@ server.listen(port, host, () => {
   console.log(`   并发上限 ${env.GATEWAY_MAX_CONCURRENT || 4} · 空闲回收 ${env.GATEWAY_IDLE_MINUTES || 30} 分钟 · 每日每人 ${env.GATEWAY_DAILY_TURNS || 100} 轮`);
   console.log(env.GATEWAY_ADMIN_PASSWORD
     ? "   网页管理台：http://" + host + ":" + port + "/admin"
-    : "   网页管理台未启用（设置 GATEWAY_ADMIN_PASSWORD 开启）；命令行：node server/gateway/admin.mjs invite");
+    : "   网页管理台未启用（设置 GATEWAY_ADMIN_PASSWORD 开启）；命令行：node server/gateway/admin/cli.mjs invite");
 });
 
 let closing = false;

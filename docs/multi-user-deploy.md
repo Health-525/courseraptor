@@ -90,7 +90,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now raptor-gateway
 # 6. 防火墙 + 云安全组放行 8080/tcp，然后生成邀请码
 sudo ufw allow 8080/tcp
 cd /opt/courseraptor && sudo -u raptor GATEWAY_STATE_DIR=/var/lib/raptor-gateway \
-  node server/gateway/admin.mjs invite --count 10 --note 班级群 --days 14
+  node server/gateway/admin/cli.mjs invite --count 10 --note 班级群 --days 14
 ```
 
 同学拿到邀请码后访问 `http://<服务器IP>:8080/register` 注册即可。
@@ -124,10 +124,10 @@ journalctl -u raptor-gateway -f          # 含每个实例的运行日志（前�
 curl http://127.0.0.1:8080/health        # {"ok":true,"running":N}
 
 # 用户管理（admin.mjs 与网关共用注册表文件）
-node server/gateway/admin.mjs list                       # 用户 + 未用邀请码 + 今日用量
-node server/gateway/admin.mjs disable 某同学             # 停用（立即禁止登录）
-node server/gateway/admin.mjs reset-pass 某同学 --password 新密码
-GATEWAY_SECRET=... node server/gateway/admin.mjs kick 某同学   # 踢下线实例
+node server/gateway/admin/cli.mjs list                       # 用户 + 未用邀请码 + 今日用量
+node server/gateway/admin/cli.mjs disable 某同学             # 停用（立即禁止登录）
+node server/gateway/admin/cli.mjs reset-pass 某同学 --password 新密码
+GATEWAY_SECRET=... node server/gateway/admin/cli.mjs kick 某同学   # 踢下线实例
 
 # 升级版本
 cd /opt/courseraptor && sudo -u raptor git pull && sudo -u raptor npm ci
