@@ -56,6 +56,11 @@ const server = createGatewayServer({
   updateAdminToken: env.GATEWAY_UPDATE_TOKEN || "",
 });
 
+// 连接保活拉长到 72s：跨公网 RTT 大、且前端有分钟级轮询，
+// 复用连接可省掉每次 ~200ms+ 的 TCP 握手（默认 5s 内就断了）
+server.keepAliveTimeout = 72_000;
+server.headersTimeout = 76_000;
+
 server.listen(port, host, () => {
   console.log(`✅ CourseRaptor 多用户网关已启动：http://${host}:${port}`);
   console.log(`   用户数据目录：${usersDir}`);
