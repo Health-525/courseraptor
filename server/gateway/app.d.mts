@@ -8,4 +8,6 @@ export function createGatewayServer(options: {
   projectRoot?: string;
   adminPassword?: string;
   maxConcurrent?: number;
+  updateServerUrl?: string;
+  updateAdminToken?: string;
 }): Server;

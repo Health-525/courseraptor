@@ -105,6 +105,12 @@ cd /opt/courseraptor && sudo -u raptor GATEWAY_STATE_DIR=/var/lib/raptor-gateway
 - 总览：注册数 / 在线与并发上限 / 可用邀请码 / 今日全站对话轮数
 - 同学账号表：在线状态、今日用量、**停用 / 启用 / 踢下线 / 重置密码**
 - 邀请码：按数量 + 备注 + 有效期生成，一键复制
+- **版本发布**（可选）：接入同机部署的更新分发后台后，可查看版本列表、
+  回滚分发版本、删除历史版本——需要在服务器上再跑一个
+  `raptor-update.service`（`server/update-server.mjs`，只绑 127.0.0.1:8787，
+  不开公网端口），并在网关 env 里配置 `GATEWAY_UPDATE_URL` +
+  `GATEWAY_UPDATE_TOKEN`（与更新后台的 `UPDATE_ADMIN_TOKEN` 一致）；
+  发版本身仍从维护者机器 `npm run publish` 上传
 
 管理会话与同学会话是两套独立 Cookie（不同名、不同签名域），互不通用；
 管理登录同样有 5 次失败锁 15 分钟的防爆破。

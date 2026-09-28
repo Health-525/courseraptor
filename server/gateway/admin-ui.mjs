@@ -193,6 +193,9 @@ const dashboardHtml = () =>
 <tbody id="invites"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody></table>
 </div>
 
+<h2>版本发布<span class="en">RELEASES</span><span class="act mono" style="font-size:11px" id="updCur"></span></h2>
+<div class="card" id="updCard"><p class="empty">加载中…</p></div>
+
 <script>
 (function () {
 "use strict";
@@ -245,6 +248,35 @@ return '<tr><td class="mono">' + esc(i.code) + '</td><td>' + esc(i.note || "—"
 '</td><td>' + status + '</td><td>' + copy + '</td></tr>';
 }).join("");
 });
+api("/admin/api/update/overview").then(function (o) {
+var cur = document.getElementById("updCur");
+var card = document.getElementById("updCard");
+if (!o) return;
+if (o.unavailable || o.error) {
+cur.textContent = "";
+card.innerHTML = '<div class="notice">' + esc(o.error || "更新后台未接入") + '</div>' +
+'<p style="color:var(--ink-2);font-size:13px">在网关环境变量配置 GATEWAY_UPDATE_URL 与 GATEWAY_UPDATE_TOKEN，并部署更新后台（server/update-server.mjs）后，这里会显示版本列表与回滚操作。</p>';
+return;
+}
+var c = o.data && o.data.current;
+cur.textContent = c ? ("当前 v" + c.version + " · " + fmtDate(c.publishedAt)) : "尚未发布过版本";
+api("/admin/api/update/versions").then(function (v) {
+if (!v || v.error || v.unavailable) { card.innerHTML = '<p class="empty">' + esc((v && (v.error || "无版本")) || "无版本") + '</p>'; return; }
+var list = v.data.versions || [];
+if (!list.length) { card.innerHTML = '<p class="empty">还没有发布过版本；在维护者机器上 npm run publish 即可发版</p>'; return; }
+var mb = function (n) { return (n / 1048576).toFixed(1) + " MB"; };
+card.innerHTML = '<table style="box-shadow:none"><thead><tr><th>版本</th><th>说明</th><th>发布时间</th><th>大小</th><th>操作</th></tr></thead><tbody>' +
+list.map(function (r) {
+var tag = r.isCurrent ? ' <span class="pill">分发中</span>' : (r.rolledBackAt ? ' <span class="pill bad">已回滚</span>' : "");
+var acts = r.isCurrent ? "" :
+'<button class="act" data-udo="rollback" data-ver="' + esc(r.version) + '">设为分发</button>' +
+'<button class="act danger" data-udo="delete" data-ver="' + esc(r.version) + '">删除</button>';
+return '<tr><td class="mono">v' + esc(r.version) + tag + '</td><td>' + esc(r.notes || "—") +
+'</td><td class="mono">' + fmtDate(r.publishedAt) + '</td><td class="mono">' + mb(r.sizeBytes || 0) +
+'</td><td>' + acts + '</td></tr>';
+}).join("") + '</tbody></table>';
+});
+});
 }
 document.addEventListener("click", function (e) {
 var t = e.target.closest ? e.target.closest("button,a") : null;
@@ -268,6 +300,18 @@ return;
 }
 var doWhat = t.getAttribute("data-do");
 var user = t.getAttribute("data-u");
+var updWhat = t.getAttribute("data-udo");
+var version = t.getAttribute("data-ver");
+if (updWhat && version) {
+var vt = updWhat === "rollback" ? "把 v" + version + " 设为当前分发版本（同学端将收到它），确认？"
+: "删除 v" + version + " 的安装包（不可恢复，当前分发版本不能删），确认？";
+if (!confirm(vt)) return;
+api("/admin/api/update/" + updWhat, { version: version }).then(function (r) {
+if (r && (r.error || r.unavailable)) { alert(r.error || "更新后台不可达"); return; }
+load();
+});
+return;
+}
 if (!doWhat || !user) return;
 if (doWhat === "reset-pass") {
 var pw = prompt("给 " + user + " 设置新密码（至少 8 位）：");
@@ -286,9 +330,44 @@ load();
 </script>`,
   );
 
-export function createAdminUi({ registry, spawner, secret, password, capacity = 0 }) {
+export function createAdminUi({
+  registry,
+  spawner,
+  secret,
+  password,
+  capacity = 0,
+  updateServerUrl = "",
+  updateAdminToken = "",
+}) {
   const enabled = typeof password === "string" && password.length >= 8;
   const failures = new Map();
+
+  /**
+   * 代理访问同机部署的更新分发后台（server/update-server.mjs，回环端口）。
+   * 未配置 / 连不上时返回 {unavailable}，管理台显示「未接入」而不是报错。
+   */
+  async function callUpdateApi(method, path, body) {
+    if (!updateServerUrl || !updateAdminToken) {
+      return { unavailable: true, error: "更新后台未接入（网关未配置 GATEWAY_UPDATE_URL / GATEWAY_UPDATE_TOKEN）" };
+    }
+    try {
+      const res = await fetch(`${updateServerUrl.replace(/\/$/, "")}${path}`, {
+        method,
+        headers: {
+          "x-admin-token": updateAdminToken,
+          ...(body ? { "content-type": "application/json" } : {}),
+        },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(5000),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) return { error: "更新后台拒绝了令牌（检查两边的 token 是否一致）" };
+      if (!res.ok) return { error: data?.error ?? `更新后台返回 ${res.status}` };
+      return { data };
+    } catch (error) {
+      return { unavailable: true, error: `更新后台不可达：${error instanceof Error ? error.message : String(error)}` };
+    }
+  }
 
   function sign(expiresAt) {
     return createHmac("sha256", secret).update(`admin.${expiresAt}`).digest("hex");
@@ -388,6 +467,9 @@ export function createAdminUi({ registry, spawner, secret, password, capacity = 
         sendJson(res, 401, { error: "未登录或会话过期" });
         return true;
       }
+      if (pathname.startsWith("/admin/api/update/")) {
+        return await handleUpdateApi(req, res, pathname);
+      }
       return await handleApi(req, res, pathname);
     }
 
@@ -458,6 +540,42 @@ export function createAdminUi({ registry, spawner, secret, password, capacity = 
         return true;
       }
       sendJson(res, 200, { ok: true });
+      return true;
+    }
+    sendJson(res, 404, { error: "not found" });
+    return true;
+  }
+
+  /** 版本发布段：全部代理到更新后台，鉴权由网关管理会话承担 */
+  async function handleUpdateApi(req, res, pathname) {
+    if (req.method !== "GET" && req.method !== "POST") {
+      sendJson(res, 404, { error: "not found" });
+      return true;
+    }
+    if (pathname === "/admin/api/update/overview") {
+      sendJson(res, 200, await callUpdateApi("GET", "/admin/api/overview"));
+      return true;
+    }
+    if (pathname === "/admin/api/update/versions") {
+      sendJson(res, 200, await callUpdateApi("GET", "/admin/api/versions"));
+      return true;
+    }
+    if (req.method === "POST" && pathname === "/admin/api/update/rollback") {
+      const body = await readJsonBody(req);
+      const result = await callUpdateApi("POST", "/admin/api/rollback", {
+        version: String(body.version ?? ""),
+      });
+      console.log(`[gw-admin] 版本回滚请求 v${body.version}: ${result.error ?? "ok"}`);
+      sendJson(res, result.error ? 400 : 200, result);
+      return true;
+    }
+    if (req.method === "POST" && pathname === "/admin/api/update/delete") {
+      const body = await readJsonBody(req);
+      const result = await callUpdateApi("POST", "/admin/api/delete", {
+        version: String(body.version ?? ""),
+      });
+      console.log(`[gw-admin] 版本删除请求 v${body.version}: ${result.error ?? "ok"}`);
+      sendJson(res, result.error ? 400 : 200, result);
       return true;
     }
     sendJson(res, 404, { error: "not found" });

@@ -126,6 +126,8 @@ export function createGatewayServer({
   projectRoot = "",
   adminPassword = "",
   maxConcurrent = 0,
+  updateServerUrl = "",
+  updateAdminToken = "",
 } = {}) {
   if (!registry) throw new Error("createGatewayServer 需要 registry");
   if (!spawner) throw new Error("createGatewayServer 需要 spawner");
@@ -140,6 +142,8 @@ export function createGatewayServer({
     secret,
     password: adminPassword,
     capacity: maxConcurrent,
+    updateServerUrl,
+    updateAdminToken,
   });
 
   function signSession(userId, expiresAt) {
