@@ -14,6 +14,7 @@ import { readFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { createAdminUi } from "./admin-ui.mjs";
+import { ownDeepseekKeyActive } from "./credentials-peek.mjs";
 
 const COOKIE_NAME = "raptor_sess";
 const SESSION_TTL_MS = 7 * 24 * 3600_000;
@@ -128,6 +129,7 @@ export function createGatewayServer({
   maxConcurrent = 0,
   updateServerUrl = "",
   updateAdminToken = "",
+  usersDir = "",
 } = {}) {
   if (!registry) throw new Error("createGatewayServer 需要 registry");
   if (!spawner) throw new Error("createGatewayServer 需要 spawner");
@@ -607,17 +609,40 @@ else { input.type = "password"; this.textContent = "显示"; }
         return;
       }
 
-      // 统一 Key 的费用护栏：每日对话轮数（按人限额优先，未设用站点默认；
-      // 自带 Key 的同学同样计数，规则透明）
-      if (req.method === "POST" && pathname === "/api/chat") {
+      // 同学端额度查询：设置弹窗「账号与模型」里展示剩余免费对话次数
+      if (req.method === "GET" && pathname === "/api/quota") {
         const limit = user.dailyTurns > 0 ? user.dailyTurns : dailyTurns;
         const used = await registry.turnsToday(user.id);
-        if (used >= limit) {
-          sendJson(res, 429, {
-            error: `今日 ${limit} 轮对话额度已用完，明天再来；或到「设置」换用自己的 DeepSeek Key`,
-          });
-          finish(429);
-          return;
+        const ownKeyActive = usersDir
+          ? await ownDeepseekKeyActive(usersDir, user.id)
+          : false;
+        sendJson(res, 200, {
+          used,
+          limit,
+          remaining: Math.max(0, limit - used),
+          ownKeyActive,
+          source: user.dailyTurns > 0 ? "personal" : "site",
+        });
+        finish(200);
+        return;
+      }
+
+      // 统一 Key 的费用护栏：每日对话轮数（按人限额优先，未设用站点默认）；
+      // 已保存自己 DeepSeek Key 的同学不占站点免费额度，仅计数用于展示
+      if (req.method === "POST" && pathname === "/api/chat") {
+        const ownKeyActive = usersDir
+          ? await ownDeepseekKeyActive(usersDir, user.id)
+          : false;
+        if (!ownKeyActive) {
+          const limit = user.dailyTurns > 0 ? user.dailyTurns : dailyTurns;
+          const used = await registry.turnsToday(user.id);
+          if (used >= limit) {
+            sendJson(res, 429, {
+              error: `今日 ${limit} 轮免费对话已用完，明天再来；或到「设置 → 账号与模型」填自己的 DeepSeek Key（不占站点额度）`,
+            });
+            finish(429);
+            return;
+          }
         }
         await registry.addTurns(user.id, 1);
       }
