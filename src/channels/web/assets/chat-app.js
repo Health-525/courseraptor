@@ -1098,9 +1098,9 @@ const HALL_CARDS = [
   /* 提示词模板与设置并列（2026-09-23）：原设置里的「常用问题」栏目拆出来
      成独立面板——它是内容管理，不是凭证配置，混在设置里连保存语义都变了味 */
   { id: "prompts", t: "提示词模板", d: "输入框上方「提示词」的自定义清单", group: "系统" },
-  { id: "settings", t: "设置", d: "教务账号、AI 模型、QQ 与本地数据", group: "系统" },
   /* 我的账号：托管版专有（改本站登录密码），quota 探测成功后现身 */
   { id: "account", t: "我的账号", d: "修改本站登录密码", group: "系统", hidden: true },
+  { id: "settings", t: "设置", d: "教务账号、AI 模型、QQ 与本地数据", group: "系统" },
 ];
 const HALL_GROUPS = ["学习安排", "效率工具", "系统"];
 const HALL_TITLES = Object.fromEntries(HALL_CARDS.map((c) => [c.id, c.t]));
