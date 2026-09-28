@@ -5,4 +5,5 @@ export function createGatewayServer(options: {
   spawner: import("./spawner.mjs").Spawner;
   secret: string;
   dailyTurns?: number;
+  projectRoot?: string;
 }): Server;

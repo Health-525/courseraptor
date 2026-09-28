@@ -10,7 +10,9 @@
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import http from "node:http";
+import path from "node:path";
 
 const COOKIE_NAME = "raptor_sess";
 const SESSION_TTL_MS = 7 * 24 * 3600_000;
@@ -115,7 +117,13 @@ function escapeHtml(text) {
     .replaceAll('"', "&quot;");
 }
 
-export function createGatewayServer({ registry, spawner, secret, dailyTurns = 100 } = {}) {
+export function createGatewayServer({
+  registry,
+  spawner,
+  secret,
+  dailyTurns = 100,
+  projectRoot = "",
+} = {}) {
   if (!registry) throw new Error("createGatewayServer 需要 registry");
   if (!spawner) throw new Error("createGatewayServer 需要 spawner");
   if (!secret || secret.length < 16) throw new Error("GATEWAY_SECRET 至少 16 位");
@@ -157,68 +165,174 @@ export function createGatewayServer({ registry, spawner, secret, dailyTurns = 10
     return `${COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`;
   }
 
-  // ── 页面（风格对齐 update-server 落地页：system-ui + 🦖 绿）─────────
+  // ── 页面（红头档案风：与正式网页版同一套设计令牌，见 chat-page.ts）──
 
   const layout = (title, body, error = "") => `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="/logo.png">
 <title>${escapeHtml(title)} · CourseRaptor</title><style>
-body{font-family:system-ui,sans-serif;max-width:420px;margin:48px auto;padding:0 20px;line-height:1.7;color:#1f2937}
-h1{font-size:22px}a{color:#15803d}
-.card{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:24px 28px}
-label{display:block;margin:14px 0 4px;font-size:14px;color:#374151}
-input{width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:15px}
-button{margin-top:20px;width:100%;padding:11px;background:#16a34a;color:#fff;border:0;border-radius:8px;font-size:15px;cursor:pointer}
-button:hover{background:#15803d}
-.err{margin-top:14px;padding:10px 14px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;color:#b91c1c;font-size:14px}
-.tip{margin-top:18px;font-size:12.5px;color:#6b7280;line-height:1.6}
-.switch{margin-top:14px;font-size:14px;text-align:center}
+:root{color-scheme:light;
+--paper:#F6F4ED;--paper-deep:#F0EDE4;--card:#FCFBF7;--shade:#ECE8DD;
+--ink:#25221C;--ink-2:#5A554A;--ink-3:#6E6656;
+--rule:#E1DCCF;--rule-2:#C9C1AF;
+--accent:#AD392C;--accent-deep:#852B22;--accent-soft:#F3E3DE;--accent-line:#E4C4BB;
+--shadow-sm:0 8px 24px rgba(50,42,31,.055);
+--serif:Georgia,"Times New Roman","Songti SC",SimSun,serif;
+--kai:"KaiTi","STKaiti","Kaiti SC",var(--serif);
+--sans:system-ui,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+--mono:ui-monospace,"Cascadia Mono",Consolas,"Liberation Mono",monospace}
+*{box-sizing:border-box}
+::selection{background:var(--accent-soft)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+body{margin:0;min-height:100vh;min-height:100dvh;display:grid;place-items:center;
+padding:34px 18px;background:var(--paper);color:var(--ink);
+font-family:var(--sans);font-size:16px;line-height:1.7;
+-webkit-font-smoothing:antialiased}
+.sheet{width:min(400px,100%)}
+/* 报头：印章 logo + 双色字标 + 楷体标语；底下压一条朱砂细线 + 灰线（文件头） */
+.mast{text-align:center;padding-bottom:20px;position:relative;
+border-bottom:1px solid var(--rule-2)}
+.mast::after{content:"";position:absolute;left:12%;right:12%;bottom:3px;height:2px;background:var(--accent)}
+.mast img{width:76px;height:76px;object-fit:contain;display:block;margin:0 auto 10px}
+.wordmark{margin:0;font-size:24px;line-height:1.2;letter-spacing:-.035em;font-weight:500}
+.wordmark .course{color:var(--ink-2)}
+.wordmark .raptor{color:var(--accent);font-weight:750}
+.tagline{margin:6px 0 0;font-family:var(--kai);font-size:14.5px;color:var(--ink-3);letter-spacing:.06em}
+/* 纸卡 */
+.card{margin-top:26px;background:var(--card);border:1px solid var(--rule);
+border-radius:3px;box-shadow:var(--shadow-sm);padding:24px 26px 22px}
+.card h2{display:flex;justify-content:space-between;align-items:baseline;
+margin:0 0 18px;padding-bottom:9px;font-family:var(--mono);font-size:12.5px;
+font-weight:600;letter-spacing:.18em;color:var(--ink-2);border-bottom:1px solid var(--rule)}
+.card h2 .en{font-weight:400;font-size:11px;letter-spacing:.08em;color:var(--ink-3)}
+label{display:block;margin:14px 0 6px;font-family:var(--mono);font-size:11px;
+font-weight:600;letter-spacing:.12em;color:var(--ink-3)}
+input{width:100%;padding:10px 12px;background:var(--card);
+border:1px solid var(--rule-2);border-radius:2px;font-family:var(--sans);
+font-size:15px;color:var(--ink);transition:border-color .15s ease,box-shadow .15s ease}
+input:hover{border-color:var(--ink-3)}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+input:-webkit-autofill{-webkit-box-shadow:0 0 0 40px var(--card) inset;-webkit-text-fill-color:var(--ink)}
+.pw{position:relative}
+.pw input{padding-right:64px}
+.pw .peek{position:absolute;right:1px;top:1px;bottom:1px;border:0;
+background:var(--paper-deep);border-left:1px solid var(--rule-2);
+border-radius:0 2px 2px 0;padding:0 13px;font-family:var(--mono);font-size:11px;
+letter-spacing:.08em;color:var(--ink-2);cursor:pointer;
+transition:background .15s ease,color .15s ease}
+.pw .peek:hover{color:var(--accent-deep);background:var(--accent-soft);
+border-left-color:var(--accent-line)}
+button.primary{display:block;width:100%;margin-top:22px;padding:12px;
+background:var(--accent);color:var(--card);border:1px solid var(--accent);
+border-radius:2px;font-family:var(--sans);font-size:15px;font-weight:600;
+letter-spacing:.14em;cursor:pointer;transition:background .15s ease}
+button.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff}
+button.primary:active{transform:translateY(1px)}
+button.primary:disabled{opacity:.65;cursor:default}
+/* 红头提示条 */
+.notice{margin:0 0 4px;padding:9px 12px;background:var(--accent-soft);
+border:1px solid var(--accent-line);border-radius:2px;color:var(--accent-deep);font-size:13.5px;line-height:1.6}
+.alt{margin-top:16px;text-align:center;font-size:13.5px;color:var(--ink-3)}
+.alt a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-line);
+padding-bottom:1px}
+.alt a:hover{border-bottom-color:var(--accent)}
+p.lead{margin:4px 0 6px;font-size:15px;color:var(--ink-2)}
+.ghost{display:inline-block;margin-top:16px;padding:9px 22px;background:none;
+border:1px solid var(--rule-2);border-radius:2px;color:var(--ink-2);
+font-size:13.5px;letter-spacing:.1em;text-decoration:none;cursor:pointer;
+font-family:var(--sans)}
+.ghost:hover{border-color:var(--accent);color:var(--accent)}
+/* 版权栏：两行小字告知（风险词朱砂强调） */
+.colophon{margin-top:22px;padding-top:12px;border-top:1px solid var(--rule-2);
+font-family:var(--mono);font-size:11.5px;line-height:1.9;color:var(--ink-2);text-align:center}
+.colophon b{color:var(--accent-deep);font-weight:600}
+@media (max-width:420px){.mast img{width:64px;height:64px}.card{padding:20px 18px 18px}}
 </style></head><body>
-<div class="card">
-<h1>🦖 CourseRaptor</h1>
-${error ? `<div class="err">${escapeHtml(error)}</div>` : ""}
+<main class="sheet">
+<header class="mast">
+<img src="/logo.png" alt="CourseRaptor 印章">
+<h1 class="wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></h1>
+<p class="tagline">课表 · 成绩 · 考试 · 通知，一句话搞定</p>
+</header>
+<section class="card">
 ${body}
-<div class="tip">课表 · 成绩 · 考试 · 通知，一句话搞定。<br>
-本站当前为班级互助自建服务：登录与教务账号请勿在公共 WiFi 等不可信网络使用（HTTP 明文传输）；
-托管凭证由站长服务器加密保存，站长技术上可解密，请知悉后使用。</div>
-</div></body></html>`;
+</section>
+<footer class="colophon">班级互助自建服务 · 当前为 <b>HTTP 明文</b>，请勿在<b>公共 WiFi</b> 使用<br>
+托管凭证由服务器加密保存（站长技术上可解密），知情使用</footer>
+</main>
+<script>
+(function () {
+"use strict";
+var forms = document.querySelectorAll("form");
+for (var i = 0; i < forms.length; i++) {
+forms[i].addEventListener("submit", function (e) {
+var btn = e.currentTarget.querySelector("button.primary");
+if (btn && !btn.disabled) { btn.disabled = true; btn.textContent = "正在验证 ···"; }
+});
+}
+var peeks = document.querySelectorAll(".peek");
+for (var j = 0; j < peeks.length; j++) {
+peeks[j].addEventListener("click", function () {
+var input = this.parentNode.querySelector("input");
+if (input.type === "password") { input.type = "text"; this.textContent = "隐藏"; }
+else { input.type = "password"; this.textContent = "显示"; }
+});
+}
+})();
+</script>
+</body></html>`;
+
+  const errorNotice = (error) => (error ? `<div class="notice">${escapeHtml(error)}</div>` : "");
 
   const loginPage = (error = "") =>
     layout(
       "登录",
-      `<form method="post" action="/login">
-<label>用户名</label><input name="username" autocomplete="username" required>
-<label>密码</label><input name="password" type="password" autocomplete="current-password" required>
-<button type="submit">登录</button>
+      `${errorNotice(error)}<form method="post" action="/login">
+<h2>登 录<span class="en">SIGN IN</span></h2>
+<label>用户名 USERNAME</label><input name="username" autocomplete="username" required autofocus placeholder="学号或用户名">
+<label>密码 PASSWORD</label>
+<div class="pw"><input name="password" type="password" autocomplete="current-password" required placeholder="登录密码">
+<button type="button" class="peek">显示</button></div>
+<button type="submit" class="primary">登 录</button>
 </form>
-<div class="switch">还没有账号？<a href="/register">凭邀请码注册</a></div>`,
-      error,
+<div class="alt">还没有账号？<a href="/register">凭邀请码注册</a></div>`,
+      "",
     );
 
   const registerPage = (error = "") =>
     layout(
       "注册",
-      `<form method="post" action="/register">
-<label>邀请码</label><input name="invite" required autocomplete="off">
-<label>用户名（字母 / 数字 / _ / -，2-32 位）</label><input name="username" autocomplete="username" required>
-<label>密码（至少 8 位）</label><input name="password" type="password" autocomplete="new-password" required>
-<label>确认密码</label><input name="password2" type="password" autocomplete="new-password" required>
-<button type="submit">注册并进入</button>
+      `${errorNotice(error)}<form method="post" action="/register">
+<h2>注 册<span class="en">SIGN UP</span></h2>
+<label>邀请码 INVITE CODE</label><input name="invite" required autocomplete="off" autofocus placeholder="向管理员索取">
+<label>用户名 USERNAME（字母 / 数字 / _ / -，2-32 位）</label><input name="username" autocomplete="username" required placeholder="注册后用于登录">
+<label>密码 PASSWORD（至少 8 位）</label>
+<div class="pw"><input name="password" type="password" autocomplete="new-password" required placeholder="至少 8 位">
+<button type="button" class="peek">显示</button></div>
+<label>确认密码 CONFIRM</label>
+<div class="pw"><input name="password2" type="password" autocomplete="new-password" required placeholder="再输入一次">
+<button type="button" class="peek">显示</button></div>
+<button type="submit" class="primary">注册并进入</button>
 </form>
-<div class="switch">已有账号？<a href="/login">去登录</a></div>`,
-      error,
+<div class="alt">已有账号？<a href="/login">去登录</a></div>`,
+      "",
     );
 
   const messagePage = (title, text) =>
     layout(
       title,
-      `<p>${escapeHtml(text)}</p><div class="switch"><a href="/login">返回登录</a></div>`,
+      `<h2>${escapeHtml(title)}<span class="en">NOTICE</span></h2>
+<p class="lead">${escapeHtml(text)}</p>
+<a class="ghost" href="/login">返回登录</a>`,
     );
 
   const busyPage = () =>
     layout(
       "稍后再试",
-      `<p>现在在线的同学比较多，服务器暂时满载了 🦖</p>
-<p>请过几分钟回来刷新重试；着急用的同学可以先用本地版（GitHub Releases 下载安装包）。</p>`,
+      `<h2>稍后再试<span class="en">BUSY</span></h2>
+<p class="lead">现在在线的同学比较多，服务器暂时满载了 🦖</p>
+<p class="lead">请过几分钟回来刷新重试；着急用的同学可以先用本地版（GitHub Releases 下载安装包）。</p>
+<a class="ghost" href="/">刷新重试</a>`,
     );
 
   function sendHtml(res, status, html, extraHeaders = {}) {
@@ -304,6 +418,28 @@ ${body}
     try {
       if (req.method === "GET" && pathname === "/health") {
         sendJson(res, 200, { ok: true, running: spawner.runningCount() });
+        return;
+      }
+
+      // 报头印章（登录/注册页用；登录后的同名路径由后端实例提供）
+      if (req.method === "GET" && pathname === "/logo.png") {
+        if (!projectRoot) {
+          res.writeHead(404);
+          res.end();
+          return;
+        }
+        try {
+          const logo = await readFile(path.join(projectRoot, "docs", "courseraptor-logo.png"));
+          res.writeHead(200, {
+            "content-type": "image/png",
+            "cache-control": "public, max-age=86400",
+            "content-length": logo.length,
+          });
+          res.end(logo);
+        } catch {
+          res.writeHead(404);
+          res.end();
+        }
         return;
       }
 

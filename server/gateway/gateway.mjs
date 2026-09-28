@@ -49,6 +49,7 @@ const server = createGatewayServer({
   spawner,
   secret,
   dailyTurns: Number(env.GATEWAY_DAILY_TURNS) || 100,
+  projectRoot: ROOT,
 });
 
 server.listen(port, host, () => {
