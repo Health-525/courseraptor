@@ -50,13 +50,17 @@ const server = createGatewayServer({
   secret,
   dailyTurns: Number(env.GATEWAY_DAILY_TURNS) || 100,
   projectRoot: ROOT,
+  adminPassword: env.GATEWAY_ADMIN_PASSWORD || "",
+  maxConcurrent: Number(env.GATEWAY_MAX_CONCURRENT) || 4,
 });
 
 server.listen(port, host, () => {
   console.log(`✅ CourseRaptor 多用户网关已启动：http://${host}:${port}`);
   console.log(`   用户数据目录：${usersDir}`);
   console.log(`   并发上限 ${env.GATEWAY_MAX_CONCURRENT || 4} · 空闲回收 ${env.GATEWAY_IDLE_MINUTES || 30} 分钟 · 每日每人 ${env.GATEWAY_DAILY_TURNS || 100} 轮`);
-  console.log("   生成邀请码：node server/gateway/admin.mjs invite");
+  console.log(env.GATEWAY_ADMIN_PASSWORD
+    ? "   网页管理台：http://" + host + ":" + port + "/admin"
+    : "   网页管理台未启用（设置 GATEWAY_ADMIN_PASSWORD 开启）；命令行：node server/gateway/admin.mjs invite");
 });
 
 let closing = false;

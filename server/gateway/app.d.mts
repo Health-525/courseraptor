@@ -6,4 +6,6 @@ export function createGatewayServer(options: {
   secret: string;
   dailyTurns?: number;
   projectRoot?: string;
+  adminPassword?: string;
+  maxConcurrent?: number;
 }): Server;

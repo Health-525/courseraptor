@@ -191,6 +191,11 @@ export function createSpawner({
       return instances.size;
     },
 
+    /** 管理后台展示在线标记用：该用户的实例当前是否在跑 */
+    isRunning(userId) {
+      return instances.has(userId);
+    },
+
     /** 空闲回收 + 供 /health 展示 */
     startReaper() {
       const timer = setInterval(() => {

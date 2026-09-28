@@ -13,6 +13,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
+import { createAdminUi } from "./admin-ui.mjs";
 
 const COOKIE_NAME = "raptor_sess";
 const SESSION_TTL_MS = 7 * 24 * 3600_000;
@@ -123,12 +124,23 @@ export function createGatewayServer({
   secret,
   dailyTurns = 100,
   projectRoot = "",
+  adminPassword = "",
+  maxConcurrent = 0,
 } = {}) {
   if (!registry) throw new Error("createGatewayServer 需要 registry");
   if (!spawner) throw new Error("createGatewayServer 需要 spawner");
   if (!secret || secret.length < 16) throw new Error("GATEWAY_SECRET 至少 16 位");
 
   const throttle = createLoginThrottle();
+
+  // 网页版管理后台（GATEWAY_ADMIN_PASSWORD 未设置时显示「未启用」）
+  const adminUi = createAdminUi({
+    registry,
+    spawner,
+    secret,
+    password: adminPassword,
+    capacity: maxConcurrent,
+  });
 
   function signSession(userId, expiresAt) {
     const mac = createHmac("sha256", secret).update(`${userId}.${expiresAt}`).digest("hex");
@@ -418,6 +430,12 @@ else { input.type = "password"; this.textContent = "显示"; }
     try {
       if (req.method === "GET" && pathname === "/health") {
         sendJson(res, 200, { ok: true, running: spawner.runningCount() });
+        return;
+      }
+
+      // ── 管理后台（/admin 页面与 /admin/api/*，独立管理会话）──
+      if (pathname === "/admin" || pathname.startsWith("/admin/")) {
+        await adminUi.handle(req, res, pathname);
         return;
       }
 

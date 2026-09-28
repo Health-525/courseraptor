@@ -97,6 +97,20 @@ cd /opt/courseraptor && sudo -u raptor GATEWAY_STATE_DIR=/var/lib/raptor-gateway
 
 ## 日常运维
 
+### 网页管理台（推荐）
+
+`/etc/raptor-gateway.env` 里设置 `GATEWAY_ADMIN_PASSWORD`（至少 8 位）后，
+浏览器打开 **http://<服务器IP>:8080/admin** 输密码即可：
+
+- 总览：注册数 / 在线与并发上限 / 可用邀请码 / 今日全站对话轮数
+- 同学账号表：在线状态、今日用量、**停用 / 启用 / 踢下线 / 重置密码**
+- 邀请码：按数量 + 备注 + 有效期生成，一键复制
+
+管理会话与同学会话是两套独立 Cookie（不同名、不同签名域），互不通用；
+管理登录同样有 5 次失败锁 15 分钟的防爆破。
+
+### 命令行（备用）
+
 ```bash
 # 状态与日志
 systemctl status raptor-gateway

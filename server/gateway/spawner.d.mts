@@ -4,6 +4,7 @@ export interface Spawner {
   kick(userId: string): void;
   stopAll(): Promise<void>;
   runningCount(): number;
+  isRunning(userId: string): boolean;
   startReaper(): () => void;
 }
 
