@@ -65,6 +65,9 @@ export function createRegistry({ stateDir }) {
   const readUsers = () => readJson(usersFile, { users: [] });
   const writeUsers = (users) => writeAtomic(usersFile, JSON.stringify({ users }, null, 2));
   const readInvites = () => readJson(invitesFile, { invites: [] });
+  const resetsFile = path.join(stateDir, "reset-requests.json");
+  const readResets = () => readJson(resetsFile, { requests: [], codes: [] });
+  const writeResets = (store) => writeAtomic(resetsFile, JSON.stringify(store, null, 2));
   const writeInvites = (invites) =>
     writeAtomic(invitesFile, JSON.stringify({ invites }, null, 2));
 
@@ -256,6 +259,85 @@ export function createRegistry({ stateDir }) {
 
     async listInvites() {
       return (await readInvites()).invites;
+    },
+
+    // ── 密码重置：申请（同学）→ 审批（管理员）→ 一次性码 → 同学自设新密码 ──
+    // 管理员只经手重置码，从头到尾不知道新密码。
+
+    async createResetRequest(userId, username) {
+      return serialized(async () => {
+        const store = await readResets();
+        // 同一用户只保留一条待审申请（重复申请覆盖时间戳）
+        store.requests = store.requests.filter(
+          (r) => !(r.userId === userId && r.status === "pending"),
+        );
+        const request = {
+          id: `r_${randomBytes(4).toString("hex")}`,
+          userId,
+          username,
+          requestedAt: new Date().toISOString(),
+          status: "pending",
+        };
+        store.requests.push(request);
+        await writeResets(store);
+        return request;
+      });
+    },
+
+    async listResetRequests() {
+      const store = await readResets();
+      return {
+        pending: store.requests.filter((r) => r.status === "pending"),
+        codes: store.codes.map((c) => ({ ...c })),
+      };
+    },
+
+    /** 同意申请：生成一次性重置码（24 小时有效），返回给管理员转交同学 */
+    async approveResetRequest(id) {
+      return serialized(async () => {
+        const store = await readResets();
+        const request = store.requests.find((r) => r.id === id && r.status === "pending");
+        if (!request) throw new Error("申请不存在或已处理");
+        request.status = "approved";
+        request.resolvedAt = new Date().toISOString();
+        const code = randomBytes(4).toString("hex");
+        store.codes.push({
+          code,
+          userId: request.userId,
+          username: request.username,
+          createdAt: request.resolvedAt,
+          expiresAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
+        });
+        await writeResets(store);
+        return { code, username: request.username, expiresAt: request.expiresAt };
+      });
+    },
+
+    async rejectResetRequest(id) {
+      return serialized(async () => {
+        const store = await readResets();
+        const request = store.requests.find((r) => r.id === id && r.status === "pending");
+        if (!request) throw new Error("申请不存在或已处理");
+        request.status = "rejected";
+        request.resolvedAt = new Date().toISOString();
+        await writeResets(store);
+      });
+    },
+
+    /** 同学持码兑换：验码（有效期内、未用过）返回 userId，用后即焚 */
+    async redeemResetCode(username, code) {
+      return serialized(async () => {
+        const store = await readResets();
+        const index = store.codes.findIndex(
+          (c) => c.code === String(code ?? "").trim() && c.username === username,
+        );
+        if (index < 0) return null;
+        const entry = store.codes[index];
+        store.codes.splice(index, 1);
+        await writeResets(store);
+        if (new Date(entry.expiresAt) < new Date()) return null;
+        return entry.userId;
+      });
     },
   };
 

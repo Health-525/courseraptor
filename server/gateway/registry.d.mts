@@ -20,6 +20,14 @@ export interface Registry {
   setDailyTurns(id: string, turns: number): Promise<void>;
   getSiteSettings(): Promise<{ deepseekKey: string }>;
   setSiteSettings(patch: { deepseekKey?: string }): Promise<void>;
+  createResetRequest(userId: string, username: string): Promise<{ id: string }>;
+  listResetRequests(): Promise<{
+    pending: Array<{ id: string; userId: string; username: string; requestedAt: string; status: string }>;
+    codes: Array<{ code: string; userId: string; username: string; createdAt: string; expiresAt: string }>;
+  }>;
+  approveResetRequest(id: string): Promise<{ code: string; username: string; expiresAt: string }>;
+  rejectResetRequest(id: string): Promise<void>;
+  redeemResetCode(username: string, code: string): Promise<string | null>;
   addTurns(id: string, count?: number): Promise<number>;
   turnsToday(id: string): Promise<number>;
   listUsers(): Promise<RegistryUser[]>;

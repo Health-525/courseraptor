@@ -1135,19 +1135,19 @@ export function chatPage(options: { demo?: boolean } = {}): string {
         </div>
       </div>
       <div class="setmsg" id="setMsg" role="status" aria-live="polite"></div>
-      <div class="my-account" id="myAccountBox" hidden>
-        <div class="ma-title">我的账号 · 本站登录密码</div>
-        <p class="dlg-intro">修改进入本网站用的账号密码（与教务账号无关）。改完后下次登录用新密码，当前会话不受影响。</p>
-        <label class="fld"><span>当前密码</span><span class="fld-row"><input id="sPassCur" type="password" autocomplete="current-password"><button class="fld-eye" type="button" id="eyePassCur" aria-pressed="false">显示</button></span></label>
-        <label class="fld"><span>新密码</span><span class="fld-row"><input id="sPassNew" type="password" autocomplete="new-password" placeholder="至少 8 位"><button class="fld-eye" type="button" id="eyePassNew" aria-pressed="false">显示</button></span></label>
-        <label class="fld"><span>确认新密码</span><span class="fld-row"><input id="sPassNew2" type="password" autocomplete="new-password"><button class="fld-eye" type="button" id="eyePassNew2" aria-pressed="false">显示</button></span></label>
-        <div class="cur" id="curPassMsg"></div>
-        <div class="diagrow"><button class="tbtn" id="saveMyPass" type="button">修改密码</button></div>
-      </div>
       <div class="hall-settings-foot">
         <button class="tbtn" id="cancelSettings" type="button">关闭</button>
         <button class="tbtn primary" id="saveSettings" ${demo ? "disabled" : ""}>保存设置</button>
       </div>
+    </div>
+    <div id="hallAccount" hidden>
+      <div class="cur" id="curAccount" style="margin-bottom:10px"></div>
+      <p class="dlg-intro">修改进入本网站用的账号密码（与教务账号无关）。改完后下次登录用新密码，当前登录不受影响。</p>
+      <label class="fld"><span>当前密码</span><span class="fld-row"><input id="sPassCur" type="password" autocomplete="current-password"><button class="fld-eye" type="button" id="eyePassCur" aria-pressed="false">显示</button></span></label>
+      <label class="fld"><span>新密码</span><span class="fld-row"><input id="sPassNew" type="password" autocomplete="new-password" placeholder="至少 8 位"><button class="fld-eye" type="button" id="eyePassNew" aria-pressed="false">显示</button></span></label>
+      <label class="fld"><span>确认新密码</span><span class="fld-row"><input id="sPassNew2" type="password" autocomplete="new-password"><button class="fld-eye" type="button" id="eyePassNew2" aria-pressed="false">显示</button></span></label>
+      <div class="cur" id="curPassMsg"></div>
+      <div class="diagrow"><button class="tbtn" id="saveMyPass" type="button">修改密码</button></div>
     </div>
     <div id="hallPrompts" hidden>
       <p class="dlg-intro">输入框上方「提示词」一排就是这份模板清单，点一下即发送。删掉用不上的、加入你常问的，按住拖动条目（或用 ↑↓）还能调整顺序，改动即时保存；每条最多 60 字、最多 12 条，清空后恢复默认清单。</p>
