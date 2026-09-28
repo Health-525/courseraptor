@@ -133,44 +133,57 @@ border-radius:2px;color:var(--accent-deep);font-size:13.5px;line-height:1.6}
 .inv-row .num{max-width:90px;text-align:center}
 .empty{padding:26px 0;text-align:center;color:var(--ink-3);font-size:13.5px}
 .copy-ok{color:var(--ok);font-family:var(--mono);font-size:11px;margin-left:8px}
-/* 左右后台布局：左侧档头导航 + 右侧内容面板 */
-.shell-lr{width:min(1080px,100%);display:grid;grid-template-columns:248px 1fr;gap:28px;
-align-items:start}
-aside.side{position:sticky;top:24px;display:flex;flex-direction:column;gap:22px;
-padding:22px 18px 16px;border:1px solid var(--rule);border-radius:3px;
-background:var(--paper-deep);box-shadow:var(--shadow-sm)}
-aside.side .mast-sm{text-align:center;padding-bottom:16px;position:relative;
-border-bottom:1px solid var(--rule-2)}
-aside.side .mast-sm::after{content:"";position:absolute;left:16%;right:16%;bottom:3px;
-height:2px;background:var(--accent)}
-aside.side img{width:44px;height:44px;object-fit:contain;display:block;margin:0 auto 6px}
-aside.side .wordmark{margin:0;font-size:16px;line-height:1.2;letter-spacing:-.03em;font-weight:500}
-aside.side .badge{display:inline-block;margin-top:8px;font-family:var(--mono);font-size:10px;
-font-weight:600;letter-spacing:.14em;color:var(--accent-deep);background:var(--accent-soft);
+/* ── 管理台应用壳：全高侧栏（主流 admin 结构）+ 滚动内容区，红头档案皮肤 ── */
+body.app{display:grid;grid-template-columns:236px 1fr;place-items:stretch;
+height:100vh;height:100dvh;overflow:hidden;padding:0}
+aside.side{display:flex;flex-direction:column;min-height:0;
+background:var(--paper-deep);border-right:1px solid var(--rule-2)}
+.side-brand{padding:20px 16px 15px;text-align:center;border-bottom:1px solid var(--rule-2);
+position:relative}
+.side-brand::after{content:"";position:absolute;left:14%;right:14%;bottom:3px;height:2px;
+background:var(--accent)}
+.side-brand img{width:42px;height:42px;object-fit:contain;display:block;margin:0 auto 6px}
+.side-brand .wordmark{margin:0;font-size:17px;line-height:1.2;letter-spacing:-.03em;font-weight:500}
+.side-brand .badge{display:inline-block;margin-top:7px;font-family:var(--mono);font-size:9.5px;
+font-weight:600;letter-spacing:.16em;color:var(--accent-deep);background:var(--accent-soft);
 border:1px solid var(--accent-line);border-radius:2px;padding:2px 8px}
-nav.toc{display:flex;flex-direction:column;gap:2px}
-nav.toc button{display:flex;justify-content:space-between;align-items:baseline;text-align:left;
-background:none;border:0;border-left:2px solid transparent;cursor:pointer;
-padding:8px 10px;font-family:var(--mono);font-size:12px;font-weight:600;
-letter-spacing:.12em;color:var(--ink-2)}
-nav.toc button .sub{font-size:10px;font-weight:400;letter-spacing:.06em;color:var(--ink-3)}
-nav.toc button:hover{color:var(--ink);background:var(--shade)}
-nav.toc button.on{color:var(--accent-deep);background:var(--accent-soft);
-border-left-color:var(--accent)}
-.side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--rule);
-display:flex;justify-content:space-around;font-size:12.5px}
-.side-foot a{color:var(--ink-3);text-decoration:none;cursor:pointer}
-.side-foot a:hover{color:var(--accent)}
-section.pane{display:flex;flex-direction:column;gap:4px;min-width:0}
-.pane .panel{display:none}
-.pane .panel.on{display:block}
+nav.groups{flex:1;min-height:0;overflow-y:auto;padding:16px 12px 10px;
+display:flex;flex-direction:column;gap:20px}
+.g-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.18em;
+color:var(--ink-3);padding:0 10px;margin:0 0 6px}
+.nav-item{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
+background:none;border:0;border-left:2px solid transparent;border-radius:2px;
+padding:8px 10px;font-family:var(--sans);font-size:13.5px;color:var(--ink-2);
+cursor:pointer;transition:background .12s ease,color .12s ease}
+.nav-item svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;
+stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.nav-item:hover{background:var(--shade);color:var(--ink)}
+.nav-item.on{background:var(--accent-soft);color:var(--accent-deep);
+border-left-color:var(--accent);font-weight:600}
+.side-uptime{padding:8px 16px;font-family:var(--mono);font-size:10px;
+letter-spacing:.06em;color:var(--ink-3);border-top:1px solid var(--rule)}
+.side-foot{display:flex;gap:8px;padding:10px 12px 14px}
+.side-foot button{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
+background:none;border:1px solid var(--rule-2);border-radius:2px;padding:7px 0;
+font-family:var(--sans);font-size:12px;color:var(--ink-2);cursor:pointer;
+transition:border-color .12s ease,color .12s ease}
+.side-foot button svg{width:13px;height:13px;stroke:currentColor;fill:none;
+stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.side-foot button:hover{border-color:var(--accent);color:var(--accent)}
+main.content{min-width:0;overflow-y:auto;padding:26px 30px 64px}
+.content-inner{max-width:960px}
+section.pane .panel{display:none}
+section.pane .panel.on{display:block}
 @media (max-width:840px){
-.shell-lr{grid-template-columns:1fr}
-aside.side{position:static}
-nav.toc{flex-direction:row;flex-wrap:wrap;gap:6px}
-nav.toc button{border-left:0;border:1px solid var(--rule-2);border-radius:2px;padding:6px 12px}
-nav.toc button.on{border-color:var(--accent-line)}
-.side-foot{margin-top:4px}
+body.app{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+aside.side{border-right:0;border-bottom:1px solid var(--rule-2)}
+.side-brand{padding:12px 16px 10px}
+.side-brand img{width:28px;height:28px;display:inline-block;vertical-align:-8px;margin:0 6px 0 0}
+nav.groups{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:8px 12px}
+.g-label{display:none}
+.nav-item{border-left:0;border:1px solid var(--rule-2);padding:6px 12px;white-space:nowrap}
+.nav-item.on{border-color:var(--accent-line)}
+.side-uptime{display:none}
 }
 @media (max-width:720px){.stats{grid-template-columns:repeat(2,1fr)}}
 `;
@@ -213,22 +226,44 @@ const disabledHtml = () =>
 const dashboardHtml = () => `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="/logo.png">
-<title>管理台 · CourseRaptor</title><style>${CSS}</style></head><body>
-<main class="shell-lr">
+<title>管理台 · CourseRaptor</title><style>${CSS}</style></head><body class="app">
 <aside class="side">
-<div class="mast-sm">
+<div class="side-brand">
 <img src="/logo.png" alt="">
 <h1 class="wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></h1>
-<span class="badge">ADMIN 管理台</span>
+<div><span class="badge">ADMIN 管理台</span></div>
 </div>
-<nav class="toc">
-<button type="button" data-nav="overview" class="on">总 览<span class="sub">OVERVIEW</span></button>
-<button type="button" data-nav="users">同学账号<span class="sub">USERS</span></button>
-<button type="button" data-nav="invites">邀请码<span class="sub">INVITES</span></button>
-<button type="button" data-nav="release">版本发布<span class="sub">RELEASES</span></button>
+<nav class="groups">
+<div class="nav-group">
+<div class="g-label">日 常 · DAILY</div>
+<button type="button" class="nav-item on" data-nav="overview">
+<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+总览</button>
+<button type="button" class="nav-item" data-nav="users">
+<svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16 3.5a4 4 0 0 1 0 7"/><path d="M17 14c2.8.5 5 3 5 6.2"/></svg>
+同学账号</button>
+<button type="button" class="nav-item" data-nav="invites">
+<svg viewBox="0 0 24 24"><path d="M3 9V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a3 3 0 0 0 0 6v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a3 3 0 0 0 0-6z"/><path d="M13 5v2M13 11v2M13 17v2"/></svg>
+邀请码</button>
+</div>
+<div class="nav-group">
+<div class="g-label">发 版 · RELEASES</div>
+<button type="button" class="nav-item" data-nav="release">
+<svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+版本发布</button>
+</div>
 </nav>
-<div class="side-foot"><a id="refresh">↻ 刷新</a><a id="logout">退出登录</a></div>
+<div class="side-uptime" id="uptimeLine">网关运行中…</div>
+<div class="side-foot">
+<button type="button" id="refresh">
+<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+刷新</button>
+<button type="button" id="logout">
+<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+退出</button>
+</div>
 </aside>
+<main class="content"><div class="content-inner">
 <section class="pane">
 <div class="panel on" id="pane-overview">
 <h2>总览<span class="en">OVERVIEW</span></h2>
@@ -262,12 +297,12 @@ const dashboardHtml = () => `<!doctype html>
 <div class="card" id="updCard"><p class="empty">加载中…</p></div>
 </div>
 </section>
-</main>
+</div></main>
 
 <script>
 (function () {
 "use strict";
-var tabs = document.querySelectorAll("nav.toc button");
+var tabs = document.querySelectorAll("nav.groups .nav-item");
 for (var i = 0; i < tabs.length; i++) {
 tabs[i].addEventListener("click", function () {
 for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove("on");
@@ -311,6 +346,8 @@ var up = o.uptimeSec || 0;
 var upText = up >= 86400 ? Math.floor(up / 86400) + " 天 " + Math.floor((up % 86400) / 3600) + " 小时"
 : up >= 3600 ? Math.floor(up / 3600) + " 小时 " + Math.floor((up % 3600) / 60) + " 分"
 : Math.floor(up / 60) + " 分钟";
+document.getElementById("uptimeLine").textContent =
+"运行 " + upText + " · " + o.online + "/" + o.capacity + " 在线";
 document.getElementById("statusCard").innerHTML =
 '<p class="lead" style="margin-top:2px"><span class="dot' + (o.online > 0 ? "" : " off") + '"></span>网关已连续运行 ' + esc(upText) +
 '，当前 ' + o.online + ' 个实例在线' + (o.online > 0 ? "" : "（空闲时不占内存）") + '。</p>' +
