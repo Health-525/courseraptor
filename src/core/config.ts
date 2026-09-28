@@ -93,13 +93,18 @@ export interface ResolvedDeepSeekApiKey {
 /**
  * 交互式 /key 明确确认的覆盖值优先于 .env：否则成功提示后重启又回到旧值，
  * 用户无法可靠地更换密钥。未标记覆盖的历史加密值仍保持 .env 优先。
+ *
+ * 多用户网关部署时注入 RAPTOR_DISABLE_DS_OVERRIDE=1：该同学选了「站点
+ * 免费额度」模式——加密保存的自己 Key 保留不删，但本轮会话改用站点 Key
+ * （.env 层）。本地版从不设置此变量，行为不变。
  */
 export function resolveDeepSeekApiKey(input: {
   environmentKey?: string;
   storedKey?: string;
   storedOverride?: boolean;
+  disableOverride?: boolean;
 }): ResolvedDeepSeekApiKey {
-  if (input.storedOverride && input.storedKey) {
+  if (input.storedOverride && input.storedKey && !input.disableOverride) {
     return { key: input.storedKey, source: "encrypted" };
   }
   if (input.environmentKey) return { key: input.environmentKey, source: "env" };
@@ -162,6 +167,7 @@ function loadConfig(): RaptorConfig {
     environmentKey: env("DEEPSEEK_API_KEY"),
     storedKey: stored?.deepseekApiKey,
     storedOverride: stored?.deepseekApiKeyOverride,
+    disableOverride: env("RAPTOR_DISABLE_DS_OVERRIDE") === "1",
   });
   if (resolvedKey.key) process.env.DEEPSEEK_API_KEY = resolvedKey.key;
 

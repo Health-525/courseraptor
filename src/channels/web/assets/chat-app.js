@@ -2571,19 +2571,29 @@ document.addEventListener("click", function (e) {
   var t = e.target.closest ? e.target.closest(".ds-opt") : null;
   if (!t) return;
   if (t.id === "dsSite") {
-    if (!confirm("切回站点免费额度？将清除已保存的自己 Key（实例稍后自动重启生效）。")) return;
-    fetch("/api/use-site-key", { method: "POST" })
+    if (!confirm("切换到站点免费额度？你保存的 API Key 会保留，之后可随时切回，无需重填。")) return;
+    fetch("/api/ds-mode", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "site" }) })
       .then(function (r) { return r.ok; })
       .then(function (okFlag) {
         if (!okFlag) { alert("切换失败，请稍后再试"); return; }
         setDsMode("site", false);
-        var k = document.getElementById("sKey"); if (k) k.value = "";
         refreshQuota();
       })
       .catch(function () { alert("网络错误"); });
     return;
   }
-  if (t.id === "dsOwn") { setDsMode("own", true); return; }
+  if (t.id === "dsOwn") {
+    /* 有已保存的 Key：直接切回自己的；没有：显示输入框，保存后自动生效 */
+    fetch("/api/ds-mode", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "own" }) })
+      .then(function (r) { return r.ok; })
+      .then(function (okFlag) {
+        setDsMode("own", false);
+        if (!okFlag) { var kk = document.getElementById("sKey"); if (kk) kk.focus(); }
+        else refreshQuota();
+      })
+      .catch(function () { setDsMode("own", false); });
+    return;
+  }
 });
 
 /* 站点托管版的免费额度展示：/api/quota 由多用户网关提供；本地版与演示页
@@ -2608,9 +2618,10 @@ function refreshQuota() {
         if (!hallPanel) renderHall();
       }
       el.textContent = q.ownKeyActive
-        ? "✓ 已使用自己的 DeepSeek Key · 不占站点免费额度"
-        : "站点免费对话：今日已用 " + q.used + "/" + q.limit +
-          "，剩余 " + q.remaining + " 次；填自己的 Key 后不占站点额度";
+        ? "✓ 正在使用自己的 DeepSeek Key（今日 " + (q.ownUsed || 0) + " 轮，不占站点额度）" +
+          (q.remaining !== undefined ? "；站点免费额度保留：剩余 " + q.remaining + " 次" : "")
+        : "站点免费对话：今日已用 " + q.used + "/" + q.limit + "，剩余 " + q.remaining + " 次" +
+          (q.hasOwnKey ? "（已保存自己的 Key，上方可随时切换）" : "；填自己的 Key 后不占站点额度");
     })
     .catch(function () {});
 }

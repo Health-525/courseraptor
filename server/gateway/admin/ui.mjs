@@ -366,6 +366,8 @@ var status = u.disabled ? '<span class="pill bad">已停用</span>' : '<span cla
 var online = u.online ? '<span class="dot"></span>在线' : '<span class="dot off"></span>—';
 var quota = u.dailyTurns > 0 ? u.turns.count + '<b class="hot">/' + u.dailyTurns + '</b>'
 : u.turns.count + '<span style="color:var(--ink-3)">/默认</span>';
+var ownUsed = (u.ownTurns && u.ownTurns.count) ? ' <span title="自己 Key 的轮数（不限额）" style="color:var(--ok)">+自' + u.ownTurns.count + '</span>' : '';
+quota += ownUsed;
 var quotaBtn = '<button class="act" data-do="quota" data-u="' + esc(u.username) + '" data-cur="' + (u.dailyTurns || 0) + '">限额</button>';
 var acts = quotaBtn;
 if (u.disabled) { acts += '<button class="act" data-do="enable" data-u="' + esc(u.username) + '">启用</button>'; }

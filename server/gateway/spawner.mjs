@@ -29,6 +29,8 @@ export function createSpawner({
   deepseekKey = "",
   /** 每次拉起实例时动态取站点 Key（管理台改 Key 后新实例即生效）；返回空串则回退 deepseekKey */
   getDeepseekKey = null,
+  /** 每次拉起时问一次：该同学是否钉在站点免费额度模式（注入禁用自己Key的旗标） */
+  getForceSiteKey = null,
   maxConcurrent = 4,
   idleMinutes = 30,
   reapIntervalMs = 60_000,
@@ -67,6 +69,15 @@ export function createSpawner({
     }
   }
 
+  async function forceSiteKey(userId) {
+    if (!getForceSiteKey) return false;
+    try {
+      return Boolean(await getForceSiteKey(userId));
+    } catch {
+      return false;
+    }
+  }
+
   /** 站点 Key 当前值：站点设置（可运行时改）优先，回退构造参数 */
   async function currentSiteKey() {
     if (!getDeepseekKey) return "";
@@ -77,7 +88,7 @@ export function createSpawner({
     }
   }
 
-  function spawnInstance(userId, restartCount, siteKey = "") {
+  function spawnInstance(userId, restartCount, siteKey = "", forceSite = false) {
     const dataDir = path.join(userDataDir(userId), "data");
     const credFile = path.join(userDataDir(userId), "credentials.enc");
     mkdirSync(dataDir, { recursive: true });
@@ -95,6 +106,7 @@ export function createSpawner({
     // 更高（src/core/config.ts 的解析顺序），无需此处感知
     const effectiveKey = siteKey || deepseekKey;
     if (effectiveKey) env.DEEPSEEK_API_KEY = effectiveKey;
+    if (forceSite) env.RAPTOR_DISABLE_DS_OVERRIDE = "1";
 
     const child = spawn(nodeExec, ["--import", tsxUrl, "src/headless/entry.ts"], {
       cwd: projectRoot,
@@ -139,7 +151,7 @@ export function createSpawner({
       const effectiveRestarts =
         Date.now() - instance.startedAt > UPTIME_RESET_MS ? 0 : instance.restarts;
       if (effectiveRestarts < MAX_RESTARTS) {
-        void currentSiteKey().then((key) => spawnInstance(userId, effectiveRestarts + 1, key));
+        void Promise.all([currentSiteKey(), forceSiteKey(userId)]).then(([key, force]) => spawnInstance(userId, effectiveRestarts + 1, key, force));
       }
     });
 
@@ -182,7 +194,7 @@ export function createSpawner({
         err.code = "ECONCURRENCY";
         throw err;
       }
-      instance = spawnInstance(userId, 0, await currentSiteKey());
+      instance = spawnInstance(userId, 0, await currentSiteKey(), await forceSiteKey(userId));
       const port = await instance.ready;
       return port;
     },
