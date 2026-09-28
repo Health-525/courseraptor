@@ -333,11 +333,9 @@ return r.json();
 }
 function esc(s) { var d = document.createElement("div"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
 function fmtDate(iso) { return String(iso || "").slice(0, 10); }
-function load() {
-api("/admin/api/overview").then(function (o) {
+function renderOverview(o) {
 if (!o) return;
-var el = document.getElementById("stats");
-el.innerHTML =
+document.getElementById("stats").innerHTML =
 '<div class="stat"><div class="n">' + o.users + '</div><div class="t">注册同学</div></div>' +
 '<div class="stat"><div class="n hot">' + o.online + "/" + o.capacity + '</div><div class="t">在线/并发上限</div></div>' +
 '<div class="stat"><div class="n">' + o.invitesLeft + '</div><div class="t">可用邀请码</div></div>' +
@@ -352,8 +350,8 @@ document.getElementById("statusCard").innerHTML =
 '<p class="lead" style="margin-top:2px"><span class="dot' + (o.online > 0 ? "" : " off") + '"></span>网关已连续运行 ' + esc(upText) +
 '，当前 ' + o.online + ' 个实例在线' + (o.online > 0 ? "" : "（空闲时不占内存）") + '。</p>' +
 '<p style="color:var(--ink-3);font-size:13px;margin:4px 0 0">实例按需拉起、空闲 30 分钟自动回收；每日每人对话限额可在服务器 env 调整（GATEWAY_DAILY_TURNS）。</p>';
-});
-api("/admin/api/users").then(function (list) {
+}
+function renderUsers(list) {
 if (!list) return;
 var el = document.getElementById("users");
 if (!list.length) { el.innerHTML = '<tr><td colspan="6" class="empty">还没有同学注册</td></tr>'; return; }
@@ -369,8 +367,8 @@ return '<tr><td class="mono">' + esc(u.username) + '</td><td>' + status + '</td>
 '</td><td class="mono">' + fmtDate(u.createdAt) + '</td><td class="mono">' + u.turns.count +
 '</td><td>' + acts + '</td></tr>';
 }).join("");
-});
-api("/admin/api/invites").then(function (list) {
+}
+function renderInvites(list) {
 if (!list) return;
 var el = document.getElementById("invites");
 if (!list.length) { el.innerHTML = '<tr><td colspan="4" class="empty">暂无邀请码，用上方表单生成</td></tr>'; return; }
@@ -382,8 +380,8 @@ var copy = used ? "" : '<button class="act" data-copy="' + esc(i.code) + '" type
 return '<tr><td class="mono">' + esc(i.code) + '</td><td>' + esc(i.note || "—") +
 '</td><td>' + status + '</td><td>' + copy + '</td></tr>';
 }).join("");
-});
-api("/admin/api/update/overview").then(function (o) {
+}
+function renderUpdate(o, v) {
 var cur = document.getElementById("updCur");
 var card = document.getElementById("updCard");
 if (!o) return;
@@ -395,7 +393,6 @@ return;
 }
 var c = o.data && o.data.current;
 cur.textContent = c ? ("当前 v" + c.version + " · " + fmtDate(c.publishedAt)) : "尚未发布过版本";
-api("/admin/api/update/versions").then(function (v) {
 if (!v || v.error || v.unavailable) { card.innerHTML = '<p class="empty">' + esc((v && (v.error || "无版本")) || "无版本") + '</p>'; return; }
 var list = v.data.versions || [];
 if (!list.length) { card.innerHTML = '<p class="empty">还没有发布过版本；在维护者机器上 npm run publish 即可发版</p>'; return; }
@@ -410,7 +407,14 @@ return '<tr><td class="mono">v' + esc(r.version) + tag + '</td><td>' + esc(r.not
 '</td><td class="mono">' + fmtDate(r.publishedAt) + '</td><td class="mono">' + mb(r.sizeBytes || 0) +
 '</td><td>' + acts + '</td></tr>';
 }).join("") + '</tbody></table>';
-});
+}
+function load() {
+api("/admin/api/bootstrap").then(function (b) {
+if (!b) return;
+renderOverview(b.overview);
+renderUsers(b.users);
+renderInvites(b.invites);
+renderUpdate(b.update.overview, b.update.versions);
 });
 }
 document.addEventListener("click", function (e) {
@@ -612,19 +616,40 @@ export function createAdminUi({
     return true;
   }
 
+  async function ownOverview() {
+    const users = await registry.listUsers();
+    const today = new Date().toISOString().slice(0, 10);
+    const invites = await registry.listInvites();
+    return {
+      users: users.length,
+      online: spawner.runningCount(),
+      capacity,
+      invitesLeft: invites.filter((i) => (i.usedBy?.length ?? 0) < (i.maxUses ?? 1)).length,
+      turnsToday: users.reduce((sum, u) => sum + (u.turns?.date === today ? u.turns.count : 0), 0),
+      uptimeSec: Math.round(process.uptime()),
+    };
+  }
+
   async function handleApi(req, res, pathname) {
-    if (req.method === "GET" && pathname === "/admin/api/overview") {
-      const users = await registry.listUsers();
-      const today = new Date().toISOString().slice(0, 10);
-      const invites = await registry.listInvites();
+    // 一次往返带回全部面板数据：跨公网链路 RTT 大，5 个串行请求是「卡」的主因
+    if (req.method === "GET" && pathname === "/admin/api/bootstrap") {
+      const [overview, users, invites, updOverview, updVersions] = await Promise.all([
+        ownOverview(),
+        registry.listUsers(),
+        registry.listInvites(),
+        callUpdateApi("GET", "/admin/api/overview"),
+        callUpdateApi("GET", "/admin/api/versions"),
+      ]);
       sendJson(res, 200, {
-        users: users.length,
-        online: spawner.runningCount(),
-        capacity,
-        invitesLeft: invites.filter((i) => (i.usedBy?.length ?? 0) < (i.maxUses ?? 1)).length,
-        turnsToday: users.reduce((sum, u) => sum + (u.turns?.date === today ? u.turns.count : 0), 0),
-        uptimeSec: Math.round(process.uptime()),
+        overview,
+        users: users.map((u) => ({ ...u, online: spawner.isRunning(u.id) })),
+        invites,
+        update: { overview: updOverview, versions: updVersions },
       });
+      return true;
+    }
+    if (req.method === "GET" && pathname === "/admin/api/overview") {
+      sendJson(res, 200, await ownOverview());
       return true;
     }
     if (req.method === "GET" && pathname === "/admin/api/users") {

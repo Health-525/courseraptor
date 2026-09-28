@@ -374,3 +374,39 @@ test("管理台·版本发布：令牌不符时返回可读错误，未配置时
   // 未登录依然 401
   assert.equal((await fetch(`${off.base}/admin/api/update/overview`)).status, 401);
 });
+
+test("管理台·bootstrap：一次往返带回全部面板数据", async (t) => {
+  const backendPort = await startBackend(t);
+  const update = await startFakeUpdateServer(t, "update-token-123");
+  const { base, registry } = await startGateway(t, {
+    backendPort,
+    adminPassword: "admin-master-pw",
+    updateServerUrl: update.url,
+    updateAdminToken: "update-token-123",
+  });
+  const [invite] = await registry.createInvites({ count: 1 });
+  const user = await registry.createUser({ username: "bootuser", password: "password123" });
+  await registry.addTurns(user.id, 4);
+
+  const cookie = (await adminLogin(base, "admin-master-pw")).cookie;
+  const boot = (await (
+    await fetch(`${base}/admin/api/bootstrap`, { headers: { cookie } })
+  ).json()) as {
+    overview: { users: number; turnsToday: number; invitesLeft: number };
+    users: Array<{ username: string; online: boolean }>;
+    invites: unknown[];
+    update: {
+      overview: { data?: { current?: { version: string } } };
+      versions: { data?: { versions: unknown[] } };
+    };
+  };
+  assert.equal(boot.overview.users, 1);
+  assert.equal(boot.overview.turnsToday, 4);
+  assert.equal(boot.overview.invitesLeft, 1);
+  assert.equal(boot.users[0].username, "bootuser");
+  assert.equal(boot.invites.length, 1);
+  assert.equal(boot.update.overview.data?.current?.version, "0.3.0");
+  assert.equal(boot.update.versions.data?.versions.length, 2);
+  // 未登录不给
+  assert.equal((await fetch(`${base}/admin/api/bootstrap`)).status, 401);
+});
