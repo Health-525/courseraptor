@@ -8,7 +8,9 @@ qq-allowlist.json
 qq-bridge.log
 *.log
 eng.traineddata
-data/
+# 锚定到仓库根：应用运行数据目录；不锚定的 data/ 会误吞嵌套同名源码目录
+# （如 server/admin/src/components/layout/data/）
+/data/
 .workbuddy/
 credentials.enc
 # 上游 skills 合集（体积大、仅本地参考，不入库不打包）
