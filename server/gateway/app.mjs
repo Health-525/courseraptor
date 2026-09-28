@@ -14,7 +14,7 @@ import { readFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { createAdminUi } from "./admin/ui.mjs";
-import { ownDeepseekKeyActive } from "./admin/credentials-peek.mjs";
+import { clearOwnDeepseekKey, ownDeepseekKeyActive } from "./admin/credentials-peek.mjs";
 
 const COOKIE_NAME = "raptor_sess";
 const SESSION_TTL_MS = 7 * 24 * 3600_000;
@@ -673,6 +673,18 @@ else { input.type = "password"; this.textContent = "显示"; }
       if (!user || user.disabled) {
         sessions.delete(session.userId);
         respond401();
+        return;
+      }
+
+      // 切回站点免费额度：清掉自己存的 Key 并回收实例（下次请求用站点 Key 重启）
+      if (req.method === "POST" && pathname === "/api/use-site-key") {
+        if (usersDir) {
+          await clearOwnDeepseekKey(usersDir, user.id);
+          spawner.kick(user.id);
+        }
+        console.log(`[gw] ${user.username} 切换回站点免费额度`);
+        sendJson(res, 200, { ok: true });
+        finish(200);
         return;
       }
 

@@ -659,6 +659,16 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .my-account { margin: 14px 2px 4px; padding: 14px 2px 4px; border-top: 1px solid var(--rule-2); }
   .my-account .ma-title { font-family: var(--mono); font-size: 12px; font-weight: 600;
                           letter-spacing: .14em; color: var(--ink-3); margin-bottom: 8px; }
+  /* Key 来源二选一（仅托管版显示）：两张可选卡，选中朱砂描边 */
+  .ds-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 2px 0 12px; }
+  .ds-opt { display: flex; flex-direction: column; gap: 3px; text-align: left; cursor: pointer;
+            background: var(--card); border: 1px solid var(--rule-2); border-radius: 3px;
+            padding: 10px 12px; font-family: var(--sans); }
+  .ds-opt b { font-size: 13.5px; color: var(--ink); font-weight: 600; }
+  .ds-opt span { font-size: 12px; line-height: 1.5; color: var(--ink-3); }
+  .ds-opt:hover { border-color: var(--ink-3); }
+  .ds-opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+  .ds-opt[aria-pressed="true"] b { color: var(--accent-deep); }
   /* 保存结果逐条展示：成功行墨色、失败行朱砂，一眼分清 */
   .setmsg.good .setmsg-line { margin: 0; }
   .setmsg.good .setmsg-line.bad { color: var(--accent-deep); }
@@ -1108,7 +1118,17 @@ export function chatPage(options: { demo?: boolean } = {}): string {
           </section>
           <section class="set-pane" id="setPaneModel" role="tabpanel" aria-labelledby="setTabModel" data-pane="model">
             <p class="dlg-intro">模型服务使用 DeepSeek API。API Key 与所选型号仅加密保存在当前电脑，留空即保持不变。</p>
-            <label class="fld"><span>API Key</span><span class="fld-row"><input id="sKey" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyeKey" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
+            <div class="ds-mode" id="dsMode" hidden>
+              <button type="button" class="ds-opt" id="dsSite" aria-pressed="false">
+                <b>站点免费额度</b>
+                <span>用站点统一 Key，每天有免费轮数；无需填写任何 Key</span>
+              </button>
+              <button type="button" class="ds-opt" id="dsOwn" aria-pressed="false">
+                <b>我自己的 API Key</b>
+                <span>自己的 DeepSeek Key，不占免费额度、不限轮数</span>
+              </button>
+            </div>
+            <label class="fld" id="sKeyRow"><span>API Key</span><span class="fld-row"><input id="sKey" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyeKey" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
             <div class="cur" id="curKey"></div>
             <div class="cur" id="curQuota" hidden></div>
             <div class="model-cards" id="modelCards" role="radiogroup" aria-label="选择 AI 模型"></div>

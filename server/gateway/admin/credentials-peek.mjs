@@ -60,3 +60,43 @@ export async function ownDeepseekKeyActive(usersDir, userId) {
   cache.set(userId, { mtime, active });
   return active;
 }
+
+/**
+ * 切回站点免费额度：清掉该同学存储的自己 Key（重新加密落盘，其他字段保留）。
+ * 文件不存在/解不开时静默成功——本来就没有自己的 Key。
+ */
+export async function clearOwnDeepseekKey(usersDir, userId) {
+  const { writeFile, rename } = await import("node:fs/promises");
+  const { randomBytes, createCipheriv } = await import("node:crypto");
+  const file = path.join(usersDir, userId, "credentials.enc");
+  let store = await decryptStore(file);
+  if (!store) store = {};
+  if (!store.deepseekApiKey && !store.deepseekApiKeyOverride) {
+    cache.delete(userId);
+    return;
+  }
+  store.deepseekApiKey = "";
+  store.deepseekApiKeyOverride = false;
+  const saltB64 = randomBytes(16).toString("base64");
+  const iv = randomBytes(12);
+  const key = scryptSync(
+    `${os.hostname()}|${os.userInfo().username}|courseraptor-v1`,
+    Buffer.from(saltB64, "base64"),
+    32,
+  );
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const data = Buffer.concat([cipher.update(JSON.stringify(store)), cipher.final()]);
+  const temp = `${file}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(
+    temp,
+    JSON.stringify({
+      v: 1,
+      salt: saltB64,
+      iv: iv.toString("base64"),
+      tag: cipher.getAuthTag().toString("base64"),
+      data: data.toString("base64"),
+    }),
+  );
+  await rename(temp, file);
+  cache.delete(userId);
+}
