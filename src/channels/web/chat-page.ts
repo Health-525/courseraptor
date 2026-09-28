@@ -1092,7 +1092,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
           <button class="set-tab on" type="button" role="tab" id="setTabAccount" aria-controls="setPaneAccount" aria-selected="true" data-pane="account"><i class="sdot" aria-hidden="true"></i>教务账号</button>
           <button class="set-tab" type="button" role="tab" id="setTabModel" aria-controls="setPaneModel" aria-selected="false" data-pane="model"><i class="sdot" aria-hidden="true"></i>AI 模型</button>
           <button class="set-tab" type="button" role="tab" id="setTabQQ" aria-controls="setPaneQQ" aria-selected="false" data-pane="qq"><i class="sdot" aria-hidden="true"></i>QQ 机器人</button>
-          <button class="set-tab" type="button" role="tab" id="setTabData" aria-controls="setPaneData" aria-selected="false" data-pane="data">本地数据</button>
+          <button class="set-tab" type="button" role="tab" id="setTabPass" aria-controls="setPanePass" aria-selected="false" data-pane="pass" hidden>我的账号</button>
+          <button class="set-tab" type="button" role="tab" id="setTabData" aria-selected="false" data-pane="data">本地数据</button>
         </nav>
         <div class="set-main">
           <section class="set-pane on" id="setPaneAccount" role="tabpanel" aria-labelledby="setTabAccount" data-pane="account">
@@ -1111,6 +1112,14 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             <input type="hidden" id="sModel" value="">
             <div class="cur" id="curModel"></div>
             <div class="diagrow"><button class="tbtn" id="testDeepseek" type="button" ${demo ? "disabled" : ""}>检测模型连接</button><span class="diagstate" id="diagDeepseek"></span></div>
+          </section>
+          <section class="set-pane" id="setPanePass" role="tabpanel" aria-labelledby="setTabPass" data-pane="pass" hidden>
+            <p class="dlg-intro">修改本站登录密码（进入这个网站用的账号密码，与教务账号无关）。改完后下次登录用新密码，当前会话不受影响。</p>
+            <label class="fld"><span>当前密码</span><span class="fld-row"><input id="sPassCur" type="password" autocomplete="current-password"><button class="fld-eye" type="button" id="eyePassCur" aria-pressed="false">显示</button></span></label>
+            <label class="fld"><span>新密码</span><span class="fld-row"><input id="sPassNew" type="password" autocomplete="new-password" placeholder="至少 8 位"><button class="fld-eye" type="button" id="eyePassNew" aria-pressed="false">显示</button></span></label>
+            <label class="fld"><span>确认新密码</span><span class="fld-row"><input id="sPassNew2" type="password" autocomplete="new-password"><button class="fld-eye" type="button" id="eyePassNew2" aria-pressed="false">显示</button></span></label>
+            <div class="cur" id="curPassMsg"></div>
+            <div class="diagrow"><button class="tbtn" id="saveMyPass" type="button">修改密码</button></div>
           </section>
           <section class="set-pane" id="setPaneQQ" role="tabpanel" aria-labelledby="setTabQQ" data-pane="qq">
             <p class="dlg-intro">在 q.qq.com 创建机器人后填入凭证，保存后即可在 QQ 里与本服务对话。凭证仅加密保存在当前电脑，留空即保持不变。</p>
