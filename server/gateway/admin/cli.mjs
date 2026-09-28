@@ -2,12 +2,12 @@
 /**
  * 多用户网关的管理命令（在部署机上执行，读写网关同一份注册表文件）。
  *
- *   node server/gateway/admin.mjs invite [--count 5] [--note 班级群] [--days 14]
- *   node server/gateway/admin.mjs list
- *   node server/gateway/admin.mjs disable <用户名或ID>   # 停用：立即禁止登录
- *   node server/gateway/admin.mjs enable <用户名或ID>
- *   node server/gateway/admin.mjs reset-pass <用户名或ID> --password <新密码>
- *   node server/gateway/admin.mjs kick <用户名或ID>      # 踢下线实例（经网关内部端点）
+ *   node server/gateway/admin/cli.mjs invite [--count 5] [--note 班级群] [--days 14]
+ *   node server/gateway/admin/cli.mjs list
+ *   node server/gateway/admin/cli.mjs disable <用户名或ID>   # 停用：立即禁止登录
+ *   node server/gateway/admin/cli.mjs enable <用户名或ID>
+ *   node server/gateway/admin/cli.mjs reset-pass <用户名或ID> --password <新密码>
+ *   node server/gateway/admin/cli.mjs kick <用户名或ID>      # 踢下线实例（经网关内部端点）
  *
  * 环境变量与 gateway.mjs 一致：GATEWAY_STATE_DIR（注册表位置）、
  * GATEWAY_URL + GATEWAY_SECRET（kick 用，默认 http://127.0.0.1:8080）。
@@ -16,9 +16,9 @@
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createRegistry } from "./registry.mjs";
+import { createRegistry } from "../registry.mjs";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const stateDir = process.env.GATEWAY_STATE_DIR || path.join(ROOT, "server", "gateway", "state");
 const registry = createRegistry({ stateDir });
 
