@@ -142,6 +142,7 @@ export function createGatewayServer({
     secret,
     password: adminPassword,
     capacity: maxConcurrent,
+    defaultDailyTurns: dailyTurns,
     updateServerUrl,
     updateAdminToken,
   });
@@ -606,12 +607,14 @@ else { input.type = "password"; this.textContent = "显示"; }
         return;
       }
 
-      // 统一 Key 的费用护栏：每日对话轮数（自带 Key 的同学同样计数，规则透明）
+      // 统一 Key 的费用护栏：每日对话轮数（按人限额优先，未设用站点默认；
+      // 自带 Key 的同学同样计数，规则透明）
       if (req.method === "POST" && pathname === "/api/chat") {
+        const limit = user.dailyTurns > 0 ? user.dailyTurns : dailyTurns;
         const used = await registry.turnsToday(user.id);
-        if (used >= dailyTurns) {
+        if (used >= limit) {
           sendJson(res, 429, {
-            error: `今日 ${dailyTurns} 轮对话额度已用完，明天再来；或到「设置」换用自己的 DeepSeek Key`,
+            error: `今日 ${limit} 轮对话额度已用完，明天再来；或到「设置」换用自己的 DeepSeek Key`,
           });
           finish(429);
           return;

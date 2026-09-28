@@ -89,6 +89,7 @@ export function createRegistry({ stateDir }) {
           disabled: false,
           createdAt: new Date().toISOString(),
           turns: { date: "", count: 0 },
+          dailyTurns: 0,
         };
         users.push(user);
         await writeUsers(users);
@@ -158,6 +159,38 @@ export function createRegistry({ stateDir }) {
       return user.turns?.date === today ? user.turns.count : 0;
     },
 
+    /** 按同学单独设每日对话轮数（0 = 用站点默认 GATEWAY_DAILY_TURNS） */
+    async setDailyTurns(id, turns) {
+      return serialized(async () => {
+        const users = (await readUsers()).users;
+        const user = users.find((u) => u.id === id);
+        if (!user) throw new Error("用户不存在");
+        const value = Number(turns);
+        if (!Number.isInteger(value) || value < 0 || value > 100_000) {
+          throw new Error("限额需为 0-100000 的整数（0=用站点默认）");
+        }
+        user.dailyTurns = value;
+        await writeUsers(users);
+      });
+    },
+
+    // ── 站点设置（管理台可改的运行时配置，site.json）──────────
+
+    /** 目前只有 deepseekKey；读取失败按空处理 */
+    async getSiteSettings() {
+      const data = await readJson(path.join(stateDir, "site.json"), null);
+      return { deepseekKey: typeof data?.deepseekKey === "string" ? data.deepseekKey : "" };
+    },
+
+    async setSiteSettings(patch) {
+      return serialized(async () => {
+        const current = await this.getSiteSettings();
+        const next = { ...current };
+        if (typeof patch.deepseekKey === "string") next.deepseekKey = patch.deepseekKey;
+        await writeAtomic(path.join(stateDir, "site.json"), JSON.stringify(next, null, 2));
+      });
+    },
+
     async listUsers() {
       return (await readUsers()).users.map((u) => ({
         id: u.id,
@@ -165,6 +198,7 @@ export function createRegistry({ stateDir }) {
         disabled: Boolean(u.disabled),
         createdAt: u.createdAt,
         turns: u.turns ?? { date: "", count: 0 },
+        dailyTurns: Number(u.dailyTurns) || 0,
       }));
     },
 

@@ -40,6 +40,8 @@ const spawner = createSpawner({
   projectRoot: ROOT,
   usersDir,
   deepseekKey: env.GATEWAY_DEEPSEEK_KEY || "",
+  // 管理台改站点 Key 后，新拉起的实例即用新值（已在线实例重启后切换）
+  getDeepseekKey: () => registry.getSiteSettings().then((s) => s.deepseekKey),
   maxConcurrent: Number(env.GATEWAY_MAX_CONCURRENT) || 4,
   idleMinutes: Number(env.GATEWAY_IDLE_MINUTES) || 30,
 });

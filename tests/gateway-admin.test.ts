@@ -422,3 +422,96 @@ test("管理台页面：内嵌脚本必须是合法 JavaScript（防编辑事故
   // 只编译不执行：语法错误（如括号不闭合）在这里抛出
   new vm.Script(match[1]);
 });
+
+test("按人限额与站点 Key 管理", async (t) => {
+  const backendPort = await startBackend(t);
+  const { base, registry } = await startGateway(t, {
+    backendPort,
+    adminPassword: "admin-master-pw",
+  });
+  const cookie = (await adminLogin(base, "admin-master-pw")).cookie;
+  const [invite] = await registry.createInvites({ count: 1 });
+  const reg = await fetch(`${base}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      invite: invite.code,
+      username: "quotauser",
+      password: "password123",
+      password2: "password123",
+    }),
+    redirect: "manual",
+  });
+  const userCookie = reg.headers.get("set-cookie") ?? "";
+
+  // 站点默认 dailyTurns=100：第 101 轮被拒（先手动把今日计数灌到 100）
+  const user = await registry.findUserByName("quotauser");
+  await registry.addTurns(user!.id, 100);
+  const blocked = await fetch(`${base}/api/chat`, {
+    method: "POST",
+    headers: { cookie: userCookie },
+    body: "{}",
+  });
+  assert.equal(blocked.status, 429);
+
+  // 给这位同学单独放开到 150：第 101 轮放行
+  const quota = await fetch(`${base}/admin/api/user/quota`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ user: "quotauser", turns: 150 }),
+  });
+  assert.equal(quota.status, 200);
+  const pass = await fetch(`${base}/api/chat`, {
+    method: "POST",
+    headers: { cookie: userCookie },
+    body: "{}",
+  });
+  assert.equal(pass.status, 200);
+
+  // 再收紧到 100：立刻又被拒（今日已 101）
+  await fetch(`${base}/admin/api/user/quota`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ user: "quotauser", turns: 100 }),
+  });
+  const blocked2 = await fetch(`${base}/api/chat`, {
+    method: "POST",
+    headers: { cookie: userCookie },
+    body: "{}",
+  });
+  assert.equal(blocked2.status, 429);
+
+  // 非法限额值被拒
+  const bad = await fetch(`${base}/admin/api/user/quota`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ user: "quotauser", turns: -5 }),
+  });
+  assert.equal(bad.status, 400);
+
+  // 站点 Key：非法格式被拒；合法格式保存后 GET 只回打码
+  const badKey = await fetch(`${base}/admin/api/site`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ deepseekKey: "not-a-key" }),
+  });
+  assert.equal(badKey.status, 400);
+  const saved = await fetch(`${base}/admin/api/site`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ deepseekKey: "sk-test-1234567890abcdef" }),
+  });
+  assert.equal(saved.status, 200);
+  const site = (await (await fetch(`${base}/admin/api/site`, { headers: { cookie } })).json()) as {
+    deepseekKeySet: boolean;
+    deepseekKeyMasked: string;
+    defaultDailyTurns: number;
+  };
+  assert.equal(site.deepseekKeySet, true);
+  assert.equal(site.deepseekKeyMasked, "sk-••••••••cdef");
+  assert.ok(
+    !JSON.stringify(site).includes("sk-test-1234567890abcdef"),
+    "完整 Key 不得出现在响应里",
+  );
+  assert.equal(site.defaultDailyTurns, 100);
+});
