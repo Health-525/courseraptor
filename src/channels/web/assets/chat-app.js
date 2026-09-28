@@ -2554,6 +2554,38 @@ async function doNewSession() {
 document.getElementById("newSession").addEventListener("click", doNewSession);
 document.getElementById("newSessionM").addEventListener("click", doNewSession);
 
+/* Key 来源二选一（仅托管版显示）：site=站点免费额度 / own=自己的 Key。
+   切到 site 时若已存有自己的 Key，先确认再清掉（网关重启实例生效） */
+function setDsMode(m, interactive) {
+  var site = document.getElementById("dsSite");
+  var own = document.getElementById("dsOwn");
+  var keyRow = document.getElementById("sKeyRow");
+  if (!site || !own) return;
+  site.setAttribute("aria-pressed", m === "site" ? "true" : "false");
+  own.setAttribute("aria-pressed", m === "own" ? "true" : "false");
+  if (keyRow) keyRow.style.display = m === "own" ? "" : "none";
+  if (!interactive) return;
+  if (m === "site" && own.getAttribute("aria-pressed") !== "false") return;
+}
+document.addEventListener("click", function (e) {
+  var t = e.target.closest ? e.target.closest(".ds-opt") : null;
+  if (!t) return;
+  if (t.id === "dsSite") {
+    if (!confirm("切回站点免费额度？将清除已保存的自己 Key（实例稍后自动重启生效）。")) return;
+    fetch("/api/use-site-key", { method: "POST" })
+      .then(function (r) { return r.ok; })
+      .then(function (okFlag) {
+        if (!okFlag) { alert("切换失败，请稍后再试"); return; }
+        setDsMode("site", false);
+        var k = document.getElementById("sKey"); if (k) k.value = "";
+        refreshQuota();
+      })
+      .catch(function () { alert("网络错误"); });
+    return;
+  }
+  if (t.id === "dsOwn") { setDsMode("own", true); return; }
+});
+
 /* 站点托管版的免费额度展示：/api/quota 由多用户网关提供；本地版与演示页
    没有该接口，静默隐藏即可，不影响任何本地行为 */
 function refreshQuota() {
@@ -2563,6 +2595,11 @@ function refreshQuota() {
       var el = document.getElementById("curQuota");
       if (!el || !q) return;
       el.hidden = false;
+      var mode = document.getElementById("dsMode");
+      if (mode) {
+        mode.hidden = false;
+        setDsMode(q.ownKeyActive ? "own" : "site", false);
+      }
       var accEl = document.getElementById("curAccount");
       if (accEl && q.username) accEl.textContent = "当前登录账号：" + q.username;
       var cardDef = HALL_CARDS.find(function (c) { return c.id === "account"; });

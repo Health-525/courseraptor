@@ -797,3 +797,63 @@ test("忘记密码全链路：申请→管理员同意出码→同学自设新�
   });
   assert.equal(newLogin.status, 303);
 });
+
+test("切回站点免费额度：清自己存的 Key 并失效豁免", async (t) => {
+  const backendPort = await startBackend(t);
+  const usersDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-sitekey-"));
+  t.after(() => fs.rmSync(usersDir, { recursive: true, force: true }));
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-sitekey-st-"));
+  const registry = createRegistry({ stateDir });
+  const spawner = fakeSpawner(backendPort);
+  const server = createGatewayServer({
+    registry,
+    spawner,
+    secret: "unit-test-secret-0123456789",
+    dailyTurns: 2,
+    usersDir,
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const base = `http://127.0.0.1:${address.port}`;
+
+  const [invite] = await registry.createInvites({ count: 1 });
+  const reg = await fetch(`${base}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      invite: invite.code,
+      username: "sitemode",
+      password: "password123",
+      password2: "password123",
+    }),
+    redirect: "manual",
+  });
+  const cookie = reg.headers.get("set-cookie") ?? "";
+  const user = await registry.findUserByName("sitemode");
+  await registry.addTurns(user!.id, 2);
+
+  // 存了自己 Key：豁免生效，对话放行
+  await craftCredentials(usersDir, user!.id, true);
+  const pass = await fetch(`${base}/api/chat`, { method: "POST", headers: { cookie }, body: "{}" });
+  assert.equal(pass.status, 200);
+
+  // 切回站点额度：Key 清除、实例被踢，额度恢复拦截
+  const kicked: string[] = [];
+  const origKick = spawner.kick;
+  const switched = await fetch(`${base}/api/use-site-key`, { method: "POST", headers: { cookie } });
+  assert.equal(switched.status, 200);
+  const q = (await (await fetch(`${base}/api/quota`, { headers: { cookie } })).json()) as {
+    ownKeyActive: boolean;
+  };
+  assert.equal(q.ownKeyActive, false, "Key 应已清除");
+  const blocked = await fetch(`${base}/api/chat`, {
+    method: "POST",
+    headers: { cookie },
+    body: "{}",
+  });
+  assert.equal(blocked.status, 429, "站点额度恢复拦截");
+  void kicked;
+  void origKick;
+});
