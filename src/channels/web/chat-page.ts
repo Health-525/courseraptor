@@ -224,7 +224,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .topbar .tb-title { flex: 1; justify-content: center; font-size: 18px; }
   .topbar .tbtn { min-height: 34px; padding: 5px 11px; font-size: 13px; }
   /* 移动顶栏导航位次对齐豆包等主流手机端 App：☰ 在左开唯一的左抽屉
-     （会话档案 + 新会话 + 功能大厅入口都在抽屉里），右侧只留高频的
+     （历史记录 + 新会话 + 功能大厅入口都在抽屉里），右侧只留高频的
      ＋ 新会话。图标按钮走 Material 3 顶栏规范：无边框幽灵图标、
      44×44 触控目标（HIG 下限），按压给朱砂浅底状态层 */
   .topbar .iconbtn { display: inline-flex; width: 44px; min-width: 44px;
@@ -1092,13 +1092,13 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     <button class="tbtn hall-btn" id="openHall" title="今日日程、课表、考试、待办、知识库、番茄钟" aria-haspopup="dialog" aria-expanded="false" aria-controls="hall">功能大厅</button>
   </div>
   <section class="sec">
-    <h2><span id="sessTitle">会话档案</span><span class="hside"><span id="sessCount"></span><button id="sessArchiveToggle" type="button" hidden></button></span></h2>
+    <h2><span id="sessTitle">历史记录</span><span class="hside"><span id="sessCount"></span><button id="sessArchiveToggle" type="button" hidden></button></span></h2>
     <ul class="sess" id="sessList"></ul>
   </section>
 </aside>
 <main>
   <div class="topbar">
-    <button class="tbtn iconbtn" id="openDrawerM" type="button" aria-label="会话列表" title="会话列表"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <button class="tbtn iconbtn" id="openDrawerM" type="button" aria-label="打开菜单：历史记录、新会话" title="菜单：历史记录 / 新会话 / 功能大厅"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
     <span class="tb-title wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></span>
     <button class="tbtn iconbtn" id="newSessionM" type="button" aria-label="新会话" title="另起一个会话（旧会话保留在档案里）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
   </div>

@@ -704,7 +704,7 @@ function renderSessList() {
   /* 兜底：归档视图里把最后一条也恢复/删掉时，自动切回主列表 */
   if (viewingArchived && !archivedCount) viewingArchived = false;
   const shownCount = viewingArchived ? archivedCount : lastSessions.length - archivedCount;
-  document.getElementById("sessTitle").textContent = viewingArchived ? "已归档" : "会话档案";
+  document.getElementById("sessTitle").textContent = viewingArchived ? "已归档" : "历史记录";
   document.getElementById("sessCount").textContent = shownCount ? shownCount + " 个" : "";
   /* 主列表里有归档过才给入口；进了归档视图常驻「返回」 */
   const toggle = document.getElementById("sessArchiveToggle");
@@ -717,13 +717,13 @@ function renderSessList() {
     const ico = el("");
     ico.innerHTML = ARCHIVE_SVG;
     li.appendChild(ico);
-    li.appendChild(el2("snone-t", "档案室还空着"));
+    li.appendChild(el2("snone-t", "还没有历史记录"));
     li.appendChild(
       el2(
         "snone-hint",
         archivedCount
           ? "会话都归档了，点右上「归档 " + archivedCount + "」可以找回。"
-          : "在右侧开问一句，这轮对话就会归档到这里，重启也不丢。",
+          : "在下面问一句，这轮对话就会存进历史，重启也不丢。",
       ),
     );
     sessList.appendChild(li);
