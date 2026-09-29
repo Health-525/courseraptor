@@ -919,10 +919,11 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
     fs.writeFileSync(f, code, "utf8");
     execFileSync(process.execPath, ["--check", f], { stdio: "pipe" });
   });
-  // 聊天页入口已收敛为「功能大厅」：侧栏与窄屏顶栏各一个按钮，完整页由面板内链接承接
+  // 聊天页入口已收敛为「功能大厅」：窄屏顶栏只有 ☰ 与 ＋，大厅入口在左抽屉里
+  // （豆包式单抽屉导航——顶栏再放一枚左滑面板按钮会被当成功能重复）
   const chat = await (await fetch(url)).text();
-  assert.match(chat, /id="openHall"[^>]*>功能大厅</, "侧栏应有功能大厅入口");
-  assert.match(chat, /id="openHallM"[^>]*>大厅</, "移动顶栏应有功能大厅入口");
+  assert.match(chat, /id="openHall"[^>]*>功能大厅</, "左抽屉应有功能大厅入口");
+  assert.ok(!chat.includes('id="openHallM"'), "窄屏顶栏不应再有独立大厅按钮（避免与 ☰ 抽屉重复）");
   assert.match(chat, /class="hall" id="hall"/, "功能大厅抽屉应存在");
   assert.match(chat, /id="hallSettings"/, "设置面板应常驻在功能大厅抽屉里");
   assert.ok(!chat.includes('id="openSettings"'), "侧栏不应再有独立的设置按钮");
