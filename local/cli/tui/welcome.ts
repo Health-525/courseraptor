@@ -5,13 +5,13 @@
  * 任何一段失败只降级那一段的文案，不影响其他段和正常对话。
  */
 
-import { config } from "../../../core/config";
-import { loadExamCache } from "../../../core/exam-cache";
-import type { ScheduleResult } from "../../../core/model";
-import { loadScheduleCache, saveScheduleCache } from "../../../core/schedule-cache";
-import { school } from "../../../core/school";
-import { listReminders } from "../../../core/workspace-data";
-import { startChatWeb } from "../../web/chat-web";
+import { startChatWeb } from "../../../src/channels/web/chat-web";
+import { config } from "../../../src/core/config";
+import { loadExamCache } from "../../../src/core/exam-cache";
+import type { ScheduleResult } from "../../../src/core/model";
+import { loadScheduleCache, saveScheduleCache } from "../../../src/core/schedule-cache";
+import { school } from "../../../src/core/school";
+import { listReminders } from "../../../src/core/workspace-data";
 import { dim, header } from "./color";
 
 declare global {

@@ -18,7 +18,7 @@ import { test } from "node:test";
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-qq-arch-"));
 
 const S = await import("../src/core/chat-sessions");
-const { qqArchiveSlot } = await import("../src/channels/qq/session-archive");
+const { qqArchiveSlot } = await import("../local/qq/session-archive");
 
 /** 与 src/channels/web/chat-web.ts 的 SESSION_ID_RE 同规则：侧栏点得开的硬约束 */
 const SESSION_ID_RE = /^[0-9A-Za-z_-]{1,64}$/;
@@ -163,7 +163,7 @@ test("端到端：QQ 写进档案后，网页历史接口列得出来、点得�
 });
 
 test("桥的落盘入口 archiveQQRound：写对档案，认不出归属时一条都不加", async () => {
-  const { archiveQQRound } = await import("../src/channels/qq/bridge");
+  const { archiveQQRound } = await import("../local/qq/bridge");
   const before = S.listSessions().length;
 
   archiveQQRound(c2c("C2C_BRIDGE", "体育课上完了吗"), "周四第 3 节", console);
@@ -181,7 +181,7 @@ test("桥的落盘入口 archiveQQRound：写对档案，认不出归属时一�
 });
 
 test("桥落盘后由模型定侧栏标题：保留 QQ 前缀、人工命名让位、失败保首问兜底", async () => {
-  const { archiveQQRound } = await import("../src/channels/qq/bridge");
+  const { archiveQQRound } = await import("../local/qq/bridge");
   const { setTitleMaker } = await import("../src/core/session-titles");
 
   // 注入替身命名 maker（不联网）：QQ 会话标题应换成模型定的主题

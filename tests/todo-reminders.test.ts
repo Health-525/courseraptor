@@ -16,7 +16,7 @@ process.env.RAPTOR_DATA_DIR = tmpData;
 
 const { dueWithinWindow, runReminderCheck } = await import("../src/core/todo-reminders");
 const { addReminder, updateReminder } = await import("../src/core/workspace-data");
-const { pushQQText, registerQQPush } = await import("../src/channels/qq/push");
+const { pushQQText, registerQQPush } = await import("../local/qq/push");
 
 /** 注入的通知出口：只记录提醒到的标题 */
 function recorder() {

@@ -6,11 +6,11 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
 /**
- * 真实拉起一个 headless 实例（node + tsx + src/headless/entry.ts），验证：
+ * 真实拉起一个 headless 实例（node + tsx + gateway/headless/entry.ts），验证：
  * 就绪端口上报、页面可访问、数据目录隔离、并发上限、kick 回收。
  * 这是网关链路里最关键的一环，代价是本测试比单元测试慢（约 10-20 秒）。
  */
-const { createSpawner } = await import("../server/gateway/spawner.mjs");
+const { createSpawner } = await import("../gateway/spawner.mjs");
 
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 

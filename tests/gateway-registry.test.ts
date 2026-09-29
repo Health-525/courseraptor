@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-const { createRegistry } = await import("../server/gateway/registry.mjs");
+const { createRegistry } = await import("../gateway/registry.mjs");
 
 function makeRegistry() {
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-reg-"));

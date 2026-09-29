@@ -10,7 +10,8 @@
 import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { pushQQText } from "../channels/qq/push";
+// 桌面提醒与 QQ 推送只随本地版（local/qq）分发；托管实例不启用提醒
+import { pushQQText } from "../../local/qq/push";
 import { writeFileAtomicSync } from "./atomic-write";
 import { PROJECT_ROOT } from "./config";
 import { listReminders, type Reminder } from "./workspace-data";

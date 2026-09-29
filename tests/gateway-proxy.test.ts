@@ -5,8 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-const { createGatewayServer } = await import("../server/gateway/app.mjs");
-const { createRegistry } = await import("../server/gateway/registry.mjs");
+const { createGatewayServer } = await import("../gateway/app.mjs");
+const { createRegistry } = await import("../gateway/registry.mjs");
 
 /**
  * 假后端：扮演某位同学的 CourseRaptor 实例。记录收到的 Host / Origin，

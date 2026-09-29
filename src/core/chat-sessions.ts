@@ -12,7 +12,7 @@
  * - 会话数、单会话消息数都有上限，防文件无限膨胀
  * - RAPTOR_DATA_DIR 可指到临时目录做测试隔离（与 schedule-cache 同款）
  * - 写入方有两个：网页（读写都走这里）和 QQ 桥（只往里落盘，上下文仍用
- *   自己那份内存窗口）。QQ 档 id 由 src/channels/qq/session-archive.ts 生成，
+ *   自己那份内存窗口）。QQ 档 id 由 local/qq/session-archive.ts 生成，
  *   统一带 qq- 前缀，与网页的 uuid/default 天然不串档
  */
 

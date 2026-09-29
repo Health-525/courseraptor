@@ -1,6 +1,6 @@
 /**
  * CourseRaptor 无终端（headless）入口：只起网页服务，供多用户网关部署。
- * 运行: node --import tsx src/headless/entry.ts（由 server/gateway/spawner.mjs 拉起）
+ * 运行: node --import tsx gateway/headless/entry.ts（由 gateway/spawner.mjs 拉起）
  *
  * 与 channels/cli 的关系：那是「终端 TUI + 网页」双入口，这里是纯网页单入口。
  * 不引 TUI、不做交互式引导（教务账号由同学在网页「设置」里填，DeepSeek Key
@@ -8,12 +8,12 @@
  * 同学本地的完整版。启动就绪后向 stdout 打一行固定格式，网关据此拿到实际端口。
  */
 
-import "../adapters";
-import { createRaptorAgent } from "../core/agent";
-import { config } from "../core/config";
-import { saveCredentialsStore } from "../core/credentials";
-import { ensureModelAvailable } from "../core/models";
-import { installDefaultTitleMaker } from "../core/session-titles";
+import "../../src/adapters";
+import { createRaptorAgent } from "../../src/core/agent";
+import { config } from "../../src/core/config";
+import { saveCredentialsStore } from "../../src/core/credentials";
+import { ensureModelAvailable } from "../../src/core/models";
+import { installDefaultTitleMaker } from "../../src/core/session-titles";
 
 // 模型退役检测（同 cli 入口语义）：赶在 agent / 网页构建之前完成迁移。
 // 无终端模式下任何启动期异常都不能让进程带病退出——网关还要靠它服务。
@@ -43,7 +43,7 @@ try {
 const agent = await createRaptorAgent();
 
 const { setChatAgent, setChatAgentRefresher, startChatWeb } = await import(
-  "../channels/web/chat-web"
+  "../../src/channels/web/chat-web"
 );
 setChatAgent(agent);
 // 换模型即重建 agent 给网页用（同学在设置里切型号后无需重启实例）

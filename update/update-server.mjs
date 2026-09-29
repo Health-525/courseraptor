@@ -4,7 +4,7 @@
  *
  * 运行：
  *   UPDATE_ADMIN_TOKEN=管理员密钥 PORT=8787 \
- *     node server/update-server.mjs
+ *     node update/update-server.mjs
  *
  * 数据写入 update-data/：
  * - meta.json + 版本 zip：更新分发。

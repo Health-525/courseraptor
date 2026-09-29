@@ -14,11 +14,11 @@
 
 ## 架构要点
 
-- **网关**（`server/gateway/`）：登录注册、会话 Cookie（HttpOnly + SameSite=Lax
+- **网关**（`gateway/`）：登录注册、会话 Cookie（HttpOnly + SameSite=Lax
   + HMAC 签名）、登录防爆破（连续 5 次失败锁 15 分钟）、每日每人对话轮数限额、
   按用户反向代理。转发时改写 `Host`、剥掉 `Origin`，后端现有的三道本机防线
   原样通过。
-- **实例**（`src/headless/entry.ts`）：每位同学一个 Node 子进程，靠环境变量
+- **实例**（`gateway/headless/entry.ts`）：每位同学一个 Node 子进程，靠环境变量
   隔离——`RAPTOR_DATA_DIR`（数据）、`RAPTOR_CREDENTIALS_FILE`（加密凭证）、
   `RAPTOR_WEB_PORT`（独立回环端口）。空闲 30 分钟自动回收，下次请求重新拉起
   （约 3-5 秒）。
@@ -78,7 +78,7 @@ After=network-online.target
 User=raptor
 WorkingDirectory=/opt/courseraptor
 EnvironmentFile=/etc/raptor-gateway.env
-ExecStart=/usr/bin/node server/gateway/gateway.mjs
+ExecStart=/usr/bin/node gateway/gateway.mjs
 Restart=always
 RestartSec=3
 
@@ -90,7 +90,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now raptor-gateway
 # 6. 防火墙 + 云安全组放行 8080/tcp，然后生成邀请码
 sudo ufw allow 8080/tcp
 cd /opt/courseraptor && sudo -u raptor GATEWAY_STATE_DIR=/var/lib/raptor-gateway \
-  node server/gateway/admin/cli.mjs invite --count 10 --note 班级群 --days 14
+  node gateway/admin/cli.mjs invite --count 10 --note 班级群 --days 14
 ```
 
 同学拿到邀请码后访问 `http://<服务器IP>:8080/register` 注册即可。
@@ -107,7 +107,7 @@ cd /opt/courseraptor && sudo -u raptor GATEWAY_STATE_DIR=/var/lib/raptor-gateway
 - 邀请码：按数量 + 备注 + 有效期生成，一键复制
 - **版本发布**（可选）：接入同机部署的更新分发后台后，可查看版本列表、
   回滚分发版本、删除历史版本——需要在服务器上再跑一个
-  `raptor-update.service`（`server/update-server.mjs`，只绑 127.0.0.1:8787，
+  `raptor-update.service`（`update/update-server.mjs`，只绑 127.0.0.1:8787，
   不开公网端口），并在网关 env 里配置 `GATEWAY_UPDATE_URL` +
   `GATEWAY_UPDATE_TOKEN`（与更新后台的 `UPDATE_ADMIN_TOKEN` 一致）；
   发版本身仍从维护者机器 `npm run publish` 上传
@@ -124,10 +124,10 @@ journalctl -u raptor-gateway -f          # 含每个实例的运行日志（前�
 curl http://127.0.0.1:8080/health        # {"ok":true,"running":N}
 
 # 用户管理（admin.mjs 与网关共用注册表文件）
-node server/gateway/admin/cli.mjs list                       # 用户 + 未用邀请码 + 今日用量
-node server/gateway/admin/cli.mjs disable 某同学             # 停用（立即禁止登录）
-node server/gateway/admin/cli.mjs reset-pass 某同学 --password 新密码
-GATEWAY_SECRET=... node server/gateway/admin/cli.mjs kick 某同学   # 踢下线实例
+node gateway/admin/cli.mjs list                       # 用户 + 未用邀请码 + 今日用量
+node gateway/admin/cli.mjs disable 某同学             # 停用（立即禁止登录）
+node gateway/admin/cli.mjs reset-pass 某同学 --password 新密码
+GATEWAY_SECRET=... node gateway/admin/cli.mjs kick 某同学   # 踢下线实例
 
 # 升级版本
 cd /opt/courseraptor && sudo -u raptor git pull && sudo -u raptor npm ci

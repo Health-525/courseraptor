@@ -1,7 +1,7 @@
 /**
  * 多用户网关的实例管理器：按需拉起 / 回收每个同学专属的 CourseRaptor 实例。
  *
- * 一个用户 = 一个 Node 子进程（src/headless/entry.ts），靠环境变量完全隔离：
+ * 一个用户 = 一个 Node 子进程（gateway/headless/entry.ts），靠环境变量完全隔离：
  * - RAPTOR_DATA_DIR / RAPTOR_CREDENTIALS_FILE → 各自独立的数据与加密凭证
  * - RAPTOR_WEB_PORT → 独立回环端口，网关按 Cookie 路由到对应端口
  * 就绪信号是子进程 stdout 的「[headless] ready port=<n>」行（RAPTOR_WEB_PORT
@@ -108,7 +108,7 @@ export function createSpawner({
     if (effectiveKey) env.DEEPSEEK_API_KEY = effectiveKey;
     if (forceSite) env.RAPTOR_DISABLE_DS_OVERRIDE = "1";
 
-    const child = spawn(nodeExec, ["--import", tsxUrl, "src/headless/entry.ts"], {
+    const child = spawn(nodeExec, ["--import", tsxUrl, "gateway/headless/entry.ts"], {
       cwd: projectRoot,
       env,
       stdio: ["ignore", "pipe", "pipe"],
