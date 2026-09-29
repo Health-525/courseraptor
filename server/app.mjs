@@ -16,27 +16,10 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const MAX_PACKAGE_BODY = 200 * 1024 * 1024;
 const MAX_ADMIN_BODY = 64 * 1024;
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
-const DEFAULT_ADMIN_DIST_DIR = path.join(ROOT, "admin", "dist");
 const ZIP_RE = /^courseraptor-v(\d+\.\d+\.\d+)\.zip$/;
 const FAILURES_TO_LOCK = 5;
 const LOCK_DURATION_MS = 15 * 60 * 1000;
 const FAILURE_IDLE_MS = 30 * 60 * 1000;
-
-const MIME_TYPES = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".mjs": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".json": "application/json; charset=utf-8",
-  ".map": "application/json",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".ico": "image/x-icon",
-  ".txt": "text/plain; charset=utf-8",
-  ".woff": "font/woff",
-  ".woff2": "font/woff2",
-};
 
 function hashToken(token) {
   return createHash("sha256").update(String(token)).digest();
@@ -104,27 +87,13 @@ ${meta ? `<p class="ver">当前版本：v${meta.version} · 发布于 ${meta.pub
 <p>启动后会自动检查新版本；对话中输入 <code>/update</code> 可下载并安装更新。</p>
 </body></html>`;
 
-const adminHintHtml = () => `<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CourseRaptor Admin</title><style>
-body{font-family:system-ui,sans-serif;max-width:640px;margin:64px auto;padding:0 16px;line-height:1.8;color:#222}
-code{background:#f2f2f2;padding:1px 6px;border-radius:4px}
-ol{padding-left:24px}
-</style></head><body><h1>🦖 CourseRaptor Admin</h1>
-<p>管理面板前端尚未构建，服务端已就绪。</p>
-<ol><li>在项目根目录执行 <code>npm run admin:build</code>（首次需先 <code>npm --prefix server/admin install</code>）。</li>
-<li>刷新本页即可进入登录界面，密钥为服务器环境变量 <code>UPDATE_ADMIN_TOKEN</code>。</li></ol>
-</body></html>`;
-
-/** 创建可测试、可嵌入的更新 HTTP 服务（含 /admin 管理面板与 admin API）。 */
+/** 创建可测试、可嵌入的更新 HTTP 服务（admin API 供网关管理台代理调用）。 */
 export function createUpdateServer({
   dataDir = path.join(ROOT, "..", "update-data"),
   adminToken,
-  adminDistDir = DEFAULT_ADMIN_DIST_DIR,
 } = {}) {
   if (!adminToken) throw new Error("缺少 UPDATE_ADMIN_TOKEN");
   mkdirSync(dataDir, { recursive: true });
-  const distRoot = path.resolve(adminDistDir);
   const metaFile = path.join(dataDir, "meta.json");
   const versionsFile = path.join(dataDir, "versions.json");
   const zipPath = (version) => path.join(dataDir, `courseraptor-v${version}.zip`);
@@ -279,51 +248,10 @@ export function createUpdateServer({
     return sendJson(res, 200, { ok: true, version });
   }
 
-  function serveAdminFile(res, relative) {
-    let decoded;
-    try {
-      decoded = decodeURIComponent(relative);
-    } catch {
-      return sendJson(res, 400, { error: "路径编码不正确" });
-    }
-    const target = path.resolve(distRoot, decoded);
-    if (target !== distRoot && !target.startsWith(distRoot + path.sep)) {
-      return sendJson(res, 403, { error: "路径不合法" });
-    }
-    let info;
-    try {
-      info = statSync(target);
-    } catch {
-      return sendJson(res, 404, { error: "not found" });
-    }
-    if (!info.isFile()) return sendJson(res, 404, { error: "not found" });
-    const ext = path.extname(target).toLowerCase();
-    const isIndex = target === path.join(distRoot, "index.html");
-    res.writeHead(200, {
-      "content-type": MIME_TYPES[ext] ?? "application/octet-stream",
-      "content-length": info.size,
-      "cache-control": isIndex ? "no-cache" : "public, max-age=31536000, immutable",
-    });
-    return createReadStream(target).pipe(res);
-  }
-
   return http.createServer(async (req, res) => {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     const pathname = url.pathname;
     try {
-      // ── admin 面板静态资源（SPA 壳本身不带密钥，数据全部走鉴权 API）──
-      if (req.method === "GET" && pathname === "/admin") {
-        res.writeHead(308, { location: "/admin/" });
-        return res.end();
-      }
-      if (req.method === "GET" && (pathname === "/admin/" || pathname === "/admin/index.html")) {
-        if (!existsSync(path.join(distRoot, "index.html"))) {
-          res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
-          return res.end(adminHintHtml());
-        }
-        return serveAdminFile(res, "index.html");
-      }
-
       // ── admin API（与 /publish 共用令牌与防爆破锁定）──
       if (req.method === "GET" && pathname === "/admin/api/overview") {
         if (!checkAdmin(req, res)) return;
@@ -408,31 +336,6 @@ export function createUpdateServer({
       if (req.method === "GET" && (pathname === "/" || pathname === "/index.html")) {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         return res.end(landingHtml(await readMeta()));
-      }
-
-      // ── admin 静态资源兜底（/admin/assets/* 与 SPA 前端路由刷新）──
-      if (req.method === "GET" && pathname.startsWith("/admin/")) {
-        const relative = pathname.slice("/admin/".length);
-        if (!relative.startsWith("api/")) {
-          // SPA（TanStack Router history 模式）：dist 内不存在的路径回 index.html；
-          // 解码后越出 dist 的路径不走回退，交给 serveAdminFile 返回 403。
-          let decoded = relative;
-          try {
-            decoded = decodeURIComponent(relative);
-          } catch {
-            // 编码错误按原样处理
-          }
-          const target = path.resolve(distRoot, decoded);
-          const insideDist = target === distRoot || target.startsWith(distRoot + path.sep);
-          if (
-            insideDist &&
-            !existsSync(target) &&
-            existsSync(path.join(distRoot, "index.html"))
-          ) {
-            return serveAdminFile(res, "index.html");
-          }
-        }
-        return serveAdminFile(res, relative);
       }
 
       return sendJson(res, 404, { error: "not found" });

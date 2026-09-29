@@ -10,12 +10,11 @@ const TOKEN = "test-admin-token";
 
 type TestContext = { after: (fn: () => void) => void };
 
-async function startServer(t: TestContext, adminDistDir?: string) {
+async function startServer(t: TestContext) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-update-admin-"));
   const server = createUpdateServer({
     dataDir,
     adminToken: TOKEN,
-    ...(adminDistDir ? { adminDistDir } : {}),
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => server.close());
@@ -196,57 +195,17 @@ test("admin API 需要令牌，连续失败触发锁定", async (t) => {
   assert.equal(locked.status, 429);
 });
 
-test("/admin 提供面板静态资源，路径穿越被拒绝", async (t) => {
-  const distDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-admin-dist-"));
-  t.after(() => fs.rmSync(distDir, { recursive: true, force: true }));
-  fs.mkdirSync(path.join(distDir, "assets"), { recursive: true });
-  fs.writeFileSync(path.join(distDir, "index.html"), "<!doctype html><title>admin</title>");
-  fs.writeFileSync(path.join(distDir, "assets", "app.js"), "console.log(1);");
+test("独立管理面板已移除：/admin 不再提供网页，admin API 照常", async (t) => {
+  const { baseUrl } = await startServer(t);
 
-  const { baseUrl } = await startServer(t, distDir);
+  // 网页入口收敛到网关管理台；更新后台只保留机器接口
+  const page = await fetch(`${baseUrl}/admin`);
+  assert.equal(page.status, 404);
+  const deep = await fetch(`${baseUrl}/admin/versions`);
+  assert.equal(deep.status, 404);
 
-  const redirect = await fetch(`${baseUrl}/admin`, { redirect: "manual" });
-  assert.equal(redirect.status, 308);
-  assert.equal(redirect.headers.get("location"), "/admin/");
-
-  const index = await fetch(`${baseUrl}/admin/`);
-  assert.equal(index.status, 200);
-  assert.ok(index.headers.get("content-type")?.includes("text/html"));
-  assert.ok(index.headers.get("cache-control")?.includes("no-cache"));
-  assert.ok((await index.text()).includes("admin"));
-
-  const asset = await fetch(`${baseUrl}/admin/assets/app.js`);
-  assert.equal(asset.status, 200);
-  assert.ok(asset.headers.get("content-type")?.includes("text/javascript"));
-  assert.ok(asset.headers.get("cache-control")?.includes("immutable"));
-  assert.equal(await asset.text(), "console.log(1);");
-
-  // %2f（编码斜杠）不会被 URL 解析器规范化，服务器解码后即为 ../..，真正打到穿越防护
-  const traversal = await fetch(`${baseUrl}/admin/assets/%2e%2e%2f..%2fmeta.json`);
-  assert.equal(traversal.status, 403);
-});
-
-test("SPA 前端路由刷新回 index.html，API 前缀不受影响", async (t) => {
-  const distDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-admin-dist-"));
-  t.after(() => fs.rmSync(distDir, { recursive: true, force: true }));
-  fs.writeFileSync(path.join(distDir, "index.html"), "<!doctype html><title>admin</title>");
-
-  const { baseUrl } = await startServer(t, distDir);
-
-  const spaRoute = await fetch(`${baseUrl}/admin/versions`);
-  assert.equal(spaRoute.status, 200);
-  assert.ok(spaRoute.headers.get("content-type")?.includes("text/html"));
-  assert.ok((await spaRoute.text()).includes("admin"));
-
-  // API 前缀不回退到 SPA，仍按 JSON 接口处理（此处是无 token 的 401）
-  const apiRoute = await fetch(`${baseUrl}/admin/api/overview`);
-  assert.equal(apiRoute.status, 401);
-  assert.ok(apiRoute.headers.get("content-type")?.includes("application/json"));
-});
-
-test("面板未构建时 /admin/ 返回构建指引而不是报错", async (t) => {
-  const { baseUrl } = await startServer(t, path.join(os.tmpdir(), "raptor-admin-dist-missing"));
-  const res = await fetch(`${baseUrl}/admin/`);
-  assert.equal(res.status, 200);
-  assert.ok((await res.text()).includes("admin:build"));
+  const api = await fetch(`${baseUrl}/admin/api/overview`, {
+    headers: { "x-admin-token": TOKEN },
+  });
+  assert.equal(api.status, 200);
 });
