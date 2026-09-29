@@ -1,10 +1,11 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import http from "node:http";
 import {
   createReadStream,
   existsSync,
   mkdirSync,
   readdirSync,
+  readFileSync,
   statSync,
   unlinkSync,
 } from "node:fs";
@@ -20,6 +21,12 @@ const ZIP_RE = /^courseraptor-v(\d+\.\d+\.\d+)\.zip$/;
 const FAILURES_TO_LOCK = 5;
 const LOCK_DURATION_MS = 15 * 60 * 1000;
 const FAILURE_IDLE_MS = 30 * 60 * 1000;
+const ENV_KEY_ID = "__env__";
+const ENV_KEY_NAME = "主密钥（环境变量）";
+const KEY_NAME_DEFAULT = "未命名密钥";
+const KEY_NAME_MAX = 64;
+/** 面板密钥令牌前缀 + 24 字节 base64url（恰 32 字符，字母表 A-Za-z0-9_-） */
+const KEY_TOKEN_PREFIX = "crak_";
 
 function hashToken(token) {
   return createHash("sha256").update(String(token)).digest();
@@ -96,7 +103,59 @@ export function createUpdateServer({
   mkdirSync(dataDir, { recursive: true });
   const metaFile = path.join(dataDir, "meta.json");
   const versionsFile = path.join(dataDir, "versions.json");
+  const keysFile = path.join(dataDir, "admin-keys.json");
   const zipPath = (version) => path.join(dataDir, `courseraptor-v${version}.zip`);
+
+  // 面板密钥启动时读一次，之后内存为准（创建/删除/使用都会同步落盘）。
+  // 落盘只存 sha256 哈希，明文令牌仅创建响应里出现一次。
+  let panelKeys = [];
+  try {
+    const parsed = JSON.parse(readFileSync(keysFile, "utf8"));
+    if (Array.isArray(parsed?.keys)) {
+      panelKeys = parsed.keys.filter(
+        (k) =>
+          k && typeof k.id === "string" && typeof k.name === "string" && typeof k.tokenHash === "string",
+      );
+    }
+  } catch {
+    // 首次使用或历史文件损坏：当作没有面板密钥，首次创建时重建
+  }
+
+  const writeKeys = () => writeAtomic(keysFile, JSON.stringify({ keys: panelKeys }, null, 2));
+
+  /** 面板密钥对外只暴露元信息，绝不带 tokenHash。 */
+  const publicKeyView = (k) => ({
+    id: k.id,
+    name: k.name,
+    isEnv: false,
+    createdAt: k.createdAt ?? null,
+    lastUsedAt: k.lastUsedAt ?? null,
+  });
+
+  const envKeyView = () => ({
+    id: ENV_KEY_ID,
+    name: ENV_KEY_NAME,
+    isEnv: true,
+    createdAt: null,
+    lastUsedAt: null,
+  });
+
+  function normalizeKeyName(name) {
+    const trimmed = typeof name === "string" ? name.trim() : "";
+    return trimmed ? trimmed.slice(0, KEY_NAME_MAX) : KEY_NAME_DEFAULT;
+  }
+
+  /** 按令牌原文匹配面板密钥（等长哈希 + 恒时比较），命中返回该密钥。 */
+  function findPanelKey(token) {
+    if (typeof token !== "string" || !token.startsWith(KEY_TOKEN_PREFIX)) return null;
+    const hashed = createHash("sha256").update(token).digest();
+    return (
+      panelKeys.find((k) => {
+        const stored = Buffer.from(k.tokenHash, "hex");
+        return stored.length === hashed.length && timingSafeEqual(stored, hashed);
+      }) ?? null
+    );
+  }
 
   // 连续鉴权失败锁定：按客户端 IP 计数，5 次失败锁 15 分钟，成功后清零。
   const failedLogins = new Map();
@@ -109,8 +168,8 @@ export function createUpdateServer({
     return loopback && typeof realIp === "string" && realIp ? realIp : remote;
   }
 
-  /** 校验管理员令牌并执行防爆破锁定；失败时响应已写出，返回 false。 */
-  function checkAdmin(req, res) {
+  /** 校验管理员令牌（环境变量主密钥或面板密钥）并执行防爆破锁定；失败时响应已写出，返回 false。 */
+  async function checkAdmin(req, res) {
     const key = clientKey(req);
     const now = Date.now();
     if (failedLogins.size > 500) {
@@ -127,6 +186,17 @@ export function createUpdateServer({
     const token = req.headers["x-admin-token"];
     if (typeof token === "string" && tokenOk(token, adminToken)) {
       failedLogins.delete(key);
+      return true;
+    }
+    const panelKey = findPanelKey(token);
+    if (panelKey) {
+      failedLogins.delete(key);
+      panelKey.lastUsedAt = new Date().toISOString();
+      try {
+        await writeKeys();
+      } catch (error) {
+        console.error("[server] 密钥使用记录写入失败", error);
+      }
       return true;
     }
     const count = (record?.count ?? 0) + 1;
@@ -254,7 +324,7 @@ export function createUpdateServer({
     try {
       // ── admin API（与 /publish 共用令牌与防爆破锁定）──
       if (req.method === "GET" && pathname === "/admin/api/overview") {
-        if (!checkAdmin(req, res)) return;
+        if (!(await checkAdmin(req, res))) return;
         const versions = await listVersions();
         const meta = await readMeta();
         return sendJson(res, 200, {
@@ -272,7 +342,7 @@ export function createUpdateServer({
       }
 
       if (req.method === "GET" && pathname === "/admin/api/versions") {
-        if (!checkAdmin(req, res)) return;
+        if (!(await checkAdmin(req, res))) return;
         return sendJson(res, 200, { versions: await listVersions() });
       }
 
@@ -280,7 +350,7 @@ export function createUpdateServer({
         req.method === "POST" &&
         (pathname === "/admin/api/rollback" || pathname === "/admin/api/delete")
       ) {
-        if (!checkAdmin(req, res)) return;
+        if (!(await checkAdmin(req, res))) return;
         let body;
         try {
           body = JSON.parse((await readBody(req, MAX_ADMIN_BODY)).toString("utf8") || "{}");
@@ -293,9 +363,56 @@ export function createUpdateServer({
         return await deleteVersion(res, version);
       }
 
+      // ── 面板管理员密钥：列表 / 新建 / 删除（权限与主密钥完全相同，经 checkAdmin 校验）──
+      if (req.method === "GET" && pathname === "/admin/api/keys") {
+        if (!(await checkAdmin(req, res))) return;
+        return sendJson(res, 200, { keys: [envKeyView(), ...panelKeys.map(publicKeyView)] });
+      }
+
+      if (req.method === "POST" && pathname === "/admin/api/keys") {
+        if (!(await checkAdmin(req, res))) return;
+        let body;
+        try {
+          body = JSON.parse((await readBody(req, MAX_ADMIN_BODY)).toString("utf8") || "{}");
+        } catch {
+          return sendJson(res, 400, { error: "请求体必须是 JSON" });
+        }
+        const token = `${KEY_TOKEN_PREFIX}${randomBytes(24).toString("base64url")}`;
+        const key = {
+          id: randomUUID(),
+          name: normalizeKeyName(body?.name),
+          tokenHash: createHash("sha256").update(token).digest("hex"),
+          createdAt: new Date().toISOString(),
+          lastUsedAt: null,
+        };
+        panelKeys.push(key);
+        await writeKeys();
+        // 明文令牌只在创建响应里出现这一次，之后仅存哈希
+        return sendJson(res, 200, { token, key: publicKeyView(key) });
+      }
+
+      if (req.method === "POST" && pathname === "/admin/api/keys/delete") {
+        if (!(await checkAdmin(req, res))) return;
+        let body;
+        try {
+          body = JSON.parse((await readBody(req, MAX_ADMIN_BODY)).toString("utf8") || "{}");
+        } catch {
+          return sendJson(res, 400, { error: "请求体必须是 JSON" });
+        }
+        const id = String(body?.id ?? "");
+        if (id === ENV_KEY_ID) {
+          return sendJson(res, 400, { error: "主密钥来自服务器环境变量,不能在面板删除" });
+        }
+        const index = panelKeys.findIndex((k) => k.id === id);
+        if (index < 0) return sendJson(res, 404, { error: "密钥不存在" });
+        panelKeys.splice(index, 1);
+        await writeKeys();
+        return sendJson(res, 200, { ok: true });
+      }
+
       // ── 发布（原有命令行链路与面板上传共用）──
       if (req.method === "POST" && pathname === "/publish") {
-        if (!checkAdmin(req, res)) return;
+        if (!(await checkAdmin(req, res))) return;
         const version = String(req.headers["x-version"] ?? "");
         if (!SEMVER_RE.test(version)) return sendJson(res, 400, { error: "x-version 必须是 x.y.z" });
         let notes = "";

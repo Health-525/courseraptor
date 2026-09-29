@@ -239,16 +239,68 @@ test("管理台：登录失败五次锁定", async (t) => {
   assert.equal(locked.status, 429);
 });
 
-/** 假更新后台：校验 x-admin-token，提供 overview/versions/rollback/delete/publish */
+/** 假更新后台：校验 x-admin-token，提供 overview/versions/rollback/delete/publish/keys */
 async function startFakeUpdateServer(t: { after: (fn: () => void) => void }, token: string) {
   const seen: string[] = [];
   const rolledBack: string[] = [];
   const published: Array<{ version: string; notes: string; bytes: number; body: string }> = [];
+  const panelKeys: Array<{ id: string; name: string; isEnv: boolean; createdAt: string | null }> = [
+    { id: "__env__", name: "主密钥（环境变量）", isEnv: true, createdAt: null },
+  ];
+  let keySeq = 0;
   const server = http.createServer((req, res) => {
     seen.push(`${req.method} ${req.url} token=${req.headers["x-admin-token"]}`);
     if (req.headers["x-admin-token"] !== token) {
       res.writeHead(401, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "管理员密钥无效" }));
+      return;
+    }
+    if (req.method === "GET" && req.url === "/admin/api/keys") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ keys: panelKeys.map((k) => ({ ...k, lastUsedAt: null })) }));
+      return;
+    }
+    if (req.method === "POST" && req.url === "/admin/api/keys") {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => {
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+        const trimmed = String(body.name ?? "").trim();
+        const key = {
+          id: `key-${++keySeq}`,
+          name: trimmed ? trimmed.slice(0, 64) : "未命名密钥",
+          isEnv: false,
+          createdAt: "2026-09-29T00:00:00Z",
+        };
+        panelKeys.push(key);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(
+          JSON.stringify({ token: `crak_fake_${key.id}`, key: { ...key, lastUsedAt: null } }),
+        );
+      });
+      return;
+    }
+    if (req.method === "POST" && req.url === "/admin/api/keys/delete") {
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => {
+        const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+        const id = String(body.id ?? "");
+        const index = panelKeys.findIndex((k) => k.id === id);
+        if (id === "__env__") {
+          res.writeHead(400, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "主密钥不能删除" }));
+          return;
+        }
+        if (index < 0) {
+          res.writeHead(404, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "密钥不存在" }));
+          return;
+        }
+        panelKeys.splice(index, 1);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true }));
+      });
       return;
     }
     if (req.method === "POST" && req.url === "/publish") {
@@ -328,7 +380,7 @@ async function startFakeUpdateServer(t: { after: (fn: () => void) => void }, tok
   t.after(() => server.close());
   const address = server.address();
   assert.ok(address && typeof address !== "string");
-  return { url: `http://127.0.0.1:${address.port}`, seen, rolledBack, published };
+  return { url: `http://127.0.0.1:${address.port}`, seen, rolledBack, published, panelKeys };
 }
 
 test("管理台·发版：上传 zip 流式转发到更新后台，版本/说明原样透传", async (t) => {
@@ -463,6 +515,68 @@ test("管理台·版本发布：代理到更新后台（带鉴权），回滚动
   });
   assert.equal(rollback.status, 200);
   assert.deepEqual(update.rolledBack, ["0.2.0"]);
+});
+
+test("管理台·密钥管理：代理到更新后台，创建/删除/主密钥保护全链路", async (t) => {
+  const backendPort = await startBackend(t);
+  const update = await startFakeUpdateServer(t, "update-token-123");
+  const { base } = await startGateway(t, {
+    backendPort,
+    adminPassword: "admin-master-pw",
+    updateServerUrl: update.url,
+    updateAdminToken: "update-token-123",
+  });
+  const cookie = (await adminLogin(base, "admin-master-pw")).cookie;
+
+  // 列表：一开始只有主密钥
+  const list1 = (await (
+    await fetch(`${base}/admin/api/update/keys`, { headers: { cookie } })
+  ).json()) as { data?: { keys: Array<{ id: string; name: string; isEnv: boolean }> } };
+  assert.equal(list1.data?.keys.length, 1);
+  assert.equal(list1.data?.keys[0].isEnv, true);
+
+  // 创建：网关代理转发名称，响应带一次性明文令牌
+  const created = (await (
+    await fetch(`${base}/admin/api/update/keys`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ name: "  发布机  " }),
+    })
+  ).json()) as { data?: { token: string; key: { id: string; name: string } } };
+  assert.equal(created.data?.key.name, "发布机", "名称由更新后台规整");
+  assert.match(created.data?.token ?? "", /^crak_/);
+  const keyId = created.data?.key.id ?? "";
+  assert.ok(
+    update.seen.some((s) => s.includes("POST /admin/api/keys token=update-token-123")),
+    "令牌应原样转发",
+  );
+
+  // 删除主密钥：更新后台 400 → 网关透传 400
+  const envDelete = await fetch(`${base}/admin/api/update/keys/delete`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ id: "__env__" }),
+  });
+  assert.equal(envDelete.status, 400);
+
+  // 删除面板密钥：成功后列表只剩主密钥
+  const del = await fetch(`${base}/admin/api/update/keys/delete`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ id: keyId }),
+  });
+  assert.equal(del.status, 200);
+  assert.equal(update.panelKeys.length, 1);
+  assert.equal(update.panelKeys[0].isEnv, true);
+
+  // bootstrap 也带回密钥列表
+  const boot = (await (
+    await fetch(`${base}/admin/api/bootstrap`, { headers: { cookie } })
+  ).json()) as { update: { keys: { data?: { keys: unknown[] } } } };
+  assert.equal(boot.update.keys.data?.keys.length, 1);
+
+  // 未登录不给
+  assert.equal((await fetch(`${base}/admin/api/update/keys`)).status, 401);
 });
 
 test("管理台·版本发布：令牌不符时返回可读错误，未配置时返回未接入", async (t) => {
