@@ -14,6 +14,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 const ADMIN_COOKIE = "raptor_admin";
 const ADMIN_TTL_MS = 12 * 3600_000;
 const MAX_JSON_BODY = 16 * 1024;
+const MAX_PACKAGE_BYTES = 200 * 1024 * 1024;
 const FAILURES_TO_LOCK = 5;
 const LOCK_DURATION_MS = 15 * 60_000;
 const FAILURE_IDLE_MS = 30 * 60_000;
@@ -134,6 +135,33 @@ border-radius:2px;color:var(--accent-deep);font-size:13.5px;line-height:1.6}
 .inv-row .num{max-width:90px;text-align:center}
 .empty{padding:26px 0;text-align:center;color:var(--ink-3);font-size:13.5px}
 .copy-ok{color:var(--ok);font-family:var(--mono);font-size:11px;margin-left:8px}
+/* ── 版本发布：上传发版 ── */
+textarea{width:100%;padding:10px 12px;background:var(--card);border:1px solid var(--rule-2);
+border-radius:2px;font-family:var(--sans);font-size:14px;color:var(--ink);resize:vertical;
+transition:border-color .15s ease,box-shadow .15s ease}
+textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
+margin-top:8px;padding:22px 16px;border:1.5px dashed var(--rule-2);border-radius:3px;
+background:var(--paper-deep);color:var(--ink-3);font-size:12px;text-align:center;cursor:pointer;
+transition:border-color .15s ease,color .15s ease,background .15s ease}
+.drop svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;
+stroke-linecap:round;stroke-linejoin:round;opacity:.75}
+.drop .b{font-size:13.5px;color:var(--ink-2)}
+.drop:hover,.drop:focus-visible,.drop.on{border-color:var(--accent);color:var(--accent-deep);
+background:var(--accent-soft);outline:none}
+.file-chip{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 12px;
+background:var(--card);border:1px solid var(--rule);border-radius:3px}
+.file-chip svg{width:18px;height:18px;flex:none;stroke:var(--accent);fill:none;stroke-width:1.7;
+stroke-linecap:round;stroke-linejoin:round}
+.file-chip .name{flex:1;min-width:0;font-size:13.5px;color:var(--ink);
+overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-chip .size{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);white-space:nowrap}
+.pbar{height:8px;background:var(--paper-deep);border:1px solid var(--rule);
+border-radius:2px;overflow:hidden}
+.pbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s ease}
+.upd-meta{display:flex;justify-content:space-between;font-family:var(--mono);
+font-size:11px;letter-spacing:.06em;color:var(--ink-3)}
+.hint{margin:10px 0 0;font-size:12.5px;color:var(--ink-3);line-height:1.7}
 /* ── 管理台应用壳：全高侧栏（主流 admin 结构）+ 滚动内容区，红头档案皮肤 ── */
 body.app{display:grid;grid-template-columns:236px 1fr;place-items:stretch;
 height:100vh;height:100dvh;overflow:hidden;padding:0}
@@ -295,7 +323,29 @@ const dashboardHtml = () => `<!doctype html>
 </div>
 
 <div class="panel" id="pane-release">
-<h2>版本发布<span class="en">RELEASES</span><span class="act mono" style="font-size:11px" id="updCur"></span></h2>
+<h2>上传新版本<span class="en">PUBLISH</span></h2>
+<div class="card">
+<div class="inv-row">
+<input id="updVer" class="mono" placeholder="x.y.z" autocomplete="off" spellcheck="false" style="max-width:130px;text-align:center">
+<input id="updNotes" placeholder="更新说明（可选），如：修复课表周次显示错误" maxlength="2000" autocomplete="off">
+</div>
+<div class="drop" id="updDrop" tabindex="0" role="button" aria-label="选择或拖入 zip 安装包">
+<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+<span class="b" id="updDropMain">点击选择，或拖入 zip 安装包</span>
+<span>最大 200 MB · 与 npm run publish 共用接口</span>
+</div>
+<input type="file" id="updFile" accept=".zip,application/zip" hidden>
+<div id="updFileBox"></div>
+<div id="updProg" hidden style="margin-top:14px">
+<div class="upd-meta"><span id="updPhase">上传中</span><span id="updPct">0%</span></div>
+<div class="pbar" style="margin-top:6px"><i id="updBar"></i></div>
+<div style="text-align:right;margin-top:8px"><button class="act" id="updCancel" type="button">取消上传</button></div>
+</div>
+<button class="primary" id="updGo" type="button">发布新版本</button>
+<p class="hint">发布后学生端下次启动 raptor 时提示更新；版本号需大于当前分发版本，否则不会触发更新。</p>
+</div>
+
+<h2>历史版本<span class="en">HISTORY</span><span class="act mono" style="font-size:11px" id="updCur"></span></h2>
 <div class="card" id="updCard"><p class="empty">加载中…</p></div>
 </div>
 
@@ -423,6 +473,74 @@ return '<tr><td class="mono">' + esc(i.code) + '</td><td>' + esc(i.note || "—"
 '</td><td>' + status + '</td><td>' + copy + '</td></tr>';
 }).join("");
 }
+var updState = { file: null, xhr: null, versionTouched: false };
+function nextPatch(v) {
+var p = String(v || "").split(".");
+var a = Number(p[0]), b = Number(p[1]), c = Number(p[2]);
+if (![a, b, c].every(Number.isFinite)) return "";
+return a + "." + b + "." + (c + 1);
+}
+function prefillVersion(curVer) {
+if (updState.versionTouched) return;
+var el = document.getElementById("updVer");
+var next = curVer ? nextPatch(curVer) : "";
+el.value = next;
+el.placeholder = curVer ? next : "1.0.0";
+}
+function updPickFile(f) {
+if (!f) return;
+if (!/\\.zip$/i.test(f.name)) { alert("只支持 zip 格式的安装包"); return; }
+if (f.size > 200 * 1048576) { alert("安装包超过 200 MB 上限（当前 " + (f.size / 1048576).toFixed(1) + " MB）"); return; }
+updState.file = f;
+document.getElementById("updFileBox").innerHTML = '<div class="file-chip">' +
+'<svg viewBox="0 0 24 24"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>' +
+'<span class="name">' + esc(f.name) + '</span><span class="size">' + (f.size / 1048576).toFixed(1) + ' MB</span>' +
+'<button class="act" id="updClear" type="button">移除</button></div>';
+}
+function updPublish() {
+if (updState.xhr) return;
+var ver = document.getElementById("updVer").value.trim();
+var notes = document.getElementById("updNotes").value.trim();
+if (!/^\\d+\\.\\d+\\.\\d+$/.test(ver)) { alert("版本号必须是 x.y.z 格式，例如 1.2.3"); return; }
+if (!updState.file) { alert("请先选择 zip 安装包"); return; }
+var xhr = new XMLHttpRequest();
+updState.xhr = xhr;
+var prog = document.getElementById("updProg");
+var bar = document.getElementById("updBar");
+var pct = document.getElementById("updPct");
+var phase = document.getElementById("updPhase");
+prog.hidden = false;
+function setPct(p) {
+bar.style.width = p + "%";
+pct.textContent = p + "%";
+phase.textContent = p >= 100 ? "服务器处理中…" : "上传中";
+}
+setPct(0);
+xhr.open("POST", "/admin/api/update/publish");
+xhr.setRequestHeader("x-version", ver);
+xhr.setRequestHeader("x-notes", encodeURIComponent(notes));
+xhr.setRequestHeader("content-type", "application/zip");
+xhr.upload.onprogress = function (e) { if (e.lengthComputable) setPct(Math.round(e.loaded / e.total * 100)); };
+xhr.onload = function () {
+updState.xhr = null;
+prog.hidden = true;
+var data = {};
+try { data = JSON.parse(xhr.responseText); } catch (err) {}
+if (xhr.status >= 200 && xhr.status < 300) {
+alert("v" + ver + " 已发布，学生端下次启动 raptor 时提示更新。");
+document.getElementById("updNotes").value = "";
+document.getElementById("updFileBox").innerHTML = "";
+updState.file = null;
+updState.versionTouched = false;
+load();
+} else {
+alert((data && data.error) || ("发布失败（HTTP " + xhr.status + "）"));
+}
+};
+xhr.onerror = function () { updState.xhr = null; prog.hidden = true; alert("网络错误，请检查与网关的连接"); };
+xhr.onabort = function () { updState.xhr = null; prog.hidden = true; };
+xhr.send(updState.file);
+}
 function renderUpdate(o, v) {
 var cur = document.getElementById("updCur");
 var card = document.getElementById("updCard");
@@ -430,16 +548,20 @@ if (!o) return;
 if (o.unavailable || o.error) {
 cur.textContent = "";
 card.innerHTML = '<div class="notice">' + esc(o.error || "更新后台未接入") + '</div>' +
-'<p style="color:var(--ink-2);font-size:13px">在网关环境变量配置 GATEWAY_UPDATE_URL 与 GATEWAY_UPDATE_TOKEN，并部署更新后台（server/update-server.mjs）后，这里会显示版本列表与回滚操作。</p>';
+'<p style="color:var(--ink-2);font-size:13px">在网关环境变量配置 GATEWAY_UPDATE_URL 与 GATEWAY_UPDATE_TOKEN，并部署更新后台（server/update-server.mjs）后，这里会显示版本列表与回滚操作。</p>' +
+'<div style="margin-top:10px"><button class="act" id="updRetry" type="button">重试</button></div>';
 return;
 }
 var c = o.data && o.data.current;
 cur.textContent = c ? ("当前 v" + c.version + " · " + fmtDate(c.publishedAt)) : "尚未发布过版本";
+prefillVersion(c ? c.version : "");
 if (!v || v.error || v.unavailable) { card.innerHTML = '<p class="empty">' + esc((v && (v.error || "无版本")) || "无版本") + '</p>'; return; }
 var list = v.data.versions || [];
-if (!list.length) { card.innerHTML = '<p class="empty">还没有发布过版本；在维护者机器上 npm run publish 即可发版</p>'; return; }
+if (!list.length) { card.innerHTML = '<p class="empty">还没有发布过版本；在上方上传第一个安装包，或在维护者机器上 npm run publish</p>'; return; }
 var mb = function (n) { return (n / 1048576).toFixed(1) + " MB"; };
-card.innerHTML = '<table style="box-shadow:none"><thead><tr><th>版本</th><th>说明</th><th>发布时间</th><th>大小</th><th>操作</th></tr></thead><tbody>' +
+var total = list.reduce(function (s, r) { return s + (r.sizeBytes || 0); }, 0);
+card.innerHTML = '<div class="upd-meta" style="margin:0 0 12px"><span>共 ' + list.length + ' 个版本 · ' + mb(total) + '</span><span>设为分发＝学生端下次启动即下载该版本</span></div>' +
+'<table style="box-shadow:none"><thead><tr><th>版本</th><th>说明</th><th>发布时间</th><th>大小</th><th>操作</th></tr></thead><tbody>' +
 list.map(function (r) {
 var tag = r.isCurrent ? ' <span class="pill">分发中</span>' : (r.rolledBackAt ? ' <span class="pill bad">已回滚</span>' : "");
 var acts = r.isCurrent ? "" :
@@ -466,6 +588,14 @@ var t = e.target.closest ? e.target.closest("button,a") : null;
 if (!t) return;
 if (t.id === "refresh") { load(); return; }
 if (t.id === "logout") { api("/admin/logout", {}).then(function () { location.href = "/admin"; }); return; }
+if (t.id === "updGo") { updPublish(); return; }
+if (t.id === "updCancel") { if (updState.xhr) updState.xhr.abort(); return; }
+if (t.id === "updClear") {
+updState.file = null;
+document.getElementById("updFileBox").innerHTML = "";
+return;
+}
+if (t.id === "updRetry") { load(); return; }
 if (t.id === "siteKeySave") {
 var nk = document.getElementById("siteKeyInput").value.trim();
 if (nk && !confirm(nk ? "保存站点统一 DeepSeek Key（新拉起的实例生效），确认？" : "")) return;
@@ -535,6 +665,29 @@ var confirmText = doWhat === "disable" ? "停用后该同学将立即无法登�
 if (!confirm(confirmText)) return;
 api("/admin/api/user/" + doWhat, { user: user }).then(load);
 });
+(function () {
+var drop = document.getElementById("updDrop");
+var fileInput = document.getElementById("updFile");
+if (drop && fileInput) {
+drop.addEventListener("click", function () { fileInput.click(); });
+drop.addEventListener("keydown", function (e) {
+if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
+});
+drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("on"); });
+drop.addEventListener("dragleave", function () { drop.classList.remove("on"); });
+drop.addEventListener("drop", function (e) {
+e.preventDefault();
+drop.classList.remove("on");
+updPickFile(e.dataTransfer.files && e.dataTransfer.files[0]);
+});
+fileInput.addEventListener("change", function () {
+updPickFile(fileInput.files && fileInput.files[0]);
+fileInput.value = "";
+});
+}
+var verInput = document.getElementById("updVer");
+if (verInput) verInput.addEventListener("input", function () { updState.versionTouched = true; });
+})();
 load();
 })();
 </script>
@@ -856,6 +1009,52 @@ export function createAdminUi({
     }
     if (pathname === "/admin/api/update/versions") {
       sendJson(res, 200, await callUpdateApi("GET", "/admin/api/versions"));
+      return true;
+    }
+    // 上传发版：浏览器请求体原样流式转发到更新后台 /publish，不在网关落盘。
+    // 200 MB 与更新后台 MAX_PACKAGE_BODY 一致；大包上传远超 callUpdateApi 的 5s 超时，单独放宽。
+    if (req.method === "POST" && pathname === "/admin/api/update/publish") {
+      const version = String(req.headers["x-version"] ?? "");
+      if (!/^\d+\.\d+\.\d+$/.test(version)) {
+        sendJson(res, 400, { error: "x-version 必须是 x.y.z" });
+        return true;
+      }
+      if (!updateServerUrl || !updateAdminToken) {
+        sendJson(res, 400, { error: "更新后台未接入（网关未配置 GATEWAY_UPDATE_URL / GATEWAY_UPDATE_TOKEN）" });
+        return true;
+      }
+      const declared = Number(req.headers["content-length"] ?? 0);
+      if (declared > MAX_PACKAGE_BYTES) {
+        sendJson(res, 413, { error: "安装包超过 200 MB 上限" });
+        return true;
+      }
+      try {
+        const upstream = await fetch(`${updateServerUrl.replace(/\/$/, "")}/publish`, {
+          method: "POST",
+          headers: {
+            "x-admin-token": updateAdminToken,
+            "x-version": version,
+            // 更新后台期望「URI 编码后的 x-notes」再自行解码；浏览器侧已编码，这里原样透传，不二次编码
+            "x-notes": String(req.headers["x-notes"] ?? ""),
+            "content-type": "application/zip",
+          },
+          body: req,
+          duplex: "half",
+          signal: AbortSignal.timeout(30 * 60_000),
+        });
+        const data = await upstream.json().catch(() => ({}));
+        console.log(`[gw-admin] 发版 v${version}: ${upstream.ok ? "ok" : data?.error ?? upstream.status}`);
+        if (!upstream.ok) {
+          sendJson(res, upstream.status === 401 ? 502 : upstream.status, {
+            error: data?.error ?? `更新后台返回 ${upstream.status}`,
+          });
+          return true;
+        }
+        sendJson(res, 200, data);
+      } catch (error) {
+        // 浏览器中途取消时 req 流出错，同样落在这里；响应无人接收，安全
+        sendJson(res, 502, { error: `更新后台不可达：${error instanceof Error ? error.message : String(error)}` });
+      }
       return true;
     }
     if (req.method === "POST" && pathname === "/admin/api/update/rollback") {

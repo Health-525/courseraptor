@@ -239,15 +239,38 @@ test("管理台：登录失败五次锁定", async (t) => {
   assert.equal(locked.status, 429);
 });
 
-/** 假更新后台：校验 x-admin-token，提供 overview/versions/rollback/delete */
+/** 假更新后台：校验 x-admin-token，提供 overview/versions/rollback/delete/publish */
 async function startFakeUpdateServer(t: { after: (fn: () => void) => void }, token: string) {
   const seen: string[] = [];
   const rolledBack: string[] = [];
+  const published: Array<{ version: string; notes: string; bytes: number; body: string }> = [];
   const server = http.createServer((req, res) => {
     seen.push(`${req.method} ${req.url} token=${req.headers["x-admin-token"]}`);
     if (req.headers["x-admin-token"] !== token) {
       res.writeHead(401, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "管理员密钥无效" }));
+      return;
+    }
+    if (req.method === "POST" && req.url === "/publish") {
+      const version = String(req.headers["x-version"] ?? "");
+      if (!/^\d+\.\d+\.\d+$/.test(version)) {
+        res.writeHead(400, { "content-type": "application/json" });
+        res.end(JSON.stringify({ error: "x-version 必须是 x.y.z" }));
+        return;
+      }
+      const chunks: Buffer[] = [];
+      req.on("data", (c: Buffer) => chunks.push(c));
+      req.on("end", () => {
+        const body = Buffer.concat(chunks).toString("utf8");
+        published.push({
+          version,
+          notes: decodeURIComponent(String(req.headers["x-notes"] ?? "")),
+          bytes: body.length,
+          body,
+        });
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true, version, publishedAt: "2026-09-29T00:00:00Z" }));
+      });
       return;
     }
     if (req.method === "GET" && req.url === "/admin/api/overview") {
@@ -305,8 +328,95 @@ async function startFakeUpdateServer(t: { after: (fn: () => void) => void }, tok
   t.after(() => server.close());
   const address = server.address();
   assert.ok(address && typeof address !== "string");
-  return { url: `http://127.0.0.1:${address.port}`, seen, rolledBack };
+  return { url: `http://127.0.0.1:${address.port}`, seen, rolledBack, published };
 }
+
+test("管理台·发版：上传 zip 流式转发到更新后台，版本/说明原样透传", async (t) => {
+  const backendPort = await startBackend(t);
+  const update = await startFakeUpdateServer(t, "update-token-123");
+  const { base } = await startGateway(t, {
+    backendPort,
+    adminPassword: "admin-master-pw",
+    updateServerUrl: update.url,
+    updateAdminToken: "update-token-123",
+  });
+  const cookie = (await adminLogin(base, "admin-master-pw")).cookie;
+
+  const zip = Buffer.from("PK-fake-zip-content-发布用");
+  const res = await fetch(`${base}/admin/api/update/publish`, {
+    method: "POST",
+    headers: {
+      cookie,
+      "x-version": "0.4.0",
+      "x-notes": encodeURIComponent("修复课表周次；新增深色模式"),
+      "content-type": "application/zip",
+      "content-length": String(zip.length),
+    },
+    body: zip,
+  });
+  assert.equal(res.status, 200);
+  assert.equal(((await res.json()) as { version?: string }).version, "0.4.0");
+  assert.equal(update.published.length, 1);
+  assert.equal(update.published[0].version, "0.4.0");
+  assert.equal(update.published[0].notes, "修复课表周次；新增深色模式");
+  assert.equal(update.published[0].body, zip.toString("utf8"), "包体应原样流式转发");
+});
+
+test("管理台·发版：版本号不合法 / 超限 / 未接入 / 未登录", async (t) => {
+  const backendPort = await startBackend(t);
+  const update = await startFakeUpdateServer(t, "update-token-123");
+  const { base } = await startGateway(t, {
+    backendPort,
+    adminPassword: "admin-master-pw",
+    updateServerUrl: update.url,
+    updateAdminToken: "update-token-123",
+  });
+  const cookie = (await adminLogin(base, "admin-master-pw")).cookie;
+
+  // 版本号不合法：网关直接拒绝，不打到更新后台
+  const bad = await fetch(`${base}/admin/api/update/publish`, {
+    method: "POST",
+    headers: { cookie, "x-version": "1.2", "content-type": "application/zip" },
+    body: "zip",
+  });
+  assert.equal(bad.status, 400);
+  assert.equal(update.published.length, 0);
+
+  // 声明的包体超过 200 MB：413，不读 body（fetch 会校验 content-length 与 body 一致，故用原生 http）
+  const hugeStatus = await new Promise<number>((resolve, reject) => {
+    const req = http.request(
+      new URL(`${base}/admin/api/update/publish`),
+      { method: "POST", headers: { cookie, "x-version": "1.2.3", "content-type": "application/zip", "content-length": String(201 * 1024 * 1024) } },
+      (res) => {
+        resolve(res.statusCode ?? 0);
+        res.destroy();
+      },
+    );
+    req.on("error", () => resolve(0));
+    req.end();
+  });
+  assert.equal(hugeStatus, 413);
+
+  // 未配置更新后台：返回未接入
+  const off = await startGateway(t, { backendPort, adminPassword: "admin-master-pw" });
+  const offCookie = (await adminLogin(off.base, "admin-master-pw")).cookie;
+  const offRes = (await (
+    await fetch(`${off.base}/admin/api/update/publish`, {
+      method: "POST",
+      headers: { cookie: offCookie, "x-version": "1.2.3", "content-type": "application/zip" },
+      body: "zip",
+    })
+  ).json()) as { error?: string };
+  assert.match(offRes.error ?? "", /未接入/);
+
+  // 未登录：401
+  const anon = await fetch(`${base}/admin/api/update/publish`, {
+    method: "POST",
+    headers: { "x-version": "1.2.3", "content-type": "application/zip" },
+    body: "zip",
+  });
+  assert.equal(anon.status, 401);
+});
 
 test("管理台·版本发布：代理到更新后台（带鉴权），回滚动作透传", async (t) => {
   const backendPort = await startBackend(t);
@@ -421,6 +531,13 @@ test("管理台页面：内嵌脚本必须是合法 JavaScript（防编辑事故
   assert.ok(match, "仪表盘应包含内嵌脚本");
   // 只编译不执行：语法错误（如括号不闭合）在这里抛出
   new vm.Script(match[1]);
+  // 模板字符串会把未加倍的 \d / \. 吞成 d / .——脚本仍合法但正则失效，
+  // 曾导致发版校验把合法版本号拒掉；这里断言发到浏览器的正则完好
+  assert.ok(
+    match[1].includes("/^\\d+\\.\\d+\\.\\d+$/.test(ver)"),
+    "版本号正则应原样出现在发到浏览器的脚本里",
+  );
+  assert.ok(match[1].includes("/\\.zip$/i.test(f.name)"), "zip 后缀正则应原样保留");
 });
 
 test("按人限额与站点 Key 管理", async (t) => {
