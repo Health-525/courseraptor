@@ -27,8 +27,8 @@ function Command({
 }
 
 function CommandDialog({
-  title = 'Command Palette',
-  description = 'Search for a command to run...',
+  title = '命令面板',
+  description = '搜索并执行命令',
   children,
   className,
   showCloseButton = true,

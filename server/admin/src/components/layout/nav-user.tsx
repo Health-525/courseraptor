@@ -44,7 +44,7 @@ export function NavUser({ user }: NavUserProps) {
                 <div className='grid flex-1 text-start text-sm leading-tight'>
                   <span className='truncate font-semibold'>{user.name}</span>
                   <span className='truncate text-xs text-muted-foreground'>
-                    UPDATE_ADMIN_TOKEN
+                    管理员密钥登录
                   </span>
                 </div>
                 <ChevronsUpDown className='ms-auto size-4' />

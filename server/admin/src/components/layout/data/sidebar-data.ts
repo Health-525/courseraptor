@@ -2,7 +2,6 @@ import {
   LayoutDashboard,
   Package,
   Rocket,
-  GraduationCap,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
 
@@ -10,15 +9,8 @@ export const sidebarData: SidebarData = {
   user: {
     name: '管理员',
     email: '',
-    avatar: '/avatars/shadcn.jpg',
+    avatar: '',
   },
-  teams: [
-    {
-      name: 'CourseRaptor',
-      logo: GraduationCap,
-      plan: '更新分发后台',
-    },
-  ],
   navGroups: [
     {
       title: '管理',

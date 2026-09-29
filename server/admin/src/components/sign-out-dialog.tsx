@@ -28,7 +28,7 @@ export function SignOutDialog({ open, onOpenChange }: SignOutDialogProps) {
       open={open}
       onOpenChange={onOpenChange}
       title='退出登录'
-      desc='Are you sure you want to sign out? You will need to sign in again to access your account.'
+      desc='确定退出登录吗？下次访问需要重新输入管理员密钥。'
       confirmText='退出'
       destructive
       handleConfirm={handleSignOut}

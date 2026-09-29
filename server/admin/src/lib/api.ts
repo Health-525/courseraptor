@@ -71,7 +71,8 @@ export function publishWithProgress(
   zip: File,
   version: string,
   notes: string,
-  onProgress: (pct: number) => void
+  onProgress: (pct: number) => void,
+  signal?: AbortSignal
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
@@ -99,6 +100,8 @@ export function publishWithProgress(
       reject(new ApiError(xhr.status, message))
     }
     xhr.onerror = () => reject(new ApiError(0, '网络错误，请检查服务器是否可达'))
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true })
+    xhr.onabort = () => reject(new DOMException('上传已取消', 'AbortError'))
     xhr.send(zip)
   })
 }
