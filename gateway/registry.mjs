@@ -4,6 +4,7 @@
  * 文件布局（stateDir 下）：
  * - users.json   用户表：id、用户名、scrypt 密码散列（独立盐）、启停状态、当日用量
  * - invites.json 邀请码表：一次性（maxUses 默认 1），可设过期天数
+ * - admin-totp.json 管理台两步验证：TOTP 密钥、恢复码哈希、会话代次（不存在=未启用）
  *
  * 写入走原子替换（tmp + rename），全部变更经模块内 Promise 链串行化，
  * 与项目其他落盘（credentials.enc / update-data）的约定一致。
@@ -11,7 +12,7 @@
 
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const USERNAME_RE = /^[A-Za-z0-9_-]{2,32}$/;
@@ -217,6 +218,30 @@ export function createRegistry({ stateDir }) {
         const next = { ...current };
         if (typeof patch.deepseekKey === "string") next.deepseekKey = patch.deepseekKey;
         await writeAtomic(path.join(stateDir, "site.json"), JSON.stringify(next, null, 2));
+      });
+    },
+
+    // ── 管理台两步验证（admin-totp.json，不存在即未启用）────────
+    // secret 为 base32 密钥；recovery 存 sha256 哈希（明文只在生成时
+    // 展示一次）；sessionEpoch 参与 admin 会话 Cookie 签名，启用/关闭时
+    // 递增即可让所有旧管理会话立即失效。
+
+    async getAdminTotp() {
+      const doc = await readJson(path.join(stateDir, "admin-totp.json"), null);
+      return doc && typeof doc.secret === "string" && doc.secret ? doc : null;
+    },
+
+    async setAdminTotp(doc) {
+      return serialized(async () => {
+        await writeAtomic(path.join(stateDir, "admin-totp.json"), JSON.stringify(doc, null, 2));
+      });
+    },
+
+    async clearAdminTotp() {
+      return serialized(async () => {
+        await unlink(path.join(stateDir, "admin-totp.json")).catch((error) => {
+          if (error.code !== "ENOENT") throw error;
+        });
       });
     },
 

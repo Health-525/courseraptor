@@ -9,6 +9,15 @@ export interface RegistryUser {
   dsMode: string;
 }
 
+/** 管理台两步验证落盘形态（admin-totp.json，不存在即未启用） */
+export interface AdminTotpDoc {
+  secret: string;
+  enabledAt: string;
+  recovery: string[];
+  lastUsedCounter?: number;
+  sessionEpoch?: number;
+}
+
 export interface Registry {
   createUser(options: { username: string; password: string }): Promise<{ id: string; username: string }>;
   findUserByName(username: string): Promise<RegistryUser | null>;
@@ -24,6 +33,9 @@ export interface Registry {
   setDsMode(id: string, mode: string): Promise<void>;
   getSiteSettings(): Promise<{ deepseekKey: string }>;
   setSiteSettings(patch: { deepseekKey?: string }): Promise<void>;
+  getAdminTotp(): Promise<AdminTotpDoc | null>;
+  setAdminTotp(doc: AdminTotpDoc): Promise<void>;
+  clearAdminTotp(): Promise<void>;
   createResetRequest(userId: string, username: string): Promise<{ id: string }>;
   listResetRequests(): Promise<{
     pending: Array<{ id: string; userId: string; username: string; requestedAt: string; status: string }>;
