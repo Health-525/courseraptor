@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   Package,
   Rocket,
+  KeyRound,
   GraduationCap,
 } from 'lucide-react'
 import { type SidebarData } from '../types'
@@ -37,6 +38,11 @@ export const sidebarData: SidebarData = {
           title: '历史版本',
           url: '/versions',
           icon: Package,
+        },
+        {
+          title: '密钥管理',
+          url: '/keys',
+          icon: KeyRound,
         },
       ],
     },

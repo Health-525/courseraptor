@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as authSignInRouteImport } from './routes/(auth)/sign-in'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
 import { Route as AuthenticatedPublishIndexRouteImport } from './routes/_authenticated/publish/index'
 import { Route as AuthenticatedVersionsIndexRouteImport } from './routes/_authenticated/versions/index'
 
@@ -27,6 +28,11 @@ const authSignInRoute = authSignInRouteImport.update({
 const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedKeysIndexRoute = AuthenticatedKeysIndexRouteImport.update({
+  id: '/keys/',
+  path: '/keys/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedPublishIndexRoute =
@@ -45,12 +51,14 @@ const AuthenticatedVersionsIndexRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
   '/sign-in': typeof authSignInRoute
+  '/keys/': typeof AuthenticatedKeysIndexRoute
   '/publish/': typeof AuthenticatedPublishIndexRoute
   '/versions/': typeof AuthenticatedVersionsIndexRoute
 }
 export interface FileRoutesByTo {
   '/sign-in': typeof authSignInRoute
   '/': typeof AuthenticatedIndexRoute
+  '/keys': typeof AuthenticatedKeysIndexRoute
   '/publish': typeof AuthenticatedPublishIndexRoute
   '/versions': typeof AuthenticatedVersionsIndexRoute
 }
@@ -59,19 +67,21 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/(auth)/sign-in': typeof authSignInRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
   '/_authenticated/publish/': typeof AuthenticatedPublishIndexRoute
   '/_authenticated/versions/': typeof AuthenticatedVersionsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/sign-in' | '/publish/' | '/versions/'
+  fullPaths: '/' | '/sign-in' | '/keys/' | '/publish/' | '/versions/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/sign-in' | '/' | '/publish' | '/versions'
+  to: '/sign-in' | '/' | '/keys' | '/publish' | '/versions'
   id:
     | '__root__'
     | '/_authenticated'
     | '/(auth)/sign-in'
     | '/_authenticated/'
+    | '/_authenticated/keys/'
     | '/_authenticated/publish/'
     | '/_authenticated/versions/'
   fileRoutesById: FileRoutesById
@@ -104,6 +114,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/keys/': {
+      id: '/_authenticated/keys/'
+      path: '/keys'
+      fullPath: '/keys/'
+      preLoaderRoute: typeof AuthenticatedKeysIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/publish/': {
       id: '/_authenticated/publish/'
       path: '/publish'
@@ -123,12 +140,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
   AuthenticatedPublishIndexRoute: typeof AuthenticatedPublishIndexRoute
   AuthenticatedVersionsIndexRoute: typeof AuthenticatedVersionsIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
   AuthenticatedPublishIndexRoute: AuthenticatedPublishIndexRoute,
   AuthenticatedVersionsIndexRoute: AuthenticatedVersionsIndexRoute,
 }

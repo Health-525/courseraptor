@@ -49,9 +49,23 @@ export interface VersionEntry extends VersionMeta {
   isCurrent: boolean
 }
 
+export interface AdminKey {
+  id: string
+  name: string
+  isEnv: boolean
+  createdAt: string | null
+  lastUsedAt: string | null
+}
+
+export interface CreatedKey {
+  token: string
+  key: AdminKey
+}
+
 export const api = {
   overview: () => request<Overview>('/admin/api/overview'),
   versions: () => request<{ versions: VersionEntry[] }>('/admin/api/versions'),
+  keys: () => request<{ keys: AdminKey[] }>('/admin/api/keys'),
   rollback: (version: string, notes?: string) =>
     request<{ ok: true }>('/admin/api/rollback', {
       method: 'POST',
@@ -63,6 +77,18 @@ export const api = {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ version }),
+    }),
+  createKey: (name: string) =>
+    request<CreatedKey>('/admin/api/keys', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }),
+  deleteKey: (id: string) =>
+    request<{ ok: true }>('/admin/api/keys/delete', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id }),
     }),
 }
 
