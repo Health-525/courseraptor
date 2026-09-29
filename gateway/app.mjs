@@ -617,6 +617,8 @@ else { input.type = "password"; this.textContent = "显示"; }
             user = await registry.createUser({ username: form.username, password: form.password });
           } catch (error) {
             problems.push(error instanceof Error ? error.message : String(error));
+            // 建号失败就退回邀请码，同学改完表单还能用同一个码
+            await registry.releaseInvite(form.invite);
           }
         }
         if (problems.length > 0 || !user) {
