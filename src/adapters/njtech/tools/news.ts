@@ -80,7 +80,7 @@ export const newsTools = {
   /** 通知正文阅读 */
   read_notice: tool({
     description:
-      "读取学校官网任意文章页面的正文全文（webplus CMS 结构解析）。两种用法：① 读 get_news 列表里的通知（用 items[].url）；② 直接读用户贴出来的链接（如 https://jwc.njtech.edu.cn/info/1158/6876.htm，用户发来 jwc/学校官网链接时就用本工具读）。返回标题、正文全文与附件下载链接。",
+      "读取学校官网任意文章页面的正文全文（webplus CMS 结构解析）。两种用法：① 读 get_news 列表里的通知（用 items[].url）；② 直接读用户贴出来的链接（如 https://jwc.njtech.edu.cn/info/1158/6876.htm，用户发来 jwc/学校官网链接时就用本工具读）。返回标题、正文全文与附件下载链接。正文内嵌 PDF 的通知（如放假安排）会自动下载 PDF 解析出全文，PDF 原件同时列入 attachments（超长时可用 fetch_attachment 分页续读）。",
     inputSchema: z.object({
       url: z.string().describe("文章页 URL（jwc.njtech.edu.cn 或其他 njtech.edu.cn 子域）"),
     }),

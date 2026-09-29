@@ -364,6 +364,76 @@ export async function webvpnFetchJwc(path: string): Promise<string> {
   }
 }
 
+/** 二进制 GET 手动跟重定向的跳数上限（登录跳板链） */
+const MAX_BINARY_REDIRECTS = 5;
+
+/** 二进制 GET：手动跟重定向，响应按原始字节收 Buffer，绝不做 utf8 解码 */
+function vpnBinaryGet(url: string, cookie: string, hops: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = https.request(
+      {
+        hostname: u.hostname,
+        path: u.pathname + u.search,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+          Cookie: cookie,
+          Referer: VPN_BASE,
+        },
+      },
+      (res) => {
+        const status = res.statusCode ?? 0;
+        const locRaw = res.headers.location;
+        const location = Array.isArray(locRaw) ? locRaw[0] : locRaw;
+        if (status >= 300 && status < 400 && location) {
+          if (hops >= MAX_BINARY_REDIRECTS) {
+            req.destroy();
+            reject(new RaptorError("UPSTREAM", "WebVPN 附件重定向超过上限"));
+            return;
+          }
+          // 挂空消费器把响应排干，跳转链才走得完
+          res.on("data", () => {});
+          res.on("end", () => {
+            vpnBinaryGet(new URL(location, url).href, cookie, hops + 1).then(resolve, reject);
+          });
+          return;
+        }
+        const chunks: Buffer[] = [];
+        res.on("data", (c: Buffer) => chunks.push(c));
+        res.on("end", () => resolve(Buffer.concat(chunks)));
+      },
+    );
+    req.setTimeout(30_000, () =>
+      req.destroy(new RaptorError("NETWORK", `WebVPN 附件下载超时：${url.slice(0, 80)}`)),
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+/**
+ * 经 WebVPN 抓取 jwc 站点的二进制文件（内嵌 PDF 正文等）。
+ * 与 webvpnFetchJwc 同一套会话管理：失效自动重登一次。
+ * 注意不能复用 webvpnFetchJwc——那条路会把响应 toString("utf8")，PDF 字节会被破坏。
+ */
+export async function webvpnFetchJwcBuffer(path: string): Promise<Buffer> {
+  const fetchWith = async (session: VpnSession): Promise<Buffer> => {
+    const buf = await vpnBinaryGet(`${VPN_BASE}${session.jwcPrefix}${path}`, session.cookie, 0);
+    const head = buf.subarray(0, 2048).toString("utf8");
+    if (looksLikeLoginPage(head)) throw new RaptorError("SESSION_EXPIRED", "WebVPN 会话已失效");
+    return buf;
+  };
+
+  try {
+    return await fetchWith(await getWebvpnSession());
+  } catch (e) {
+    if (!isSessionExpiredError(e)) throw e;
+    invalidateWebvpnSession();
+    return fetchWith(await getWebvpnSession(true));
+  }
+}
+
 // ── URL 映射 ─────────────────────────────────────────────────
 
 /** 公网 jwc URL → 站内路径（供代理抓取用）；非 jwc 域返回 null */

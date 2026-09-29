@@ -141,6 +141,30 @@ async function extractPptxText(buf: Buffer): Promise<string> {
   return slides.join("\n\n");
 }
 
+/**
+ * pdf-parse v2 抽 PDF 文本（附件解析、文档转换与通知内嵌 PDF 共用）。
+ * v2 不再暴露 lib/pdf-parse.js 子路径（exports 限定），必须走包主入口。
+ * 解析失败（损坏文件/扫描件）返回 null，由调用方决定降级路径。
+ */
+export async function pdfTextFromBuffer(buf: Buffer): Promise<string | null> {
+  try {
+    const { PDFParse } = require("pdf-parse") as {
+      PDFParse: new (o: {
+        data: Uint8Array;
+      }) => {
+        getText(): Promise<string | { text: string }>;
+        destroy(): Promise<unknown>;
+      };
+    };
+    const parser = new PDFParse({ data: new Uint8Array(buf) });
+    const r = await parser.getText();
+    await parser.destroy().catch(() => {});
+    return typeof r === "string" ? r : r.text;
+  } catch {
+    return null;
+  }
+}
+
 /** docx/pdf/pptx 抽全文；txt/md 等直接解码。解析不出内容返回 null */
 async function extractText(
   buf: Buffer,
@@ -149,11 +173,8 @@ async function extractText(
   const ext = filename.toLowerCase().match(/\.([a-z0-9]{1,8})$/)?.[1] ?? "";
   try {
     if (ext === "pdf") {
-      const pdfParse = require("pdf-parse/lib/pdf-parse.js") as (
-        b: Buffer,
-      ) => Promise<{ text: string }>;
-      const r = await pdfParse(buf);
-      return { format: "pdf", text: r.text };
+      const text = await pdfTextFromBuffer(buf);
+      return text !== null ? { format: "pdf", text } : null;
     }
     if (ext === "docx") {
       const mammoth = require("mammoth") as {
