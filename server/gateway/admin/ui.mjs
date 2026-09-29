@@ -280,6 +280,9 @@ const dashboardHtml = () => `<!doctype html>
 <button type="button" class="nav-item" data-nav="release">
 <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
 版本发布</button>
+<button type="button" class="nav-item" data-nav="keys">
+<svg viewBox="0 0 24 24"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+密钥管理</button>
 </div>
 </nav>
 <div class="side-uptime" id="uptimeLine">网关运行中…</div>
@@ -349,6 +352,20 @@ const dashboardHtml = () => `<!doctype html>
 <div class="card" id="updCard"><p class="empty">加载中…</p></div>
 </div>
 
+<div class="panel" id="pane-keys">
+<h2>更新后台密钥<span class="en">ADMIN KEYS</span><span class="act mono" style="font-size:11px">用于命令行发版与后台登录，与主密钥同权</span></h2>
+<div class="card">
+<div class="inv-row">
+<input id="keyName" placeholder="名称（可选），如：发布机 / 值班同学" maxlength="64" autocomplete="off">
+<button class="act" id="keyGen" type="button" style="margin:0;padding:8px 18px">新建密钥</button>
+</div>
+<div id="keyCreated" hidden></div>
+<table style="margin-top:14px;box-shadow:none"><thead><tr><th>名称</th><th>类型</th><th>创建时间</th><th>最后使用</th><th></th></tr></thead>
+<tbody id="keys"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table>
+<p class="hint">主密钥来自服务器环境变量 UPDATE_ADMIN_TOKEN，始终可用且不能在这里删除；面板密钥删除后立即失效。明文只在创建时展示一次，之后仅存哈希。</p>
+</div>
+</div>
+
 <div class="panel" id="pane-site">
 <h2>站点设置<span class="en">SITE</span></h2>
 <div class="card">
@@ -389,6 +406,7 @@ return r.json();
 }
 function esc(s) { var d = document.createElement("div"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
 function fmtDate(iso) { return String(iso || "").slice(0, 10); }
+function fmtTime(iso) { return iso ? String(iso).replace("T", " ").slice(0, 16) : "—"; }
 function renderOverview(o) {
 if (!o) return;
 document.getElementById("stats").innerHTML =
@@ -572,6 +590,24 @@ return '<tr><td class="mono">v' + esc(r.version) + tag + '</td><td>' + esc(r.not
 '</td><td>' + acts + '</td></tr>';
 }).join("") + '</tbody></table>';
 }
+function renderKeys(r) {
+var el = document.getElementById("keys");
+if (!r) return;
+if (r.unavailable || r.error) {
+el.innerHTML = '<tr><td colspan="5" class="empty">' + esc(r.error || "更新后台未接入") + '</td></tr>';
+return;
+}
+var list = (r.data && r.data.keys) || [];
+if (!list.length) { el.innerHTML = '<tr><td colspan="5" class="empty">没有可用密钥</td></tr>'; return; }
+el.innerHTML = list.map(function (k) {
+var type = k.isEnv ? '<span class="pill">主密钥</span>' : '<span class="pill">面板密钥</span>';
+var del = k.isEnv ? "" :
+'<button class="act danger" data-keydel="' + esc(k.id) + '" data-name="' + esc(k.name) + '">删除</button>';
+return '<tr><td class="mono">' + esc(k.name) + '</td><td>' + type +
+'</td><td class="mono">' + fmtTime(k.createdAt) + '</td><td class="mono">' + fmtTime(k.lastUsedAt) +
+'</td><td>' + del + '</td></tr>';
+}).join("");
+}
 function load() {
 api("/admin/api/bootstrap").then(function (b) {
 if (!b) return;
@@ -579,8 +615,9 @@ renderOverview(b.overview);
 renderUsers(b.users);
 renderInvites(b.invites);
 renderResets(b.resets);
-renderUpdate(b.update.overview, b.update.versions);
-renderSite(b.site);
+	renderUpdate(b.update.overview, b.update.versions);
+	renderKeys(b.update.keys);
+	renderSite(b.site);
 });
 }
 document.addEventListener("click", function (e) {
@@ -595,7 +632,22 @@ updState.file = null;
 document.getElementById("updFileBox").innerHTML = "";
 return;
 }
-if (t.id === "updRetry") { load(); return; }
+	if (t.id === "updRetry") { load(); return; }
+	if (t.id === "keyGen") {
+	api("/admin/api/update/keys", { name: document.getElementById("keyName").value }).then(function (r) {
+	document.getElementById("keyName").value = "";
+	if (!r || r.error || r.unavailable) { alert((r && (r.error || "更新后台不可达")) || "创建失败"); return; }
+	var token = r.data && r.data.token;
+	var k = r.data && r.data.key;
+	var box = document.getElementById("keyCreated");
+	box.hidden = false;
+	box.innerHTML = '<div class="notice">密钥「' + esc(k.name) + '」已创建——明文仅此一次展示，之后无法再查看，请立即复制保存：</div>' +
+	'<div class="inv-row" style="margin-top:10px"><input class="mono" readonly value="' + esc(token) + '" onfocus="this.select()">' +
+	'<button class="act" data-copy="' + esc(token) + '" type="button" style="margin:0;padding:8px 18px">复制</button></div>';
+	load();
+	});
+	return;
+	}
 if (t.id === "siteKeySave") {
 var nk = document.getElementById("siteKeyInput").value.trim();
 if (nk && !confirm(nk ? "保存站点统一 DeepSeek Key（新拉起的实例生效），确认？" : "")) return;
@@ -641,16 +693,25 @@ var doWhat = t.getAttribute("data-do");
 var user = t.getAttribute("data-u");
 var updWhat = t.getAttribute("data-udo");
 var version = t.getAttribute("data-ver");
-if (updWhat && version) {
-var vt = updWhat === "rollback" ? "把 v" + version + " 设为当前分发版本（同学端将收到它），确认？"
-: "删除 v" + version + " 的安装包（不可恢复，当前分发版本不能删），确认？";
-if (!confirm(vt)) return;
-api("/admin/api/update/" + updWhat, { version: version }).then(function (r) {
-if (r && (r.error || r.unavailable)) { alert(r.error || "更新后台不可达"); return; }
-load();
-});
-return;
-}
+	if (updWhat && version) {
+	var vt = updWhat === "rollback" ? "把 v" + version + " 设为当前分发版本（同学端将收到它），确认？"
+	: "删除 v" + version + " 的安装包（不可恢复，当前分发版本不能删），确认？";
+	if (!confirm(vt)) return;
+	api("/admin/api/update/" + updWhat, { version: version }).then(function (r) {
+	if (r && (r.error || r.unavailable)) { alert(r.error || "更新后台不可达"); return; }
+	load();
+	});
+	return;
+	}
+	var keyId = t.getAttribute("data-keydel");
+	if (keyId) {
+	if (!confirm("删除密钥「" + (t.getAttribute("data-name") || "") + "」？用它发版或登录的地方会立即失效，确认？")) return;
+	api("/admin/api/update/keys/delete", { id: keyId }).then(function (r) {
+	if (!r || r.error || r.unavailable) { alert((r && (r.error || "更新后台不可达")) || "删除失败"); return; }
+	load();
+	});
+	return;
+	}
 if (!doWhat || !user) return;
 if (doWhat === "quota") {
 var q = prompt("给 " + user + " 设每日对话轮数限额（0 = 用站点默认）：", t.getAttribute("data-cur") || "0");
@@ -883,15 +944,17 @@ export function createAdminUi({
   async function handleApi(req, res, pathname) {
     // 一次往返带回全部面板数据：跨公网链路 RTT 大，5 个串行请求是「卡」的主因
     if (req.method === "GET" && pathname === "/admin/api/bootstrap") {
-      const [overview, users, invites, site, resets, updOverview, updVersions] = await Promise.all([
-        ownOverview(),
-        registry.listUsers(),
-        registry.listInvites(),
-        registry.getSiteSettings(),
-        registry.listResetRequests(),
-        callUpdateApi("GET", "/admin/api/overview"),
-        callUpdateApi("GET", "/admin/api/versions"),
-      ]);
+      const [overview, users, invites, site, resets, updOverview, updVersions, updKeys] =
+        await Promise.all([
+          ownOverview(),
+          registry.listUsers(),
+          registry.listInvites(),
+          registry.getSiteSettings(),
+          registry.listResetRequests(),
+          callUpdateApi("GET", "/admin/api/overview"),
+          callUpdateApi("GET", "/admin/api/versions"),
+          callUpdateApi("GET", "/admin/api/keys"),
+        ]);
       sendJson(res, 200, {
         overview,
         users: users.map((u) => ({ ...u, online: spawner.isRunning(u.id) })),
@@ -904,7 +967,7 @@ export function createAdminUi({
             : "",
           defaultDailyTurns,
         },
-        update: { overview: updOverview, versions: updVersions },
+        update: { overview: updOverview, versions: updVersions, keys: updKeys },
       });
       return true;
     }
@@ -1072,6 +1135,31 @@ export function createAdminUi({
         version: String(body.version ?? ""),
       });
       console.log(`[gw-admin] 版本删除请求 v${body.version}: ${result.error ?? "ok"}`);
+      sendJson(res, result.error ? 400 : 200, result);
+      return true;
+    }
+    // 密钥管理：同样全部代理到更新后台，明文令牌只在创建响应里出现一次
+    if (pathname === "/admin/api/update/keys") {
+      if (req.method === "GET") {
+        sendJson(res, 200, await callUpdateApi("GET", "/admin/api/keys"));
+        return true;
+      }
+      if (req.method === "POST") {
+        const body = await readJsonBody(req);
+        const result = await callUpdateApi("POST", "/admin/api/keys", {
+          name: String(body.name ?? ""),
+        });
+        console.log(`[gw-admin] 新建更新后台密钥「${result.data?.key?.name ?? ""}」: ${result.error ?? "ok"}`);
+        sendJson(res, result.error ? 400 : 200, result);
+        return true;
+      }
+    }
+    if (req.method === "POST" && pathname === "/admin/api/update/keys/delete") {
+      const body = await readJsonBody(req);
+      const result = await callUpdateApi("POST", "/admin/api/keys/delete", {
+        id: String(body.id ?? ""),
+      });
+      console.log(`[gw-admin] 删除更新后台密钥 ${String(body.id ?? "")}: ${result.error ?? "ok"}`);
       sendJson(res, result.error ? 400 : 200, result);
       return true;
     }
