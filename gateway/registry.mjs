@@ -298,6 +298,17 @@ export function createRegistry({ stateDir }) {
       });
     },
 
+    /** 注册中途失败（如用户名被占用）时释放占位，码退回可再用——否则一次手误废一个码 */
+    async releaseInvite(code) {
+      return serialized(async () => {
+        const invites = (await readInvites()).invites;
+        const invite = invites.find((i) => i.code === String(code ?? "").trim());
+        if (!invite) return;
+        invite.usedBy = (invite.usedBy ?? []).filter((u) => !String(u).startsWith("pending-"));
+        await writeInvites(invites);
+      });
+    },
+
     /** 注册完成后把占位换成实际用户名（失败不影响注册结果） */
     async markInviteUsed(code, username) {
       return serialized(async () => {

@@ -672,6 +672,52 @@ test("管理台·bootstrap：一次往返带回全部面板数据", async (t) =>
   assert.equal((await fetch(`${base}/admin/api/bootstrap`)).status, 401);
 });
 
+test("注册·邀请码绑定：用户名被占不废码，bootstrap 带出码↔账号绑定关系", async (t) => {
+  const backendPort = await startBackend(t);
+  const { base, registry } = await startGateway(t, {
+    backendPort,
+    adminPassword: "admin-master-pw",
+  });
+  const cookie = (await adminLogin(base, "admin-master-pw")).cookie;
+
+  await registry.createUser({ username: "taken", password: "password123" });
+  const [invite] = await registry.createInvites({ count: 1, note: "班级群" });
+  const regForm = (username: string) =>
+    new URLSearchParams({
+      invite: invite.code,
+      username,
+      password: "password123",
+      password2: "password123",
+    });
+
+  // 第一次注册撞了已有用户名：失败，但邀请码不应被 pending 占位废掉
+  const fail = await fetch(`${base}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: regForm("taken"),
+    redirect: "manual",
+  });
+  assert.equal(fail.status, 400);
+
+  // 同一个码、换个用户名：应能注册成功
+  const ok = await fetch(`${base}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: regForm("newmate"),
+    redirect: "manual",
+  });
+  assert.equal(ok.status, 303);
+
+  // bootstrap 下发的邀请码已回填使用者，管理台两边的绑定关系都靠它渲染
+  const boot = (await (
+    await fetch(`${base}/admin/api/bootstrap`, { headers: { cookie } })
+  ).json()) as { invites: Array<{ code: string; note: string; usedBy: string[] }> };
+  const used = boot.invites.find((i) => i.code === invite.code);
+  assert.ok(used);
+  assert.equal(used.note, "班级群");
+  assert.deepEqual(used.usedBy, ["newmate"]);
+});
+
 test("管理台页面：内嵌脚本必须是合法 JavaScript（防编辑事故回归）", async (t) => {
   const backendPort = await startBackend(t);
   const { base } = await startGateway(t, { backendPort, adminPassword: "admin-master-pw" });

@@ -333,8 +333,8 @@ const dashboardHtml = () => `<!doctype html>
 
 <div class="panel" id="pane-users">
 <h2>同学账号<span class="en">USERS</span></h2>
-<table><thead><tr><th>用户名</th><th>状态</th><th>Key 来源</th><th>在线</th><th>注册于</th><th>今日轮数</th><th>操作</th></tr></thead>
-<tbody id="users"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table>
+<table><thead><tr><th>用户名</th><th>状态</th><th>Key 来源</th><th>在线</th><th>来源</th><th>注册于</th><th>今日轮数</th><th>操作</th></tr></thead>
+<tbody id="users"><tr><td colspan="8" class="empty">加载中…</td></tr></tbody></table>
 
 <h2>邀请码<span class="en">INVITES</span><span class="act mono" style="font-size:11px">发给同学，凭码注册</span></h2>
 <div class="card">
@@ -344,8 +344,8 @@ const dashboardHtml = () => `<!doctype html>
 <input class="num" id="invDays" type="number" min="0" max="365" value="0" title="有效天数，0=永久">
 <button class="act" id="invGen" type="button" style="margin:0;padding:8px 18px">生成</button>
 </div>
-<table style="margin-top:14px;box-shadow:none"><thead><tr><th>邀请码</th><th>备注</th><th>状态</th><th></th></tr></thead>
-<tbody id="invites"><tr><td colspan="4" class="empty">加载中…</td></tr></tbody></table>
+<table style="margin-top:14px;box-shadow:none"><thead><tr><th>邀请码</th><th>备注</th><th>使用者</th><th>状态</th><th></th></tr></thead>
+<tbody id="invites"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table>
 </div>
 
 <h2>密码重置申请<span class="en">RESET REQUESTS</span><span class="act mono" style="font-size:11px">同意后把码发给同学，新密码由同学自己设</span></h2>
@@ -474,12 +474,23 @@ document.getElementById("statusCard").innerHTML =
 '<p style="color:var(--ink-3);font-size:13px;margin:4px 0 0">实例按需拉起、空闲 30 分钟自动回收；每人每日限额默认 ' +
 esc(site ? site.defaultDailyTurns : "—") + " 轮，可在「同学账号」按人单独设置。</p>" + todo;
 }
-function renderUsers(list, defaultTurns) {
+function renderUsers(list, defaultTurns, invites) {
 if (!list) return;
 var el = document.getElementById("users");
-if (!list.length) { el.innerHTML = '<tr><td colspan="7" class="empty">还没有同学注册</td></tr>'; return; }
+if (!list.length) { el.innerHTML = '<tr><td colspan="8" class="empty">还没有同学注册</td></tr>'; return; }
+// 用户名 → 注册用的邀请码（usedBy 已回填用户名，反查即得绑定关系，老账号同样有）
+var byUser = {};
+(invites || []).forEach(function (i) {
+(i.usedBy || []).forEach(function (u) {
+if (String(u).indexOf("pending-") !== 0) byUser[u] = i;
+});
+});
 var defLimit = Number(defaultTurns) || 0;
 el.innerHTML = list.map(function (u) {
+var inv = byUser[u.username];
+var origin = !inv ? "—"
+: inv.note ? '<span title="邀请码 ' + esc(inv.code) + '">' + esc(inv.note) + "</span>"
+: '<span class="mono" title="凭此码注册">' + esc(inv.code) + "</span>";
 var status = u.disabled ? '<span class="pill bad">已停用</span>' : '<span class="pill">正常</span>';
 var keySrc = u.dsMode === "site"
 ? '<span class="pill bad" title="钉在站点免费额度：自己保存的 Key 保留不用">站点额度</span>'
@@ -502,7 +513,7 @@ if (u.disabled) { acts += '<button class="act" data-do="enable" data-u="' + esc(
 else { acts += '<button class="act danger" data-do="disable" data-u="' + esc(u.username) + '">停用</button>'; }
 if (u.online) { acts += '<button class="act" data-do="kick" data-u="' + esc(u.username) + '">踢下线</button>'; }
 return '<tr><td class="mono">' + esc(u.username) + "</td><td>" + status + "</td><td>" + keySrc + "</td><td>" + online +
-'</td><td class="mono">' + fmtDate(u.createdAt) + '</td><td class="mono">' + quota +
+'</td><td>' + origin + '</td><td class="mono">' + fmtDate(u.createdAt) + '</td><td class="mono">' + quota +
 "</td><td>" + acts + "</td></tr>";
 }).join("");
 }
@@ -583,16 +594,19 @@ el.innerHTML =
 function renderInvites(list) {
 if (!list) return;
 var el = document.getElementById("invites");
-if (!list.length) { el.innerHTML = '<tr><td colspan="4" class="empty">暂无邀请码，用上方表单生成</td></tr>'; return; }
+if (!list.length) { el.innerHTML = '<tr><td colspan="5" class="empty">暂无邀请码，用上方表单生成</td></tr>'; return; }
 el.innerHTML = list.map(function (i) {
+// pending- 前缀是消费瞬间留下的占位（正常会立刻回填成用户名），展示绑定关系时剔除
+var users = (i.usedBy || []).filter(function (u) { return String(u).indexOf("pending-") !== 0; });
 var used = (i.usedBy || []).length >= (i.maxUses || 1);
 var expired = !used && i.expiresAt && new Date(i.expiresAt) < new Date();
-var status = used ? '<span class="pill">已被 ' + esc((i.usedBy || [])[0] || "") + " 使用</span>"
+var status = used ? '<span class="pill">已使用</span>'
 : expired ? '<span class="pill bad">已过期</span>'
 : (i.expiresAt ? '<span class="pill bad">' + fmtDate(i.expiresAt) + " 前有效</span>" : '<span class="pill">未使用</span>');
+var who = users.length ? users.map(esc).join("、") : "—";
 var copy = used || expired ? "" : '<button class="act" data-copy="' + esc(i.code) + '" type="button">复制</button>';
 return '<tr><td class="mono">' + esc(i.code) + '</td><td>' + esc(i.note || "—") +
-"</td><td>" + status + "</td><td>" + copy + "</td></tr>";
+'</td><td class="mono">' + who + "</td><td>" + status + "</td><td>" + copy + "</td></tr>";
 }).join("");
 }
 var updState = { file: null, xhr: null, versionTouched: false };
@@ -716,7 +730,7 @@ function load() {
 api("/admin/api/bootstrap").then(function (b) {
 if (!b) return;
 renderOverview(b.overview, b.site);
-renderUsers(b.users, b.site ? b.site.defaultDailyTurns : 0);
+renderUsers(b.users, b.site ? b.site.defaultDailyTurns : 0, b.invites);
 renderInvites(b.invites);
 renderResets(b.resets);
 renderUpdate(b.update.overview, b.update.versions);

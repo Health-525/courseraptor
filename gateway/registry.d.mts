@@ -53,6 +53,8 @@ export interface Registry {
     expiresDays?: number;
   }): Promise<Array<{ code: string; note: string; maxUses: number; usedBy: string[]; expiresAt: string }>>;
   consumeInvite(code: string): Promise<boolean>;
+  /** 注册中途失败时释放 pending 占位，码退回可再次消费 */
+  releaseInvite(code: string): Promise<void>;
   markInviteUsed(code: string, username: string): Promise<void>;
   listInvites(): Promise<Array<{ code: string; note: string; maxUses: number; usedBy: string[]; expiresAt: string }>>;
 }

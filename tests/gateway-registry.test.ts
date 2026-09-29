@@ -72,6 +72,21 @@ test("邀请码：一次性消费，无效/过期/已用都拒绝", async () => 
   assert.equal(await registry.consumeInvite(expiring.code), false, "过期邀请码应拒绝");
 });
 
+test("邀请码：建号失败后释放占位，码退回可再次消费", async () => {
+  const { registry } = makeRegistry();
+  const [invite] = await registry.createInvites({ count: 1, note: "班级群" });
+  assert.equal(await registry.consumeInvite(invite.code), true);
+
+  // 模拟注册中途失败（用户名被占等）：释放后不留 pending 占位
+  await registry.releaseInvite(invite.code);
+  assert.deepEqual((await registry.listInvites())[0].usedBy, []);
+  assert.equal(await registry.consumeInvite(invite.code), true, "释放后应能再次消费");
+
+  // 正常闭环：占位回填为真实用户名，绑定关系落盘
+  await registry.markInviteUsed(invite.code, "student01");
+  assert.deepEqual((await registry.listInvites())[0].usedBy, ["student01"]);
+});
+
 test("当日用量：累加并按日期自动清零", async () => {
   const { registry, stateDir } = makeRegistry();
   const user = await registry.createUser({ username: "student01", password: "password123" });
