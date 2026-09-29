@@ -221,16 +221,21 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .topbar { display: none; align-items: center; gap: 10px;
             min-height: 60px; padding: 10px 16px;
             border-bottom: 1px solid var(--rule); background: var(--paper-deep); }
-  .topbar .tb-title { margin-right: auto; font-size: 18px; }
+  .topbar .tb-title { flex: 1; justify-content: center; font-size: 18px; }
   .topbar .tbtn { min-height: 34px; padding: 5px 11px; font-size: 13px; }
   /* 移动顶栏导航位次对齐豆包等主流手机端 App：☰ 在左开唯一的左抽屉
      （会话档案 + 新会话 + 功能大厅入口都在抽屉里），右侧只留高频的
-     ＋ 新会话；动作全部图标化，44×44 触控目标满足 HIG 下限（Material 3） */
+     ＋ 新会话。图标按钮走 Material 3 顶栏规范：无边框幽灵图标、
+     44×44 触控目标（HIG 下限），按压给朱砂浅底状态层 */
   .topbar .iconbtn { display: inline-flex; width: 44px; min-width: 44px;
-                     min-height: 44px; padding: 0; justify-content: center; }
+                     min-height: 44px; padding: 0; justify-content: center;
+                     border-color: transparent; background: none; }
   .topbar .iconbtn svg { display: block; width: 20px; height: 20px; fill: none;
                          stroke: currentColor; stroke-width: 1.8;
                          stroke-linecap: round; stroke-linejoin: round; }
+  .topbar .iconbtn:hover { border-color: transparent; background: none;
+                           color: var(--accent); }
+  .topbar .iconbtn:active { background: var(--accent-soft); }
   #log { flex: 1; min-height: 0; overflow-y: auto; padding: 44px 40px 36px; }
   .inner { width: min(100%, 800px); min-height: 100%; margin: 0 auto; }
 
@@ -511,7 +516,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
        align-items: center; gap: 7px;
        border: 1px solid var(--accent); background: var(--accent);
        min-height: 44px; color: #FBFAF6; font-size: 14px; font-weight: 600;
-       padding: 9px 18px; border-radius: 4px; cursor: pointer;
+       padding: 9px 18px; border-radius: 6px; cursor: pointer;
        transition: background 0.15s ease, color 0.15s ease,
                    border-color 0.15s ease, opacity 0.15s ease; }
   #b .kbd { font-family: var(--mono); font-size: 12px; opacity: .7; }
@@ -1001,10 +1006,15 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .topbar { display: flex; }
     #log { padding: 28px 20px 24px; }
     form { padding: 11px 16px max(10px, env(safe-area-inset-bottom)); }
-    /* 窄屏快捷问题回单排横滚：wrap 三四行会挤压输入区 */
+    /* 附件与发送同高（44px）：高低不齐在手机上一眼就露怯 */
+    .attach-btn { min-height: 44px; }
+    /* 窄屏快捷问题回单排横滚：wrap 三四行会挤压输入区；
+       两侧 12px 渐隐提示可横滚（与会话标题悬停渐隐同一手法） */
     .quickbar { align-items: center; margin-bottom: 8px; }
     .qlabel { margin-top: 0; }
-    .qchips { flex-wrap: nowrap; overflow-x: auto; }
+    .qchips { flex-wrap: nowrap; overflow-x: auto;
+              -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+              mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%); }
     .fhint { display: none; }
   }
   @media (max-width: 560px) {
@@ -1029,7 +1039,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .attach-btn { width: 44px; padding: 0; }
     .attach-text { display: none; }
     textarea { font-size: 16px; }
-    #b { min-height: 40px; padding: 8px 14px; }
+    #b { min-height: 44px; padding: 8px 14px; }
     #b .kbd { display: none; }
     .data-grid { grid-template-columns: repeat(2, 1fr); }
     /* 大厅已改单列目录行，行高自适应，小屏无需再调 */
