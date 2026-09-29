@@ -191,8 +191,12 @@ export function createGatewayServer({
   // ── 页面（红头档案风：与正式网页版同一套设计令牌，见 chat-page.ts）──
 
   const layout = (title, body, error = "") => `<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F6F4ED">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="CourseRaptor">
 <link rel="icon" href="/logo.png">
+<link rel="apple-touch-icon" href="/logo.png">
 <title>${escapeHtml(title)} · CourseRaptor</title><style>
 :root{color-scheme:light;
 --paper:#F6F4ED;--paper-deep:#F0EDE4;--card:#FCFBF7;--shade:#ECE8DD;
@@ -204,9 +208,12 @@ export function createGatewayServer({
 --kai:"KaiTi","STKaiti","Kaiti SC",var(--serif);
 --sans:system-ui,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
 --mono:ui-monospace,"Cascadia Mono",Consolas,"Liberation Mono",monospace}
-*{box-sizing:border-box}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 ::selection{background:var(--accent-soft)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* 触屏：按钮双击不缩放、长按不弹选中（与对话页同一套手感规则） */
+button,.peek{touch-action:manipulation;-webkit-user-select:none;user-select:none}
 body{margin:0;min-height:100vh;min-height:100dvh;display:grid;place-items:center;
 padding:34px 18px;background:var(--paper);color:var(--ink);
 font-family:var(--sans);font-size:16px;line-height:1.7;

@@ -121,6 +121,23 @@ const LOGO_PNG = path.resolve(
   "courseraptor-logo.png",
 );
 
+/** PWA 清单：iOS「添加到主屏幕」与 Android「安装」的元数据。
+ *  图标直接复用 logo（1254² 方图，浏览器自行缩放）；主题色取纸面深一档，
+ *  与对话页顶栏同色。display=standalone 让安装后没有浏览器地址栏。 */
+const WEB_MANIFEST = JSON.stringify({
+  name: "CourseRaptor",
+  short_name: "CourseRaptor",
+  description: "课表、成绩、考试、通知，一句话查询",
+  start_url: "/",
+  display: "standalone",
+  background_color: "#F6F4ED",
+  theme_color: "#F0EDE4",
+  icons: [
+    { src: "/logo.png", sizes: "192x192", type: "image/png" },
+    { src: "/logo.png", sizes: "512x512", type: "image/png" },
+  ],
+});
+
 /** 静态资源进程启动后不会变，读一次常驻内存即可——请求路径上不再碰盘，
  * 同进程还挂着 SSE 流式对话，同步 IO 阻塞事件循环会放大流式延迟 */
 const staticCache = new Map<string, Buffer | null>();
@@ -858,6 +875,15 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         res.writeHead(404);
         res.end();
       }
+      return;
+    }
+    // PWA 清单（iOS 添加到主屏幕 / Android 安装到桌面）；图标复用 logo
+    if (url === "/manifest.webmanifest") {
+      res.writeHead(200, {
+        "content-type": "application/manifest+json; charset=utf-8",
+        "cache-control": "public, max-age=86400",
+      });
+      res.end(WEB_MANIFEST);
       return;
     }
     if (url === "/today" || url === "/today/") {

@@ -29,7 +29,13 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F0EDE4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="CourseRaptor">
 <link rel="icon" type="image/png" href="/logo.png">
+<link rel="apple-touch-icon" href="/logo.png">
+<link rel="manifest" href="/manifest.webmanifest">
 <title>CourseRaptor</title>
 <script src="/vendor/marked.min.js"></script>
 <style>
@@ -59,6 +65,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
+  /* 旋转屏幕时 iOS 不许对正文做字号膨胀（放大后布局必炸） */
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
   /* 锁定整页：只有消息区能滚，输入/发送条永远钉在视口底部；
      dvh 让移动端键盘弹出时底栏跟着抬进可见区而不是被顶出屏幕。
      第三列 0px 是功能大厅的坑位：打开时撑到 min(420px, 40vw)，
@@ -68,10 +76,18 @@ export function chatPage(options: { demo?: boolean } = {}): string {
          background: var(--paper); color: var(--ink);
          font-family: var(--sans); font-size: 16px; line-height: 1.7;
          -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
-         transition: grid-template-columns .24s ease; }
+         transition: grid-template-columns .24s ease;
+         /* 关掉整页橡皮筋与下拉刷新：聊天中途误触刷新是最伤的「网页感」来源；
+             #log / .hall-body 内部各自 contain，滚动到头不往外冒 */
+         overscroll-behavior: none; }
   body.hall-open { grid-template-columns: 284px 1fr min(420px, 40vw); }
   ::selection { background: var(--accent-soft); }
   button, input, textarea { font-family: inherit; }
+  /* 触屏手感三件套：无点击灰闪（Android tap highlight）、双击不触发缩放
+     （touch-action）、控件文字长按不可选（正文不受影响，仍可复制） */
+  button, .chip { -webkit-tap-highlight-color: transparent;
+                  touch-action: manipulation;
+                  -webkit-user-select: none; user-select: none; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   /* 纯文字品牌标：不用徽章与副标题，靠字重和双色建立辨识度。 */
@@ -236,7 +252,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .topbar .iconbtn:hover { border-color: transparent; background: none;
                            color: var(--accent); }
   .topbar .iconbtn:active { background: var(--accent-soft); }
-  #log { flex: 1; min-height: 0; overflow-y: auto; padding: 44px 40px 36px; }
+  #log { flex: 1; min-height: 0; overflow-y: auto; padding: 44px 40px 36px;
+         overscroll-behavior: contain; }
   .inner { width: min(100%, 800px); min-height: 100%; margin: 0 auto; }
 
   /* 对话按「往来文书」排版：一行题注 + 正文，不做聊天气泡。
@@ -715,6 +732,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-rule { border-bottom: 1px solid var(--accent); margin: 0 20px; }
   .hall-body { flex: 1; min-height: 0; overflow-y: auto;
                padding: 14px 20px max(24px, env(safe-area-inset-bottom));
+               overscroll-behavior: contain;
                scrollbar-width: thin; scrollbar-color: var(--rule-2) transparent; }
   .hall-body::-webkit-scrollbar { width: 8px; }
   .hall-body::-webkit-scrollbar-track { background: transparent; }
