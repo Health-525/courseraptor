@@ -9,11 +9,13 @@
  *   → 上次成功抓取的落盘缓存（前两者都失败时兜底，注明快照时间）。
  */
 
-import { fetchUrlText } from "../../core/http";
+import { createRequire } from "node:module";
+import { RaptorError } from "../../core/errors";
+import { fetchUrlBuffer, fetchUrlText } from "../../core/http";
 import { readJsonCache, writeJsonCache } from "../../core/json-cache";
 import { logger } from "../../core/logger";
 import type { NewsItem } from "../../core/model";
-import { jwcUrlToPath, webvpnFetchJwc, webvpnUrlToPublic } from "./webvpn";
+import { jwcUrlToPath, webvpnFetchJwc, webvpnFetchJwcBuffer, webvpnUrlToPublic } from "./webvpn";
 
 const BASE_URL = "https://jwc.njtech.edu.cn";
 
@@ -43,6 +45,94 @@ const DIRECT_HEADERS = {
   Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "Accept-Language": "zh-CN,zh;q=0.9",
 };
+
+// ── 内嵌 PDF 正文（webplus 把整篇通知做成 PDF 挂进页面）─────────
+// 一部分通知（如放假教学安排）的 v_news_content 里没有 HTML 文本，只有
+// pdf.js 的 <iframe src="/system/resource/pdfjs/viewer.html?file=...">
+// HTML 解析只能拿到导航壳；必须下载 PDF 抽文本，才读得到正文。
+
+/** PDF 二进制的 WebVPN 通道（测试可注入替身） */
+let webvpnPdfFetch: (path: string) => Promise<Buffer> = webvpnFetchJwcBuffer;
+
+/** @internal 仅为测试注入替身使用 */
+export function _setWebvpnPdfFetchForTest(fn: ((path: string) => Promise<Buffer>) | null): void {
+  webvpnPdfFetch = fn ?? webvpnFetchJwcBuffer;
+}
+
+const require = createRequire(import.meta.url);
+type PdfParseFn = (b: Buffer) => Promise<{ text: string }>;
+let pdfParseFn: PdfParseFn | null = null;
+
+/** PDF 文本抽取（pdf-parse，测试可注入替身） */
+async function parsePdfText(buf: Buffer): Promise<string> {
+  pdfParseFn ??= require("pdf-parse/lib/pdf-parse.js") as PdfParseFn;
+  return (await pdfParseFn(buf)).text;
+}
+
+let pdfTextParser: (buf: Buffer) => Promise<string> = parsePdfText;
+
+/** @internal 仅为测试注入替身使用 */
+export function _setPdfTextParserForTest(fn: ((buf: Buffer) => Promise<string>) | null): void {
+  pdfTextParser = fn ?? parsePdfText;
+}
+
+function isPdfBuffer(buf: Buffer): boolean {
+  return buf.subarray(0, 4).toString("latin1") === "%PDF";
+}
+
+/** 下载内嵌 PDF：直连（校内）优先，被校外拦截/网络失败时降级 WebVPN 二进制通道 */
+async function fetchJwcPdf(path: string): Promise<Buffer> {
+  try {
+    const { status, buf } = await fetchUrlBuffer(`${BASE_URL}${path}`, {
+      timeoutMs: 30_000,
+      headers: DIRECT_HEADERS,
+    });
+    if (status < 400 && isPdfBuffer(buf)) return buf;
+  } catch {
+    /* 直连失败（校外拦截/断网/超时）换 WebVPN 通道 */
+  }
+  const buf = await webvpnPdfFetch(path);
+  if (!isPdfBuffer(buf)) {
+    throw new RaptorError("PARSE", "内嵌 PDF 下载失败：通道返回的不是 PDF 文件");
+  }
+  return buf;
+}
+
+/**
+ * 从页面片段里找内嵌 PDF 的站内路径：pdf.js viewer 的 file= 参数，
+ * 或正文里直接挂的 /__local/*.pdf 链接。返回形如 /__local/B/56/xx.pdf 的路径。
+ */
+function findEmbeddedPdfPath(scope: string): string | null {
+  const raw =
+    scope.match(/viewer\.html\?file=([^"'&<>]+)/i)?.[1] ??
+    scope.match(/(?:href|src)="(\/__local\/[^"'<>?\s]+\.pdf)"/i)?.[1];
+  if (!raw) return null;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(raw);
+  } catch {
+    decoded = raw;
+  }
+  // WebVPN 改写页里 file= 可能是绝对地址：剥掉协议与域名，只留站内路径
+  if (/^https?:\/\//i.test(decoded)) {
+    try {
+      const u = new URL(decoded);
+      decoded = u.pathname + u.search;
+    } catch {
+      return null;
+    }
+  }
+  return decoded.startsWith("/") ? decoded : null;
+}
+
+/** pdf-parse 输出排版噪声重（连排空格/大量空行），收敛成可读正文 */
+function normalizePdfText(text: string): string {
+  return text
+    .replace(/\r/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 // ── 抓取阶梯 ─────────────────────────────────────────────────
 
@@ -246,9 +336,10 @@ export async function fetchJwcArticle(url: string): Promise<JwcArticle> {
 
   // 正文在 v_news_content / vsb_content 容器内；容器有嵌套 div，
   // 必须做配对计数提取（正则非贪婪会在第一个 </div> 截断）
-  let bodyHtml =
+  const containerHtml =
     extractDivBlock(html, /<div[^>]*class="[^"]*v_news_content[^"]*"[^>]*>/i) ??
     extractDivBlock(html, /<div[^>]*class="[^"]*vsb_content[^"]*"[^>]*>/i);
+  let bodyHtml = containerHtml;
   if (!bodyHtml || htmlToText(bodyHtml).length < 200) {
     bodyHtml = html; // 容器缺失/过短时退化为整页剥离
   }
@@ -275,7 +366,29 @@ export async function fetchJwcArticle(url: string): Promise<JwcArticle> {
     }
   }
 
-  return { title, text: htmlToText(bodyHtml), attachments };
+  // 正文内嵌 PDF 的通知：下载抽文本替换导航壳，PDF 同时登记进
+  // attachments（超长正文可让模型用 fetch_attachment 分页续读）。
+  // 优先在正文容器里找（整页别的模块也可能挂 pdf.js 阅读器）
+  let text = htmlToText(bodyHtml);
+  const pdfPath = containerHtml
+    ? (findEmbeddedPdfPath(containerHtml) ?? findEmbeddedPdfPath(html))
+    : findEmbeddedPdfPath(html);
+  if (pdfPath) {
+    const pdfUrl = `${BASE_URL}${pdfPath}`;
+    if (!attachments.some((a) => a.url === pdfUrl)) {
+      attachments.push({ name: `${title || "通知正文"}.pdf`, url: pdfUrl });
+    }
+    try {
+      const pdfText = normalizePdfText(await pdfTextParser(await fetchJwcPdf(pdfPath)));
+      if (pdfText) text = pdfText;
+    } catch (e) {
+      logger.warn("[jwc-news] 内嵌 PDF 下载/解析失败，正文暂为页面壳文本", {
+        error: (e as Error).message,
+      });
+    }
+  }
+
+  return { title, text, attachments };
 }
 
 /** 提取指定开标签 div 的完整内容（<div 配对计数，正确处理嵌套） */

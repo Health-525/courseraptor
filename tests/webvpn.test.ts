@@ -25,7 +25,8 @@ process.env.CAS_PASSWORD = "cas-pass-123";
 process.env.JWGL_USERNAME = "202321144057";
 process.env.JWGL_PASSWORD = "jwgl-pass";
 
-const { fetchJwcNews, fetchJwcNewsDetailed } = await import("../src/adapters/njtech/news");
+const { fetchJwcArticle, fetchJwcNews, fetchJwcNewsDetailed, _setPdfTextParserForTest } =
+  await import("../src/adapters/njtech/news");
 const {
   _setCaptchaSolverForTest,
   encryptCasPassword,
@@ -295,5 +296,47 @@ test("直连可用时优先直连，不触发 WebVPN 登录", async () => {
   } finally {
     restoreHttp();
     resetSessionState();
+  }
+});
+
+// ── 内嵌 PDF 通知经 WebVPN 读取 ───────────────────────────────
+
+const PDF_ARTICLE_HTML = `<html><head><title>关于2026年中秋节、国庆节放假本科教学安排的通知-教务处</title></head><body>
+<div id="vsb_content" class="txt"><div class="v_news_content">
+<p><iframe src="/system/resource/pdfjs/viewer.html?file=/__local/B/56/TEST_FD7C9A42_12F48.pdf"></iframe></p>
+</div></div></body></html>`;
+
+test("校外读内嵌 PDF 通知：文章页与 PDF 二进制都经 WebVPN 通道取得", async () => {
+  resetSessionState();
+  _setCaptchaSolverForTest(async () => "ab31");
+  _setPdfTextParserForTest(async (buf) => {
+    assert.equal(
+      buf.subarray(0, 4).toString("latin1"),
+      "%PDF",
+      "WebVPN 二进制通道不能把 PDF 解码成 utf8 文本",
+    );
+    return "2026年9月25日至10月7日放假调休，共13天。";
+  });
+  installDirectBlocked();
+  installWebvpnScript((method, url, cookie) => {
+    // 文章页与 PDF 直链都被校外拦截（global fetch 只回拦截页），
+    // 两者都必须落到 https.request 的 WebVPN 代理前缀上
+    if (url.includes(`/http/webvpn${JWC_HASH}/info/1158/`)) return { body: PDF_ARTICLE_HTML };
+    if (url.includes(`/http/webvpn${JWC_HASH}/__local/`)) return { body: "%PDF-1.7 fake-pdf" };
+    return happyPathScript(method, url, cookie);
+  });
+  try {
+    const article = await fetchJwcArticle("https://jwc.njtech.edu.cn/info/1158/6925.htm");
+    assert.match(article.text, /放假调休，共13天/);
+    const pdf = article.attachments.find((a) => a.url.includes("/__local/"));
+    assert.equal(
+      pdf?.url,
+      "https://jwc.njtech.edu.cn/__local/B/56/TEST_FD7C9A42_12F48.pdf",
+      "附件链接必须是映射回的公网地址",
+    );
+  } finally {
+    restoreHttp();
+    resetSessionState();
+    _setPdfTextParserForTest(null);
   }
 });

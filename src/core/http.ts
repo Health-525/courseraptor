@@ -356,6 +356,44 @@ export async function fetchUrlText(
   }
 }
 
+/** 注入点：真实 fetch 或测试替身（二进制形态）。返回最小 Response 形状即可 */
+export type BufferFetch = (
+  url: string,
+  init?: { signal?: AbortSignal; headers?: Record<string, string> },
+) => Promise<{
+  status: number;
+  arrayBuffer(): Promise<ArrayBuffer>;
+}>;
+
+export interface FetchUrlBufferOptions {
+  /** 超时毫秒数，默认 30000 */
+  timeoutMs?: number;
+  headers?: Record<string, string>;
+  fetchImpl?: BufferFetch;
+}
+
+/** global fetch + 超时 + 类型化网络错误（二进制，如内嵌 PDF）；HTTP 状态不在此判定 */
+export async function fetchUrlBuffer(
+  url: string,
+  opts: FetchUrlBufferOptions = {},
+): Promise<{ status: number; buf: Buffer }> {
+  const doFetch: BufferFetch = opts.fetchImpl ?? ((u, init) => fetch(u, init));
+  const timeoutMs = opts.timeoutMs ?? 30_000;
+  try {
+    const res = await doFetch(url, {
+      headers: opts.headers,
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    return { status: res.status, buf: Buffer.from(await res.arrayBuffer()) };
+  } catch (e) {
+    const err = e as Error;
+    if (err?.name === "TimeoutError" || err?.name === "AbortError") {
+      throw new RaptorError("NETWORK", `请求超时（${Math.round(timeoutMs / 1000)}s）：${url}`);
+    }
+    throw new RaptorError("NETWORK", `网络错误：${err?.message ?? String(e)}`);
+  }
+}
+
 /** 统一的抓取结果：ok=false 时必须把 error 如实上报给模型，不许降级成空列表 */
 import type { FetchResult } from "./fetch-result";
 
