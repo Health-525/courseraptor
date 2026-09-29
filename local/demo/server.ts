@@ -6,12 +6,12 @@
 import { readFileSync } from "node:fs";
 import http from "node:http";
 import type { ModelMessage } from "ai";
-import { chatPage } from "../channels/web/chat-page";
-import { knowledgePage } from "../channels/web/knowledge-page";
-import { DEFAULT_QUESTIONS } from "../channels/web/quick-questions";
-import { schedulePage } from "../channels/web/schedule-page";
-import { todayPage } from "../channels/web/today-page";
-import { todosPage } from "../channels/web/todos-page";
+import { chatPage } from "../../src/channels/web/chat-page";
+import { knowledgePage } from "../../src/channels/web/knowledge-page";
+import { DEFAULT_QUESTIONS } from "../../src/channels/web/quick-questions";
+import { schedulePage } from "../../src/channels/web/schedule-page";
+import { todayPage } from "../../src/channels/web/today-page";
+import { todosPage } from "../../src/channels/web/todos-page";
 import { type DemoStreamAgent, runDemoLiveTurn } from "./agent";
 import { type DemoCard, demoCardsForMessage } from "./cards";
 import { demoKnowledge, demoTodayBrief } from "./data";

@@ -43,7 +43,7 @@ if (!Number.isInteger(port) || port < 0 || port > 65535) {
   let liveAgent: DemoStreamAgent | null = null;
   let liveModel = "";
   if (live) {
-    // shell 环境优先；缺的键再从项目根 .env 补（src/demo/ 上两级即项目根）
+    // shell 环境优先；缺的键再从项目根 .env 补（local/demo/ 上两级即项目根）
     const fromEnvFile = readDemoEnvKeys(fileURLToPath(new URL("../../.env", import.meta.url)), [
       "DEEPSEEK_API_KEY",
       "DEEPSEEK_BASE_URL",

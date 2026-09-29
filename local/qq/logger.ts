@@ -5,8 +5,8 @@
  * 保留独立文件：排查桥接问题时一个文件看全。
  */
 
-import { createFileLogger } from "../../core/logger";
-import { migratedDataPath } from "../../core/paths";
+import { createFileLogger } from "../../src/core/logger";
+import { migratedDataPath } from "../../src/core/paths";
 
 const LOG_FILE = migratedDataPath("qq-bridge.log");
 const impl = createFileLogger(LOG_FILE);

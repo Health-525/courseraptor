@@ -6,8 +6,8 @@ import path from "node:path";
 import { test } from "node:test";
 import vm from "node:vm";
 
-const { createGatewayServer } = await import("../server/gateway/app.mjs");
-const { createRegistry } = await import("../server/gateway/registry.mjs");
+const { createGatewayServer } = await import("../gateway/app.mjs");
+const { createRegistry } = await import("../gateway/registry.mjs");
 
 async function startBackend(t: { after: (fn: () => void) => void }) {
   const backend = http.createServer((_req, res) => {

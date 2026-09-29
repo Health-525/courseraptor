@@ -4,7 +4,7 @@
  * 键位语义（1.0.84 实测）：流式期间 ESC 和 Ctrl+C 都会打断当前回复并终结
  * 整个会话，它的词表里没有「打断但继续」。期望的约定（Claude Code 等主流 CLI）：
  *   - ESC    = 打断当前回复，回到输入框（本代理拦下单字节 ESC，转成软打断
- *              信号，由 agent 包装层消费：src/channels/cli/tui/soft-interrupt.ts）
+ *              信号，由 agent 包装层消费：local/cli/tui/soft-interrupt.ts）
  *   - Ctrl+C = 退出程序（原样透传。库任何状态下按 Ctrl+C 都会打断在途
  *              回复并走 runAgentTUI 正常 resolve 的优雅退出路径）
  *

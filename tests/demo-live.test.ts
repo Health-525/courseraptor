@@ -5,10 +5,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { type DemoStreamAgent, demoLiveTools, runDemoLiveTurn } from "../src/demo/agent";
-import { demoCardFromTool, demoCardsForMessage, examsCard, scheduleCard } from "../src/demo/cards";
-import { demoExams, demoGrades, demoNews, demoTodayBrief, demoTodos } from "../src/demo/data";
-import { createDemoServer } from "../src/demo/server";
+import { type DemoStreamAgent, demoLiveTools, runDemoLiveTurn } from "../local/demo/agent";
+import {
+  demoCardFromTool,
+  demoCardsForMessage,
+  examsCard,
+  scheduleCard,
+} from "../local/demo/cards";
+import { demoExams, demoGrades, demoNews, demoTodayBrief, demoTodos } from "../local/demo/data";
+import { createDemoServer } from "../local/demo/server";
 
 const asTool = (t: unknown) =>
   t as { execute: (input: Record<string, unknown>) => Promise<Record<string, unknown>> };

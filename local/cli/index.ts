@@ -4,29 +4,29 @@
  * 运行: raptor / npm run dev
  *
  * 默认使用 @ai-sdk/tui 全屏卡片 UI（用户指定偏好：不要顺着命令行往下滚），
- * 行内渲染器（src/channels/cli/tui/inline.ts）作为备选，两种 UI 可运行时互切：
+ * 行内渲染器（local/cli/tui/inline.ts）作为备选，两种 UI 可运行时互切：
  *   - 卡片模式输入 /inline → 行内（输出顺着终端缓冲区走、滚轮/选中复制可用）
  *   - 行内模式输入 /card   → 卡片
- * RAPTOR_TUI_INLINE=1 只决定初始模式。滚轮/滚动步长/斜杠命令见 src/channels/cli/tui/keys.ts。
+ * RAPTOR_TUI_INLINE=1 只决定初始模式。滚轮/滚动步长/斜杠命令见 local/cli/tui/keys.ts。
  * 两种 UI 输入 / 都会唤出斜杠命令候选菜单（↑↓ 选择、Tab/Enter 补全），
- * 注册表与渲染共用 src/channels/cli/tui/slash-menu.ts。
+ * 注册表与渲染共用 local/cli/tui/slash-menu.ts。
  */
 
-import "../../adapters";
-import { createRaptorAgent } from "../../core/agent";
-import { config } from "../../core/config";
-import { saveCredentialsStore } from "../../core/credentials";
-import { flushCapturedSession } from "../../core/memory/shortterm";
-import { ensureModelAvailable } from "../../core/models";
-import { ensureCredentials, runDeepSeekKeySetup } from "../../core/onboarding";
-import { school } from "../../core/school";
+import "../../src/adapters";
+import { createRaptorAgent } from "../../src/core/agent";
+import { config } from "../../src/core/config";
+import { saveCredentialsStore } from "../../src/core/credentials";
+import { flushCapturedSession } from "../../src/core/memory/shortterm";
+import { ensureModelAvailable } from "../../src/core/models";
+import { ensureCredentials, runDeepSeekKeySetup } from "../../src/core/onboarding";
+import { school } from "../../src/core/school";
 import {
   checkForUpdate,
   formatUpdateBadge,
   formatUpdateBanner,
   type UpdateInfo,
-} from "../../core/update-check";
-import { runUpdateCommand } from "../../core/updater";
+} from "../../src/core/update-check";
+import { runUpdateCommand } from "../../src/core/updater";
 import { SLASH_COMMANDS } from "./tui/slash-menu";
 
 // 更新检查先发出，与凭证加载/agent 构建并行跑，后面收结果
@@ -84,7 +84,7 @@ if (config.deepseekApiKey) {
 // 会话自动命名 maker：直调模型 API（不带工具），失败静默——标题还有首问
 // 兜底。网页与 QQ 桥落的是同一份档案，注册表也共用（src/session-titles.ts），
 // 装配赶在 QQ 桥启动之前
-await import("../../core/session-titles").then(({ installDefaultTitleMaker }) =>
+await import("../../src/core/session-titles").then(({ installDefaultTitleMaker }) =>
   installDefaultTitleMaker(),
 );
 
@@ -100,7 +100,9 @@ if (config.qqBotAppId && config.qqBotAppSecret) {
 const agent = await createRaptorAgent();
 
 // 网页对话窗口：浏览器打开即聊（地址显示在欢迎卡片下方），起不来不影响终端
-const { setChatAgent, setChatAgentRefresher, startChatWeb } = await import("../web/chat-web");
+const { setChatAgent, setChatAgentRefresher, startChatWeb } = await import(
+  "../../src/channels/web/chat-web"
+);
 setChatAgent(agent);
 // 换模型即重建 agent 给网页用；终端 TUI 持有的是上面这个实例，重启后才用新模型
 setChatAgentRefresher(async () => {
@@ -110,7 +112,7 @@ startChatWeb().catch(() => {});
 
 // 待办到期提醒：每小时扫描「距到期 ≤ 7 天」的未完成待办（每天最多一次，
 // 桌面通知 + QQ 推送）。QQ 桥在线时进程在 TUI 退出后仍存活，提醒也随之持续
-void import("../../core/todo-reminders").then(({ startTodoReminderScheduler }) =>
+void import("../../src/core/todo-reminders").then(({ startTodoReminderScheduler }) =>
   startTodoReminderScheduler(),
 );
 
@@ -175,7 +177,7 @@ while (running) {
           .join(" · "),
         // 键位约定（对齐 Claude Code 等主流 CLI）：ESC=打断当前回复并回到输入框
         // （库默认 ESC/Ctrl+C 都会终结会话，键位代理拦 ESC 转软打断信号，包装层
-        // 消费：src/channels/cli/tui/soft-interrupt.ts）；Ctrl+C=退出程序（透传，库自己走优雅退出）
+        // 消费：local/cli/tui/soft-interrupt.ts）；Ctrl+C=退出程序（透传，库自己走优雅退出）
         agent: withSoftInterrupt(agent),
         // userInput 是库未文档化的运行时参数，类型未声明所以断言一下
         userInput: keys.stream,

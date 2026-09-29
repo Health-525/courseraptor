@@ -3,8 +3,8 @@
  * 全部条目为虚构示例；日期相对「现在」生成，任何时刻打开演示都成立。
  */
 
-import type { BriefCourse, BriefDay, TodayBrief } from "../channels/web/today-brief";
-import type { KnowledgeEntry } from "../core/knowledge";
+import type { BriefCourse, BriefDay, TodayBrief } from "../../src/channels/web/today-brief";
+import type { KnowledgeEntry } from "../../src/core/knowledge";
 
 export const DEMO_PERIOD_TIMES: Record<string, string> = {
   "1": "08:10-08:55",

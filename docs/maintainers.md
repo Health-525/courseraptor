@@ -17,13 +17,15 @@ npm run demo
 
 ## 代码结构导览
 
+仓库按部署单元分顶层目录：`src/` 是公用核心（core + adapters + channels/web 网页界面，本地版与线上托管版共用）；`local/` 是本地版专属入口（TUI `cli/`、QQ 机器人 `qq/`、演示 `demo/`）；`gateway/` 是线上托管版（多用户网关 + 网关管理台 `admin/` + 托管实例入口 `headless/`）；`update/` 是更新分发后台（安装包发布/下载，服务本地版升级）；`landing/` 是项目介绍落地页（React+Vite，发 GitHub Pages，与运行时无关）。
+
 依赖方向：channels → core ← adapters。core 定义 SchoolAdapter 端口（`src/core/school.ts`）并只依赖端口；adapters 实现端口并可自由使用 core；channels（终端/网页/QQ）只做装配与展示，不 import 任何学校适配器。core 与 channels 里 import `adapters/njtech` 视为架构违规。
 
 | 目录/模块 | 职责 |
 |---|---|
-| `src/channels/cli/index.ts` | 终端主入口：装配学校适配器（`import "../adapters"`）、凭证引导、拉起 QQ 桥 / 网页服务 / 待办调度、TUI 循环 |
+| `local/cli/index.ts` | 终端主入口：装配学校适配器（`import "../../src/adapters"`）、凭证引导、拉起 QQ 桥 / 网页服务 / 待办调度、TUI 循环 |
 | `src/channels/web/` | 网页服务与页面（聊天/大厅/日程/课表/待办/知识库） |
-| `src/channels/qq/` | QQ 官方机器人桥 |
+| `local/qq/` | QQ 官方机器人桥 |
 | `src/core/agent.ts` | agent 组装：core 通用工具 + 学校适配器贡献的教务工具合并；提示词骨架在 `src/core/prompt.ts`，教务段由适配器提供（校历段运行时渲染自 `data/term-dates.json`，不在代码里硬编码） |
 | `src/core/tools/` | 通用工具聚合（文件/文档/记忆/待办/知识库/番茄钟/设置/天气/时间） |
 | `src/adapters/njtech/` | 南京工业大学适配器：登录/课表/成绩/考试/学籍/选课/通知抓取与教务工具（`index.ts` 组装成 SchoolAdapter；`session.ts` 是登录 cookie / 选课会话缓存，经端口供 UI 使用） |
@@ -49,7 +51,7 @@ npm run demo
 
 ## 更新后台
 
-后台入口为 `server/update-server.mjs`，数据保存在 `update-data/`。Node 默认监听本机，通过 Nginx 和 HTTPS 对外提供服务；参考 `server/nginx.conf.example`。
+后台入口为 `update/update-server.mjs`，数据保存在 `update-data/`。Node 默认监听本机，通过 Nginx 和 HTTPS 对外提供服务；参考 `server/nginx.conf.example`。
 
 需要维护者配置 `UPDATE_ADMIN_TOKEN`、`HOST`、`PORT`。密钥使用自己的高强度随机值，通过部署环境注入，不写进 README、Issue 或示例文件。
 
@@ -57,7 +59,7 @@ npm run demo
 
 ### Admin 管理（无独立面板）
 
-发版管理的网页入口在**网关管理台的「版本发布」面板**（`server/gateway/admin/ui.mjs`，见 `docs/multi-user-deploy.md`）：上传新版本（zip 拖拽上传带进度，与 `npm run publish` 共用 `/publish` 接口）、查看历史版本、一键回滚、删除，均经网关 `/admin/api/update/*` 流式代理到更新后台，鉴权由网关管理会话承担。
+发版管理的网页入口在**网关管理台的「版本发布」面板**（`gateway/admin/ui.mjs`，见 `docs/multi-user-deploy.md`）：上传新版本（zip 拖拽上传带进度，与 `npm run publish` 共用 `/publish` 接口）、查看历史版本、一键回滚、删除，均经网关 `/admin/api/update/*` 流式代理到更新后台，鉴权由网关管理会话承担。
 
 更新后台自身不再提供网页面板（原先 `server/admin/` 的 React SPA 已移除），只保留机器接口：`/admin/api/overview|versions|rollback|delete` 与 `/publish`，全部要求 `x-admin-token`。发布历史记录在 `update-data/versions.json`，由 publish / rollback / delete 自动维护，删除历史文件不影响后台运行。
 

@@ -6,7 +6,7 @@
  * 后端 chat-web 现有的「Host / Origin / CSRF」三道本机防线原样通过，
  * 跨站防护由本网关的会话边界（HttpOnly + SameSite=Lax）承担。
  *
- * 可注入 registry / spawner 以便测试（同 server/app.mjs 的 createUpdateServer 风格）。
+ * 可注入 registry / spawner 以便测试（同 update/app.mjs 的 createUpdateServer 风格）。
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";

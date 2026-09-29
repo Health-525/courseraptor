@@ -23,7 +23,7 @@
  * 菜单绘制全部用光标相对移动（下移不滚屏、\n 在屏底自然滚屏、画完按行数
  * 上移 + 绝对列归位），不查询光标绝对位置，readline 对这一切无感。
  * 菜单刷新挂在 keypress 事件上：事件触发时 readline 已处理完按键，
- * rl.line 是最新行文本。见 src/channels/cli/tui/slash-menu.ts（共用注册表与渲染）。
+ * rl.line 是最新行文本。见 local/cli/tui/slash-menu.ts（共用注册表与渲染）。
  */
 
 import readline from "node:readline";
@@ -567,7 +567,7 @@ export async function runInlineTUI(options: {
       continue;
     }
     if (prompt === "/update") {
-      const { applyUpdate } = await import("../../../core/updater");
+      const { applyUpdate } = await import("../../../src/core/updater");
       try {
         const res = await applyUpdate((m) => write(`  ${m}\n`));
         write(`  ${res}\n\n`);

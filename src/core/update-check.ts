@@ -1,6 +1,6 @@
 /**
  * 更新检查：对比「更新后台」上的最新版本与本地版本，有新版则提示。
- * 后台 = server/update-server.mjs（发版用 npm run publish 推上去）。
+ * 后台 = update/update-server.mjs（发版用 npm run publish 推上去）。
  *
  * 设计约束：
  *  - 每 24h 最多真正联网一次，结果（含「没有新版」）缓存 data/update-check.json，

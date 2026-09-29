@@ -566,7 +566,7 @@ if (!o) return;
 if (o.unavailable || o.error) {
 cur.textContent = "";
 card.innerHTML = '<div class="notice">' + esc(o.error || "更新后台未接入") + '</div>' +
-'<p style="color:var(--ink-2);font-size:13px">在网关环境变量配置 GATEWAY_UPDATE_URL 与 GATEWAY_UPDATE_TOKEN，并部署更新后台（server/update-server.mjs）后，这里会显示版本列表与回滚操作。</p>' +
+'<p style="color:var(--ink-2);font-size:13px">在网关环境变量配置 GATEWAY_UPDATE_URL 与 GATEWAY_UPDATE_TOKEN，并部署更新后台（update/update-server.mjs）后，这里会显示版本列表与回滚操作。</p>' +
 '<div style="margin-top:10px"><button class="act" id="updRetry" type="button">重试</button></div>';
 return;
 }
@@ -768,7 +768,7 @@ export function createAdminUi({
   const failures = new Map();
 
   /**
-   * 代理访问同机部署的更新分发后台（server/update-server.mjs，回环端口）。
+   * 代理访问同机部署的更新分发后台（update/update-server.mjs，回环端口）。
    * 未配置 / 连不上时返回 {unavailable}，管理台显示「未接入」而不是报错。
    */
   async function callUpdateApi(method, path, body) {

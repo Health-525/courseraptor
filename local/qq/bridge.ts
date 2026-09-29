@@ -3,7 +3,7 @@
  *
  * 两种运行方式：
  * - 嵌入模式（默认）：`raptor` 启动终端 TUI 时自动拉起（日志写文件，
- *   见 src/channels/qq/logger.ts，避免破坏 TUI 渲染）
+ *   见 local/qq/logger.ts，避免破坏 TUI 渲染）
  * - 独立模式：`npm run qq` 只跑桥（日志走控制台）
  *
  * - 场景：单聊（C2C）直接对话；群聊需 @机器人 触发（mentionGate）
@@ -13,7 +13,7 @@
  *   网页那套会话档案（data/chat-sessions.json），侧栏能回看 QQ 里的对话
  */
 
-import "../../adapters";
+import "../../src/adapters";
 import { realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -26,15 +26,15 @@ import {
   QQBot,
 } from "@tencent-connect/qqbot-nodejs";
 import type { ModelMessage } from "ai";
-import { createRaptorAgent } from "../../core/agent";
-import { quarantineCorruptFile, writeFileAtomic } from "../../core/atomic-write";
-import { appendRound } from "../../core/chat-sessions";
-import { config } from "../../core/config";
-import { drainGeneratedRound, runInDocumentRound } from "../../core/document/save";
-import { isRaptorError, isSessionExpiredError } from "../../core/errors";
-import { ensureCredentials } from "../../core/onboarding";
-import { migratedDataPath } from "../../core/paths";
-import { maybeAutoTitle } from "../../core/session-titles";
+import { createRaptorAgent } from "../../src/core/agent";
+import { quarantineCorruptFile, writeFileAtomic } from "../../src/core/atomic-write";
+import { appendRound } from "../../src/core/chat-sessions";
+import { config } from "../../src/core/config";
+import { drainGeneratedRound, runInDocumentRound } from "../../src/core/document/save";
+import { isRaptorError, isSessionExpiredError } from "../../src/core/errors";
+import { ensureCredentials } from "../../src/core/onboarding";
+import { migratedDataPath } from "../../src/core/paths";
+import { maybeAutoTitle } from "../../src/core/session-titles";
 import { localOnlyCommandMessage } from "../cli/tui/slash-menu";
 import { mdToPlain, splitMessage } from "./format";
 import { registerQQPush } from "./push";
@@ -92,7 +92,7 @@ async function saveAllowlist(): Promise<void> {
 
 // ── 会话历史（每发送者独立，滑动窗口）─────────────────────────
 // 这里只是喂模型的上下文窗口。网页侧栏看到的「历史记录」是另一条线：
-// 每轮问答另外写进 chat-sessions（见 src/channels/qq/session-archive.ts 的归档
+// 每轮问答另外写进 chat-sessions（见 local/qq/session-archive.ts 的归档
 // 粒度），只写不读——网页里删改 QQ 档不会反过来影响这里的上下文。
 
 const MAX_HISTORY_TURNS = 20;
@@ -400,11 +400,11 @@ export async function startStandaloneQQ(
 if (isEntry) {
   // 侧栏会话标题的模型命名：独立跑桥也照常装配（与嵌入模式的 index.ts
   // 同一个注册表），QQ 落进档案的会话同样有模型定的标题
-  await import("../../core/session-titles").then(({ installDefaultTitleMaker }) =>
+  await import("../../src/core/session-titles").then(({ installDefaultTitleMaker }) =>
     installDefaultTitleMaker(),
   );
   await startStandaloneQQ();
   // 独立跑桥时待办提醒照常工作（主入口 index.ts 里另有启动）
-  const { startTodoReminderScheduler } = await import("../../core/todo-reminders");
+  const { startTodoReminderScheduler } = await import("../../src/core/todo-reminders");
   startTodoReminderScheduler();
 }

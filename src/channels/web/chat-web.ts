@@ -287,12 +287,16 @@ export function setQQBridgeLauncher(fn: QQBridgeLauncher | null): void {
 
 /** 未在跑则拉起；已在跑则沿用启动时的凭证（重启后切换），失败如实说明 */
 async function defaultQQBridgeLauncher(): Promise<string> {
-  const { isQQBridgeOnline, startQQBridge } = await import("../qq/bridge");
+  const {
+    isQQBridgeOnline,
+    startQQBridge,
+  } = // QQ 桥只随本地版（local/qq）分发；托管实例不会走到这个懒加载
+    await import("../../../local/qq/bridge");
   if (isQQBridgeOnline()) {
     return "；QQ 桥已在线（沿用启动时的凭证），重启 raptor 后切换为新凭证";
   }
   try {
-    const { createQQFileLogger } = await import("../qq/logger");
+    const { createQQFileLogger } = await import("../../../local/qq/logger");
     // 20 秒没连上就先回话：桥后台继续尝试，凭证已加密保存
     const timeout = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error("连接超时（20 秒）")), 20_000);

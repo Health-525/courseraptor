@@ -7,7 +7,7 @@
  *   GATEWAY_DEEPSEEK_KEY=站点统一 DeepSeek Key（可空=同学必须自带） \
  *   GATEWAY_STATE_DIR=/var/lib/raptor-gateway \
  *   GATEWAY_USERS_DIR=/var/lib/raptor-users \
- *   node server/gateway/gateway.mjs
+ *   node gateway/gateway.mjs
  *
  * 可调参数：GATEWAY_PORT(8080) / GATEWAY_MAX_CONCURRENT(4) /
  * GATEWAY_IDLE_MINUTES(30) / GATEWAY_DAILY_TURNS(100)
@@ -21,7 +21,7 @@ import { createGatewayServer } from "./app.mjs";
 import { createRegistry } from "./registry.mjs";
 import { createSpawner } from "./spawner.mjs";
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const env = process.env;
 
 const secret = env.GATEWAY_SECRET;
@@ -30,8 +30,8 @@ if (!secret || secret.length < 16) {
   process.exit(1);
 }
 
-const stateDir = env.GATEWAY_STATE_DIR || path.join(ROOT, "server", "gateway", "state");
-const usersDir = env.GATEWAY_USERS_DIR || path.join(ROOT, "server", "gateway", "users");
+const stateDir = env.GATEWAY_STATE_DIR || path.join(ROOT, "gateway", "state");
+const usersDir = env.GATEWAY_USERS_DIR || path.join(ROOT, "gateway", "users");
 const port = Number(env.GATEWAY_PORT) || 8080;
 const host = env.GATEWAY_HOST || "0.0.0.0";
 
@@ -73,7 +73,7 @@ server.listen(port, host, () => {
   console.log(`   并发上限 ${env.GATEWAY_MAX_CONCURRENT || 4} · 空闲回收 ${env.GATEWAY_IDLE_MINUTES || 30} 分钟 · 每日每人 ${env.GATEWAY_DAILY_TURNS || 100} 轮`);
   console.log(env.GATEWAY_ADMIN_PASSWORD
     ? "   网页管理台：http://" + host + ":" + port + "/admin"
-    : "   网页管理台未启用（设置 GATEWAY_ADMIN_PASSWORD 开启）；命令行：node server/gateway/admin/cli.mjs invite");
+    : "   网页管理台未启用（设置 GATEWAY_ADMIN_PASSWORD 开启）；命令行：node gateway/admin/cli.mjs invite");
 });
 
 let closing = false;

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-const { createUpdateServer } = await import("../server/app.mjs");
+const { createUpdateServer } = await import("../update/app.mjs");
 
 async function startServer(t: { after: (fn: () => void) => void }) {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-update-api-"));
