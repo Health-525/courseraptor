@@ -5,6 +5,13 @@ export interface Spawner {
   stopAll(): Promise<void>;
   runningCount(): number;
   isRunning(userId: string): boolean;
+  listRunning(): Array<{
+    userId: string;
+    port: number | null;
+    startedAt: number;
+    lastRequestAt: number;
+    restarts: number;
+  }>;
   startReaper(): () => void;
 }
 

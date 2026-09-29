@@ -32,7 +32,7 @@ export interface Registry {
   approveResetRequest(id: string): Promise<{ code: string; username: string; expiresAt: string }>;
   rejectResetRequest(id: string): Promise<void>;
   redeemResetCode(username: string, code: string): Promise<string | null>;
-  addTurns(id: string, count?: number): Promise<number>;
+  addTurns(id: string, count?: number, ledger?: "site" | "own"): Promise<number>;
   turnsToday(id: string): Promise<number>;
   listUsers(): Promise<RegistryUser[]>;
   createInvites(options?: {

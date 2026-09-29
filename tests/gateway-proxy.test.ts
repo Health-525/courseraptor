@@ -59,6 +59,9 @@ function fakeSpawner(port: number) {
     isRunning(userId: string) {
       return calls.includes(`acquire:${userId}`);
     },
+    listRunning() {
+      return [];
+    },
     startReaper() {
       return () => {};
     },

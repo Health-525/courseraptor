@@ -15,6 +15,7 @@
  * GATEWAY_HOST 为 127.0.0.1。
  */
 
+import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createGatewayServer } from "./app.mjs";
@@ -23,6 +24,9 @@ import { createSpawner } from "./spawner.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const env = process.env;
+const { version: appVersion } = JSON.parse(
+  readFileSync(path.join(ROOT, "package.json"), "utf8"),
+);
 
 const secret = env.GATEWAY_SECRET;
 if (!secret || secret.length < 16) {
@@ -60,6 +64,9 @@ const server = createGatewayServer({
   updateServerUrl: env.GATEWAY_UPDATE_URL || "",
   updateAdminToken: env.GATEWAY_UPDATE_TOKEN || "",
   usersDir,
+  // 管理台展示用：当前部署的代码版本，以及 env 是否兜底配了站点 Key
+  appVersion: String(appVersion || ""),
+  envDeepseekKeySet: Boolean(env.GATEWAY_DEEPSEEK_KEY),
 });
 
 // 连接保活拉长到 72s：跨公网 RTT 大、且前端有分钟级轮询，

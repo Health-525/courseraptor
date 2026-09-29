@@ -222,6 +222,17 @@ export function createSpawner({
       return instances.has(userId);
     },
 
+    /** 管理后台展示用：在线实例的端口 / 启动时间 / 最近活跃 / 自动重启次数 */
+    listRunning() {
+      return [...instances.values()].map((it) => ({
+        userId: it.userId,
+        port: it.port,
+        startedAt: it.startedAt,
+        lastRequestAt: it.lastRequestAt,
+        restarts: it.restarts,
+      }));
+    },
+
     /** 空闲回收 + 供 /health 展示 */
     startReaper() {
       const timer = setInterval(() => {

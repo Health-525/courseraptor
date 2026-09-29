@@ -28,7 +28,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <link rel="icon" type="image/png" href="/logo.png">
 <title>CourseRaptor</title>
 <script src="/vendor/marked.min.js"></script>
@@ -82,7 +82,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 
   /* ── 左栏：档头 ── */
   aside { display: flex; flex-direction: column; gap: 28px; min-height: 0;
-          padding: 27px 22px 20px; border-right: 1px solid var(--rule);
+          padding: 27px 22px max(20px, env(safe-area-inset-bottom)); border-right: 1px solid var(--rule);
           background: var(--paper-deep); overflow: hidden; }
   .mast { padding: 2px 0; }
   .mast h1 { display: flex; margin: 0; font-size: 21px; line-height: 1.2; }
@@ -221,8 +221,21 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .topbar { display: none; align-items: center; gap: 10px;
             min-height: 60px; padding: 10px 16px;
             border-bottom: 1px solid var(--rule); background: var(--paper-deep); }
-  .topbar .tb-title { margin-right: auto; font-size: 18px; }
+  .topbar .tb-title { flex: 1; justify-content: center; font-size: 18px; }
   .topbar .tbtn { min-height: 34px; padding: 5px 11px; font-size: 13px; }
+  /* 移动顶栏导航位次对齐豆包等主流手机端 App：☰ 在左开唯一的左抽屉
+     （会话档案 + 新会话 + 功能大厅入口都在抽屉里），右侧只留高频的
+     ＋ 新会话。图标按钮走 Material 3 顶栏规范：无边框幽灵图标、
+     44×44 触控目标（HIG 下限），按压给朱砂浅底状态层 */
+  .topbar .iconbtn { display: inline-flex; width: 44px; min-width: 44px;
+                     min-height: 44px; padding: 0; justify-content: center;
+                     border-color: transparent; background: none; }
+  .topbar .iconbtn svg { display: block; width: 20px; height: 20px; fill: none;
+                         stroke: currentColor; stroke-width: 1.8;
+                         stroke-linecap: round; stroke-linejoin: round; }
+  .topbar .iconbtn:hover { border-color: transparent; background: none;
+                           color: var(--accent); }
+  .topbar .iconbtn:active { background: var(--accent-soft); }
   #log { flex: 1; min-height: 0; overflow-y: auto; padding: 44px 40px 36px; }
   .inner { width: min(100%, 800px); min-height: 100%; margin: 0 auto; }
 
@@ -453,7 +466,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 
   /* ── 底部：快速提问常驻 + 档案「留言」栏 ── */
   form { flex: none; border-top: 1px solid var(--rule); background: var(--paper-deep);
-         padding: 14px 32px 13px; }
+         padding: 14px 32px max(13px, env(safe-area-inset-bottom)); }
   /* 桌面放得下就全部展示（wrap 两行内），不藏进横向滚动——
      用户看得见全部快捷问题才会去点；窄屏退回单排横滚，不挤输入区 */
   .quickbar { display: flex; align-items: flex-start; gap: 10px;
@@ -502,8 +515,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   #b { flex: none; align-self: center; display: inline-flex;
        align-items: center; gap: 7px;
        border: 1px solid var(--accent); background: var(--accent);
-       min-height: 42px; color: #FBFAF6; font-size: 14px; font-weight: 600;
-       padding: 9px 18px; border-radius: 4px; cursor: pointer;
+       min-height: 44px; color: #FBFAF6; font-size: 14px; font-weight: 600;
+       padding: 9px 18px; border-radius: 6px; cursor: pointer;
        transition: background 0.15s ease, color 0.15s ease,
                    border-color 0.15s ease, opacity 0.15s ease; }
   #b .kbd { font-family: var(--mono); font-size: 12px; opacity: .7; }
@@ -700,7 +713,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                padding: 4px 10px; border-radius: 4px; min-height: 30px; }
   .hall-back:hover { border-color: var(--accent); color: var(--accent); }
   .hall-rule { border-bottom: 1px solid var(--accent); margin: 0 20px; }
-  .hall-body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 20px 24px;
+  .hall-body { flex: 1; min-height: 0; overflow-y: auto;
+               padding: 14px 20px max(24px, env(safe-area-inset-bottom));
                scrollbar-width: thin; scrollbar-color: var(--rule-2) transparent; }
   .hall-body::-webkit-scrollbar { width: 8px; }
   .hall-body::-webkit-scrollbar-track { background: transparent; }
@@ -973,12 +987,15 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 
   @media (max-width: 960px) {
     body { grid-template-columns: 1fr; }
-    /* 窄屏推不动主区：大厅退回右侧滑入的浮层 + 遮罩 */
+    /* 窄屏推不动主区：大厅退回左侧滑入的整幅抽屉（小屏全出血、平板 420px），
+       与会话抽屉同一侧——对齐豆包等手机端 App「面板从左侧出」的习惯，
+       也不在屏幕右侧留缝 */
     body.hall-open { grid-template-columns: 1fr; }
-    .hall { position: fixed; top: 0; right: 0; bottom: 0; z-index: 45;
-            width: min(420px, 92vw); transform: translateX(103%);
-            transition: transform .2s ease;
-            box-shadow: -14px 0 36px rgba(38, 35, 29, .2); }
+    .hall { position: fixed; top: 0; left: 0; bottom: 0; z-index: 45;
+            width: min(420px, 100vw); transform: translateX(-103%);
+            transition: transform .2s ease; border-left: 0;
+            border-right: 1px solid var(--rule-2);
+            box-shadow: 14px 0 36px rgba(38, 35, 29, .2); }
     body.hall-open .hall { transform: translateX(0); }
     body.hall-open .hall-backdrop { display: block; }
     aside { display: flex; position: fixed; inset: 0 auto 0 0; z-index: 40; width: min(320px, 88vw);
@@ -988,17 +1005,23 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     body.drawer-open .drawer-backdrop { display: block; }
     .topbar { display: flex; }
     #log { padding: 28px 20px 24px; }
-    form { padding: 11px 16px 10px; }
-    /* 窄屏快捷问题回单排横滚：wrap 三四行会挤压输入区 */
+    form { padding: 11px 16px max(10px, env(safe-area-inset-bottom)); }
+    /* 附件与发送同高（44px）：高低不齐在手机上一眼就露怯 */
+    .attach-btn { min-height: 44px; }
+    /* 窄屏快捷问题回单排横滚：wrap 三四行会挤压输入区；
+       两侧 12px 渐隐提示可横滚（与会话标题悬停渐隐同一手法） */
     .quickbar { align-items: center; margin-bottom: 8px; }
     .qlabel { margin-top: 0; }
-    .qchips { flex-wrap: nowrap; overflow-x: auto; }
+    .qchips { flex-wrap: nowrap; overflow-x: auto;
+              -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%);
+              mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 12px), transparent 100%); }
     .fhint { display: none; }
   }
   @media (max-width: 560px) {
-    .topbar { min-height: 54px; padding: 8px 12px; gap: 7px; }
+    .topbar { min-height: 56px; padding: 8px 12px; gap: 7px; }
     .topbar .tb-title { font-size: 17px; }
     .topbar .tbtn { min-height: 32px; padding: 4px 9px; font-size: 12px; }
+    .topbar .iconbtn { width: 44px; min-width: 44px; min-height: 44px; }
     #log { padding: 22px 15px 18px; }
     .hero { justify-content: center; padding: 32px 4px 48px; }
     .hero .seal { width: 92px; height: 92px; margin-bottom: 22px; }
@@ -1008,15 +1031,15 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .hero .hint { display: inline-block; margin-top: 5px; font-size: 12px; }
     .turn { margin-bottom: 32px; }
     .turn.bot .msg, .turn.user .msg { font-size: 16px; }
-    form { padding: 9px 12px 10px; }
+    form { padding: 9px 12px max(10px, env(safe-area-inset-bottom)); }
     .quickbar { gap: 8px; }
     .qlabel { font-size: 12px; }
     .chip { min-height: 32px; padding: 4px 10px; font-size: 12px; }
     .cwrap { gap: 8px; }
-    .attach-btn { width: 34px; padding: 0; }
+    .attach-btn { width: 44px; padding: 0; }
     .attach-text { display: none; }
     textarea { font-size: 16px; }
-    #b { min-height: 40px; padding: 8px 14px; }
+    #b { min-height: 44px; padding: 8px 14px; }
     #b .kbd { display: none; }
     .data-grid { grid-template-columns: repeat(2, 1fr); }
     /* 大厅已改单列目录行，行高自适应，小屏无需再调 */
@@ -1045,13 +1068,16 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .hall-ics { min-height: 36px; }
     .hall-back, .hall-refresh, .hall-more, .hall-pomo-cancel { min-height: 38px; }
     .hall-cat { min-height: 34px; }
-    .dclose { min-width: 36px; min-height: 36px; }
+    .dclose { min-width: 40px; min-height: 40px; }
     .sess .sx { padding: 6px 10px; }
     #sessArchiveToggle { min-height: 36px; padding: 0 6px; }
     .upchip button { min-width: 28px; min-height: 28px; }
     .qq-item button { min-width: 28px; min-height: 28px; }
     .chip { min-height: 38px; }
     .topbar .tbtn { min-height: 38px; }
+    .topbar .iconbtn { width: 44px; min-width: 44px; min-height: 44px; }
+    /* 触屏主操作提到 44px 触控目标（HIG 下限）：发送与附件都是高频按钮 */
+    #b, .attach-btn { min-height: 44px; }
     .fld input, .fld select, .qq-add input, .hall-search input { font-size: 16px; }
   }
 </style>
@@ -1072,10 +1098,9 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 </aside>
 <main>
   <div class="topbar">
+    <button class="tbtn iconbtn" id="openDrawerM" type="button" aria-label="会话列表" title="会话列表"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
     <span class="tb-title wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></span>
-    <button class="tbtn" id="openHallM" aria-haspopup="dialog" aria-expanded="false" aria-controls="hall">大厅</button>
-    <button class="tbtn" id="openDrawerM">会话</button>
-    <button class="tbtn" id="newSessionM">新会话</button>
+    <button class="tbtn iconbtn" id="newSessionM" type="button" aria-label="新会话" title="另起一个会话（旧会话保留在档案里）"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
   </div>
   <div id="log"><div class="inner" id="inner">
     <div class="hero" id="hero">

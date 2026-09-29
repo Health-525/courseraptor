@@ -2447,11 +2447,8 @@ document.getElementById("openHall").addEventListener("click", () => {
   hallFromCard = "";
   openHall();
 });
-document.getElementById("openHallM").addEventListener("click", () => {
-  hallPanel = "";
-  hallFromCard = "";
-  openHall();
-});
+/* 窄屏顶栏不再放独立的大厅按钮（原 openHallM）：与 ☰ 同为左滑面板会被
+   当成功能重复；入口统一走左抽屉里的「功能大厅」（豆包式单抽屉导航） */
 document.getElementById("closeHall").addEventListener("click", closeHall);
 document.getElementById("hallBackdrop").addEventListener("click", closeHall);
 hallBack.addEventListener("click", () => {
