@@ -236,6 +236,26 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
           "content-type": script ? "text/javascript; charset=utf-8" : "image/png",
         });
         res.end(bytes);
+      } else if (req.method === "GET" && url === "/manifest.webmanifest") {
+        // 与正式版 chat-web 同源的 PWA 清单（图标复用 logo）
+        res.writeHead(200, {
+          "content-type": "application/manifest+json; charset=utf-8",
+        });
+        res.end(
+          JSON.stringify({
+            name: "CourseRaptor",
+            short_name: "CourseRaptor",
+            description: "课表、成绩、考试、通知，一句话查询",
+            start_url: "/",
+            display: "standalone",
+            background_color: "#F6F4ED",
+            theme_color: "#F0EDE4",
+            icons: [
+              { src: "/logo.png", sizes: "192x192", type: "image/png" },
+              { src: "/logo.png", sizes: "512x512", type: "image/png" },
+            ],
+          }),
+        );
       } else if (req.method === "GET" && url === "/api/settings") {
         json(res, {
           jwgl: { configured: false, username: "", sourceLabel: "演示模式" },
