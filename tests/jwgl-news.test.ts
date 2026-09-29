@@ -118,7 +118,14 @@ test("正文内嵌 PDF 的通知：直连下载抽全文，不再把导航壳当
       "%PDF",
       "传给解析器的必须是下载到的 PDF 二进制",
     );
-    return "关于2026年中秋节、国庆节放假本科教学安排的通知\n2026年9月25日至10月7日放假调休，共13天。";
+    // 模拟 pdf-parse 真实输出：中文软换行 + 制表符 + 页标记
+    return (
+      "关于2026年中秋节、国庆节放假本科教学安排的通知\n" +
+      "（南工教运〔2026〕02号）\n" +
+      "2026年9月25日至10月7日放假\n" +
+      "调休，共13天。\n\n" +
+      "特此通知。\n\n-- 1 of 1 --"
+    );
   });
   const restore = installFetch((url) =>
     url.includes("/__local/") ? Buffer.from("%PDF-1.7 fake-pdf-bytes") : PDF_ARTICLE_HTML,
@@ -126,7 +133,9 @@ test("正文内嵌 PDF 的通知：直连下载抽全文，不再把导航壳当
   try {
     const article = await fetchJwcArticle("https://jwc.njtech.edu.cn/info/1158/6925.htm");
     assert.match(article.title, /中秋节、国庆节放假/);
-    assert.match(article.text, /9月25日至10月7日放假调休/);
+    assert.match(article.text, /9月25日至10月7日放假调休，共13天/, "软换行必须拼回连贯正文");
+    assert.match(article.text, /放假调休，共13天。\n\n特此通知。/, "段落空行要保留");
+    assert.doesNotMatch(article.text, /-- 1 of 1 --/, "pdf.js 页标记要清掉");
     assert.doesNotMatch(article.text, /网站地图|帮助中心/, "导航壳不能混进正文");
     const pdf = article.attachments.find((a) => a.url.includes("/__local/"));
     assert.ok(pdf, "内嵌 PDF 必须登记进附件列表");

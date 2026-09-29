@@ -9,7 +9,7 @@
  *   → 上次成功抓取的落盘缓存（前两者都失败时兜底，注明快照时间）。
  */
 
-import { createRequire } from "node:module";
+import { pdfTextFromBuffer } from "../../core/attachments";
 import { RaptorError } from "../../core/errors";
 import { fetchUrlBuffer, fetchUrlText } from "../../core/http";
 import { readJsonCache, writeJsonCache } from "../../core/json-cache";
@@ -59,14 +59,13 @@ export function _setWebvpnPdfFetchForTest(fn: ((path: string) => Promise<Buffer>
   webvpnPdfFetch = fn ?? webvpnFetchJwcBuffer;
 }
 
-const require = createRequire(import.meta.url);
-type PdfParseFn = (b: Buffer) => Promise<{ text: string }>;
-let pdfParseFn: PdfParseFn | null = null;
-
-/** PDF 文本抽取（pdf-parse，测试可注入替身） */
+/** PDF 文本抽取（pdf-parse v2，测试可注入替身）；失败抛错由调用方降级 */
 async function parsePdfText(buf: Buffer): Promise<string> {
-  pdfParseFn ??= require("pdf-parse/lib/pdf-parse.js") as PdfParseFn;
-  return (await pdfParseFn(buf)).text;
+  const text = await pdfTextFromBuffer(buf);
+  if (text === null) {
+    throw new RaptorError("PARSE", "PDF 文本抽取失败（文件损坏或扫描件）");
+  }
+  return text;
 }
 
 let pdfTextParser: (buf: Buffer) => Promise<string> = parsePdfText;
@@ -125,13 +124,24 @@ function findEmbeddedPdfPath(scope: string): string | null {
   return decoded.startsWith("/") ? decoded : null;
 }
 
-/** pdf-parse 输出排版噪声重（连排空格/大量空行），收敛成可读正文 */
+/** 汉字与中文标点（判定软换行的字符集） */
+const CJK_CLASS = "·—…“”‘’《》〈〉（）【】，。；：！？、\u4e00-\u9fff";
+
+/** pdf-parse 输出排版噪声重（软换行/制表符/页标记），收敛成可读正文 */
 function normalizePdfText(text: string): string {
-  return text
-    .replace(/\r/g, "")
-    .replace(/[ \t]{2,}/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  return (
+    text
+      .replace(/\r/g, "")
+      .replace(/^-- \d+ of \d+ --$/gm, "") // pdf.js 的页标记
+      .replace(/[ \t]{2,}/g, " ")
+      // 中文软换行拼回：换行前是汉字/中文标点说明是折行而非分段
+      //（后随空行=真分段，保留）
+      .replace(new RegExp(`([${CJK_CLASS}])[ \\t]*\\n(?!\\n)`, "g"), "$1")
+      .replace(new RegExp(`([${CJK_CLASS}])\\t+`, "g"), "$1")
+      .replace(/\t/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
 }
 
 // ── 抓取阶梯 ─────────────────────────────────────────────────
