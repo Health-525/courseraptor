@@ -105,6 +105,13 @@ cd /opt/courseraptor && sudo -u raptor GATEWAY_STATE_DIR=/var/lib/raptor-gateway
 - 总览：注册数 / 在线与并发上限 / 可用邀请码 / 今日全站对话轮数
 - 同学账号表：在线状态、今日用量、**停用 / 启用 / 踢下线 / 重置密码**
 - 邀请码：按数量 + 备注 + 有效期生成，一键复制
+- **安全设置（两步验证 / TOTP）**：用手机验证器（Google / Microsoft
+  Authenticator 等）扫码绑定后，登录管理台需「管理密码 + 6 位动态码」，
+  附 10 枚一次性恢复码（手机不在身边时替代动态码，每枚限用一次）。
+  启用 / 关闭 / 重新生成恢复码都要求再验一次动态码；每次启用或关闭会
+  注销全部已登录管理会话。手机与恢复码全丢时，SSH 上机执行
+  `node gateway/admin/cli.mjs totp off` 兜底恢复仅密码登录（密钥只存
+  服务器 `admin-totp.json`，恢复码只存 sha256 哈希）
 - **版本发布**（可选）：接入同机部署的更新分发后台后，可查看版本列表、
   回滚分发版本、删除历史版本——需要在服务器上再跑一个
   `raptor-update.service`（`update/update-server.mjs`，只绑 127.0.0.1:8787，
@@ -113,7 +120,7 @@ cd /opt/courseraptor && sudo -u raptor GATEWAY_STATE_DIR=/var/lib/raptor-gateway
   发版本身仍从维护者机器 `npm run publish` 上传
 
 管理会话与同学会话是两套独立 Cookie（不同名、不同签名域），互不通用；
-管理登录同样有 5 次失败锁 15 分钟的防爆破。
+管理登录同样有 5 次失败锁 15 分钟的防爆破（密码错误与动态码错误都计入）。
 
 ### 命令行（备用）
 
@@ -128,6 +135,8 @@ node gateway/admin/cli.mjs list                       # 用户 + 未用邀请码
 node gateway/admin/cli.mjs disable 某同学             # 停用（立即禁止登录）
 node gateway/admin/cli.mjs reset-pass 某同学 --password 新密码
 GATEWAY_SECRET=... node gateway/admin/cli.mjs kick 某同学   # 踢下线实例
+node gateway/admin/cli.mjs totp                       # 查看管理台两步验证状态
+node gateway/admin/cli.mjs totp off                   # 应急关闭两步验证（需 SSH 在服务器执行）
 
 # 升级版本
 cd /opt/courseraptor && sudo -u raptor git pull && sudo -u raptor npm ci

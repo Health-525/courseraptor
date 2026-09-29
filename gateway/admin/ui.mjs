@@ -7,9 +7,22 @@
  * 鉴权：独立的管理会话 Cookie（raptor_admin，HMAC 签名与同学会话不同名
  * 不同签名域，互不通用）；登录失败同样 5 次锁 15 分钟。页面与 /admin/api/*
  * 与登录/注册页同一套「红头档案」设计令牌。
+ *
+ * 两步验证（TOTP）：在「安全设置」扫码绑定手机验证器后，登录需管理密码
+ * + 6 位动态码（附 10 枚一次性恢复码）。启用/关闭会递增 sessionEpoch，
+ * 令既有管理会话立即失效；手机与恢复码全丢时 SSH 上机执行
+ * `admin.mjs totp off` 兜底。未绑定则维持仅密码登录，行为与从前一致。
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import QRCode from "qrcode";
+import {
+  generateTotpSecret,
+  generateRecoveryCodes,
+  hashRecoveryCode,
+  otpauthUri,
+  verifyTotp,
+} from "./totp.mjs";
 
 const ADMIN_COOKIE = "raptor_admin";
 const ADMIN_TTL_MS = 12 * 3600_000;
@@ -138,6 +151,12 @@ border-radius:2px;color:var(--accent-deep);font-size:13.5px;line-height:1.6}
 a.goto{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-line);
 font-weight:600;cursor:pointer}
 a.goto:hover{border-bottom-color:var(--accent)}
+/* ── 安全设置：扫码绑定 ── */
+.qr{background:#fff;border:1px solid var(--rule);border-radius:3px;
+width:fit-content;padding:10px;margin:12px 0 10px}
+.qr svg{display:block;width:184px;height:184px}
+.codes{font-family:var(--mono);font-size:15px;letter-spacing:.08em;line-height:2.1;
+margin:10px 0 0;color:var(--ink)}
 /* ── 版本发布：上传发版 ── */
 textarea{width:100%;padding:10px 12px;background:var(--card);border:1px solid var(--rule-2);
 border-radius:2px;font-family:var(--sans);font-size:14px;color:var(--ink);resize:vertical;
@@ -233,14 +252,16 @@ const shell = (title, body) => `<!doctype html>
 ${body}
 </main></body></html>`;
 
-const loginHtml = (error = "") =>
+const loginHtml = (error = "", mfa = false) =>
   shell(
     "管理登录",
     `<section style="width:min(400px,100%);margin:26px auto 0" class="card">
 ${error ? `<div class="notice">${escapeHtml(error)}</div>` : ""}
 <form method="post" action="/admin/login">
 <label>管理密码 PASSWORD</label>
-<input name="password" type="password" autocomplete="current-password" required autofocus placeholder="请输入管理密码">
+<input name="password" type="password" autocomplete="current-password" required${mfa ? "" : " autofocus"} placeholder="请输入管理密码">
+${mfa ? `<label>动态码 2FA CODE</label>
+<input name="code" inputmode="numeric" autocomplete="one-time-code" required autofocus placeholder="验证器 6 位数字（或恢复码）" style="letter-spacing:.3em">` : ""}
 <button type="submit" class="primary">进入管理台</button>
 </form></section>`,
   );
@@ -277,6 +298,9 @@ const dashboardHtml = () => `<!doctype html>
 <button type="button" class="nav-item" data-nav="site">
 <svg viewBox="0 0 24 24"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>
 站点设置</button>
+<button type="button" class="nav-item" data-nav="security">
+<svg viewBox="0 0 24 24"><path d="M12 22s8-3.6 8-10V5.5L12 2 4 5.5V12c0 6.4 8 10 8 10z"/><path d="M9 11.5l2 2 4-4.5"/></svg>
+安全设置</button>
 </div>
 <div class="nav-group">
 <div class="g-label">发 版 · RELEASES</div>
@@ -383,6 +407,11 @@ const dashboardHtml = () => `<!doctype html>
 <p class="lead" style="margin:4px 0 0">站点默认每人每日 <b class="mono" id="siteDefaultTurns">—</b> 轮；在「同学账号」里可按人单独设限额（0 = 用默认）。同学自带 Key 的同样计数，规则透明。</p>
 <p style="color:var(--ink-3);font-size:12.5px;margin:10px 0 0" id="dsModeLine">加载中…</p>
 </div>
+</div>
+
+<div class="panel" id="pane-security">
+<h2>两步验证<span class="en">2FA · TOTP</span><span class="act mono" style="font-size:11px">登录需密码 + 手机验证器动态码</span></h2>
+<div class="card" id="mfaCard"><p class="empty">加载中…</p></div>
 </div>
 </section>
 </div></main>
@@ -521,6 +550,35 @@ return u.ownTurns && u.ownTurns.date === today && u.ownTurns.count > 0;
 }).length;
 document.getElementById("dsModeLine").textContent =
 "共 " + list.length + " 位同学：钉在站点额度 " + pinned + " 人，其余「自有优先」（有自己的 Key 就用自己的）；今日用自己 Key 对话过的 " + ownActive + " 人。";
+}
+function showRecoveryCodes(codes, needRelogin) {
+var el = document.getElementById("mfaCodesBox") || document.getElementById("mfaSetupBox");
+if (!el) return;
+var html = '<div class="notice">恢复码仅此一次展示，请立即抄写或截图保存——手机不在身边时，每枚可替代动态码登录一次：</div>' +
+'<p class="codes">' + codes.map(esc).join(" &nbsp;·&nbsp; ") + "</p>" +
+'<div style="margin-top:8px"><button class="act" data-copy="' + esc(codes.join("\\n")) + '" type="button">复制全部</button>' +
+(needRelogin ? ' <button class="act" id="mfaRelogin" type="button">已保存，去重新登录</button>' : "") +
+"</div>";
+el.innerHTML = html;
+el.hidden = false;
+}
+function renderSecurity(sec) {
+if (!sec) return;
+var el = document.getElementById("mfaCard");
+if (!sec.mfaEnabled) {
+el.innerHTML =
+'<p class="lead" style="margin-top:2px">当前登录仅需管理密码。<b>建议启用两步验证</b>：之后登录还需输入手机验证器（Google / Microsoft Authenticator、1Password 等）的 6 位动态码，密码泄露也进不来。</p>' +
+'<div style="margin-top:12px"><button class="act" id="mfaSetup" type="button" style="padding:8px 18px">启用两步验证</button></div>' +
+'<div id="mfaSetupBox" style="margin-top:14px"></div>';
+return;
+}
+el.innerHTML =
+'<p class="lead" style="margin-top:2px"><span class="dot"></span>已启用（' + esc(fmtDate(sec.enabledAt)) + ' 起）——登录需管理密码 + 6 位动态码。恢复码剩余 <b class="mono">' + sec.recoveryLeft + "</b> 枚。</p>" +
+'<div id="mfaCodesBox" style="margin-top:12px"></div>' +
+'<div class="inv-row" style="margin-top:14px"><input id="mfaCodeInput" placeholder="当前动态码（或恢复码）" autocomplete="off" inputmode="numeric">' +
+'<button class="act" id="mfaRegen" type="button" style="margin:0;padding:8px 18px">重新生成恢复码</button>' +
+'<button class="act danger" id="mfaOff" type="button" style="margin:0;padding:8px 18px">关闭两步验证</button></div>' +
+'<p class="hint" style="margin-top:10px">关闭与重生成都要再验一次动态码，防止会话被劫持后降级安全。手机与恢复码全部丢失时，需 SSH 上机执行 admin.mjs totp off 兜底。</p>';
 }
 function renderInvites(list) {
 if (!list) return;
@@ -664,6 +722,7 @@ renderResets(b.resets);
 renderUpdate(b.update.overview, b.update.versions);
 renderKeys(b.update.keys);
 renderSite(b.site, b.users);
+renderSecurity(b.security);
 });
 }
 document.addEventListener("click", function (e) {
@@ -700,16 +759,53 @@ return;
 	});
 	return;
 	}
-if (t.id === "siteKeySave") {
-var nk = document.getElementById("siteKeyInput").value.trim();
-if (nk && !confirm(nk ? "保存站点统一 DeepSeek Key（新拉起的实例生效），确认？" : "")) return;
-api("/admin/api/site", { deepseekKey: nk }).then(function (r) {
-if (r && r.error) { alert(r.error); return; }
-document.getElementById("siteKeyInput").value = "";
-load();
-});
-return;
-}
+	if (t.id === "siteKeySave") {
+	var nk = document.getElementById("siteKeyInput").value.trim();
+	if (nk && !confirm(nk ? "保存站点统一 DeepSeek Key（新拉起的实例生效），确认？" : "")) return;
+	api("/admin/api/site", { deepseekKey: nk }).then(function (r) {
+	if (r && r.error) { alert(r.error); return; }
+	document.getElementById("siteKeyInput").value = "";
+	load();
+	});
+	return;
+	}
+	if (t.id === "mfaSetup") {
+	api("/admin/api/totp/setup", {}).then(function (r) {
+	if (!r || r.error) { alert((r && r.error) || "生成二维码失败"); return; }
+	var grouped = r.secret.replace(/(.{4})/g, "$1 ").trim();
+	document.getElementById("mfaSetupBox").innerHTML =
+	'<div class="qr">' + r.qrSvg + "</div>" +
+	'<p style="font-size:13px;color:var(--ink-2)">用手机验证器扫描二维码（或手输密钥 <b class="mono">' + esc(grouped) + "</b>），然后输入验证器上当前的 6 位动态码完成绑定：</p>" +
+	'<div class="inv-row" style="margin-top:10px"><input id="mfaVerifyCode" placeholder="6 位动态码" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="max-width:160px;letter-spacing:.3em;text-align:center">' +
+	'<button class="act" id="mfaEnable" type="button" style="margin:0;padding:8px 18px">验证并启用</button></div>';
+	});
+	return;
+	}
+	if (t.id === "mfaEnable") {
+	var vcode = document.getElementById("mfaVerifyCode").value.trim();
+	if (!vcode) { alert("请输入验证器上当前的 6 位动态码"); return; }
+	api("/admin/api/totp/enable", { code: vcode }).then(function (r) {
+	if (!r || r.error) { alert((r && r.error) || "启用失败"); return; }
+	showRecoveryCodes(r.recoveryCodes, true);
+	});
+	return;
+	}
+	if (t.id === "mfaRelogin") { location.href = "/admin"; return; }
+	if (t.id === "mfaRegen" || t.id === "mfaOff") {
+	var ccode = document.getElementById("mfaCodeInput").value.trim();
+	if (!ccode) { alert("请先在左侧输入当前动态码（或恢复码）"); return; }
+	if (t.id === "mfaOff" && !confirm("关闭后登录仅需管理密码，确认关闭两步验证？")) return;
+	api("/admin/api/totp/" + (t.id === "mfaOff" ? "disable" : "recovery"), { code: ccode }).then(function (r) {
+	if (!r || r.error) { alert((r && r.error) || "操作失败"); return; }
+	if (t.id === "mfaOff") {
+	alert("两步验证已关闭。当前会话已一并注销，请用管理密码重新登录。");
+	location.href = "/admin";
+	return;
+	}
+	showRecoveryCodes(r.recoveryCodes, false);
+	});
+	return;
+	}
 if (t.id === "invGen") {
 api("/admin/api/invite", {
 count: Number(document.getElementById("invCount").value) || 1,
@@ -820,6 +916,9 @@ export function createAdminUi({
 }) {
   const enabled = typeof password === "string" && password.length >= 8;
   const failures = new Map();
+  // 扫码绑定流程的中间态：只存内存，未走完「验证并启用」就丢弃（重启作废重来）
+  let pendingSetup = null;
+  const PENDING_SETUP_TTL_MS = 10 * 60_000;
 
   /**
    * 代理访问同机部署的更新分发后台（update/update-server.mjs，回环端口）。
@@ -848,18 +947,18 @@ export function createAdminUi({
     }
   }
 
-  function sign(expiresAt) {
-    return createHmac("sha256", secret).update(`admin.${expiresAt}`).digest("hex");
+  function sign(expiresAt, epoch = 0) {
+    return createHmac("sha256", secret).update(`admin.${epoch}.${expiresAt}`).digest("hex");
   }
 
-  function sessionFrom(req) {
+  function sessionFrom(req, epoch = 0) {
     const raw = req.headers.cookie;
     if (typeof raw !== "string") return null;
     const match = /(?:^|;\s*)raptor_admin=([^;]+)/.exec(raw);
     if (!match) return null;
     const [expiresAt, mac] = match[1].split(".");
     if (!expiresAt || !mac) return null;
-    const expected = sign(expiresAt);
+    const expected = sign(expiresAt, epoch);
     const a = Buffer.from(mac);
     const b = Buffer.from(expected);
     if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
@@ -879,6 +978,42 @@ export function createAdminUi({
     const a = Buffer.from(String(candidate ?? ""));
     const b = Buffer.from(password);
     return a.length === b.length && timingSafeEqual(a, b);
+  }
+
+  function recordFailure(ip) {
+    const now = Date.now();
+    const record = failures.get(ip);
+    const count = (record?.count ?? 0) + 1;
+    const lockedUntil = count >= FAILURES_TO_LOCK ? now + LOCK_DURATION_MS : 0;
+    failures.set(ip, { count, lockedUntil, lastAt: now });
+  }
+
+  /**
+   * 高危动作（登录、关闭两步验证、重生成恢复码）的动态码校验：
+   * TOTP 命中则推进防重放水位，未命中再试恢复码（命中即消耗一枚）。
+   * 返回 { ok, replay?, doc }，doc 为校验副作用后的最新落盘文档。
+   */
+  async function verifyAdminCode(doc, candidate) {
+    const verdict = verifyTotp(doc.secret, String(candidate ?? "").trim(), {
+      lastUsedCounter: doc.lastUsedCounter ?? -1,
+    });
+    if (verdict.ok) {
+      return {
+        ok: true,
+        recoveryUsed: false,
+        doc: { ...doc, lastUsedCounter: Math.max(doc.lastUsedCounter ?? -1, verdict.counter) },
+      };
+    }
+    const index = (doc.recovery ?? []).indexOf(hashRecoveryCode(String(candidate ?? "")));
+    if (index >= 0) {
+      const recovery = [...doc.recovery];
+      recovery.splice(index, 1);
+      return { ok: true, recoveryUsed: true, doc: { ...doc, recovery } };
+    }
+    return {
+      ok: false,
+      replay: Boolean(verdict.replay),
+    };
   }
 
   function send(res, status, body, type = "text/html; charset=utf-8", extra = {}) {
@@ -901,39 +1036,62 @@ export function createAdminUi({
       return true;
     }
 
+    // 两步验证状态每次请求现读：启用/关闭后无需重启即生效；
+    // sessionEpoch 参与会话签名，状态一变所有旧管理会话立即失效
+    const totpDoc = await registry.getAdminTotp();
+    const epoch = totpDoc?.sessionEpoch ?? 0;
+    const mfaOn = Boolean(totpDoc);
+
     if (req.method === "GET" && pathname === "/admin") {
-      send(res, 200, sessionFrom(req) ? dashboardHtml() : loginHtml());
+      send(res, 200, sessionFrom(req, epoch) ? dashboardHtml() : loginHtml("", mfaOn));
       return true;
     }
 
     if (req.method === "POST" && pathname === "/admin/login") {
       const lockSec = checkThrottle(ip);
       if (lockSec) {
-        send(res, 429, loginHtml(`尝试次数过多，请 ${lockSec} 秒后再试`));
+        send(res, 429, loginHtml(`尝试次数过多，请 ${lockSec} 秒后再试`, mfaOn));
         return true;
       }
       const body = await readJsonOrForm(req);
       const pass = String(body.password ?? "");
-      if (!passwordOk(pass)) {
-        const now = Date.now();
-        const record = failures.get(ip);
-        const count = (record?.count ?? 0) + 1;
-        const lockedUntil = count >= FAILURES_TO_LOCK ? now + LOCK_DURATION_MS : 0;
-        failures.set(ip, { count, lockedUntil, lastAt: now });
-        send(res, 401, loginHtml(lockedUntil ? `密码错误次数过多，已锁定 ${LOCK_DURATION_MS / 60000} 分钟` : "管理密码不正确"));
+      const fail = (message) => {
+        recordFailure(ip);
+        const locked = Boolean(failures.get(ip)?.lockedUntil);
+        send(
+          res,
+          401,
+          loginHtml(
+            locked ? `密码或动态码错误次数过多，已锁定 ${LOCK_DURATION_MS / 60000} 分钟` : message,
+            mfaOn,
+          ),
+        );
         return true;
+      };
+      if (!passwordOk(pass)) return fail("管理密码不正确");
+      if (totpDoc) {
+        const verdict = await verifyAdminCode(totpDoc, body.code);
+        if (!verdict.ok) {
+          return fail(
+            verdict.replay ? "这枚动态码刚用过，请等验证器出下一枚（30 秒内）" : "动态码不正确或已过期",
+          );
+        }
+        await registry.setAdminTotp(verdict.doc);
+        if (verdict.recoveryUsed) {
+          console.log("[gw-admin] 管理台以恢复码登录（已消耗一枚，剩 %d 枚）", verdict.doc.recovery.length);
+        }
       }
       failures.delete(ip);
       const expiresAt = Date.now() + ADMIN_TTL_MS;
       send(res, 303, "", "text/html; charset=utf-8", {
         location: "/admin",
-        "set-cookie": `${ADMIN_COOKIE}=${expiresAt}.${sign(expiresAt)}; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=${ADMIN_TTL_MS / 1000}`,
+        "set-cookie": `${ADMIN_COOKIE}=${expiresAt}.${sign(expiresAt, epoch)}; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=${ADMIN_TTL_MS / 1000}`,
       });
       return true;
     }
 
     if (req.method === "POST" && pathname === "/admin/logout") {
-      if (!sessionFrom(req)) return false;
+      if (!sessionFrom(req, epoch)) return false;
       send(res, 303, "", "text/html; charset=utf-8", {
         location: "/admin",
         "set-cookie": `${ADMIN_COOKIE}=; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=0`,
@@ -942,7 +1100,7 @@ export function createAdminUi({
     }
 
     if (pathname.startsWith("/admin/api/")) {
-      if (!sessionFrom(req)) {
+      if (!sessionFrom(req, epoch)) {
         sendJson(res, 401, { error: "未登录或会话过期" });
         return true;
       }
@@ -975,7 +1133,7 @@ export function createAdminUi({
           return true;
         }
       }
-      return await handleApi(req, res, pathname);
+      return await handleApi(req, res, pathname, ip);
     }
 
     send(res, 404, "not found");
@@ -1023,16 +1181,106 @@ export function createAdminUi({
     };
   }
 
-  async function handleApi(req, res, pathname) {
+  async function handleApi(req, res, pathname, ip = "unknown") {
+    // ── 两步验证（TOTP）管理：绑定 / 启用 / 关闭 / 恢复码 ─────────
+    // 高危动作（关闭、重生成）都要求再验一次动态码：即便会话 Cookie 被劫持，
+    // 没有 Authenticator 也降不了安全等级、拿不到新恢复码。
+    if (req.method === "POST" && pathname === "/admin/api/totp/setup") {
+      if (await registry.getAdminTotp()) {
+        sendJson(res, 400, { error: "两步验证已启用，无需重复绑定" });
+        return true;
+      }
+      const secret = generateTotpSecret();
+      pendingSetup = { secret, createdAt: Date.now() };
+      const uri = otpauthUri({ secret });
+      sendJson(res, 200, { secret, uri, qrSvg: await QRCode.toString(uri, { type: "svg", margin: 1 }) });
+      return true;
+    }
+    if (req.method === "POST" && pathname === "/admin/api/totp/enable") {
+      if (await registry.getAdminTotp()) {
+        sendJson(res, 400, { error: "两步验证已启用，无需重复绑定" });
+        return true;
+      }
+      if (!pendingSetup || Date.now() - pendingSetup.createdAt > PENDING_SETUP_TTL_MS) {
+        pendingSetup = null;
+        sendJson(res, 400, { error: "绑定会话已过期，请重新生成二维码" });
+        return true;
+      }
+      const body = await readJsonBody(req);
+      const verdict = verifyTotp(pendingSetup.secret, String(body.code ?? "").trim());
+      if (!verdict.ok) {
+        sendJson(res, 400, { error: "动态码不正确，请确认验证器已添加 CourseRaptor 且手机时间正常" });
+        return true;
+      }
+      const plainCodes = generateRecoveryCodes(10);
+      await registry.setAdminTotp({
+        secret: pendingSetup.secret,
+        enabledAt: new Date().toISOString(),
+        recovery: plainCodes.map(hashRecoveryCode),
+        // 防重放水位从 -1 起：绑定用的这枚码在跳去登录时还能用（30 秒窗口），
+        // 首次登录消耗后防重放才收紧——避免「刚启用就被拒」的困惑
+        lastUsedCounter: -1,
+        // 0 → 1：即刻注销启用前签发的所有管理会话（含当前这个）
+        sessionEpoch: 1,
+      });
+      pendingSetup = null;
+      console.log("[gw-admin] 管理台两步验证已启用（TOTP），恢复码已生成");
+      sendJson(res, 200, { ok: true, recoveryCodes: plainCodes });
+      return true;
+    }
+    if (req.method === "POST" && pathname === "/admin/api/totp/disable") {
+      const doc = await registry.getAdminTotp();
+      if (!doc) {
+        sendJson(res, 400, { error: "两步验证未启用" });
+        return true;
+      }
+      const body = await readJsonBody(req);
+      const verdict = await verifyAdminCode(doc, body.code);
+      if (!verdict.ok) {
+        recordFailure(ip);
+        sendJson(res, 401, {
+          error: verdict.replay ? "这枚动态码刚用过，请等验证器出下一枚（30 秒内）" : "动态码不正确或已过期",
+        });
+        return true;
+      }
+      await registry.clearAdminTotp();
+      pendingSetup = null;
+      console.log("[gw-admin] 管理台两步验证已关闭（恢复仅密码登录）");
+      sendJson(res, 200, { ok: true });
+      return true;
+    }
+    if (req.method === "POST" && pathname === "/admin/api/totp/recovery") {
+      const doc = await registry.getAdminTotp();
+      if (!doc) {
+        sendJson(res, 400, { error: "两步验证未启用" });
+        return true;
+      }
+      const body = await readJsonBody(req);
+      const verdict = await verifyAdminCode(doc, body.code);
+      if (!verdict.ok) {
+        recordFailure(ip);
+        sendJson(res, 401, {
+          error: verdict.replay ? "这枚动态码刚用过，请等验证器出下一枚（30 秒内）" : "动态码不正确或已过期",
+        });
+        return true;
+      }
+      const plainCodes = generateRecoveryCodes(10);
+      await registry.setAdminTotp({ ...verdict.doc, recovery: plainCodes.map(hashRecoveryCode) });
+      console.log("[gw-admin] 管理台恢复码已重新生成（旧恢复码全部作废）");
+      sendJson(res, 200, { ok: true, recoveryCodes: plainCodes });
+      return true;
+    }
+
     // 一次往返带回全部面板数据：跨公网链路 RTT 大，5 个串行请求是「卡」的主因
     if (req.method === "GET" && pathname === "/admin/api/bootstrap") {
-      const [overview, users, invites, site, resets, updOverview, updVersions, updKeys] =
+      const [overview, users, invites, site, resets, totp, updOverview, updVersions, updKeys] =
         await Promise.all([
           ownOverview(),
           registry.listUsers(),
           registry.listInvites(),
           registry.getSiteSettings(),
           registry.listResetRequests(),
+          registry.getAdminTotp(),
           callUpdateApi("GET", "/admin/api/overview"),
           callUpdateApi("GET", "/admin/api/versions"),
           callUpdateApi("GET", "/admin/api/keys"),
@@ -1042,6 +1290,11 @@ export function createAdminUi({
         users: users.map((u) => ({ ...u, ...decorateUser(u.id) })),
         invites,
         resets,
+        security: {
+          mfaEnabled: Boolean(totp),
+          enabledAt: totp?.enabledAt ?? "",
+          recoveryLeft: totp?.recovery?.length ?? 0,
+        },
         site: {
           deepseekKeySet: Boolean(site.deepseekKey),
           deepseekKeyMasked: site.deepseekKey

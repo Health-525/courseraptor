@@ -62,6 +62,7 @@
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.20.2",
     "pptxgenjs": "^4.0.1",
+    "qrcode": "^1.5.4",
     "tesseract.js": "^7.0.0",
     "tsx": "^4.23.15",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",

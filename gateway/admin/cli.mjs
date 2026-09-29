@@ -8,6 +8,8 @@
  *   node gateway/admin/cli.mjs enable <用户名或ID>
  *   node gateway/admin/cli.mjs reset-pass <用户名或ID> --password <新密码>
  *   node gateway/admin/cli.mjs kick <用户名或ID>      # 踢下线实例（经网关内部端点）
+ *   node gateway/admin/cli.mjs totp                  # 查看管理台两步验证状态
+ *   node gateway/admin/cli.mjs totp off              # 关闭两步验证（应急逃生舱）
  *
  * 环境变量与 gateway.mjs 一致：GATEWAY_STATE_DIR（注册表位置）、
  * GATEWAY_URL + GATEWAY_SECRET（kick 用，默认 http://127.0.0.1:8080）。
@@ -29,7 +31,9 @@ function usage(code = 1) {
   admin.mjs disable <用户名或ID>
   admin.mjs enable <用户名或ID>
   admin.mjs reset-pass <用户名或ID> --password <新密码>
-  admin.mjs kick <用户名或ID>`);
+  admin.mjs kick <用户名或ID>
+  admin.mjs totp
+  admin.mjs totp off`);
   process.exit(code);
 }
 
@@ -148,6 +152,29 @@ switch (command) {
       process.exit(1);
     }
     await kickViaGateway(user.username);
+    break;
+  }
+  case "totp": {
+    // 只做「查看 / 关闭」：绑定必须走管理台扫码（密钥不经命令行回显）
+    const doc = await registry.getAdminTotp();
+    if (target === "off") {
+      if (!doc) {
+        console.log("两步验证本来就没启用，无需处理");
+        break;
+      }
+      await registry.clearAdminTotp();
+      console.log("✅ 已关闭管理台两步验证，恢复仅密码登录（管理会话同时全部注销）");
+      break;
+    }
+    if (target) usage();
+    if (!doc) {
+      console.log("两步验证：未启用（管理台仅密码登录，可在「安全设置」扫码开启）");
+    } else {
+      console.log(
+        `两步验证：已启用（${doc.enabledAt.slice(0, 10)} 起），恢复码剩 ${doc.recovery.length} 枚`,
+      );
+      console.log("应急关闭：admin.mjs totp off");
+    }
     break;
   }
   default:
