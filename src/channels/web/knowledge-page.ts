@@ -172,12 +172,23 @@ export function knowledgePage(
     .pagehead .seal { width: 38px; height: 38px; }
     .pagehead .seal img { top: 4px; left: 4px; width: 30px; height: 30px; }
     .ph-title h1 { font-size: 20px; }
-    .ph-right { width: 100%; justify-content: space-between; }
+    /* 时钟独占一行、按钮换行排第二行且不折字（与 today 页同一修法） */
+    .ph-right { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
+    .ph-clock { flex: 1 1 100%; }
+    .ph-right .tbtn { flex: none; white-space: nowrap; }
     main { display: block; padding: 22px 14px 56px; }
     .kn-rail { position: static; padding: 0 0 18px; }
     .cat-nav { flex-direction: row; flex-wrap: wrap; }
     .cat-btn { border: 1px solid var(--rule-2); background: var(--card); }
     .rail-meta { margin-top: 10px; padding-top: 10px; }
+  }
+  /* 触屏：搜索框提到 16px 防 iOS 聚焦缩放；小字按钮放大到能点的尺寸 */
+  @media (hover: none) {
+    .kw-box { font-size: 16px; }
+    .sort-btn { min-height: 38px; }
+    .cat-btn { min-height: 40px; }
+    .k-del { min-height: 36px; padding: 6px 12px; }
+    .k-toggle { min-height: 36px; padding: 8px 0; }
   }
   @media print {
     body { background: #fff; }
