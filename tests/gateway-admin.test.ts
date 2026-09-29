@@ -383,10 +383,18 @@ test("管理台·发版：版本号不合法 / 超限 / 未接入 / 未登录", 
   assert.equal(update.published.length, 0);
 
   // 声明的包体超过 200 MB：413，不读 body（fetch 会校验 content-length 与 body 一致，故用原生 http）
-  const hugeStatus = await new Promise<number>((resolve, reject) => {
+  const hugeStatus = await new Promise<number>((resolve) => {
     const req = http.request(
       new URL(`${base}/admin/api/update/publish`),
-      { method: "POST", headers: { cookie, "x-version": "1.2.3", "content-type": "application/zip", "content-length": String(201 * 1024 * 1024) } },
+      {
+        method: "POST",
+        headers: {
+          cookie,
+          "x-version": "1.2.3",
+          "content-type": "application/zip",
+          "content-length": String(201 * 1024 * 1024),
+        },
+      },
       (res) => {
         resolve(res.statusCode ?? 0);
         res.destroy();
