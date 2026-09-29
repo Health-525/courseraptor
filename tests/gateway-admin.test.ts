@@ -39,6 +39,15 @@ function fakeSpawner(port: number) {
     isRunning(userId: string) {
       return running.has(userId);
     },
+    listRunning() {
+      return [...running].map((userId) => ({
+        userId,
+        port,
+        startedAt: Date.now(),
+        lastRequestAt: Date.now(),
+        restarts: 0,
+      }));
+    },
     startReaper() {
       return () => {};
     },
@@ -52,6 +61,7 @@ async function startGateway(
     adminPassword?: string;
     updateServerUrl?: string;
     updateAdminToken?: string;
+    appVersion?: string;
   },
 ) {
   const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-admin-"));
@@ -65,6 +75,7 @@ async function startGateway(
     maxConcurrent: 4,
     updateServerUrl: options.updateServerUrl,
     updateAdminToken: options.updateAdminToken,
+    appVersion: options.appVersion,
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   t.after(() => server.close());
@@ -616,18 +627,30 @@ test("管理台·bootstrap：一次往返带回全部面板数据", async (t) =>
     adminPassword: "admin-master-pw",
     updateServerUrl: update.url,
     updateAdminToken: "update-token-123",
+    appVersion: "9.9.9-test",
   });
   const [invite] = await registry.createInvites({ count: 1 });
+  // 已过期的邀请码不应计入「可用邀请码」
+  await registry.createInvites({ count: 1, expiresDays: -1 });
   const user = await registry.createUser({ username: "bootuser", password: "password123" });
   await registry.addTurns(user.id, 4);
+  await registry.addTurns(user.id, 2, "own");
 
   const cookie = (await adminLogin(base, "admin-master-pw")).cookie;
   const boot = (await (
     await fetch(`${base}/admin/api/bootstrap`, { headers: { cookie } })
   ).json()) as {
-    overview: { users: number; turnsToday: number; invitesLeft: number };
-    users: Array<{ username: string; online: boolean }>;
+    overview: {
+      users: number;
+      turnsToday: number;
+      ownTurnsToday: number;
+      invitesLeft: number;
+      pendingResets: number;
+      version: string;
+    };
+    users: Array<{ username: string; online: boolean; dsMode: string }>;
     invites: unknown[];
+    site: { envDeepseekKeySet: boolean; defaultDailyTurns: number };
     update: {
       overview: { data?: { current?: { version: string } } };
       versions: { data?: { versions: unknown[] } };
@@ -635,9 +658,14 @@ test("管理台·bootstrap：一次往返带回全部面板数据", async (t) =>
   };
   assert.equal(boot.overview.users, 1);
   assert.equal(boot.overview.turnsToday, 4);
+  assert.equal(boot.overview.ownTurnsToday, 2);
   assert.equal(boot.overview.invitesLeft, 1);
+  assert.equal(boot.overview.pendingResets, 0);
+  assert.equal(boot.overview.version, "9.9.9-test");
   assert.equal(boot.users[0].username, "bootuser");
-  assert.equal(boot.invites.length, 1);
+  assert.equal(boot.users[0].dsMode, "");
+  assert.equal(boot.site.envDeepseekKeySet, false);
+  assert.equal(boot.invites.length, 2);
   assert.equal(boot.update.overview.data?.current?.version, "0.3.0");
   assert.equal(boot.update.versions.data?.versions.length, 2);
   // 未登录不给

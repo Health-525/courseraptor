@@ -11,4 +11,8 @@ export function createGatewayServer(options: {
   updateServerUrl?: string;
   updateAdminToken?: string;
   usersDir?: string;
+  /** 管理台展示用：部署的代码版本（package.json version） */
+  appVersion?: string;
+  /** 管理台展示用：env 是否兜底配了站点 DeepSeek Key */
+  envDeepseekKeySet?: boolean;
 }): Server;

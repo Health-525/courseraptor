@@ -135,6 +135,9 @@ border-radius:2px;color:var(--accent-deep);font-size:13.5px;line-height:1.6}
 .inv-row .num{max-width:90px;text-align:center}
 .empty{padding:26px 0;text-align:center;color:var(--ink-3);font-size:13.5px}
 .copy-ok{color:var(--ok);font-family:var(--mono);font-size:11px;margin-left:8px}
+a.goto{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-line);
+font-weight:600;cursor:pointer}
+a.goto:hover{border-bottom-color:var(--accent)}
 /* ── 版本发布：上传发版 ── */
 textarea{width:100%;padding:10px 12px;background:var(--card);border:1px solid var(--rule-2);
 border-radius:2px;font-family:var(--sans);font-size:14px;color:var(--ink);resize:vertical;
@@ -306,8 +309,8 @@ const dashboardHtml = () => `<!doctype html>
 
 <div class="panel" id="pane-users">
 <h2>同学账号<span class="en">USERS</span></h2>
-<table><thead><tr><th>用户名</th><th>状态</th><th>在线</th><th>注册于</th><th>今日轮数</th><th>操作</th></tr></thead>
-<tbody id="users"><tr><td colspan="6" class="empty">加载中…</td></tr></tbody></table>
+<table><thead><tr><th>用户名</th><th>状态</th><th>Key 来源</th><th>在线</th><th>注册于</th><th>今日轮数</th><th>操作</th></tr></thead>
+<tbody id="users"><tr><td colspan="7" class="empty">加载中…</td></tr></tbody></table>
 
 <h2>邀请码<span class="en">INVITES</span><span class="act mono" style="font-size:11px">发给同学，凭码注册</span></h2>
 <div class="card">
@@ -378,6 +381,7 @@ const dashboardHtml = () => `<!doctype html>
 <p style="color:var(--ink-3);font-size:12.5px;margin:12px 0 0">保存后新拉起的实例立即使用新 Key；在线实例下次拉起时切换。同学在网页「设置」里保存自己的 Key 后，优先用自己的，不消耗站点额度。</p>
 <h2>对话限额<span class="en">QUOTA</span></h2>
 <p class="lead" style="margin:4px 0 0">站点默认每人每日 <b class="mono" id="siteDefaultTurns">—</b> 轮；在「同学账号」里可按人单独设限额（0 = 用默认）。同学自带 Key 的同样计数，规则透明。</p>
+<p style="color:var(--ink-3);font-size:12.5px;margin:10px 0 0" id="dsModeLine">加载中…</p>
 </div>
 </div>
 </section>
@@ -407,43 +411,70 @@ return r.json();
 function esc(s) { var d = document.createElement("div"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
 function fmtDate(iso) { return String(iso || "").slice(0, 10); }
 function fmtTime(iso) { return iso ? String(iso).replace("T", " ").slice(0, 16) : "—"; }
-function renderOverview(o) {
+function renderOverview(o, site) {
 if (!o) return;
+var own = o.ownTurnsToday || 0;
 document.getElementById("stats").innerHTML =
 '<div class="stat"><div class="n">' + o.users + '</div><div class="t">注册同学</div></div>' +
 '<div class="stat"><div class="n hot">' + o.online + "/" + o.capacity + '</div><div class="t">在线/并发上限</div></div>' +
 '<div class="stat"><div class="n">' + o.invitesLeft + '</div><div class="t">可用邀请码</div></div>' +
-'<div class="stat"><div class="n hot">' + o.turnsToday + '</div><div class="t">今日对话轮数</div></div>';
+'<div class="stat"><div class="n hot">' + o.turnsToday + (own > 0 ? '<span style="font-size:13px;color:var(--ink-3)"> +' + own + "</span>" : "") +
+'</div><div class="t">今日对话轮数' + (own > 0 ? "（另自有 Key +" + own + "）" : "") + "</div></div>";
 var up = o.uptimeSec || 0;
 var upText = up >= 86400 ? Math.floor(up / 86400) + " 天 " + Math.floor((up % 86400) / 3600) + " 小时"
 : up >= 3600 ? Math.floor(up / 3600) + " 小时 " + Math.floor((up % 3600) / 60) + " 分"
 : Math.floor(up / 60) + " 分钟";
 document.getElementById("uptimeLine").textContent =
-"运行 " + upText + " · " + o.online + "/" + o.capacity + " 在线";
+(o.version ? "v" + o.version + " · " : "") + "运行 " + upText + " · " + o.online + "/" + o.capacity + " 在线";
+var keyLine = !site
+? ""
+: site.deepseekKeySet
+? "站点统一 Key：面板已设置（<span class=\\"mono\\">" + esc(site.deepseekKeyMasked) + "</span>），新拉起实例即用"
+: site.envDeepseekKeySet
+? "站点统一 Key：面板未设置，回退服务器 env（GATEWAY_DEEPSEEK_KEY）"
+: '站点统一 Key：<b class="hot">未设置</b>——同学须在设置里填自己的 Key';
+var todo = (o.pendingResets || 0) > 0
+? '<p style="margin:10px 0 0"><a href="#" class="goto" data-nav="users">' + o.pendingResets +
+" 条密码重置申请待审批，点击前往处理 →</a></p>"
+: "";
 document.getElementById("statusCard").innerHTML =
 '<p class="lead" style="margin-top:2px"><span class="dot' + (o.online > 0 ? "" : " off") + '"></span>网关已连续运行 ' + esc(upText) +
-'，当前 ' + o.online + ' 个实例在线' + (o.online > 0 ? "" : "（空闲时不占内存）") + '。</p>' +
-'<p style="color:var(--ink-3);font-size:13px;margin:4px 0 0">实例按需拉起、空闲 30 分钟自动回收；每日每人对话限额可在服务器 env 调整（GATEWAY_DAILY_TURNS）。</p>';
+"，当前 " + o.online + " 个实例在线" + (o.online > 0 ? "" : "（空闲时不占内存）") +
+(o.version ? '，网关 <span class="mono">v' + esc(o.version) + "</span>（升级后在此核对）" : "") + "。</p>" +
+'<p style="color:var(--ink-3);font-size:13px;margin:4px 0 0">' + keyLine + "</p>" +
+'<p style="color:var(--ink-3);font-size:13px;margin:4px 0 0">实例按需拉起、空闲 30 分钟自动回收；每人每日限额默认 ' +
+esc(site ? site.defaultDailyTurns : "—") + " 轮，可在「同学账号」按人单独设置。</p>" + todo;
 }
-function renderUsers(list) {
+function renderUsers(list, defaultTurns) {
 if (!list) return;
 var el = document.getElementById("users");
-if (!list.length) { el.innerHTML = '<tr><td colspan="6" class="empty">还没有同学注册</td></tr>'; return; }
+if (!list.length) { el.innerHTML = '<tr><td colspan="7" class="empty">还没有同学注册</td></tr>'; return; }
+var defLimit = Number(defaultTurns) || 0;
 el.innerHTML = list.map(function (u) {
 var status = u.disabled ? '<span class="pill bad">已停用</span>' : '<span class="pill">正常</span>';
-var online = u.online ? '<span class="dot"></span>在线' : '<span class="dot off"></span>—';
-var quota = u.dailyTurns > 0 ? u.turns.count + '<b class="hot">/' + u.dailyTurns + '</b>'
-: u.turns.count + '<span style="color:var(--ink-3)">/默认</span>';
-var ownUsed = (u.ownTurns && u.ownTurns.count) ? ' <span title="自己 Key 的轮数（不限额）" style="color:var(--ok)">+自' + u.ownTurns.count + '</span>' : '';
+var keySrc = u.dsMode === "site"
+? '<span class="pill bad" title="钉在站点免费额度：自己保存的 Key 保留不用">站点额度</span>'
+: '<span class="pill" title="有自己保存的 Key 就用自己的，否则用站点 Key">自有优先</span>';
+var online = '<span class="dot off"></span>—';
+if (u.online) {
+var tip = "实例启动 " + fmtTime(u.startedAt) + " · 最近活跃 " + fmtTime(u.lastRequestAt) +
+(u.restarts > 0 ? " · 曾自动重启 " + u.restarts + " 次" : "");
+online = '<span class="dot" title="' + esc(tip) + '"></span>在线';
+}
+var limit = u.dailyTurns > 0 ? u.dailyTurns : defLimit;
+var quota = u.turns.count + (u.dailyTurns > 0
+? '<b class="hot" title="个人限额，覆盖站点默认 ' + defLimit + ' 轮">/' + limit + "</b>"
+: '<span style="color:var(--ink-3)">/' + limit + "</span>");
+var ownUsed = (u.ownTurns && u.ownTurns.count) ? ' <span title="自己 Key 的轮数（不限额）" style="color:var(--ok)">+自' + u.ownTurns.count + "</span>" : "";
 quota += ownUsed;
 var quotaBtn = '<button class="act" data-do="quota" data-u="' + esc(u.username) + '" data-cur="' + (u.dailyTurns || 0) + '">限额</button>';
 var acts = quotaBtn;
 if (u.disabled) { acts += '<button class="act" data-do="enable" data-u="' + esc(u.username) + '">启用</button>'; }
 else { acts += '<button class="act danger" data-do="disable" data-u="' + esc(u.username) + '">停用</button>'; }
 if (u.online) { acts += '<button class="act" data-do="kick" data-u="' + esc(u.username) + '">踢下线</button>'; }
-return '<tr><td class="mono">' + esc(u.username) + '</td><td>' + status + '</td><td>' + online +
+return '<tr><td class="mono">' + esc(u.username) + "</td><td>" + status + "</td><td>" + keySrc + "</td><td>" + online +
 '</td><td class="mono">' + fmtDate(u.createdAt) + '</td><td class="mono">' + quota +
-'</td><td>' + acts + '</td></tr>';
+"</td><td>" + acts + "</td></tr>";
 }).join("");
 }
 function renderResets(r) {
@@ -465,18 +496,31 @@ if (codes.length) {
 html += '<h2 style="margin-top:16px">有效重置码<span class="en">ACTIVE CODES</span></h2>' +
 '<table style="box-shadow:none"><thead><tr><th>用户名</th><th>重置码</th><th>过期时间</th><th></th></tr></thead><tbody>' +
 codes.map(function (c) {
-return '<tr><td class="mono">' + esc(c.username) + '</td><td class="mono"><b class="hot">' + esc(c.code) + '</b></td>' +
-'<td class="mono">' + esc(String(c.expiresAt).replace("T", " ").slice(0, 16)) + '</td>' +
-'<td><button class="act" data-copy="' + esc(c.code) + '" type="button">复制</button></td></tr>';
-}).join("") + '</tbody></table>';
+var expired = new Date(c.expiresAt) < new Date();
+return '<tr><td class="mono">' + esc(c.username) + '</td><td class="mono"><b class="hot">' + esc(c.code) + "</b></td>" +
+'<td class="mono">' + esc(String(c.expiresAt).replace("T", " ").slice(0, 16)) + "</td>" +
+"<td>" + (expired ? '<span class="pill bad">已过期</span>'
+: '<button class="act" data-copy="' + esc(c.code) + '" type="button">复制</button>') + "</td></tr>";
+}).join("") + "</tbody></table>";
 }
 box.innerHTML = html;
 }
-function renderSite(s) {
+function renderSite(s, users) {
 if (!s) return;
 document.getElementById("siteKeyState").textContent = s.deepseekKeySet
-? "当前：" + s.deepseekKeyMasked : "未设置（同学须在设置里填自己的 Key）";
+? "当前：面板已设置 " + s.deepseekKeyMasked
+: s.envDeepseekKeySet
+? "面板未设置，回退服务器 env 的 GATEWAY_DEEPSEEK_KEY"
+: "未设置（同学须在设置里填自己的 Key）";
 document.getElementById("siteDefaultTurns").textContent = s.defaultDailyTurns;
+var list = users || [];
+var pinned = list.filter(function (u) { return u.dsMode === "site"; }).length;
+var today = new Date().toISOString().slice(0, 10);
+var ownActive = list.filter(function (u) {
+return u.ownTurns && u.ownTurns.date === today && u.ownTurns.count > 0;
+}).length;
+document.getElementById("dsModeLine").textContent =
+"共 " + list.length + " 位同学：钉在站点额度 " + pinned + " 人，其余「自有优先」（有自己的 Key 就用自己的）；今日用自己 Key 对话过的 " + ownActive + " 人。";
 }
 function renderInvites(list) {
 if (!list) return;
@@ -484,11 +528,13 @@ var el = document.getElementById("invites");
 if (!list.length) { el.innerHTML = '<tr><td colspan="4" class="empty">暂无邀请码，用上方表单生成</td></tr>'; return; }
 el.innerHTML = list.map(function (i) {
 var used = (i.usedBy || []).length >= (i.maxUses || 1);
-var status = used ? '<span class="pill">已被 ' + esc((i.usedBy || [])[0] || "") + ' 使用</span>'
-: (i.expiresAt ? '<span class="pill bad">' + fmtDate(i.expiresAt) + ' 前有效</span>' : '<span class="pill">未使用</span>');
-var copy = used ? "" : '<button class="act" data-copy="' + esc(i.code) + '" type="button">复制</button>';
+var expired = !used && i.expiresAt && new Date(i.expiresAt) < new Date();
+var status = used ? '<span class="pill">已被 ' + esc((i.usedBy || [])[0] || "") + " 使用</span>"
+: expired ? '<span class="pill bad">已过期</span>'
+: (i.expiresAt ? '<span class="pill bad">' + fmtDate(i.expiresAt) + " 前有效</span>" : '<span class="pill">未使用</span>');
+var copy = used || expired ? "" : '<button class="act" data-copy="' + esc(i.code) + '" type="button">复制</button>';
 return '<tr><td class="mono">' + esc(i.code) + '</td><td>' + esc(i.note || "—") +
-'</td><td>' + status + '</td><td>' + copy + '</td></tr>';
+"</td><td>" + status + "</td><td>" + copy + "</td></tr>";
 }).join("");
 }
 var updState = { file: null, xhr: null, versionTouched: false };
@@ -611,13 +657,13 @@ return '<tr><td class="mono">' + esc(k.name) + '</td><td>' + type +
 function load() {
 api("/admin/api/bootstrap").then(function (b) {
 if (!b) return;
-renderOverview(b.overview);
-renderUsers(b.users);
+renderOverview(b.overview, b.site);
+renderUsers(b.users, b.site ? b.site.defaultDailyTurns : 0);
 renderInvites(b.invites);
 renderResets(b.resets);
-	renderUpdate(b.update.overview, b.update.versions);
-	renderKeys(b.update.keys);
-	renderSite(b.site);
+renderUpdate(b.update.overview, b.update.versions);
+renderKeys(b.update.keys);
+renderSite(b.site, b.users);
 });
 }
 document.addEventListener("click", function (e) {
@@ -625,6 +671,12 @@ var t = e.target.closest ? e.target.closest("button,a") : null;
 if (!t) return;
 if (t.id === "refresh") { load(); return; }
 if (t.id === "logout") { api("/admin/logout", {}).then(function () { location.href = "/admin"; }); return; }
+if (t.classList.contains("goto")) {
+e.preventDefault();
+var navBtn = document.querySelector('.nav-item[data-nav="' + t.getAttribute("data-nav") + '"]');
+if (navBtn) navBtn.click();
+return;
+}
 if (t.id === "updGo") { updPublish(); return; }
 if (t.id === "updCancel") { if (updState.xhr) updState.xhr.abort(); return; }
 if (t.id === "updClear") {
@@ -763,6 +815,8 @@ export function createAdminUi({
   defaultDailyTurns = 100,
   updateServerUrl = "",
   updateAdminToken = "",
+  version = "",
+  envDeepseekKeySet = false,
 }) {
   const enabled = typeof password === "string" && password.length >= 8;
   const failures = new Map();
@@ -903,6 +957,7 @@ export function createAdminUi({
             deepseekKeyMasked: site.deepseekKey
               ? `${site.deepseekKey.slice(0, 3)}${"•".repeat(8)}${site.deepseekKey.slice(-4)}`
               : "",
+            envDeepseekKeySet,
             defaultDailyTurns: defaultDailyTurns,
           });
           return true;
@@ -927,17 +982,44 @@ export function createAdminUi({
     return true;
   }
 
+  /** 用户条目叠加在线状态与实例详情（在线时带启动/最近活跃/重启次数） */
+  function decorateUser(userId) {
+    const online = spawner.isRunning(userId);
+    if (!online) return { online };
+    const running =
+      typeof spawner.listRunning === "function"
+        ? (spawner.listRunning() ?? []).find((it) => it.userId === userId)
+        : undefined;
+    if (!running) return { online };
+    return {
+      online,
+      startedAt: new Date(running.startedAt).toISOString(),
+      lastRequestAt: new Date(running.lastRequestAt).toISOString(),
+      restarts: running.restarts,
+    };
+  }
+
   async function ownOverview() {
     const users = await registry.listUsers();
     const today = new Date().toISOString().slice(0, 10);
     const invites = await registry.listInvites();
+    const resets = await registry.listResetRequests();
+    const usable = (i) =>
+      (i.usedBy?.length ?? 0) < (i.maxUses ?? 1) &&
+      !(i.expiresAt && new Date(i.expiresAt) < new Date());
     return {
       users: users.length,
       online: spawner.runningCount(),
       capacity,
-      invitesLeft: invites.filter((i) => (i.usedBy?.length ?? 0) < (i.maxUses ?? 1)).length,
+      invitesLeft: invites.filter(usable).length,
       turnsToday: users.reduce((sum, u) => sum + (u.turns?.date === today ? u.turns.count : 0), 0),
+      ownTurnsToday: users.reduce(
+        (sum, u) => sum + (u.ownTurns?.date === today ? u.ownTurns.count : 0),
+        0,
+      ),
+      pendingResets: resets.pending.length,
       uptimeSec: Math.round(process.uptime()),
+      version,
     };
   }
 
@@ -957,7 +1039,7 @@ export function createAdminUi({
         ]);
       sendJson(res, 200, {
         overview,
-        users: users.map((u) => ({ ...u, online: spawner.isRunning(u.id) })),
+        users: users.map((u) => ({ ...u, ...decorateUser(u.id) })),
         invites,
         resets,
         site: {
@@ -965,6 +1047,7 @@ export function createAdminUi({
           deepseekKeyMasked: site.deepseekKey
             ? `${site.deepseekKey.slice(0, 3)}${"•".repeat(8)}${site.deepseekKey.slice(-4)}`
             : "",
+          envDeepseekKeySet,
           defaultDailyTurns,
         },
         update: { overview: updOverview, versions: updVersions, keys: updKeys },
@@ -1000,7 +1083,7 @@ export function createAdminUi({
     }
     if (req.method === "GET" && pathname === "/admin/api/users") {
       const users = await registry.listUsers();
-      sendJson(res, 200, users.map((u) => ({ ...u, online: spawner.isRunning(u.id) })));
+      sendJson(res, 200, users.map((u) => ({ ...u, ...decorateUser(u.id) })));
       return true;
     }
     if (req.method === "GET" && pathname === "/admin/api/invites") {

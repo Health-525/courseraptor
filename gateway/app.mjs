@@ -130,6 +130,8 @@ export function createGatewayServer({
   updateServerUrl = "",
   updateAdminToken = "",
   usersDir = "",
+  appVersion = "",
+  envDeepseekKeySet = false,
 } = {}) {
   if (!registry) throw new Error("createGatewayServer 需要 registry");
   if (!spawner) throw new Error("createGatewayServer 需要 spawner");
@@ -147,6 +149,8 @@ export function createGatewayServer({
     defaultDailyTurns: dailyTurns,
     updateServerUrl,
     updateAdminToken,
+    version: appVersion,
+    envDeepseekKeySet,
   });
 
   function signSession(userId, expiresAt) {
