@@ -177,12 +177,19 @@ export function todosPage(options: { demo?: boolean; demoData?: TodayBrief } = {
     .pagehead .seal { width: 38px; height: 38px; }
     .pagehead .seal img { top: 4px; left: 4px; width: 30px; height: 30px; }
     .ph-title h1 { font-size: 20px; }
-    .ph-right { width: 100%; justify-content: space-between; }
+    /* 时钟独占一行、按钮换行排第二行且不折字（与 today 页同一修法） */
+    .ph-right { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
+    .ph-clock { flex: 1 1 100%; }
+    .ph-right .tbtn { flex: none; white-space: nowrap; }
     main { display: block; padding: 22px 14px 56px; }
     .todos-rail { position: static; padding: 0 0 18px; }
     .rail-meta { margin-top: 10px; padding-top: 10px; }
     .todo-item { grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 8px; }
     .todo-ics { display: none; }
+  }
+  /* 触屏没有悬停：行内小字按钮放大到能点的尺寸 */
+  @media (hover: none) {
+    .todo-del { min-height: 36px; padding: 6px 12px; }
   }
   @media print {
     body { background: #fff; }

@@ -1037,6 +1037,23 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     *, *::before, *::after { animation: none !important;
                              transition: none !important; }
   }
+  /* ── 触屏（无悬停）：小字行内按钮放大到能点的尺寸；
+     输入类控件提到 16px——iOS Safari 对小于 16px 的输入框聚焦时会整页放大。
+     放在窄屏断点之后，同等特异性下压过 560px 里的紧凑尺寸 ── */
+  @media (hover: none) {
+    .hall-del { min-height: 36px; padding: 6px 12px; }
+    .hall-ics { min-height: 36px; }
+    .hall-back, .hall-refresh, .hall-more, .hall-pomo-cancel { min-height: 38px; }
+    .hall-cat { min-height: 34px; }
+    .dclose { min-width: 36px; min-height: 36px; }
+    .sess .sx { padding: 6px 10px; }
+    #sessArchiveToggle { min-height: 36px; padding: 0 6px; }
+    .upchip button { min-width: 28px; min-height: 28px; }
+    .qq-item button { min-width: 28px; min-height: 28px; }
+    .chip { min-height: 38px; }
+    .topbar .tbtn { min-height: 38px; }
+    .fld input, .fld select, .qq-add input, .hall-search input { font-size: 16px; }
+  }
 </style>
 </head>
 <body data-demo="${demo}">

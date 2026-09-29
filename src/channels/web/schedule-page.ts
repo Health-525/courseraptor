@@ -88,7 +88,9 @@ export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } 
   main { max-width: 1240px; margin: 0 auto; padding: 30px 22px 64px;
          display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 24px;
          align-items: start; }
-  .col { display: grid; gap: 26px; min-width: 0; align-content: start; }
+  /* 隐式 auto 轨道会按课表的最小宽（≥920px）把整列撑出屏幕；
+     minmax(0, 1fr) 让卡片钉在列宽内，横滚收敛到 .weekwrap 里 */
+  .col { display: grid; grid-template-columns: minmax(0, 1fr); gap: 26px; min-width: 0; align-content: start; }
 
   .schedule-rail { position: sticky; top: 22px; padding: 8px 4px; }
   .rail-kicker { margin: 0 0 6px; color: var(--accent-deep); font-family: var(--mono); font-size: 11px;
@@ -169,38 +171,53 @@ export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } 
   .week-unscheduled { margin: 12px 0 0; padding-top: 10px; border-top: 1px dashed var(--rule);
                       font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
 
-  /* ── 手机：整周压进屏宽（节次列只留数字），极窄屏仍可横向滚动 ── */
+  /* ── 手机：日列保住可读的最小宽度，整周横向滚动查看。
+     旧版把 7 天硬压进屏宽（每列仅 ~39px），课名被劈成一字一行的竖条，
+     完全没法读；改为 minmax(60px, 1fr)——放得下就撑满，放不下就横滚。
+     上课时间直接进课格（.tt-course-meta[data-time]），滚到周中时不用
+     回头查节次列。 ── */
   @media (max-width: 720px) {
     .pagehead { flex-wrap: wrap; padding: 14px 16px; gap: 10px 12px; }
     .pagehead .seal { width: 38px; height: 38px; }
     .pagehead .seal img { top: 4px; left: 4px; width: 30px; height: 30px; }
     .ph-title h1 { font-size: 20px; }
-    .ph-right { width: 100%; justify-content: space-between; }
+    /* 时钟独占一行、按钮换行排第二行且不折字（与 today 页同一修法） */
+    .ph-right { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
+    .ph-clock { flex: 1 1 100%; }
+    .ph-right .tbtn { flex: none; white-space: nowrap; }
     main { display: block; padding: 22px 14px 56px; }
     .schedule-rail { position: static; padding: 0 0 18px; }
     .rail-meta { margin-top: 10px; padding-top: 10px; }
     .col { gap: 20px; }
-    .week-timetable { min-width: 0; grid-template-columns: 30px repeat(7, minmax(0, 1fr));
+    .week-timetable { min-width: 0; grid-template-columns: 32px repeat(7, minmax(60px, 1fr));
                       grid-template-rows: 42px repeat(var(--period-count), minmax(46px, auto)); }
     #weekCard .cbody { padding: 10px 8px 12px; }
     .tt-range { display: none; }
     .tt-period { font-size: 12px; }
-    /* 表头竖排堆叠并允许换行：40px 出头的日列放不下「周六 补课」横排 */
+    /* 表头竖排堆叠并允许换行：60px 出头的日列放不下「周六 补课」横排 */
     .tt-day { flex-direction: column; align-items: flex-start; justify-content: center;
-              gap: 1px; padding: 3px 2px; }
-    .tt-day-name { font-size: 12px; line-height: 1.3; white-space: normal; }
-    .tt-day-date { font-size: 10px; line-height: 1.3; white-space: normal; }
-    .tt-day-tag { margin-left: 2px; font-size: 9px; padding: 0 2px; }
-    .tt-course { margin: 2px; padding: 3px 4px; border-left-width: 2px; }
-    .tt-course-name { font-size: 11.5px; }
-    .tt-course-meta { font-size: 10px; }
-    .tt-holiday { font-size: 12px; }
+              gap: 1px; padding: 3px 3px; }
+    .tt-day-name { font-size: 13px; line-height: 1.3; white-space: normal; }
+    .tt-day-date { font-size: 10.5px; line-height: 1.3; white-space: normal; }
+    .tt-day-tag { margin-left: 2px; font-size: 9.5px; padding: 0 2px; }
+    .tt-course { margin: 2px; padding: 4px 5px; border-left-width: 2px; }
+    .tt-course-name { font-size: 12px; }
+    .tt-course-meta { font-size: 10.5px; }
+    .tt-course-meta[data-time]::before { content: attr(data-time); display: block; }
+    .tt-holiday { font-size: 13px; }
+    /* 横滚提示：只有真放不下时才由 JS 挂上 */
+    .week-hint { margin: 8px 0 0; text-align: center; font-family: var(--mono);
+                 font-size: 11px; color: var(--ink-3); letter-spacing: .04em; }
+  }
+  /* 触屏：周次直达下拉提到 16px 防 iOS 聚焦缩放 */
+  @media (hover: none) {
+    .week-sel { font-size: 16px; }
   }
 
   /* ── 打印：隐去导航与操作，只留周课表（左栏周次标题保留作上下文） ── */
   @media print {
     body { background: #fff; }
-    .ph-right, .week-nav, .tbtn { display: none !important; }
+    .ph-right, .week-nav, .week-hint, .tbtn { display: none !important; }
     main { display: block; max-width: none; padding: 0; }
     .col { display: block; }
     .card { box-shadow: none; break-inside: avoid; }
@@ -278,6 +295,10 @@ function periodRange(periodTimes, p) {
 function renderWeek(b) {
   const body = $("weekCard").querySelector(".cbody");
   const note = $("weekNote");
+  /* 清空前先记住横滚位置：60s 自刷新会重建整个网格，
+     不记的话用户滚到周中看课会被拽回「今天」列 */
+  const prevWrap = body.querySelector(".weekwrap");
+  const prevScroll = prevWrap ? prevWrap.scrollLeft : 0;
   body.textContent = "";
   if (!b.schedule.available) {
     body.appendChild(el("p", "daynote", "暂无课表数据。在对话页问一次课表（如「这学期课表看一下」），缓存到本机后这里就有数据了。"));
@@ -368,13 +389,28 @@ function renderWeek(b) {
       course.title = [c.title, "第 " + start + (end === start ? "" : "–" + end) + " 节", c.time, c.location, c.teacher, c.weeks]
         .filter(Boolean).join(" · ");
       course.appendChild(el("div", "tt-course-name", c.title));
-      course.appendChild(el("div", "tt-course-meta", c.location || "地点待定"));
+      const meta = el("div", "tt-course-meta", c.location || "地点待定");
+      if (c.time) meta.dataset.time = c.time;  /* 手机横滚看周中时，时间就在课格里 */
+      course.appendChild(meta);
       timetable.appendChild(course);
     }
   }
   wrap.appendChild(timetable);
   body.appendChild(wrap);
   if (unscheduled.length) body.appendChild(el("p", "week-unscheduled", "未能定位节次：" + unscheduled.join("；")));
+  /* 整周放不下时横向滚动：先还原用户滚到的位置；初次渲染（没滚过）
+     把「今天」列请到视野中央，省得自己找 */
+  if (wrap.scrollWidth > wrap.clientWidth) {
+    if (prevScroll > 0) {
+      wrap.scrollLeft = prevScroll;
+    } else {
+      const todayHead = timetable.querySelector(".tt-day.today");
+      if (todayHead) {
+        wrap.scrollLeft = Math.max(0, todayHead.offsetLeft + todayHead.offsetWidth / 2 - wrap.clientWidth / 2);
+      }
+    }
+    body.appendChild(el("p", "week-hint", "← 左右滚动查看整周 · 课格内已含上课时间 →"));
+  }
 }
 
 function renderSrc(b) {

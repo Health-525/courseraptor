@@ -162,7 +162,11 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
     .pagehead .seal { width: 38px; height: 38px; }
     .pagehead .seal img { top: 4px; left: 4px; width: 30px; height: 30px; }
     .ph-title h1 { font-size: 20px; }
-    .ph-right { width: 100%; justify-content: space-between; }
+    /* 时钟独占一行、按钮换行排第二行且不折字：窄屏塞不下时整行换行，
+       而不是把按钮文字竖着劈成两半 */
+    .ph-right { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
+    .ph-clock { flex: 1 1 100%; }
+    .ph-right .tbtn { flex: none; white-space: nowrap; }
     main { display: block; padding: 22px 14px 56px; }
     .schedule-rail { position: static; padding: 0 0 18px; }
     .rail-meta { margin-top: 10px; padding-top: 10px; }

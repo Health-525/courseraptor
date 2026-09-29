@@ -266,6 +266,8 @@ font-family:var(--sans)}
 font-family:var(--mono);font-size:11.5px;line-height:1.9;color:var(--ink-2);text-align:center}
 .colophon b{color:var(--accent-deep);font-weight:600}
 @media (max-width:420px){.mast img{width:64px;height:64px}.card{padding:20px 18px 18px}}
+/* 触屏：输入框提到 16px，防 iOS Safari 聚焦时整页放大（基础值 15px 会触发） */
+@media (hover:none){input{font-size:16px}}
 </style></head><body>
 <main class="sheet">
 <header class="mast">
