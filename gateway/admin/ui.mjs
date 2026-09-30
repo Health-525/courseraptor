@@ -7,13 +7,15 @@
  * 鉴权：独立的管理会话 Cookie（raptor_admin，HMAC 签名与同学会话不同名
  * 不同签名域，互不通用）；登录失败同样 5 次锁 15 分钟。
  *
- * 页面架构与同学端网页（src/channels/web/chat-page.ts）同一套交付模式：
- * 前端应用代码在 assets/admin-app.js（独立 JS 资产，编辑器可直接解析、
- * 静态检查有测试兜底），此处读入后内联进页面——单文件交付，浏览器不多
- * 发一个请求。应用壳对齐同学端「红头档案」设计：左侧 284px 档头栏 +
- * 右侧滚动内容区，窄屏退回 ☰ 左抽屉（豆包式），全部颜色只在 :root 令牌。
+ * 页面形态完全按同学端网页版的独立页（today / knowledge / schedule）
+ * 推导，不沿用旧管理台的「侧栏后台」范式：报头（旋转印章 + 楷体标题 +
+ * 眉批 + 时钟）+ 左侧窄栏（kicker / 楷体题 / 目录导航 / 运行信息）+
+ * 右侧朱砂顶线卡片列。首页 = 对话页 hero + 功能大厅目录行；「同学」页 =
+ * 知识库式的名录 + 个人档案。前端应用在 assets/admin-app.js（与
+ * chat-app.js 同一交付模式：无构建、静态检查有测试兜底、服务时内联，
+ * 单文件交付）。改 admin-app.js 后需重启网关（appJs 有内存缓存）。
  *
- * 两步验证（TOTP）：在「安全设置」扫码绑定手机验证器后，登录需管理密码
+ * 两步验证（TOTP）：在「安全」扫码绑定手机验证器后，登录需管理密码
  * + 6 位动态码（附 10 枚一次性恢复码）。启用/关闭会递增 sessionEpoch，
  * 令既有管理会话立即失效；手机与恢复码全丢时 SSH 上机执行
  * `admin.mjs totp off` 兜底。未绑定则维持仅密码登录，行为与从前一致。
@@ -92,14 +94,14 @@ function escapeHtml(text) {
     .replaceAll('"', "&quot;");
 }
 
-/** 与 chat-page.ts 同源的红头档案设计令牌（管理台在此之上补表格/统计卡等后台件） */
+/** 与 chat-page.ts 同源的红头档案设计令牌 */
 const TOKENS_CSS = `
 :root{color-scheme:light;
 --paper:#F6F4ED;--paper-deep:#F0EDE4;--card:#FCFBF7;--shade:#ECE8DD;
 --ink:#25221C;--ink-2:#5A554A;--ink-3:#6E6656;
 --rule:#E1DCCF;--rule-2:#C9C1AF;
 --accent:#AD392C;--accent-deep:#852B22;--accent-soft:#F3E3DE;--accent-line:#E4C4BB;
---ok:#3D6B4F;--ok-soft:#E4EEE7;
+--ok:#3D6B4F;
 --shadow-sm:0 8px 24px rgba(50,42,31,.055);
 --serif:Georgia,"Times New Roman","Songti SC",SimSun,serif;
 --kai:"KaiTi","STKaiti","Kaiti SC",var(--serif);
@@ -112,8 +114,8 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 button,input,textarea{font-family:inherit}
 button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--paper);color:var(--ink);
-font-family:var(--sans);font-size:15px;line-height:1.7;
--webkit-font-smoothing:antialiased}
+font-family:var(--sans);font-size:16px;line-height:1.7;
+-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 `;
 
 /** 登录页 / 未启用页：与同学端登录注册同一副「居中一页纸」骨架 */
@@ -134,10 +136,6 @@ border-radius:2px;padding:2px 8px;margin-left:10px;vertical-align:3px}
 .tagline{margin:6px 0 0;font-family:var(--kai);font-size:14.5px;color:var(--ink-3);letter-spacing:.06em}
 .card{margin-top:26px;background:var(--card);border:1px solid var(--rule);
 border-radius:3px;box-shadow:var(--shadow-sm);padding:24px 26px 22px}
-.card h2{display:flex;justify-content:space-between;align-items:baseline;
-margin:0 0 18px;padding-bottom:9px;font-family:var(--mono);font-size:12.5px;
-font-weight:600;letter-spacing:.18em;color:var(--ink-2);border-bottom:1px solid var(--rule)}
-.card h2 .en{font-weight:400;font-size:11px;letter-spacing:.08em;color:var(--ink-3)}
 label{display:block;margin:14px 0 6px;font-family:var(--mono);font-size:11px;
 font-weight:600;letter-spacing:.12em;color:var(--ink-3)}
 input{width:100%;padding:10px 12px;background:var(--card);
@@ -160,152 +158,197 @@ font-size:13.5px;line-height:1.6}
 @media (hover:none){input{font-size:16px}}
 `;
 
-/** 管理台应用壳：对齐 chat-page.ts 的三段式（档头栏 / 滚动正文 / 窄屏抽屉） */
+/**
+ * 管理总台应用壳：today/knowledge 独立页的编辑台变体。
+ * 报头（印章 + 楷体题 + 眉批 + 时钟）→ 左窄栏（目录 + 运行信息）→
+ * 右侧卡片列（朱砂顶线卡）。窄屏时窄栏叠到卡片列上方（today 页 720 断点同款）。
+ */
 const APP_CSS = `
 ${TOKENS_CSS}
-body{display:grid;grid-template-columns:284px 1fr;height:100vh;height:100dvh;
-overflow:hidden;overscroll-behavior:none}
-.wordmark{display:inline-flex;align-items:baseline;font-weight:500;
-letter-spacing:-.035em;white-space:nowrap}
-.wordmark .course{color:var(--ink-2)}
-.wordmark .raptor{color:var(--accent);font-weight:750}
-/* ── 左栏：档头（同学端 aside 的管理台变体）── */
-aside{display:flex;flex-direction:column;min-height:0;overflow:hidden;
-padding:24px 18px max(16px,env(safe-area-inset-bottom));
-border-right:1px solid var(--rule);background:var(--paper-deep)}
-.mast{flex:none;text-align:center;padding-bottom:16px;position:relative;
-border-bottom:1px solid var(--rule-2)}
-.mast::after{content:"";position:absolute;left:14%;right:14%;bottom:3px;
-height:2px;background:var(--accent)}
-.mast img{width:44px;height:44px;object-fit:contain;display:block;margin:0 auto 7px}
-.mast h1{margin:0;font-size:19px;line-height:1.2}
-.mast .badge{display:inline-block;margin-top:8px;font-family:var(--mono);
-font-size:9.5px;font-weight:600;letter-spacing:.16em;color:var(--accent-deep);
-background:var(--accent-soft);border:1px solid var(--accent-line);
-border-radius:2px;padding:2px 8px}
-nav.groups{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
-display:flex;flex-direction:column;gap:22px;padding:18px 2px 8px 0;
-scrollbar-width:thin;scrollbar-color:transparent transparent}
-nav.groups:hover,nav.groups:focus-within{scrollbar-color:var(--rule-2) transparent}
-nav.groups::-webkit-scrollbar{width:8px}
-nav.groups::-webkit-scrollbar-thumb{background:transparent;border:2px solid transparent;
-background-clip:content-box;border-radius:4px}
-nav.groups:hover::-webkit-scrollbar-thumb{background:var(--rule-2);background-clip:content-box}
-.sec h2{display:flex;justify-content:space-between;align-items:baseline;
-margin:0 0 7px;padding:0 10px 7px;font-family:var(--mono);font-size:11px;
-font-weight:600;letter-spacing:.16em;color:var(--ink-3);
-border-bottom:1px solid var(--rule)}
-.sec h2 span:last-child{font-weight:400;letter-spacing:.06em}
-/* 导航条目：会话列表同款语言——悬停浅朱砂竖线，选中实朱砂 + 纸卡 */
-.nav-item{position:relative;display:flex;align-items:center;gap:11px;width:100%;
-text-align:left;background:none;border:0;border-left:2px solid transparent;
-border-radius:0 4px 4px 0;padding:8px 10px;font-size:13.5px;color:var(--ink-2);
-cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease}
-.nav-item svg{width:15px;height:15px;flex:none;stroke:currentColor;fill:none;
-stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.nav-item:hover{background:var(--card);border-left-color:var(--accent-soft);color:var(--ink)}
-.nav-item.on{background:var(--card);border-left-color:var(--accent);color:var(--ink);
-font-weight:600;box-shadow:var(--shadow-sm)}
-.nav-item .ndot{position:absolute;top:50%;right:10px;transform:translateY(-50%);
-width:8px;height:8px;border-radius:50%;background:var(--accent);
-box-shadow:0 0 0 2px var(--paper-deep)}
-.side-foot{flex:none;padding-top:12px;border-top:1px solid var(--rule-2)}
-.side-uptime{padding:0 2px 9px;font-family:var(--mono);font-size:10px;
-letter-spacing:.04em;color:var(--ink-3)}
-.side-foot .foot-btns{display:flex;gap:8px}
-/* ── 通用控件（tbtn / 表格 / 卡片：与同学端同一手感）── */
 .tbtn{background:none;border:1px solid var(--rule-2);color:var(--ink-2);
-border-radius:2px;padding:5px 12px;font-size:12.5px;cursor:pointer;
-display:inline-flex;align-items:center;justify-content:center;gap:6px;
+min-height:34px;font-size:13px;padding:5px 13px;border-radius:4px;cursor:pointer;
+text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;
 transition:border-color .15s ease,color .15s ease,background .15s ease}
-.tbtn:hover{border-color:var(--accent);color:var(--accent)}
+.tbtn:hover{border-color:var(--accent);color:var(--accent);background:var(--card)}
 .tbtn:active{transform:translateY(1px)}
-.tbtn.danger:hover{border-color:var(--accent-deep);background:var(--accent-soft);
-color:var(--accent-deep)}
-.tbtn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;
-stroke-linecap:round;stroke-linejoin:round}
-.foot-btns .tbtn{flex:1}
-main.content{display:flex;flex-direction:column;min-width:0;min-height:0}
-.topbar{display:none}
-.pagewrap{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
-padding:36px 40px 64px}
-.inner{width:min(100%,880px);margin:0 auto}
-h2{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
-margin:30px 0 12px;padding-bottom:8px;font-family:var(--mono);font-size:12.5px;
-font-weight:600;letter-spacing:.18em;color:var(--ink-2);border-bottom:1px solid var(--rule)}
-h2:first-child{margin-top:0}
-h2 .en{font-weight:400;font-size:11px;letter-spacing:.08em;color:var(--ink-3)}
-h2 .act{font-weight:400;letter-spacing:.04em;font-family:var(--mono);
-font-size:11px;color:var(--ink-3)}
-.card{background:var(--card);border:1px solid var(--rule);border-radius:3px;
-box-shadow:var(--shadow-sm);padding:20px 22px 18px}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.stat{background:var(--card);border:1px solid var(--rule);border-radius:3px;
-box-shadow:var(--shadow-sm);padding:14px 16px 11px;text-align:center}
-.stat .n{font-family:var(--mono);font-size:26px;font-weight:600;
-letter-spacing:-.02em;color:var(--ink)}
-.stat .n.hot{color:var(--accent)}
-.stat .t{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
-color:var(--ink-3);margin-top:2px}
-table{width:100%;border-collapse:collapse;background:var(--card);
-border:1px solid var(--rule);box-shadow:var(--shadow-sm)}
-table.plain{border:0;box-shadow:none}
-th{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;
-color:var(--ink-3);text-align:left;padding:10px 12px;background:var(--paper-deep);
-border-bottom:1px solid var(--rule-2)}
-td{padding:9px 12px;border-bottom:1px solid var(--rule);vertical-align:middle}
-table.plain td{border-bottom:1px dashed var(--rule)}
-tr:last-child td{border-bottom:0}
-tbody tr:hover td{background:var(--paper-deep)}
+.tbtn.danger:hover{border-color:var(--accent-deep);background:var(--accent-soft);color:var(--accent-deep)}
+/* ── 报头（today 页 pagehead 同款）── */
+.pagehead{display:flex;align-items:center;gap:16px;padding:16px 26px;
+border-bottom:1px solid var(--rule);background:var(--paper-deep)}
+.pagehead .seal{flex:none;position:relative;width:44px;height:44px;transform:rotate(-7deg)}
+.pagehead .seal::before{content:"";position:absolute;inset:0;
+border:2px solid var(--accent);border-radius:50%;opacity:.9}
+.pagehead .seal img{position:absolute;top:5px;left:5px;width:34px;height:34px;
+border-radius:50%;object-fit:cover}
+.ph-title{flex:1;min-width:0;display:flex;align-items:baseline;gap:14px}
+.ph-title h1{margin:0;font-family:var(--kai);font-weight:400;font-size:24px;letter-spacing:2px}
+.ph-stamp{font-family:var(--mono);font-size:12px;color:var(--ink-3);letter-spacing:.1em}
+.ph-right{display:flex;align-items:center;gap:12px}
+.ph-clock{text-align:right;font-family:var(--mono);line-height:1.5}
+.ph-date{font-size:13px;color:var(--ink-2)}
+.ph-week{font-size:11px;color:var(--ink-3);letter-spacing:.06em}
+/* ── 正文：左窄栏 + 右卡片列（knowledge 页 main 网格同款）── */
+main.content{max-width:1240px;margin:0 auto;padding:30px 22px 64px;
+display:grid;grid-template-columns:220px minmax(0,1fr);gap:26px;align-items:start}
+.rail{position:sticky;top:22px;padding:8px 4px}
+.rail-kicker{margin:0 0 6px;color:var(--accent-deep);font-family:var(--mono);
+font-size:11px;letter-spacing:.18em}
+.rail-title{margin:0;font-family:var(--kai);font-size:30px;font-weight:400;line-height:1.25}
+.cat-nav{display:flex;flex-direction:column;gap:4px;margin-top:16px}
+.cat-btn{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+background:none;border:1px solid transparent;padding:6px 8px;border-radius:4px;
+color:var(--ink-2);font-size:14px;cursor:pointer;font-family:inherit;text-align:left;
+transition:background .15s ease,color .15s ease}
+.cat-btn:hover{background:var(--card);color:var(--ink)}
+.cat-btn.active{border-color:var(--rule-2);background:var(--card);color:var(--accent-deep)}
+.cat-count{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
+.cat-count.warn{color:var(--accent-deep);font-weight:600}
+.rail-meta{margin-top:18px;padding-top:14px;border-top:1px solid var(--rule-2);
+font-family:var(--mono);font-size:12px;line-height:1.8;color:var(--ink-3)}
+/* ── 卡片（knowledge 页 card 同款：朱砂顶线 + 等宽栏头）── */
+.card{border:1px solid var(--rule-2);border-top:2px solid var(--accent);
+background:var(--card);box-shadow:var(--shadow-sm)}
+.card + .card{margin-top:22px}
+.card > h2{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+margin:0;padding:13px 18px 10px;border-bottom:1px solid var(--rule);
+font-family:var(--mono);font-size:13px;font-weight:600;
+letter-spacing:.18em;color:var(--ink-2)}
+.card > h2 .cnote{font-family:var(--mono);font-weight:400;font-size:12px;
+letter-spacing:.03em;color:var(--ink-3);text-align:right}
+.cbody{padding:14px 18px 16px;display:grid;gap:10px;align-content:start}
+.lead{margin:4px 0 6px;font-size:15px;color:var(--ink-2)}
+.chint{margin:2px 0 0;font-size:12.5px;color:var(--ink-3);line-height:1.7}
+.empty{padding:22px 0;text-align:center;color:var(--ink-3);font-size:13.5px}
+.skel{color:var(--ink-3);margin:6px 0}
 .mono{font-family:var(--mono);font-size:13px}
 b.hot,.hot{color:var(--accent-deep)}
+.ok{color:var(--ok)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;
-background:var(--ok);margin-right:6px;vertical-align:1px}
+background:var(--ok);margin-right:7px;vertical-align:1px}
 .dot.off{background:var(--rule-2)}
-.pill{font-family:var(--mono);font-size:11px;letter-spacing:.08em;border-radius:2px;
-padding:1px 8px;border:1px solid var(--ok-soft);background:var(--ok-soft);color:var(--ok);
-white-space:nowrap}
-.pill.bad{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent-deep)}
+.notice{margin:0;padding:9px 12px;background:var(--accent-soft);
+border:1px solid var(--accent-line);border-radius:2px;color:var(--accent-deep);
+font-size:13.5px;line-height:1.6}
+.copy-ok{color:var(--ok);font-family:var(--mono);font-size:11px;cursor:default;
+border:0;background:none;padding:3px 0}
+/* ── 首页：hero（chat 页同款）+ 数据行 + 大厅目录行 ── */
+.panel{display:none}
+.panel.on{display:block}
+.hero{display:flex;min-height:220px;flex-direction:column;align-items:center;
+justify-content:center;text-align:center;padding:10px 16px 26px}
+.hero .seal{position:relative;width:104px;height:104px;transform:rotate(-7deg)}
+.hero .seal::before{content:"";position:absolute;inset:0;border:2.5px solid var(--accent);
+border-radius:50%;opacity:.85}
+.hero .seal::after{content:"";position:absolute;inset:6px;border:1px solid var(--accent-line);border-radius:50%}
+.hero .seal img{position:absolute;top:12px;left:12px;width:80px;height:80px;
+border-radius:50%;object-fit:cover}
+.hero-kicker{margin:18px 0 10px;font-family:var(--mono);font-size:11px;
+letter-spacing:.3em;color:var(--accent-deep)}
+.hero h2{margin:0 0 10px;font-family:var(--kai);font-weight:400;font-size:30px;letter-spacing:2px}
+.hero p{margin:0 auto;max-width:520px;font-size:15px;color:var(--ink-2)}
+.hstats{display:grid;grid-template-columns:repeat(4,1fr);margin:0 0 26px;
+border-top:1px solid var(--rule-2);border-bottom:1px solid var(--rule)}
+.hstat{padding:13px 10px 11px;text-align:center;border-left:1px solid var(--rule)}
+.hstat:first-child{border-left:0}
+.hstat b{display:block;font-family:var(--mono);font-size:23px;font-weight:600;letter-spacing:-.02em}
+.hstat span{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--ink-3)}
+/* 大厅目录行（chat 页 hall-card 同款语言）*/
+.hall-sec{display:flex;align-items:baseline;justify-content:space-between;
+margin:0 0 6px;padding-bottom:6px;font-family:var(--mono);font-size:12px;
+font-weight:600;letter-spacing:.14em;color:var(--ink-3);border-bottom:1px solid var(--rule)}
+.hall-sec span:last-child{font-weight:400;letter-spacing:.04em}
+.hall-grid{display:grid;grid-template-columns:1fr}
+.hall-card{position:relative;display:flex;flex-direction:column;gap:4px;
+text-align:left;width:100%;border:0;border-bottom:1px solid var(--rule);
+background:none;padding:12px 6px 12px 15px;cursor:pointer;font-family:inherit;
+transition:background .15s ease}
+.hall-grid .hall-card:last-child{border-bottom-color:transparent}
+.hall-card::before{content:"";position:absolute;left:0;top:10px;bottom:10px;
+width:3px;background:var(--accent);opacity:0;transition:opacity .15s ease}
+.hall-card:hover{background:var(--paper-deep)}
+.hall-card:hover::before{opacity:1}
+.hall-card:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.hall-card-top{display:flex;align-items:center;gap:9px}
+.hall-ico{flex:none;width:28px;height:28px;display:inline-flex;align-items:center;
+justify-content:center;background:var(--accent-soft);color:var(--accent-deep);border-radius:4px}
+.hall-ico svg{display:block;width:15px;height:15px;fill:none;stroke:currentColor;
+stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.hall-card b{flex:1;min-width:0;font-size:15px;font-weight:600;
+overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
+.hall-go{flex:none;color:var(--rule-2);font-size:14px;
+transition:color .15s ease,transform .15s ease}
+.hall-card:hover .hall-go{color:var(--accent);transform:translateX(2px)}
+.hall-card > span{font-family:var(--mono);font-size:12px;color:var(--ink-3);
+letter-spacing:.02em;line-height:1.6}
+.hall-badge{flex:none;font-family:var(--mono);font-size:11px;letter-spacing:.04em;
+color:var(--accent-deep);background:var(--accent-soft);padding:1px 8px;
+border-radius:2px;white-space:nowrap}
+.hall-badge.warn{background:var(--accent);color:var(--card);font-weight:600}
+.hall-note{margin:16px 2px 0;font-family:var(--mono);font-size:12px;
+color:var(--ink-3);line-height:1.8}
+/* ── 同学：名录行 + 档案卡 ── */
+.kw-box{width:100%;padding:7px 10px;border:1px solid var(--rule-2);
+border-radius:4px;background:var(--card);color:var(--ink);font-size:14px;font-family:inherit}
+.kw-box:focus{outline:none;border-color:var(--accent)}
+.st-row{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;
+border:1px solid var(--rule);background:var(--card);border-radius:4px;
+padding:10px 12px 10px 14px;cursor:pointer;font-family:inherit;position:relative;
+transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}
+.st-row::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;
+border-radius:4px 0 0 4px;background:var(--accent);opacity:0;transition:opacity .15s ease}
+.st-row:hover{border-color:var(--rule-2);background:var(--paper-deep)}
+.st-row:hover::before,.st-row.active::before{opacity:1}
+.st-row.active{border-color:var(--accent-line);box-shadow:var(--shadow-sm)}
+.st-row-top{display:flex;align-items:center;gap:9px}
+.st-row-top b{font-size:15px;font-weight:600}
+.st-quota{margin-left:auto;color:var(--ink-2);font-size:12.5px}
+.st-sub{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
+.dos .dos-head{display:flex;align-items:center;gap:12px;padding:12px 18px 0}
+.dos-name{font-size:16px;font-weight:600;color:var(--accent-deep)}
+.dos-body{padding:6px 18px 4px}
+.dos-row{display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px;
+padding:7px 0;border-bottom:1px dashed var(--rule)}
+.dos-row:last-child{border-bottom:0}
+.dos-k{font-family:var(--mono);font-size:12px;color:var(--ink-3);
+letter-spacing:.06em;padding-top:2px}
+.dos-v{font-size:14px;color:var(--ink)}
+.dos-acts{display:flex;gap:10px;flex-wrap:wrap;align-items:center;
+padding:8px 18px 14px;border-top:1px solid var(--rule);margin-top:8px}
+.dos-acts input{width:200px}
+.dos-hint{margin:0 18px 16px;font-family:var(--mono);font-size:11.5px;
+color:var(--ink-3);line-height:1.7}
+/* ── 通行条目行（邀请码 / 重置 / 版本 / 密钥共用）── */
+.inv-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+padding:9px 2px;border-bottom:1px dashed var(--rule)}
+.inv-row:last-child{border-bottom:0}
+.inv-row b{font-size:14px}
+.inv-row input{flex:1;min-width:200px}
+.inv-code{letter-spacing:.04em}
+.inv-note{flex:1;min-width:120px;font-size:13.5px;color:var(--ink-2);
+overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.inv-used{font-size:12px;color:var(--ink-3)}
 .row{display:flex;gap:10px;flex-wrap:wrap}
 .row input{flex:1;min-width:120px}
 .row .num{max-width:90px;text-align:center}
-input,textarea{width:100%;padding:9px 12px;background:var(--card);
-border:1px solid var(--rule-2);border-radius:2px;font-size:14.5px;color:var(--ink);
+input,textarea{padding:8px 11px;background:var(--card);border:1px solid var(--rule-2);
+border-radius:4px;font-size:14.5px;color:var(--ink);
 transition:border-color .15s ease,box-shadow .15s ease}
 input:hover,textarea:hover{border-color:var(--ink-3)}
-input:focus,textarea:focus{outline:none;border-color:var(--accent);
-box-shadow:0 0 0 3px var(--accent-soft)}
+input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 textarea{resize:vertical;font-size:14px}
-.empty{padding:26px 0;text-align:center;color:var(--ink-3);font-size:13.5px}
-.copy-ok{color:var(--ok);font-family:var(--mono);font-size:11px;cursor:default;
-border:0;background:none;padding:3px 0}
-.notice{margin:0 0 4px;padding:9px 12px;background:var(--accent-soft);
-border:1px solid var(--accent-line);border-radius:2px;color:var(--accent-deep);
-font-size:13.5px;line-height:1.6}
-p.lead{margin:4px 0 6px;font-size:15px;color:var(--ink-2)}
-a.goto{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-line);
-font-weight:600}
-a.goto:hover{border-bottom-color:var(--accent)}
-.hint{margin:10px 0 0;font-size:12.5px;color:var(--ink-3);line-height:1.7}
-/* ── 安全设置：扫码绑定 ── */
-.qr{background:#fff;border:1px solid var(--rule);border-radius:3px;
-width:fit-content;padding:10px;margin:12px 0 10px}
-.qr svg{display:block;width:184px;height:184px}
-.codes{font-family:var(--mono);font-size:15px;letter-spacing:.08em;line-height:2.1;
-margin:10px 0 0;color:var(--ink)}
-/* ── 版本发布：上传发版 ── */
+.ks{font-size:12.5px;color:var(--ink-3);margin:0}
+/* ── 版本发布：上传 ── */
 .drop{display:flex;flex-direction:column;align-items:center;justify-content:center;
-gap:5px;margin-top:8px;padding:22px 16px;border:1.5px dashed var(--rule-2);
-border-radius:3px;background:var(--paper-deep);color:var(--ink-3);font-size:12px;
-text-align:center;cursor:pointer;
-transition:border-color .15s ease,color .15s ease,background .15s ease}
+gap:5px;padding:22px 16px;border:1.5px dashed var(--rule-2);border-radius:4px;
+background:var(--paper-deep);color:var(--ink-3);font-size:12px;text-align:center;
+cursor:pointer;transition:border-color .15s ease,color .15s ease,background .15s ease}
 .drop svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;
 stroke-linecap:round;stroke-linejoin:round;opacity:.75}
 .drop .b{font-size:13.5px;color:var(--ink-2)}
 .drop:hover,.drop:focus-visible,.drop.on{border-color:var(--accent);
 color:var(--accent-deep);background:var(--accent-soft);outline:none}
-.file-chip{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 12px;
-background:var(--card);border:1px solid var(--rule);border-radius:3px}
+.file-chip{display:flex;align-items:center;gap:10px;padding:10px 12px;
+background:var(--card);border:1px solid var(--rule);border-radius:4px}
 .file-chip svg{width:18px;height:18px;flex:none;stroke:var(--accent);fill:none;
 stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .file-chip .name{flex:1;min-width:0;font-size:13.5px;color:var(--ink);
@@ -313,35 +356,40 @@ overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .file-chip .size{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);white-space:nowrap}
 .pbar{height:8px;background:var(--paper-deep);border:1px solid var(--rule);
 border-radius:2px;overflow:hidden}
-.pbar i{display:block;height:100%;width:0;background:var(--accent);
-transition:width .25s ease}
-.meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+.pbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s ease}
+.upd-meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
 font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-3)}
-button.primary{display:block;width:100%;margin-top:22px;padding:12px;
+button.primary{display:block;width:100%;margin-top:14px;padding:12px;
 background:var(--accent);color:var(--card);border:1px solid var(--accent);
-border-radius:2px;font-size:15px;font-weight:600;letter-spacing:.14em;cursor:pointer;
+border-radius:4px;font-size:15px;font-weight:600;letter-spacing:.14em;cursor:pointer;
 transition:background .15s ease}
 button.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff}
 button.primary:active{transform:translateY(1px)}
-.drawer-backdrop{display:none;position:fixed;inset:0;z-index:39;
-background:rgba(38,35,29,.35)}
-/* ── 窄屏：aside 退回左抽屉（豆包式），顶栏带 ☰ ── */
+/* ── 安全：扫码 ── */
+.qr{background:#fff;border:1px solid var(--rule);border-radius:4px;
+width:fit-content;padding:10px;margin:6px 0 8px}
+.qr svg{display:block;width:184px;height:184px}
+.codes{font-family:var(--mono);font-size:15px;letter-spacing:.08em;line-height:2.1;
+margin:10px 0 0;color:var(--ink)}
+/* ── 窄屏（today 页 720 断点同思路，管理台用 960）── */
 @media (max-width:960px){
-body{grid-template-columns:1fr}
-aside{position:fixed;inset:0 auto 0 0;z-index:40;width:min(320px,88vw);
-transform:translateX(-102%);transition:transform .2s ease;
-box-shadow:14px 0 36px rgba(38,35,29,.2)}
-body.drawer-open aside{transform:translateX(0)}
-body.drawer-open .drawer-backdrop{display:block}
-.topbar{display:flex;flex:none;align-items:center;gap:8px;padding:9px 14px;
-border-bottom:1px solid var(--rule);background:var(--paper-deep)}
-.topbar .tb-title{flex:1;justify-content:center;font-size:17px}
-.topbar .iconbtn{width:44px;min-width:44px;min-height:44px;padding:0;
-border-color:transparent;background:none}
-.topbar .iconbtn svg{width:20px;height:20px}
-.topbar .iconbtn:active{background:var(--accent-soft)}
-.pagewrap{padding:24px 16px 56px}
-.stats{grid-template-columns:repeat(2,1fr)}
+main.content{display:block;padding:22px 14px 56px}
+.rail{position:static;padding:0 0 18px}
+.cat-nav{flex-direction:row;flex-wrap:wrap}
+.pagehead{flex-wrap:wrap;padding:12px 16px;gap:10px 12px}
+.pagehead .seal{width:38px;height:38px}
+.pagehead .seal img{top:4px;left:4px;width:30px;height:30px}
+.ph-title h1{font-size:20px}
+.ph-right{width:100%;flex-wrap:wrap;justify-content:flex-end}
+.ph-clock{flex:1 1 100%}
+.hstats{grid-template-columns:repeat(2,1fr)}
+.hstat:nth-child(3){border-left:0}
+.hstat{border-top:1px solid var(--rule)}
+.hstat:nth-child(-n+2){border-top:0}
+.hero .seal{width:84px;height:84px}
+.hero .seal img{top:10px;left:10px;width:64px;height:64px}
+.hero h2{font-size:24px}
+.dos-row{grid-template-columns:1fr;gap:2px;padding:8px 0}
 }
 @media (hover:none){input,textarea{font-size:16px}}
 `;
@@ -385,179 +433,165 @@ const disabledHtml = () =>
 <span class="mono">admin.mjs</span> 命令行管理。</p></section>`,
   );
 
-const NAV_ICON = {
-  overview:
-    '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
-  users:
-    '<svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16 3.5a4 4 0 0 1 0 7"/><path d="M17 14c2.8.5 5 3 5 6.2"/></svg>',
-  invites:
-    '<svg viewBox="0 0 24 24"><path d="M4 22h16c1.1 0 2-.9 2-2v-4H2v4c0 1.1.9 2 2 2z"/><path d="M6 13V4c0-1.1.9-2 2-2h8c1.1 0 2 .9 2 2v9"/><path d="M10 6h4"/></svg>',
-  resets:
-    '<svg viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.3 12.7 21 2"/><path d="m15 7 3 3"/><path d="m18 4 3 3"/></svg>',
-  site:
-    '<svg viewBox="0 0 24 24"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>',
-  security:
-    '<svg viewBox="0 0 24 24"><path d="M12 22s8-3.6 8-10V5.5L12 2 4 5.5V12c0 6.4 8 10 8 10z"/><path d="M9 11.5l2 2 4-4.5"/></svg>',
-  release:
-    '<svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>',
-  keys:
-    '<svg viewBox="0 0 24 24"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>',
-};
-
-const navItem = (id, label, dot = false) =>
-  `<button type="button" class="nav-item" data-nav="${id}">${NAV_ICON[id]}${label}${dot ? '<span class="ndot" id="resetsDot" hidden></span>' : ""}</button>`;
-
 const dashboardHtml = () => `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#F0EDE4">
 <link rel="icon" href="/logo.png">
-<title>管理台 · CourseRaptor</title><style>${APP_CSS}</style></head><body>
-<aside>
-  <div class="mast">
-    <img src="/logo.png" alt="CourseRaptor 印章">
-    <h1 class="wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></h1>
-    <div><span class="badge">ADMIN 管理台</span></div>
-  </div>
-  <nav class="groups">
-    <section class="sec">
-      <h2><span>日 常</span><span>DAILY</span></h2>
-      ${navItem("overview", "总览")}
-      ${navItem("users", "同学账号")}
-      ${navItem("invites", "邀请码")}
-      ${navItem("resets", "重置审批", true)}
-    </section>
-    <section class="sec">
-      <h2><span>站 点</span><span>SITE</span></h2>
-      ${navItem("site", "站点设置")}
-      ${navItem("security", "安全设置")}
-    </section>
-    <section class="sec">
-      <h2><span>发 版</span><span>RELEASES</span></h2>
-      ${navItem("release", "版本发布")}
-      ${navItem("keys", "密钥管理")}
-    </section>
-  </nav>
-  <div class="side-foot">
-    <div class="side-uptime" id="uptimeLine">网关运行中…</div>
-    <div class="foot-btns">
-      <button type="button" class="tbtn" id="refresh">
-        <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>刷新</button>
-      <button type="button" class="tbtn" id="logout">
-        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>退出</button>
-    </div>
-  </div>
-</aside>
+<title>管理总台 · CourseRaptor</title><style>${APP_CSS}</style></head><body>
+<header class="pagehead">
+<span class="seal" aria-hidden="true"><img src="/logo.png" alt="" width="34" height="34"></span>
+<div class="ph-title">
+<h1>管理总台</h1>
+<span class="ph-stamp">COURSERAPTOR · ADMIN DESK</span>
+</div>
+<div class="ph-right">
+<div class="ph-clock">
+<div class="ph-date" id="phDate"></div>
+<div class="ph-week" id="phWeek"></div>
+</div>
+<button type="button" class="tbtn" id="refresh">刷新数据</button>
+<button type="button" class="tbtn" id="logout">退出</button>
+</div>
+</header>
 <main class="content">
-  <div class="topbar">
-    <button type="button" class="tbtn iconbtn" id="openDrawerM" aria-label="打开菜单">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
-    <span class="tb-title wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></span>
-    <button type="button" class="tbtn iconbtn" id="refreshM" aria-label="刷新数据">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>
-  </div>
-  <div class="pagewrap"><div class="inner">
-  <section class="pane">
+<aside class="rail" aria-label="管理目录">
+<p class="rail-kicker">OPERATIONS</p>
+<h2 class="rail-title" id="railTitle">首页</h2>
+<nav class="cat-nav" aria-label="管理区">
+<button type="button" class="cat-btn active" data-nav="home"><span>首页</span></button>
+<button type="button" class="cat-btn" data-nav="students"><span>同学</span><span class="cat-count" id="navCountStudents"></span></button>
+<button type="button" class="cat-btn" data-nav="access"><span>准入</span><span class="cat-count" id="navCountAccess"></span></button>
+<button type="button" class="cat-btn" data-nav="model"><span>模型与额度</span></button>
+<button type="button" class="cat-btn" data-nav="release"><span>版本</span></button>
+<button type="button" class="cat-btn" data-nav="keys"><span>密钥</span></button>
+<button type="button" class="cat-btn" data-nav="security"><span>安全</span></button>
+</nav>
+<div class="rail-meta" id="railMeta">读取中…</div>
+</aside>
+<div class="col">
+<section class="pane">
 
-  <div class="panel on" id="pane-overview">
-    <h2>总览<span class="en">OVERVIEW</span></h2>
-    <div class="stats" id="stats"></div>
-    <h2>运行状态<span class="en">STATUS</span></h2>
-    <div class="card" id="statusCard"><p class="empty">加载中…</p></div>
-  </div>
+<div class="panel on" id="pane-home">
+<div class="hero">
+<div class="seal" aria-hidden="true"><img src="/logo.png" alt="" width="80" height="80"></div>
+<p class="hero-kicker">ADMIN DESK</p>
+<h2>今日值班。</h2>
+<p>同学在网页版里注册、对话、查课表——这里守护这条链路：账号、额度、Key 与版本。</p>
+</div>
+<div class="hstats" id="homeStats"></div>
+<div class="hall-sec"><span>管理目录</span><span>DIRECTORY</span></div>
+<div class="hall-grid" id="homeDir"></div>
+<p class="hall-note" id="homeNote"></p>
+</div>
 
-  <div class="panel" id="pane-users">
-    <h2>同学账号<span class="en">USERS</span></h2>
-    <table><thead><tr><th>用户名</th><th>状态</th><th>Key 来源</th><th>在线</th><th>来源</th><th>注册于</th><th>今日轮数</th><th>操作</th></tr></thead>
-    <tbody id="users"><tr><td colspan="8" class="empty">加载中…</td></tr></tbody></table>
-    <p class="hint">「Key 来源」显示分账模式：站点额度＝统一 Key 计费；自有优先＝同学保存了自己的 DeepSeek Key 时不占站点额度。悬停在线圆点可看实例启动 / 最近活跃时间。</p>
-  </div>
+<div class="panel" id="pane-students">
+<section class="card">
+<h2>同学名录<span class="cnote" id="studentCount"></span></h2>
+<div class="cbody">
+<input class="kw-box" id="studentSearch" type="search" placeholder="搜索用户名…" aria-label="搜索同学">
+<div id="studentList"><p class="skel">…</p></div>
+</div>
+</section>
+<section class="card dos" id="studentDossier" hidden></section>
+</div>
 
-  <div class="panel" id="pane-invites">
-    <h2>生成邀请码<span class="en">INVITES</span><span class="act">发给同学，凭码注册</span></h2>
-    <div class="card">
-      <div class="row">
-        <input class="num" id="invCount" type="number" min="1" max="50" value="5" title="数量">
-        <input id="invNote" placeholder="备注（如：班级群）">
-        <input class="num" id="invDays" type="number" min="0" max="365" value="0" title="有效天数，0=永久">
-        <button class="tbtn" id="invGen" type="button" style="margin:0;padding:8px 18px">生成</button>
-      </div>
-    </div>
-    <h2>邀请码档案<span class="en">HISTORY</span></h2>
-    <table><thead><tr><th>邀请码</th><th>备注</th><th>使用者</th><th>状态</th><th></th></tr></thead>
-    <tbody id="invites"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table>
-  </div>
+<div class="panel" id="pane-access">
+<section class="card">
+<h2>邀请码<span class="cnote">发给同学，凭码在 /register 注册</span></h2>
+<div class="cbody">
+<div class="row">
+<input class="num" id="invCount" type="number" min="1" max="50" value="5" title="数量">
+<input id="invNote" placeholder="备注（如：班级群）">
+<input class="num" id="invDays" type="number" min="0" max="365" value="0" title="有效天数，0=永久">
+<button class="tbtn" id="invGen" type="button" style="margin:0">生成</button>
+</div>
+<div id="inviteList"><p class="skel">…</p></div>
+</div>
+</section>
+<section class="card">
+<h2>密码重置申请<span class="cnote">同意后把码发给同学，新密码由同学自己设</span></h2>
+<div class="cbody"><div id="resetPending"><p class="skel">…</p></div></div>
+</section>
+<section class="card">
+<h2>有效重置码<span class="cnote">24 小时内有效 · 用后即焚</span></h2>
+<div class="cbody"><div id="resetCodes"><p class="skel">…</p></div></div>
+</section>
+</div>
 
-  <div class="panel" id="pane-resets">
-    <h2>密码重置申请<span class="en">RESET REQUESTS</span><span class="act">同意后把码发给同学，新密码由同学自己设</span></h2>
-    <div id="resetBox"><p class="empty">加载中…</p></div>
-  </div>
+<div class="panel" id="pane-model">
+<section class="card">
+<h2>站点 DeepSeek Key<span class="cnote">网页「设置 → AI 模型」的统一 Key</span></h2>
+<div class="cbody">
+<p class="mono ks" id="keyState">…</p>
+<div class="row">
+<input id="siteKeyInput" placeholder="粘贴新的 sk- 开头 Key" autocomplete="off">
+<button class="tbtn" id="siteKeySave" type="button" style="margin:0">保存</button>
+</div>
+<p class="chint">保存后新拉起的实例立即使用新 Key；在线实例下次拉起时切换。同学在网页「设置」里保存自己的 Key 后，优先用自己的，不消耗站点额度。</p>
+</div>
+</section>
+<section class="card">
+<h2>对话限额与分账<span class="cnote">站点统一 Key 计费，自有 Key 只计数</span></h2>
+<div class="cbody"><div id="quotaStats"><p class="skel">…</p></div></div>
+</section>
+</div>
 
-  <div class="panel" id="pane-site">
-    <h2>站点设置<span class="en">SITE</span></h2>
-    <div class="card">
-      <label>统一 DEEPSEEK KEY（未设置则同学须自带）</label>
-      <p class="mono" id="siteKeyState" style="margin:0 0 10px;font-size:12.5px;color:var(--ink-3)">加载中…</p>
-      <div class="row">
-        <input id="siteKeyInput" placeholder="粘贴新的 sk- 开头 Key" autocomplete="off">
-        <button class="tbtn" id="siteKeySave" type="button" style="margin:0;padding:8px 18px">保存</button>
-      </div>
-      <p style="color:var(--ink-3);font-size:12.5px;margin:12px 0 0">保存后新拉起的实例立即使用新 Key；在线实例下次拉起时切换。同学在网页「设置」里保存自己的 Key 后，优先用自己的，不消耗站点额度。</p>
-      <h2 style="margin-top:22px">对话限额<span class="en">QUOTA</span></h2>
-      <p class="lead" style="margin:4px 0 0">站点默认每人每日 <b class="mono" id="siteDefaultTurns">—</b> 轮；在「同学账号」里可按人单独设限额（0 = 用默认）。同学自带 Key 的同样计数，规则透明。</p>
-      <p style="color:var(--ink-3);font-size:12.5px;margin:10px 0 0" id="dsModeLine">加载中…</p>
-    </div>
-  </div>
+<div class="panel" id="pane-release">
+<section class="card">
+<h2>上传新版本<span class="cnote">同学端安装包 · 与 npm run publish 共用接口</span></h2>
+<div class="cbody">
+<div class="row">
+<input id="updVer" class="mono" placeholder="x.y.z" autocomplete="off" spellcheck="false" style="max-width:130px;text-align:center">
+<input id="updNotes" placeholder="更新说明（可选），如：修复课表周次显示错误" maxlength="2000" autocomplete="off">
+</div>
+<div class="drop" id="updDrop" tabindex="0" role="button" aria-label="选择或拖入 zip 安装包">
+<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+<span class="b">点击选择，或拖入 zip 安装包</span>
+<span>最大 200 MB</span>
+</div>
+<input type="file" id="updFile" accept=".zip,application/zip" hidden>
+<div id="updFileBox"></div>
+<div id="updProg" hidden>
+<div class="upd-meta"><span id="updPhase">上传中</span><span id="updPct">0%</span></div>
+<div class="pbar" style="margin-top:6px"><i id="updBar"></i></div>
+<div style="text-align:right;margin-top:8px"><button class="tbtn" id="updCancel" type="button">取消上传</button></div>
+</div>
+<button class="primary" id="updGo" type="button">发布新版本</button>
+<p class="chint">发布后学生端下次启动 raptor 时提示更新；版本号需大于当前分发版本，否则不会触发更新。</p>
+</div>
+</section>
+<section class="card">
+<h2>历史版本<span class="cnote" id="updCur"></span></h2>
+<div class="cbody"><div id="updCard"><p class="skel">…</p></div></div>
+</section>
+</div>
 
-  <div class="panel" id="pane-security">
-    <h2>两步验证<span class="en">2FA · TOTP</span><span class="act">登录需密码 + 手机验证器动态码</span></h2>
-    <div class="card" id="mfaCard"><p class="empty">加载中…</p></div>
-  </div>
+<div class="panel" id="pane-keys">
+<section class="card">
+<h2>更新后台密钥<span class="cnote">命令行发版与后台登录用，与主密钥同权</span></h2>
+<div class="cbody">
+<div class="row">
+<input id="keyName" placeholder="名称（可选），如：发布机 / 值班同学" maxlength="64" autocomplete="off">
+<button class="tbtn" id="keyGen" type="button" style="margin:0">新建密钥</button>
+</div>
+<div id="keyCreated" hidden></div>
+<div id="keyList"><p class="skel">…</p></div>
+<p class="chint">主密钥来自服务器环境变量 UPDATE_ADMIN_TOKEN，始终可用且不能在这里删除；面板密钥删除后立即失效。明文只在创建时展示一次，之后仅存哈希。</p>
+</div>
+</section>
+</div>
 
-  <div class="panel" id="pane-release">
-    <h2>上传新版本<span class="en">PUBLISH</span></h2>
-    <div class="card">
-      <div class="row">
-        <input id="updVer" class="mono" placeholder="x.y.z" autocomplete="off" spellcheck="false" style="max-width:130px;text-align:center">
-        <input id="updNotes" placeholder="更新说明（可选），如：修复课表周次显示错误" maxlength="2000" autocomplete="off">
-      </div>
-      <div class="drop" id="updDrop" tabindex="0" role="button" aria-label="选择或拖入 zip 安装包">
-        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
-        <span class="b" id="updDropMain">点击选择，或拖入 zip 安装包</span>
-        <span>最大 200 MB · 与 npm run publish 共用接口</span>
-      </div>
-      <input type="file" id="updFile" accept=".zip,application/zip" hidden>
-      <div id="updFileBox"></div>
-      <div id="updProg" hidden style="margin-top:14px">
-        <div class="meta"><span id="updPhase">上传中</span><span id="updPct">0%</span></div>
-        <div class="pbar" style="margin-top:6px"><i id="updBar"></i></div>
-        <div style="text-align:right;margin-top:8px"><button class="tbtn" id="updCancel" type="button">取消上传</button></div>
-      </div>
-      <button class="primary" id="updGo" type="button">发布新版本</button>
-      <p class="hint">发布后学生端下次启动 raptor 时提示更新；版本号需大于当前分发版本，否则不会触发更新。</p>
-    </div>
-    <h2>历史版本<span class="en">HISTORY</span><span class="act" id="updCur"></span></h2>
-    <div class="card" id="updCard"><p class="empty">加载中…</p></div>
-  </div>
+<div class="panel" id="pane-security">
+<section class="card">
+<h2>两步验证<span class="cnote">登录需密码 + 手机验证器动态码</span></h2>
+<div class="cbody" id="mfaCard"><p class="skel">…</p></div>
+</section>
+</div>
 
-  <div class="panel" id="pane-keys">
-    <h2>更新后台密钥<span class="en">ADMIN KEYS</span><span class="act">用于命令行发版与后台登录，与主密钥同权</span></h2>
-    <div class="card">
-      <div class="row">
-        <input id="keyName" placeholder="名称（可选），如：发布机 / 值班同学" maxlength="64" autocomplete="off">
-        <button class="tbtn" id="keyGen" type="button" style="margin:0;padding:8px 18px">新建密钥</button>
-      </div>
-      <div id="keyCreated" hidden></div>
-      <table class="plain" style="margin-top:14px"><thead><tr><th>名称</th><th>类型</th><th>创建时间</th><th>最后使用</th><th></th></tr></thead>
-      <tbody id="keys"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table>
-      <p class="hint">主密钥来自服务器环境变量 UPDATE_ADMIN_TOKEN，始终可用且不能在这里删除；面板密钥删除后立即失效。明文只在创建时展示一次，之后仅存哈希。</p>
-    </div>
-  </div>
-
-  </section>
-  </div></div>
+</section>
+</div>
 </main>
-<div class="drawer-backdrop"></div>
 <script>
 ${appJs()}
 </script>
@@ -932,7 +966,7 @@ export function createAdminUi({
       return true;
     }
 
-    // 一次往返带回全部面板数据：跨公网链路 RTT 大，5 个串行请求是「卡」的主因
+    // 一次往返带回全部面板数据：跨公网链路 RTT 大，多个串行请求是「卡」的主因
     if (req.method === "GET" && pathname === "/admin/api/bootstrap") {
       const [overview, users, invites, site, resets, totp, updOverview, updVersions, updKeys] =
         await Promise.all([
