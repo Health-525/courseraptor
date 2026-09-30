@@ -5,8 +5,13 @@
  * 显示「未启用」说明页，管理动作一律 404，只能继续用 admin.mjs 命令行。
  *
  * 鉴权：独立的管理会话 Cookie（raptor_admin，HMAC 签名与同学会话不同名
- * 不同签名域，互不通用）；登录失败同样 5 次锁 15 分钟。页面与 /admin/api/*
- * 与登录/注册页同一套「红头档案」设计令牌。
+ * 不同签名域，互不通用）；登录失败同样 5 次锁 15 分钟。
+ *
+ * 页面架构与同学端网页（src/channels/web/chat-page.ts）同一套交付模式：
+ * 前端应用代码在 assets/admin-app.js（独立 JS 资产，编辑器可直接解析、
+ * 静态检查有测试兜底），此处读入后内联进页面——单文件交付，浏览器不多
+ * 发一个请求。应用壳对齐同学端「红头档案」设计：左侧 284px 档头栏 +
+ * 右侧滚动内容区，窄屏退回 ☰ 左抽屉（豆包式），全部颜色只在 :root 令牌。
  *
  * 两步验证（TOTP）：在「安全设置」扫码绑定手机验证器后，登录需管理密码
  * + 6 位动态码（附 10 枚一次性恢复码）。启用/关闭会递增 sessionEpoch，
@@ -15,6 +20,9 @@
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import QRCode from "qrcode";
 import {
   generateTotpSecret,
@@ -23,6 +31,26 @@ import {
   otpauthUri,
   verifyTotp,
 } from "./totp.mjs";
+
+const APP_JS_PATH = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "assets",
+  "admin-app.js",
+);
+let appJsCache = null;
+
+/** 读入前端应用并缓存（与 chat-page.ts 的 appJs() 同一模式） */
+function appJs() {
+  if (appJsCache === null) {
+    try {
+      appJsCache = fs.readFileSync(APP_JS_PATH, "utf8");
+    } catch {
+      // 资产读不到时页面仍可打开，但在控制台明确报因，不渲染一个死页面
+      appJsCache = 'console.error("前端脚本缺失：gateway/admin/assets/admin-app.js 不可读");';
+    }
+  }
+  return appJsCache;
+}
 
 const ADMIN_COOKIE = "raptor_admin";
 const ADMIN_TTL_MS = 12 * 3600_000;
@@ -64,8 +92,8 @@ function escapeHtml(text) {
     .replaceAll('"', "&quot;");
 }
 
-/** 与 app.mjs 同族的红头档案设计令牌（管理台多一套表格/统计卡样式） */
-const CSS = `
+/** 与 chat-page.ts 同源的红头档案设计令牌（管理台在此之上补表格/统计卡等后台件） */
+const TOKENS_CSS = `
 :root{color-scheme:light;
 --paper:#F6F4ED;--paper-deep:#F0EDE4;--card:#FCFBF7;--shade:#ECE8DD;
 --ink:#25221C;--ink-2:#5A554A;--ink-3:#6E6656;
@@ -78,79 +106,187 @@ const CSS = `
 --sans:system-ui,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
 --mono:ui-monospace,"Cascadia Mono",Consolas,"Liberation Mono",monospace}
 *{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 ::selection{background:var(--accent-soft)}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-body{margin:0;min-height:100vh;display:grid;place-items:start center;
-padding:34px 18px 60px;background:var(--paper);color:var(--ink);
-font-family:var(--sans);font-size:15px;line-height:1.7;-webkit-font-smoothing:antialiased}
-.sheet{width:min(860px,100%)}
+button,input,textarea{font-family:inherit}
+button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--paper);color:var(--ink);
+font-family:var(--sans);font-size:15px;line-height:1.7;
+-webkit-font-smoothing:antialiased}
+`;
+
+/** 登录页 / 未启用页：与同学端登录注册同一副「居中一页纸」骨架 */
+const AUTH_CSS = `
+${TOKENS_CSS}
+body{min-height:100vh;min-height:100dvh;display:grid;place-items:center;
+padding:34px 18px;font-size:16px;overscroll-behavior:none}
+.sheet{width:min(400px,100%)}
 .mast{text-align:center;padding-bottom:20px;position:relative;border-bottom:1px solid var(--rule-2)}
 .mast::after{content:"";position:absolute;left:12%;right:12%;bottom:3px;height:2px;background:var(--accent)}
-.mast img{width:60px;height:60px;object-fit:contain;display:block;margin:0 auto 8px}
-.wordmark{margin:0;font-size:21px;line-height:1.2;letter-spacing:-.035em;font-weight:500}
+.mast img{width:76px;height:76px;object-fit:contain;display:block;margin:0 auto 10px}
+.wordmark{margin:0;font-size:24px;line-height:1.2;letter-spacing:-.035em;font-weight:500}
 .wordmark .course{color:var(--ink-2)}
 .wordmark .raptor{color:var(--accent);font-weight:750}
 .wordmark .badge{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.14em;
 color:var(--accent-deep);background:var(--accent-soft);border:1px solid var(--accent-line);
 border-radius:2px;padding:2px 8px;margin-left:10px;vertical-align:3px}
-.tagline{margin:5px 0 0;font-family:var(--kai);font-size:13.5px;color:var(--ink-3);letter-spacing:.06em}
-h2{display:flex;justify-content:space-between;align-items:baseline;margin:26px 0 14px;
-padding-bottom:8px;font-family:var(--mono);font-size:12.5px;font-weight:600;
-letter-spacing:.18em;color:var(--ink-2);border-bottom:1px solid var(--rule)}
+.tagline{margin:6px 0 0;font-family:var(--kai);font-size:14.5px;color:var(--ink-3);letter-spacing:.06em}
+.card{margin-top:26px;background:var(--card);border:1px solid var(--rule);
+border-radius:3px;box-shadow:var(--shadow-sm);padding:24px 26px 22px}
+.card h2{display:flex;justify-content:space-between;align-items:baseline;
+margin:0 0 18px;padding-bottom:9px;font-family:var(--mono);font-size:12.5px;
+font-weight:600;letter-spacing:.18em;color:var(--ink-2);border-bottom:1px solid var(--rule)}
+.card h2 .en{font-weight:400;font-size:11px;letter-spacing:.08em;color:var(--ink-3)}
+label{display:block;margin:14px 0 6px;font-family:var(--mono);font-size:11px;
+font-weight:600;letter-spacing:.12em;color:var(--ink-3)}
+input{width:100%;padding:10px 12px;background:var(--card);
+border:1px solid var(--rule-2);border-radius:2px;font-size:15px;color:var(--ink);
+transition:border-color .15s ease,box-shadow .15s ease}
+input:hover{border-color:var(--ink-3)}
+input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+input:-webkit-autofill{-webkit-box-shadow:0 0 0 40px var(--card) inset;-webkit-text-fill-color:var(--ink)}
+button.primary{display:block;width:100%;margin-top:22px;padding:12px;
+background:var(--accent);color:var(--card);border:1px solid var(--accent);
+border-radius:2px;font-size:15px;font-weight:600;letter-spacing:.14em;cursor:pointer;
+transition:background .15s ease}
+button.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff}
+button.primary:active{transform:translateY(1px)}
+.notice{margin:0 0 4px;padding:9px 12px;background:var(--accent-soft);
+border:1px solid var(--accent-line);border-radius:2px;color:var(--accent-deep);
+font-size:13.5px;line-height:1.6}
+.mono{font-family:var(--mono)}
+@media (max-width:420px){.mast img{width:64px;height:64px}.card{padding:20px 18px 18px}}
+@media (hover:none){input{font-size:16px}}
+`;
+
+/** 管理台应用壳：对齐 chat-page.ts 的三段式（档头栏 / 滚动正文 / 窄屏抽屉） */
+const APP_CSS = `
+${TOKENS_CSS}
+body{display:grid;grid-template-columns:284px 1fr;height:100vh;height:100dvh;
+overflow:hidden;overscroll-behavior:none}
+.wordmark{display:inline-flex;align-items:baseline;font-weight:500;
+letter-spacing:-.035em;white-space:nowrap}
+.wordmark .course{color:var(--ink-2)}
+.wordmark .raptor{color:var(--accent);font-weight:750}
+/* ── 左栏：档头（同学端 aside 的管理台变体）── */
+aside{display:flex;flex-direction:column;min-height:0;overflow:hidden;
+padding:24px 18px max(16px,env(safe-area-inset-bottom));
+border-right:1px solid var(--rule);background:var(--paper-deep)}
+.mast{flex:none;text-align:center;padding-bottom:16px;position:relative;
+border-bottom:1px solid var(--rule-2)}
+.mast::after{content:"";position:absolute;left:14%;right:14%;bottom:3px;
+height:2px;background:var(--accent)}
+.mast img{width:44px;height:44px;object-fit:contain;display:block;margin:0 auto 7px}
+.mast h1{margin:0;font-size:19px;line-height:1.2}
+.mast .badge{display:inline-block;margin-top:8px;font-family:var(--mono);
+font-size:9.5px;font-weight:600;letter-spacing:.16em;color:var(--accent-deep);
+background:var(--accent-soft);border:1px solid var(--accent-line);
+border-radius:2px;padding:2px 8px}
+nav.groups{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+display:flex;flex-direction:column;gap:22px;padding:18px 2px 8px 0;
+scrollbar-width:thin;scrollbar-color:transparent transparent}
+nav.groups:hover,nav.groups:focus-within{scrollbar-color:var(--rule-2) transparent}
+nav.groups::-webkit-scrollbar{width:8px}
+nav.groups::-webkit-scrollbar-thumb{background:transparent;border:2px solid transparent;
+background-clip:content-box;border-radius:4px}
+nav.groups:hover::-webkit-scrollbar-thumb{background:var(--rule-2);background-clip:content-box}
+.sec h2{display:flex;justify-content:space-between;align-items:baseline;
+margin:0 0 7px;padding:0 10px 7px;font-family:var(--mono);font-size:11px;
+font-weight:600;letter-spacing:.16em;color:var(--ink-3);
+border-bottom:1px solid var(--rule)}
+.sec h2 span:last-child{font-weight:400;letter-spacing:.06em}
+/* 导航条目：会话列表同款语言——悬停浅朱砂竖线，选中实朱砂 + 纸卡 */
+.nav-item{position:relative;display:flex;align-items:center;gap:11px;width:100%;
+text-align:left;background:none;border:0;border-left:2px solid transparent;
+border-radius:0 4px 4px 0;padding:8px 10px;font-size:13.5px;color:var(--ink-2);
+cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease}
+.nav-item svg{width:15px;height:15px;flex:none;stroke:currentColor;fill:none;
+stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.nav-item:hover{background:var(--card);border-left-color:var(--accent-soft);color:var(--ink)}
+.nav-item.on{background:var(--card);border-left-color:var(--accent);color:var(--ink);
+font-weight:600;box-shadow:var(--shadow-sm)}
+.nav-item .ndot{position:absolute;top:50%;right:10px;transform:translateY(-50%);
+width:8px;height:8px;border-radius:50%;background:var(--accent);
+box-shadow:0 0 0 2px var(--paper-deep)}
+.side-foot{flex:none;padding-top:12px;border-top:1px solid var(--rule-2)}
+.side-uptime{padding:0 2px 9px;font-family:var(--mono);font-size:10px;
+letter-spacing:.04em;color:var(--ink-3)}
+.side-foot .foot-btns{display:flex;gap:8px}
+/* ── 通用控件（tbtn / 表格 / 卡片：与同学端同一手感）── */
+.tbtn{background:none;border:1px solid var(--rule-2);color:var(--ink-2);
+border-radius:2px;padding:5px 12px;font-size:12.5px;cursor:pointer;
+display:inline-flex;align-items:center;justify-content:center;gap:6px;
+transition:border-color .15s ease,color .15s ease,background .15s ease}
+.tbtn:hover{border-color:var(--accent);color:var(--accent)}
+.tbtn:active{transform:translateY(1px)}
+.tbtn.danger:hover{border-color:var(--accent-deep);background:var(--accent-soft);
+color:var(--accent-deep)}
+.tbtn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.8;
+stroke-linecap:round;stroke-linejoin:round}
+.foot-btns .tbtn{flex:1}
+main.content{display:flex;flex-direction:column;min-width:0;min-height:0}
+.topbar{display:none}
+.pagewrap{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+padding:36px 40px 64px}
+.inner{width:min(100%,880px);margin:0 auto}
+h2{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+margin:30px 0 12px;padding-bottom:8px;font-family:var(--mono);font-size:12.5px;
+font-weight:600;letter-spacing:.18em;color:var(--ink-2);border-bottom:1px solid var(--rule)}
+h2:first-child{margin-top:0}
 h2 .en{font-weight:400;font-size:11px;letter-spacing:.08em;color:var(--ink-3)}
-h2 .act{font-weight:400;letter-spacing:.04em}
-h2 .act a{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-line);cursor:pointer}
-/* 统计卡 */
+h2 .act{font-weight:400;letter-spacing:.04em;font-family:var(--mono);
+font-size:11px;color:var(--ink-3)}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:3px;
+box-shadow:var(--shadow-sm);padding:20px 22px 18px}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .stat{background:var(--card);border:1px solid var(--rule);border-radius:3px;
 box-shadow:var(--shadow-sm);padding:14px 16px 11px;text-align:center}
-.stat .n{font-family:var(--mono);font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--ink)}
+.stat .n{font-family:var(--mono);font-size:26px;font-weight:600;
+letter-spacing:-.02em;color:var(--ink)}
 .stat .n.hot{color:var(--accent)}
-.stat .t{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--ink-3);margin-top:2px}
-/* 表格 */
+.stat .t{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;
+color:var(--ink-3);margin-top:2px}
 table{width:100%;border-collapse:collapse;background:var(--card);
 border:1px solid var(--rule);box-shadow:var(--shadow-sm)}
+table.plain{border:0;box-shadow:none}
 th{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.12em;
 color:var(--ink-3);text-align:left;padding:10px 12px;background:var(--paper-deep);
 border-bottom:1px solid var(--rule-2)}
 td{padding:9px 12px;border-bottom:1px solid var(--rule);vertical-align:middle}
+table.plain td{border-bottom:1px dashed var(--rule)}
 tr:last-child td{border-bottom:0}
-tr:hover td{background:var(--paper-deep)}
+tbody tr:hover td{background:var(--paper-deep)}
 .mono{font-family:var(--mono);font-size:13px}
 b.hot,.hot{color:var(--accent-deep)}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);
-margin-right:6px;vertical-align:1px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;
+background:var(--ok);margin-right:6px;vertical-align:1px}
 .dot.off{background:var(--rule-2)}
 .pill{font-family:var(--mono);font-size:11px;letter-spacing:.08em;border-radius:2px;
-padding:1px 8px;border:1px solid var(--ok-soft);background:var(--ok-soft);color:var(--ok)}
+padding:1px 8px;border:1px solid var(--ok-soft);background:var(--ok-soft);color:var(--ok);
+white-space:nowrap}
 .pill.bad{border-color:var(--accent-line);background:var(--accent-soft);color:var(--accent-deep)}
-button.act,button.primary{border-radius:2px;cursor:pointer;font-family:var(--sans);
-transition:background .15s ease,color .15s ease,border-color .15s ease}
-button.act{background:none;border:1px solid var(--rule-2);color:var(--ink-2);
-font-size:12px;padding:4px 10px;margin-right:6px}
-button.act:hover{border-color:var(--accent);color:var(--accent)}
-button.act.danger:hover{border-color:var(--accent-deep);background:var(--accent-soft);color:var(--accent-deep)}
-button.primary{display:block;width:100%;margin-top:22px;padding:12px;background:var(--accent);
-color:var(--card);border:1px solid var(--accent);font-size:15px;font-weight:600;letter-spacing:.14em}
-button.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff}
-input{width:100%;padding:10px 12px;background:var(--card);border:1px solid var(--rule-2);
-border-radius:2px;font-family:var(--sans);font-size:15px;color:var(--ink);
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row input{flex:1;min-width:120px}
+.row .num{max-width:90px;text-align:center}
+input,textarea{width:100%;padding:9px 12px;background:var(--card);
+border:1px solid var(--rule-2);border-radius:2px;font-size:14.5px;color:var(--ink);
 transition:border-color .15s ease,box-shadow .15s ease}
-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-label{display:block;margin:14px 0 6px;font-family:var(--mono);font-size:11px;
-font-weight:600;letter-spacing:.12em;color:var(--ink-3)}
-.card{background:var(--card);border:1px solid var(--rule);border-radius:3px;
-box-shadow:var(--shadow-sm);padding:24px 26px 22px}
-.notice{margin:0 0 4px;padding:9px 12px;background:var(--accent-soft);border:1px solid var(--accent-line);
-border-radius:2px;color:var(--accent-deep);font-size:13.5px;line-height:1.6}
-.inv-row{display:flex;gap:10px;flex-wrap:wrap}
-.inv-row input{flex:1;min-width:120px}
-.inv-row .num{max-width:90px;text-align:center}
+input:hover,textarea:hover{border-color:var(--ink-3)}
+input:focus,textarea:focus{outline:none;border-color:var(--accent);
+box-shadow:0 0 0 3px var(--accent-soft)}
+textarea{resize:vertical;font-size:14px}
 .empty{padding:26px 0;text-align:center;color:var(--ink-3);font-size:13.5px}
-.copy-ok{color:var(--ok);font-family:var(--mono);font-size:11px;margin-left:8px}
+.copy-ok{color:var(--ok);font-family:var(--mono);font-size:11px;cursor:default;
+border:0;background:none;padding:3px 0}
+.notice{margin:0 0 4px;padding:9px 12px;background:var(--accent-soft);
+border:1px solid var(--accent-line);border-radius:2px;color:var(--accent-deep);
+font-size:13.5px;line-height:1.6}
+p.lead{margin:4px 0 6px;font-size:15px;color:var(--ink-2)}
 a.goto{color:var(--accent);text-decoration:none;border-bottom:1px solid var(--accent-line);
-font-weight:600;cursor:pointer}
+font-weight:600}
 a.goto:hover{border-bottom-color:var(--accent)}
+.hint{margin:10px 0 0;font-size:12.5px;color:var(--ink-3);line-height:1.7}
 /* ── 安全设置：扫码绑定 ── */
 .qr{background:#fff;border:1px solid var(--rule);border-radius:3px;
 width:fit-content;padding:10px;margin:12px 0 10px}
@@ -158,104 +294,77 @@ width:fit-content;padding:10px;margin:12px 0 10px}
 .codes{font-family:var(--mono);font-size:15px;letter-spacing:.08em;line-height:2.1;
 margin:10px 0 0;color:var(--ink)}
 /* ── 版本发布：上传发版 ── */
-textarea{width:100%;padding:10px 12px;background:var(--card);border:1px solid var(--rule-2);
-border-radius:2px;font-family:var(--sans);font-size:14px;color:var(--ink);resize:vertical;
-transition:border-color .15s ease,box-shadow .15s ease}
-textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;
-margin-top:8px;padding:22px 16px;border:1.5px dashed var(--rule-2);border-radius:3px;
-background:var(--paper-deep);color:var(--ink-3);font-size:12px;text-align:center;cursor:pointer;
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;
+gap:5px;margin-top:8px;padding:22px 16px;border:1.5px dashed var(--rule-2);
+border-radius:3px;background:var(--paper-deep);color:var(--ink-3);font-size:12px;
+text-align:center;cursor:pointer;
 transition:border-color .15s ease,color .15s ease,background .15s ease}
 .drop svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;
 stroke-linecap:round;stroke-linejoin:round;opacity:.75}
 .drop .b{font-size:13.5px;color:var(--ink-2)}
-.drop:hover,.drop:focus-visible,.drop.on{border-color:var(--accent);color:var(--accent-deep);
-background:var(--accent-soft);outline:none}
+.drop:hover,.drop:focus-visible,.drop.on{border-color:var(--accent);
+color:var(--accent-deep);background:var(--accent-soft);outline:none}
 .file-chip{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 12px;
 background:var(--card);border:1px solid var(--rule);border-radius:3px}
-.file-chip svg{width:18px;height:18px;flex:none;stroke:var(--accent);fill:none;stroke-width:1.7;
-stroke-linecap:round;stroke-linejoin:round}
+.file-chip svg{width:18px;height:18px;flex:none;stroke:var(--accent);fill:none;
+stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .file-chip .name{flex:1;min-width:0;font-size:13.5px;color:var(--ink);
 overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .file-chip .size{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);white-space:nowrap}
 .pbar{height:8px;background:var(--paper-deep);border:1px solid var(--rule);
 border-radius:2px;overflow:hidden}
-.pbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s ease}
-.upd-meta{display:flex;justify-content:space-between;font-family:var(--mono);
-font-size:11px;letter-spacing:.06em;color:var(--ink-3)}
-.hint{margin:10px 0 0;font-size:12.5px;color:var(--ink-3);line-height:1.7}
-/* ── 管理台应用壳：全高侧栏（主流 admin 结构）+ 滚动内容区，红头档案皮肤 ── */
-body.app{display:grid;grid-template-columns:236px 1fr;place-items:stretch;
-height:100vh;height:100dvh;overflow:hidden;padding:0}
-aside.side{display:flex;flex-direction:column;min-height:0;
-background:var(--paper-deep);border-right:1px solid var(--rule-2)}
-.side-brand{padding:20px 16px 15px;text-align:center;border-bottom:1px solid var(--rule-2);
-position:relative}
-.side-brand::after{content:"";position:absolute;left:14%;right:14%;bottom:3px;height:2px;
-background:var(--accent)}
-.side-brand img{width:42px;height:42px;object-fit:contain;display:block;margin:0 auto 6px}
-.side-brand .wordmark{margin:0;font-size:17px;line-height:1.2;letter-spacing:-.03em;font-weight:500}
-.side-brand .badge{display:inline-block;margin-top:7px;font-family:var(--mono);font-size:9.5px;
-font-weight:600;letter-spacing:.16em;color:var(--accent-deep);background:var(--accent-soft);
-border:1px solid var(--accent-line);border-radius:2px;padding:2px 8px}
-nav.groups{flex:1;min-height:0;overflow-y:auto;padding:16px 12px 10px;
-display:flex;flex-direction:column;gap:20px}
-.g-label{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.18em;
-color:var(--ink-3);padding:0 10px;margin:0 0 6px}
-.nav-item{display:flex;align-items:center;gap:11px;width:100%;text-align:left;
-background:none;border:0;border-left:2px solid transparent;border-radius:2px;
-padding:8px 10px;font-family:var(--sans);font-size:13.5px;color:var(--ink-2);
-cursor:pointer;transition:background .12s ease,color .12s ease}
-.nav-item svg{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;
-stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.nav-item:hover{background:var(--shade);color:var(--ink)}
-.nav-item.on{background:var(--accent-soft);color:var(--accent-deep);
-border-left-color:var(--accent);font-weight:600}
-.side-uptime{padding:8px 16px;font-family:var(--mono);font-size:10px;
-letter-spacing:.06em;color:var(--ink-3);border-top:1px solid var(--rule)}
-.side-foot{display:flex;gap:8px;padding:10px 12px 14px}
-.side-foot button{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
-background:none;border:1px solid var(--rule-2);border-radius:2px;padding:7px 0;
-font-family:var(--sans);font-size:12px;color:var(--ink-2);cursor:pointer;
-transition:border-color .12s ease,color .12s ease}
-.side-foot button svg{width:13px;height:13px;stroke:currentColor;fill:none;
-stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.side-foot button:hover{border-color:var(--accent);color:var(--accent)}
-main.content{min-width:0;overflow-y:auto;padding:26px 30px 64px}
-.content-inner{max-width:960px}
-section.pane .panel{display:none}
-section.pane .panel.on{display:block}
-@media (max-width:840px){
-body.app{grid-template-columns:1fr;grid-template-rows:auto 1fr}
-aside.side{border-right:0;border-bottom:1px solid var(--rule-2)}
-.side-brand{padding:12px 16px 10px}
-.side-brand img{width:28px;height:28px;display:inline-block;vertical-align:-8px;margin:0 6px 0 0}
-nav.groups{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:6px;padding:8px 12px}
-.g-label{display:none}
-.nav-item{border-left:0;border:1px solid var(--rule-2);padding:6px 12px;white-space:nowrap}
-.nav-item.on{border-color:var(--accent-line)}
-.side-uptime{display:none}
+.pbar i{display:block;height:100%;width:0;background:var(--accent);
+transition:width .25s ease}
+.meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-3)}
+button.primary{display:block;width:100%;margin-top:22px;padding:12px;
+background:var(--accent);color:var(--card);border:1px solid var(--accent);
+border-radius:2px;font-size:15px;font-weight:600;letter-spacing:.14em;cursor:pointer;
+transition:background .15s ease}
+button.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff}
+button.primary:active{transform:translateY(1px)}
+.drawer-backdrop{display:none;position:fixed;inset:0;z-index:39;
+background:rgba(38,35,29,.35)}
+/* ── 窄屏：aside 退回左抽屉（豆包式），顶栏带 ☰ ── */
+@media (max-width:960px){
+body{grid-template-columns:1fr}
+aside{position:fixed;inset:0 auto 0 0;z-index:40;width:min(320px,88vw);
+transform:translateX(-102%);transition:transform .2s ease;
+box-shadow:14px 0 36px rgba(38,35,29,.2)}
+body.drawer-open aside{transform:translateX(0)}
+body.drawer-open .drawer-backdrop{display:block}
+.topbar{display:flex;flex:none;align-items:center;gap:8px;padding:9px 14px;
+border-bottom:1px solid var(--rule);background:var(--paper-deep)}
+.topbar .tb-title{flex:1;justify-content:center;font-size:17px}
+.topbar .iconbtn{width:44px;min-width:44px;min-height:44px;padding:0;
+border-color:transparent;background:none}
+.topbar .iconbtn svg{width:20px;height:20px}
+.topbar .iconbtn:active{background:var(--accent-soft)}
+.pagewrap{padding:24px 16px 56px}
+.stats{grid-template-columns:repeat(2,1fr)}
 }
-@media (max-width:720px){.stats{grid-template-columns:repeat(2,1fr)}}
+@media (hover:none){input,textarea{font-size:16px}}
 `;
 
-const shell = (title, body) => `<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+const authShell = (title, body) => `<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F0EDE4">
 <link rel="icon" href="/logo.png">
-<title>${escapeHtml(title)} · CourseRaptor 管理</title><style>${CSS}</style></head><body>
+<title>${escapeHtml(title)} · CourseRaptor 管理</title><style>${AUTH_CSS}</style></head><body>
 <main class="sheet">
 <header class="mast">
-<img src="/logo.png" alt="">
-<h1 class="wordmark"><span class="course">Course</span><span class="raptor">Raptor</span><span class="badge">ADMIN 管理台</span></h1>
-<p class="tagline">班级互助服务 · 多用户网关</p>
+<img src="/logo.png" alt="CourseRaptor 印章">
+<h1 class="wordmark"><span class="course">Course</span><span class="raptor">Raptor</span><span class="badge">ADMIN</span></h1>
+<p class="tagline">班级互助服务 · 管理台</p>
 </header>
 ${body}
 </main></body></html>`;
 
 const loginHtml = (error = "", mfa = false) =>
-  shell(
+  authShell(
     "管理登录",
-    `<section style="width:min(400px,100%);margin:26px auto 0" class="card">
+    `<section class="card">
 ${error ? `<div class="notice">${escapeHtml(error)}</div>` : ""}
 <form method="post" action="/admin/login">
 <label>管理密码 PASSWORD</label>
@@ -267,652 +376,190 @@ ${mfa ? `<label>动态码 2FA CODE</label>
   );
 
 const disabledHtml = () =>
-  shell(
+  authShell(
     "未启用",
-    `<section style="width:min(460px,100%);margin:26px auto 0" class="card">
+    `<section class="card" style="width:min(460px,100%)">
 <div class="notice">管理后台未启用：服务器未设置 <span class="mono">GATEWAY_ADMIN_PASSWORD</span>。</div>
 <p style="color:var(--ink-2)">在 <span class="mono">/etc/raptor-gateway.env</span> 加入该变量并
 <span class="mono">systemctl restart raptor-gateway</span> 即可开启；期间可继续用
 <span class="mono">admin.mjs</span> 命令行管理。</p></section>`,
   );
 
-const dashboardHtml = () => `<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" href="/logo.png">
-<title>管理台 · CourseRaptor</title><style>${CSS}</style></head><body class="app">
-<aside class="side">
-<div class="side-brand">
-<img src="/logo.png" alt="">
-<h1 class="wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></h1>
-<div><span class="badge">ADMIN 管理台</span></div>
-</div>
-<nav class="groups">
-<div class="nav-group">
-<div class="g-label">日 常 · DAILY</div>
-<button type="button" class="nav-item on" data-nav="overview">
-<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-总览</button>
-<button type="button" class="nav-item" data-nav="users">
-<svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16 3.5a4 4 0 0 1 0 7"/><path d="M17 14c2.8.5 5 3 5 6.2"/></svg>
-同学账号</button>
-<button type="button" class="nav-item" data-nav="site">
-<svg viewBox="0 0 24 24"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>
-站点设置</button>
-<button type="button" class="nav-item" data-nav="security">
-<svg viewBox="0 0 24 24"><path d="M12 22s8-3.6 8-10V5.5L12 2 4 5.5V12c0 6.4 8 10 8 10z"/><path d="M9 11.5l2 2 4-4.5"/></svg>
-安全设置</button>
-</div>
-<div class="nav-group">
-<div class="g-label">发 版 · RELEASES</div>
-<button type="button" class="nav-item" data-nav="release">
-<svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
-版本发布</button>
-<button type="button" class="nav-item" data-nav="keys">
-<svg viewBox="0 0 24 24"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>
-密钥管理</button>
-</div>
-</nav>
-<div class="side-uptime" id="uptimeLine">网关运行中…</div>
-<div class="side-foot">
-<button type="button" id="refresh">
-<svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
-刷新</button>
-<button type="button" id="logout">
-<svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-退出</button>
-</div>
-</aside>
-<main class="content"><div class="content-inner">
-<section class="pane">
-<div class="panel on" id="pane-overview">
-<h2>总览<span class="en">OVERVIEW</span></h2>
-<div class="stats" id="stats"></div>
-<h2>运行状态<span class="en">STATUS</span></h2>
-<div class="card" id="statusCard"><p class="empty">加载中…</p></div>
-</div>
-
-<div class="panel" id="pane-users">
-<h2>同学账号<span class="en">USERS</span></h2>
-<table><thead><tr><th>用户名</th><th>状态</th><th>Key 来源</th><th>在线</th><th>来源</th><th>注册于</th><th>今日轮数</th><th>操作</th></tr></thead>
-<tbody id="users"><tr><td colspan="8" class="empty">加载中…</td></tr></tbody></table>
-
-<h2>邀请码<span class="en">INVITES</span><span class="act mono" style="font-size:11px">发给同学，凭码注册</span></h2>
-<div class="card">
-<div class="inv-row">
-<input class="num" id="invCount" type="number" min="1" max="50" value="5" title="数量">
-<input id="invNote" placeholder="备注（如：班级群）">
-<input class="num" id="invDays" type="number" min="0" max="365" value="0" title="有效天数，0=永久">
-<button class="act" id="invGen" type="button" style="margin:0;padding:8px 18px">生成</button>
-</div>
-<table style="margin-top:14px;box-shadow:none"><thead><tr><th>邀请码</th><th>备注</th><th>使用者</th><th>状态</th><th></th></tr></thead>
-<tbody id="invites"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table>
-</div>
-
-<h2>密码重置申请<span class="en">RESET REQUESTS</span><span class="act mono" style="font-size:11px">同意后把码发给同学，新密码由同学自己设</span></h2>
-<div id="resetBox"><p class="empty">加载中…</p></div>
-</div>
-
-<div class="panel" id="pane-release">
-<h2>上传新版本<span class="en">PUBLISH</span></h2>
-<div class="card">
-<div class="inv-row">
-<input id="updVer" class="mono" placeholder="x.y.z" autocomplete="off" spellcheck="false" style="max-width:130px;text-align:center">
-<input id="updNotes" placeholder="更新说明（可选），如：修复课表周次显示错误" maxlength="2000" autocomplete="off">
-</div>
-<div class="drop" id="updDrop" tabindex="0" role="button" aria-label="选择或拖入 zip 安装包">
-<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
-<span class="b" id="updDropMain">点击选择，或拖入 zip 安装包</span>
-<span>最大 200 MB · 与 npm run publish 共用接口</span>
-</div>
-<input type="file" id="updFile" accept=".zip,application/zip" hidden>
-<div id="updFileBox"></div>
-<div id="updProg" hidden style="margin-top:14px">
-<div class="upd-meta"><span id="updPhase">上传中</span><span id="updPct">0%</span></div>
-<div class="pbar" style="margin-top:6px"><i id="updBar"></i></div>
-<div style="text-align:right;margin-top:8px"><button class="act" id="updCancel" type="button">取消上传</button></div>
-</div>
-<button class="primary" id="updGo" type="button">发布新版本</button>
-<p class="hint">发布后学生端下次启动 raptor 时提示更新；版本号需大于当前分发版本，否则不会触发更新。</p>
-</div>
-
-<h2>历史版本<span class="en">HISTORY</span><span class="act mono" style="font-size:11px" id="updCur"></span></h2>
-<div class="card" id="updCard"><p class="empty">加载中…</p></div>
-</div>
-
-<div class="panel" id="pane-keys">
-<h2>更新后台密钥<span class="en">ADMIN KEYS</span><span class="act mono" style="font-size:11px">用于命令行发版与后台登录，与主密钥同权</span></h2>
-<div class="card">
-<div class="inv-row">
-<input id="keyName" placeholder="名称（可选），如：发布机 / 值班同学" maxlength="64" autocomplete="off">
-<button class="act" id="keyGen" type="button" style="margin:0;padding:8px 18px">新建密钥</button>
-</div>
-<div id="keyCreated" hidden></div>
-<table style="margin-top:14px;box-shadow:none"><thead><tr><th>名称</th><th>类型</th><th>创建时间</th><th>最后使用</th><th></th></tr></thead>
-<tbody id="keys"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table>
-<p class="hint">主密钥来自服务器环境变量 UPDATE_ADMIN_TOKEN，始终可用且不能在这里删除；面板密钥删除后立即失效。明文只在创建时展示一次，之后仅存哈希。</p>
-</div>
-</div>
-
-<div class="panel" id="pane-site">
-<h2>站点设置<span class="en">SITE</span></h2>
-<div class="card">
-<label>统一 DEEPSEEK KEY（未设置则同学须自带）</label>
-<p class="mono" id="siteKeyState" style="margin:0 0 10px;font-size:12.5px;color:var(--ink-3)">加载中…</p>
-<div class="inv-row">
-<input id="siteKeyInput" placeholder="粘贴新的 sk- 开头 Key" autocomplete="off">
-<button class="act" id="siteKeySave" type="button" style="margin:0;padding:8px 18px">保存</button>
-</div>
-<p style="color:var(--ink-3);font-size:12.5px;margin:12px 0 0">保存后新拉起的实例立即使用新 Key；在线实例下次拉起时切换。同学在网页「设置」里保存自己的 Key 后，优先用自己的，不消耗站点额度。</p>
-<h2>对话限额<span class="en">QUOTA</span></h2>
-<p class="lead" style="margin:4px 0 0">站点默认每人每日 <b class="mono" id="siteDefaultTurns">—</b> 轮；在「同学账号」里可按人单独设限额（0 = 用默认）。同学自带 Key 的同样计数，规则透明。</p>
-<p style="color:var(--ink-3);font-size:12.5px;margin:10px 0 0" id="dsModeLine">加载中…</p>
-</div>
-</div>
-
-<div class="panel" id="pane-security">
-<h2>两步验证<span class="en">2FA · TOTP</span><span class="act mono" style="font-size:11px">登录需密码 + 手机验证器动态码</span></h2>
-<div class="card" id="mfaCard"><p class="empty">加载中…</p></div>
-</div>
-</section>
-</div></main>
-
-<script>
-(function () {
-"use strict";
-var tabs = document.querySelectorAll("nav.groups .nav-item");
-for (var i = 0; i < tabs.length; i++) {
-tabs[i].addEventListener("click", function () {
-for (var j = 0; j < tabs.length; j++) tabs[j].classList.remove("on");
-this.classList.add("on");
-var panels = document.querySelectorAll(".pane .panel");
-for (var k = 0; k < panels.length; k++) panels[k].classList.remove("on");
-var target = document.getElementById("pane-" + this.getAttribute("data-nav"));
-if (target) target.classList.add("on");
-});
-}
-function api(path, body) {
-var opts = body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {};
-return fetch(path, opts).then(function (r) {
-if (r.status === 401) { location.href = "/admin"; return null; }
-return r.json();
-});
-}
-function esc(s) { var d = document.createElement("div"); d.textContent = String(s == null ? "" : s); return d.innerHTML; }
-function fmtDate(iso) { return String(iso || "").slice(0, 10); }
-function fmtTime(iso) { return iso ? String(iso).replace("T", " ").slice(0, 16) : "—"; }
-function renderOverview(o, site) {
-if (!o) return;
-var own = o.ownTurnsToday || 0;
-document.getElementById("stats").innerHTML =
-'<div class="stat"><div class="n">' + o.users + '</div><div class="t">注册同学</div></div>' +
-'<div class="stat"><div class="n hot">' + o.online + "/" + o.capacity + '</div><div class="t">在线/并发上限</div></div>' +
-'<div class="stat"><div class="n">' + o.invitesLeft + '</div><div class="t">可用邀请码</div></div>' +
-'<div class="stat"><div class="n hot">' + o.turnsToday + (own > 0 ? '<span style="font-size:13px;color:var(--ink-3)"> +' + own + "</span>" : "") +
-'</div><div class="t">今日对话轮数' + (own > 0 ? "（另自有 Key +" + own + "）" : "") + "</div></div>";
-var up = o.uptimeSec || 0;
-var upText = up >= 86400 ? Math.floor(up / 86400) + " 天 " + Math.floor((up % 86400) / 3600) + " 小时"
-: up >= 3600 ? Math.floor(up / 3600) + " 小时 " + Math.floor((up % 3600) / 60) + " 分"
-: Math.floor(up / 60) + " 分钟";
-document.getElementById("uptimeLine").textContent =
-(o.version ? "v" + o.version + " · " : "") + "运行 " + upText + " · " + o.online + "/" + o.capacity + " 在线";
-var keyLine = !site
-? ""
-: site.deepseekKeySet
-? "站点统一 Key：面板已设置（<span class=\\"mono\\">" + esc(site.deepseekKeyMasked) + "</span>），新拉起实例即用"
-: site.envDeepseekKeySet
-? "站点统一 Key：面板未设置，回退服务器 env（GATEWAY_DEEPSEEK_KEY）"
-: '站点统一 Key：<b class="hot">未设置</b>——同学须在设置里填自己的 Key';
-var todo = (o.pendingResets || 0) > 0
-? '<p style="margin:10px 0 0"><a href="#" class="goto" data-nav="users">' + o.pendingResets +
-" 条密码重置申请待审批，点击前往处理 →</a></p>"
-: "";
-document.getElementById("statusCard").innerHTML =
-'<p class="lead" style="margin-top:2px"><span class="dot' + (o.online > 0 ? "" : " off") + '"></span>网关已连续运行 ' + esc(upText) +
-"，当前 " + o.online + " 个实例在线" + (o.online > 0 ? "" : "（空闲时不占内存）") +
-(o.version ? '，网关 <span class="mono">v' + esc(o.version) + "</span>（升级后在此核对）" : "") + "。</p>" +
-'<p style="color:var(--ink-3);font-size:13px;margin:4px 0 0">' + keyLine + "</p>" +
-'<p style="color:var(--ink-3);font-size:13px;margin:4px 0 0">实例按需拉起、空闲 30 分钟自动回收；每人每日限额默认 ' +
-esc(site ? site.defaultDailyTurns : "—") + " 轮，可在「同学账号」按人单独设置。</p>" + todo;
-}
-function renderUsers(list, defaultTurns, invites) {
-if (!list) return;
-var el = document.getElementById("users");
-if (!list.length) { el.innerHTML = '<tr><td colspan="8" class="empty">还没有同学注册</td></tr>'; return; }
-// 用户名 → 注册用的邀请码（usedBy 已回填用户名，反查即得绑定关系，老账号同样有）
-var byUser = {};
-(invites || []).forEach(function (i) {
-(i.usedBy || []).forEach(function (u) {
-if (String(u).indexOf("pending-") !== 0) byUser[u] = i;
-});
-});
-var defLimit = Number(defaultTurns) || 0;
-el.innerHTML = list.map(function (u) {
-var inv = byUser[u.username];
-var origin = !inv ? "—"
-: inv.note ? '<span title="邀请码 ' + esc(inv.code) + '">' + esc(inv.note) + "</span>"
-: '<span class="mono" title="凭此码注册">' + esc(inv.code) + "</span>";
-var status = u.disabled ? '<span class="pill bad">已停用</span>' : '<span class="pill">正常</span>';
-var keySrc = u.dsMode === "site"
-? '<span class="pill bad" title="钉在站点免费额度：自己保存的 Key 保留不用">站点额度</span>'
-: '<span class="pill" title="有自己保存的 Key 就用自己的，否则用站点 Key">自有优先</span>';
-var online = '<span class="dot off"></span>—';
-if (u.online) {
-var tip = "实例启动 " + fmtTime(u.startedAt) + " · 最近活跃 " + fmtTime(u.lastRequestAt) +
-(u.restarts > 0 ? " · 曾自动重启 " + u.restarts + " 次" : "");
-online = '<span class="dot" title="' + esc(tip) + '"></span>在线';
-}
-var limit = u.dailyTurns > 0 ? u.dailyTurns : defLimit;
-var quota = u.turns.count + (u.dailyTurns > 0
-? '<b class="hot" title="个人限额，覆盖站点默认 ' + defLimit + ' 轮">/' + limit + "</b>"
-: '<span style="color:var(--ink-3)">/' + limit + "</span>");
-var ownUsed = (u.ownTurns && u.ownTurns.count) ? ' <span title="自己 Key 的轮数（不限额）" style="color:var(--ok)">+自' + u.ownTurns.count + "</span>" : "";
-quota += ownUsed;
-var quotaBtn = '<button class="act" data-do="quota" data-u="' + esc(u.username) + '" data-cur="' + (u.dailyTurns || 0) + '">限额</button>';
-var acts = quotaBtn;
-if (u.disabled) { acts += '<button class="act" data-do="enable" data-u="' + esc(u.username) + '">启用</button>'; }
-else { acts += '<button class="act danger" data-do="disable" data-u="' + esc(u.username) + '">停用</button>'; }
-if (u.online) { acts += '<button class="act" data-do="kick" data-u="' + esc(u.username) + '">踢下线</button>'; }
-return '<tr><td class="mono">' + esc(u.username) + "</td><td>" + status + "</td><td>" + keySrc + "</td><td>" + online +
-'</td><td>' + origin + '</td><td class="mono">' + fmtDate(u.createdAt) + '</td><td class="mono">' + quota +
-"</td><td>" + acts + "</td></tr>";
-}).join("");
-}
-function renderResets(r) {
-if (!r) return;
-var box = document.getElementById("resetBox");
-var pend = r.pending || [];
-var codes = r.codes || [];
-var html = "";
-if (!pend.length && !codes.length) { box.innerHTML = '<p class="empty">暂无申请。同学在登录页点「忘记密码」提交后出现在这里。</p>'; return; }
-if (pend.length) {
-html += '<table style="box-shadow:none"><thead><tr><th>用户名</th><th>申请时间</th><th>操作</th></tr></thead><tbody>' +
-pend.map(function (q) {
-return '<tr><td class="mono">' + esc(q.username) + '</td><td class="mono">' + esc(String(q.requestedAt).replace("T", " ").slice(0, 16)) +
-'</td><td><button class="act" data-approve="' + esc(q.id) + '">同意并生成码</button>' +
-'<button class="act danger" data-reject="' + esc(q.id) + '">拒绝</button></td></tr>';
-}).join("") + '</tbody></table>';
-}
-if (codes.length) {
-html += '<h2 style="margin-top:16px">有效重置码<span class="en">ACTIVE CODES</span></h2>' +
-'<table style="box-shadow:none"><thead><tr><th>用户名</th><th>重置码</th><th>过期时间</th><th></th></tr></thead><tbody>' +
-codes.map(function (c) {
-var expired = new Date(c.expiresAt) < new Date();
-return '<tr><td class="mono">' + esc(c.username) + '</td><td class="mono"><b class="hot">' + esc(c.code) + "</b></td>" +
-'<td class="mono">' + esc(String(c.expiresAt).replace("T", " ").slice(0, 16)) + "</td>" +
-"<td>" + (expired ? '<span class="pill bad">已过期</span>'
-: '<button class="act" data-copy="' + esc(c.code) + '" type="button">复制</button>') + "</td></tr>";
-}).join("") + "</tbody></table>";
-}
-box.innerHTML = html;
-}
-function renderSite(s, users) {
-if (!s) return;
-document.getElementById("siteKeyState").textContent = s.deepseekKeySet
-? "当前：面板已设置 " + s.deepseekKeyMasked
-: s.envDeepseekKeySet
-? "面板未设置，回退服务器 env 的 GATEWAY_DEEPSEEK_KEY"
-: "未设置（同学须在设置里填自己的 Key）";
-document.getElementById("siteDefaultTurns").textContent = s.defaultDailyTurns;
-var list = users || [];
-var pinned = list.filter(function (u) { return u.dsMode === "site"; }).length;
-var today = new Date().toISOString().slice(0, 10);
-var ownActive = list.filter(function (u) {
-return u.ownTurns && u.ownTurns.date === today && u.ownTurns.count > 0;
-}).length;
-document.getElementById("dsModeLine").textContent =
-"共 " + list.length + " 位同学：钉在站点额度 " + pinned + " 人，其余「自有优先」（有自己的 Key 就用自己的）；今日用自己 Key 对话过的 " + ownActive + " 人。";
-}
-function showRecoveryCodes(codes, needRelogin) {
-var el = document.getElementById("mfaCodesBox") || document.getElementById("mfaSetupBox");
-if (!el) return;
-var html = '<div class="notice">恢复码仅此一次展示，请立即抄写或截图保存——手机不在身边时，每枚可替代动态码登录一次：</div>' +
-'<p class="codes">' + codes.map(esc).join(" &nbsp;·&nbsp; ") + "</p>" +
-'<div style="margin-top:8px"><button class="act" data-copy="' + esc(codes.join("\\n")) + '" type="button">复制全部</button>' +
-(needRelogin ? ' <button class="act" id="mfaRelogin" type="button">已保存，去重新登录</button>' : "") +
-"</div>";
-el.innerHTML = html;
-el.hidden = false;
-}
-function renderSecurity(sec) {
-if (!sec) return;
-var el = document.getElementById("mfaCard");
-if (!sec.mfaEnabled) {
-el.innerHTML =
-'<p class="lead" style="margin-top:2px">当前登录仅需管理密码。<b>建议启用两步验证</b>：之后登录还需输入手机验证器（Google / Microsoft Authenticator、1Password 等）的 6 位动态码，密码泄露也进不来。</p>' +
-'<div style="margin-top:12px"><button class="act" id="mfaSetup" type="button" style="padding:8px 18px">启用两步验证</button></div>' +
-'<div id="mfaSetupBox" style="margin-top:14px"></div>';
-return;
-}
-el.innerHTML =
-'<p class="lead" style="margin-top:2px"><span class="dot"></span>已启用（' + esc(fmtDate(sec.enabledAt)) + ' 起）——登录需管理密码 + 6 位动态码。恢复码剩余 <b class="mono">' + sec.recoveryLeft + "</b> 枚。</p>" +
-'<div id="mfaCodesBox" style="margin-top:12px"></div>' +
-'<div class="inv-row" style="margin-top:14px"><input id="mfaCodeInput" placeholder="当前动态码（或恢复码）" autocomplete="off" inputmode="numeric">' +
-'<button class="act" id="mfaRegen" type="button" style="margin:0;padding:8px 18px">重新生成恢复码</button>' +
-'<button class="act danger" id="mfaOff" type="button" style="margin:0;padding:8px 18px">关闭两步验证</button></div>' +
-'<p class="hint" style="margin-top:10px">关闭与重生成都要再验一次动态码，防止会话被劫持后降级安全。手机与恢复码全部丢失时，需 SSH 上机执行 admin.mjs totp off 兜底。</p>';
-}
-function renderInvites(list) {
-if (!list) return;
-var el = document.getElementById("invites");
-if (!list.length) { el.innerHTML = '<tr><td colspan="5" class="empty">暂无邀请码，用上方表单生成</td></tr>'; return; }
-el.innerHTML = list.map(function (i) {
-// pending- 前缀是消费瞬间留下的占位（正常会立刻回填成用户名），展示绑定关系时剔除
-var users = (i.usedBy || []).filter(function (u) { return String(u).indexOf("pending-") !== 0; });
-var used = (i.usedBy || []).length >= (i.maxUses || 1);
-var expired = !used && i.expiresAt && new Date(i.expiresAt) < new Date();
-var status = used ? '<span class="pill">已使用</span>'
-: expired ? '<span class="pill bad">已过期</span>'
-: (i.expiresAt ? '<span class="pill bad">' + fmtDate(i.expiresAt) + " 前有效</span>" : '<span class="pill">未使用</span>');
-var who = users.length ? users.map(esc).join("、") : "—";
-var copy = used || expired ? "" : '<button class="act" data-copy="' + esc(i.code) + '" type="button">复制</button>';
-return '<tr><td class="mono">' + esc(i.code) + '</td><td>' + esc(i.note || "—") +
-'</td><td class="mono">' + who + "</td><td>" + status + "</td><td>" + copy + "</td></tr>";
-}).join("");
-}
-var updState = { file: null, xhr: null, versionTouched: false };
-function nextPatch(v) {
-var p = String(v || "").split(".");
-var a = Number(p[0]), b = Number(p[1]), c = Number(p[2]);
-if (![a, b, c].every(Number.isFinite)) return "";
-return a + "." + b + "." + (c + 1);
-}
-function prefillVersion(curVer) {
-if (updState.versionTouched) return;
-var el = document.getElementById("updVer");
-var next = curVer ? nextPatch(curVer) : "";
-el.value = next;
-el.placeholder = curVer ? next : "1.0.0";
-}
-function updPickFile(f) {
-if (!f) return;
-if (!/\\.zip$/i.test(f.name)) { alert("只支持 zip 格式的安装包"); return; }
-if (f.size > 200 * 1048576) { alert("安装包超过 200 MB 上限（当前 " + (f.size / 1048576).toFixed(1) + " MB）"); return; }
-updState.file = f;
-document.getElementById("updFileBox").innerHTML = '<div class="file-chip">' +
-'<svg viewBox="0 0 24 24"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>' +
-'<span class="name">' + esc(f.name) + '</span><span class="size">' + (f.size / 1048576).toFixed(1) + ' MB</span>' +
-'<button class="act" id="updClear" type="button">移除</button></div>';
-}
-function updPublish() {
-if (updState.xhr) return;
-var ver = document.getElementById("updVer").value.trim();
-var notes = document.getElementById("updNotes").value.trim();
-if (!/^\\d+\\.\\d+\\.\\d+$/.test(ver)) { alert("版本号必须是 x.y.z 格式，例如 1.2.3"); return; }
-if (!updState.file) { alert("请先选择 zip 安装包"); return; }
-var xhr = new XMLHttpRequest();
-updState.xhr = xhr;
-var prog = document.getElementById("updProg");
-var bar = document.getElementById("updBar");
-var pct = document.getElementById("updPct");
-var phase = document.getElementById("updPhase");
-prog.hidden = false;
-function setPct(p) {
-bar.style.width = p + "%";
-pct.textContent = p + "%";
-phase.textContent = p >= 100 ? "服务器处理中…" : "上传中";
-}
-setPct(0);
-xhr.open("POST", "/admin/api/update/publish");
-xhr.setRequestHeader("x-version", ver);
-xhr.setRequestHeader("x-notes", encodeURIComponent(notes));
-xhr.setRequestHeader("content-type", "application/zip");
-xhr.upload.onprogress = function (e) { if (e.lengthComputable) setPct(Math.round(e.loaded / e.total * 100)); };
-xhr.onload = function () {
-updState.xhr = null;
-prog.hidden = true;
-var data = {};
-try { data = JSON.parse(xhr.responseText); } catch (err) {}
-if (xhr.status >= 200 && xhr.status < 300) {
-alert("v" + ver + " 已发布，学生端下次启动 raptor 时提示更新。");
-document.getElementById("updNotes").value = "";
-document.getElementById("updFileBox").innerHTML = "";
-updState.file = null;
-updState.versionTouched = false;
-load();
-} else {
-alert((data && data.error) || ("发布失败（HTTP " + xhr.status + "）"));
-}
+const NAV_ICON = {
+  overview:
+    '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+  users:
+    '<svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16 3.5a4 4 0 0 1 0 7"/><path d="M17 14c2.8.5 5 3 5 6.2"/></svg>',
+  invites:
+    '<svg viewBox="0 0 24 24"><path d="M4 22h16c1.1 0 2-.9 2-2v-4H2v4c0 1.1.9 2 2 2z"/><path d="M6 13V4c0-1.1.9-2 2-2h8c1.1 0 2 .9 2 2v9"/><path d="M10 6h4"/></svg>',
+  resets:
+    '<svg viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.3 12.7 21 2"/><path d="m15 7 3 3"/><path d="m18 4 3 3"/></svg>',
+  site:
+    '<svg viewBox="0 0 24 24"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>',
+  security:
+    '<svg viewBox="0 0 24 24"><path d="M12 22s8-3.6 8-10V5.5L12 2 4 5.5V12c0 6.4 8 10 8 10z"/><path d="M9 11.5l2 2 4-4.5"/></svg>',
+  release:
+    '<svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>',
+  keys:
+    '<svg viewBox="0 0 24 24"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>',
 };
-xhr.onerror = function () { updState.xhr = null; prog.hidden = true; alert("网络错误，请检查与网关的连接"); };
-xhr.onabort = function () { updState.xhr = null; prog.hidden = true; };
-xhr.send(updState.file);
-}
-function renderUpdate(o, v) {
-var cur = document.getElementById("updCur");
-var card = document.getElementById("updCard");
-if (!o) return;
-if (o.unavailable || o.error) {
-cur.textContent = "";
-card.innerHTML = '<div class="notice">' + esc(o.error || "更新后台未接入") + '</div>' +
-'<p style="color:var(--ink-2);font-size:13px">在网关环境变量配置 GATEWAY_UPDATE_URL 与 GATEWAY_UPDATE_TOKEN，并部署更新后台（update/update-server.mjs）后，这里会显示版本列表与回滚操作。</p>' +
-'<div style="margin-top:10px"><button class="act" id="updRetry" type="button">重试</button></div>';
-return;
-}
-var c = o.data && o.data.current;
-cur.textContent = c ? ("当前 v" + c.version + " · " + fmtDate(c.publishedAt)) : "尚未发布过版本";
-prefillVersion(c ? c.version : "");
-if (!v || v.error || v.unavailable) { card.innerHTML = '<p class="empty">' + esc((v && (v.error || "无版本")) || "无版本") + '</p>'; return; }
-var list = v.data.versions || [];
-if (!list.length) { card.innerHTML = '<p class="empty">还没有发布过版本；在上方上传第一个安装包，或在维护者机器上 npm run publish</p>'; return; }
-var mb = function (n) { return (n / 1048576).toFixed(1) + " MB"; };
-var total = list.reduce(function (s, r) { return s + (r.sizeBytes || 0); }, 0);
-card.innerHTML = '<div class="upd-meta" style="margin:0 0 12px"><span>共 ' + list.length + ' 个版本 · ' + mb(total) + '</span><span>设为分发＝学生端下次启动即下载该版本</span></div>' +
-'<table style="box-shadow:none"><thead><tr><th>版本</th><th>说明</th><th>发布时间</th><th>大小</th><th>操作</th></tr></thead><tbody>' +
-list.map(function (r) {
-var tag = r.isCurrent ? ' <span class="pill">分发中</span>' : (r.rolledBackAt ? ' <span class="pill bad">已回滚</span>' : "");
-var acts = r.isCurrent ? "" :
-'<button class="act" data-udo="rollback" data-ver="' + esc(r.version) + '">设为分发</button>' +
-'<button class="act danger" data-udo="delete" data-ver="' + esc(r.version) + '">删除</button>';
-return '<tr><td class="mono">v' + esc(r.version) + tag + '</td><td>' + esc(r.notes || "—") +
-'</td><td class="mono">' + fmtDate(r.publishedAt) + '</td><td class="mono">' + mb(r.sizeBytes || 0) +
-'</td><td>' + acts + '</td></tr>';
-}).join("") + '</tbody></table>';
-}
-function renderKeys(r) {
-var el = document.getElementById("keys");
-if (!r) return;
-if (r.unavailable || r.error) {
-el.innerHTML = '<tr><td colspan="5" class="empty">' + esc(r.error || "更新后台未接入") + '</td></tr>';
-return;
-}
-var list = (r.data && r.data.keys) || [];
-if (!list.length) { el.innerHTML = '<tr><td colspan="5" class="empty">没有可用密钥</td></tr>'; return; }
-el.innerHTML = list.map(function (k) {
-var type = k.isEnv ? '<span class="pill">主密钥</span>' : '<span class="pill">面板密钥</span>';
-var del = k.isEnv ? "" :
-'<button class="act danger" data-keydel="' + esc(k.id) + '" data-name="' + esc(k.name) + '">删除</button>';
-return '<tr><td class="mono">' + esc(k.name) + '</td><td>' + type +
-'</td><td class="mono">' + fmtTime(k.createdAt) + '</td><td class="mono">' + fmtTime(k.lastUsedAt) +
-'</td><td>' + del + '</td></tr>';
-}).join("");
-}
-function load() {
-api("/admin/api/bootstrap").then(function (b) {
-if (!b) return;
-renderOverview(b.overview, b.site);
-renderUsers(b.users, b.site ? b.site.defaultDailyTurns : 0, b.invites);
-renderInvites(b.invites);
-renderResets(b.resets);
-renderUpdate(b.update.overview, b.update.versions);
-renderKeys(b.update.keys);
-renderSite(b.site, b.users);
-renderSecurity(b.security);
-});
-}
-document.addEventListener("click", function (e) {
-var t = e.target.closest ? e.target.closest("button,a") : null;
-if (!t) return;
-if (t.id === "refresh") { load(); return; }
-if (t.id === "logout") { api("/admin/logout", {}).then(function () { location.href = "/admin"; }); return; }
-if (t.classList.contains("goto")) {
-e.preventDefault();
-var navBtn = document.querySelector('.nav-item[data-nav="' + t.getAttribute("data-nav") + '"]');
-if (navBtn) navBtn.click();
-return;
-}
-if (t.id === "updGo") { updPublish(); return; }
-if (t.id === "updCancel") { if (updState.xhr) updState.xhr.abort(); return; }
-if (t.id === "updClear") {
-updState.file = null;
-document.getElementById("updFileBox").innerHTML = "";
-return;
-}
-	if (t.id === "updRetry") { load(); return; }
-	if (t.id === "keyGen") {
-	api("/admin/api/update/keys", { name: document.getElementById("keyName").value }).then(function (r) {
-	document.getElementById("keyName").value = "";
-	if (!r || r.error || r.unavailable) { alert((r && (r.error || "更新后台不可达")) || "创建失败"); return; }
-	var token = r.data && r.data.token;
-	var k = r.data && r.data.key;
-	var box = document.getElementById("keyCreated");
-	box.hidden = false;
-	box.innerHTML = '<div class="notice">密钥「' + esc(k.name) + '」已创建——明文仅此一次展示，之后无法再查看，请立即复制保存：</div>' +
-	'<div class="inv-row" style="margin-top:10px"><input class="mono" readonly value="' + esc(token) + '" onfocus="this.select()">' +
-	'<button class="act" data-copy="' + esc(token) + '" type="button" style="margin:0;padding:8px 18px">复制</button></div>';
-	load();
-	});
-	return;
-	}
-	if (t.id === "siteKeySave") {
-	var nk = document.getElementById("siteKeyInput").value.trim();
-	if (nk && !confirm(nk ? "保存站点统一 DeepSeek Key（新拉起的实例生效），确认？" : "")) return;
-	api("/admin/api/site", { deepseekKey: nk }).then(function (r) {
-	if (r && r.error) { alert(r.error); return; }
-	document.getElementById("siteKeyInput").value = "";
-	load();
-	});
-	return;
-	}
-	if (t.id === "mfaSetup") {
-	api("/admin/api/totp/setup", {}).then(function (r) {
-	if (!r || r.error) { alert((r && r.error) || "生成二维码失败"); return; }
-	var grouped = r.secret.replace(/(.{4})/g, "$1 ").trim();
-	document.getElementById("mfaSetupBox").innerHTML =
-	'<div class="qr">' + r.qrSvg + "</div>" +
-	'<p style="font-size:13px;color:var(--ink-2)">用手机验证器扫描二维码（或手输密钥 <b class="mono">' + esc(grouped) + "</b>），然后输入验证器上当前的 6 位动态码完成绑定：</p>" +
-	'<div class="inv-row" style="margin-top:10px"><input id="mfaVerifyCode" placeholder="6 位动态码" inputmode="numeric" autocomplete="one-time-code" maxlength="6" style="max-width:160px;letter-spacing:.3em;text-align:center">' +
-	'<button class="act" id="mfaEnable" type="button" style="margin:0;padding:8px 18px">验证并启用</button></div>';
-	});
-	return;
-	}
-	if (t.id === "mfaEnable") {
-	var vcode = document.getElementById("mfaVerifyCode").value.trim();
-	if (!vcode) { alert("请输入验证器上当前的 6 位动态码"); return; }
-	api("/admin/api/totp/enable", { code: vcode }).then(function (r) {
-	if (!r || r.error) { alert((r && r.error) || "启用失败"); return; }
-	showRecoveryCodes(r.recoveryCodes, true);
-	});
-	return;
-	}
-	if (t.id === "mfaRelogin") { location.href = "/admin"; return; }
-	if (t.id === "mfaRegen" || t.id === "mfaOff") {
-	var ccode = document.getElementById("mfaCodeInput").value.trim();
-	if (!ccode) { alert("请先在左侧输入当前动态码（或恢复码）"); return; }
-	if (t.id === "mfaOff" && !confirm("关闭后登录仅需管理密码，确认关闭两步验证？")) return;
-	api("/admin/api/totp/" + (t.id === "mfaOff" ? "disable" : "recovery"), { code: ccode }).then(function (r) {
-	if (!r || r.error) { alert((r && r.error) || "操作失败"); return; }
-	if (t.id === "mfaOff") {
-	alert("两步验证已关闭。当前会话已一并注销，请用管理密码重新登录。");
-	location.href = "/admin";
-	return;
-	}
-	showRecoveryCodes(r.recoveryCodes, false);
-	});
-	return;
-	}
-if (t.id === "invGen") {
-api("/admin/api/invite", {
-count: Number(document.getElementById("invCount").value) || 1,
-note: document.getElementById("invNote").value,
-days: Number(document.getElementById("invDays").value) || 0,
-}).then(load);
-return;
-}
-if (t.hasAttribute("data-copy")) {
-var code = t.getAttribute("data-copy");
-navigator.clipboard.writeText(code).then(function () {
-t.textContent = "已复制"; t.className = "copy-ok";
-});
-return;
-}
-var approveId = t.getAttribute("data-approve");
-var rejectId = t.getAttribute("data-reject");
-if (approveId || rejectId) {
-if (approveId) {
-if (!confirm("同意该同学的重置申请并生成一次性码（24 小时有效）？新密码将由同学自己设置。")) return;
-api("/admin/api/reset/approve", { id: approveId }).then(function (r) {
-if (!r || r.error) { alert((r && r.error) || "失败"); return; }
-alert("重置码：" + r.code + "（24 小时内有效）——请发给 " + r.username + "，ta 在登录页用它自设新密码。");
-load();
-});
-} else {
-if (!confirm("拒绝该申请？")) return;
-api("/admin/api/reset/reject", { id: rejectId }).then(load);
-}
-return;
-}
-var doWhat = t.getAttribute("data-do");
-var user = t.getAttribute("data-u");
-var updWhat = t.getAttribute("data-udo");
-var version = t.getAttribute("data-ver");
-	if (updWhat && version) {
-	var vt = updWhat === "rollback" ? "把 v" + version + " 设为当前分发版本（同学端将收到它），确认？"
-	: "删除 v" + version + " 的安装包（不可恢复，当前分发版本不能删），确认？";
-	if (!confirm(vt)) return;
-	api("/admin/api/update/" + updWhat, { version: version }).then(function (r) {
-	if (r && (r.error || r.unavailable)) { alert(r.error || "更新后台不可达"); return; }
-	load();
-	});
-	return;
-	}
-	var keyId = t.getAttribute("data-keydel");
-	if (keyId) {
-	if (!confirm("删除密钥「" + (t.getAttribute("data-name") || "") + "」？用它发版或登录的地方会立即失效，确认？")) return;
-	api("/admin/api/update/keys/delete", { id: keyId }).then(function (r) {
-	if (!r || r.error || r.unavailable) { alert((r && (r.error || "更新后台不可达")) || "删除失败"); return; }
-	load();
-	});
-	return;
-	}
-if (!doWhat || !user) return;
-if (doWhat === "quota") {
-var q = prompt("给 " + user + " 设每日对话轮数限额（0 = 用站点默认）：", t.getAttribute("data-cur") || "0");
-if (q === null) return;
-api("/admin/api/user/" + doWhat, { user: user, turns: Number(q) }).then(function (r) {
-if (r && r.error) { alert(r.error); return; }
-load();
-});
-return;
-}
-var confirmText = doWhat === "disable" ? "停用后该同学将立即无法登录，确认？" : "踢下线后该同学的实例立即回收，确认？";
-if (!confirm(confirmText)) return;
-api("/admin/api/user/" + doWhat, { user: user }).then(load);
-});
-(function () {
-var drop = document.getElementById("updDrop");
-var fileInput = document.getElementById("updFile");
-if (drop && fileInput) {
-drop.addEventListener("click", function () { fileInput.click(); });
-drop.addEventListener("keydown", function (e) {
-if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fileInput.click(); }
-});
-drop.addEventListener("dragover", function (e) { e.preventDefault(); drop.classList.add("on"); });
-drop.addEventListener("dragleave", function () { drop.classList.remove("on"); });
-drop.addEventListener("drop", function (e) {
-e.preventDefault();
-drop.classList.remove("on");
-updPickFile(e.dataTransfer.files && e.dataTransfer.files[0]);
-});
-fileInput.addEventListener("change", function () {
-updPickFile(fileInput.files && fileInput.files[0]);
-fileInput.value = "";
-});
-}
-var verInput = document.getElementById("updVer");
-if (verInput) verInput.addEventListener("input", function () { updState.versionTouched = true; });
-})();
-load();
-})();
+
+const navItem = (id, label, dot = false) =>
+  `<button type="button" class="nav-item" data-nav="${id}">${NAV_ICON[id]}${label}${dot ? '<span class="ndot" id="resetsDot" hidden></span>' : ""}</button>`;
+
+const dashboardHtml = () => `<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#F0EDE4">
+<link rel="icon" href="/logo.png">
+<title>管理台 · CourseRaptor</title><style>${APP_CSS}</style></head><body>
+<aside>
+  <div class="mast">
+    <img src="/logo.png" alt="CourseRaptor 印章">
+    <h1 class="wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></h1>
+    <div><span class="badge">ADMIN 管理台</span></div>
+  </div>
+  <nav class="groups">
+    <section class="sec">
+      <h2><span>日 常</span><span>DAILY</span></h2>
+      ${navItem("overview", "总览")}
+      ${navItem("users", "同学账号")}
+      ${navItem("invites", "邀请码")}
+      ${navItem("resets", "重置审批", true)}
+    </section>
+    <section class="sec">
+      <h2><span>站 点</span><span>SITE</span></h2>
+      ${navItem("site", "站点设置")}
+      ${navItem("security", "安全设置")}
+    </section>
+    <section class="sec">
+      <h2><span>发 版</span><span>RELEASES</span></h2>
+      ${navItem("release", "版本发布")}
+      ${navItem("keys", "密钥管理")}
+    </section>
+  </nav>
+  <div class="side-foot">
+    <div class="side-uptime" id="uptimeLine">网关运行中…</div>
+    <div class="foot-btns">
+      <button type="button" class="tbtn" id="refresh">
+        <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>刷新</button>
+      <button type="button" class="tbtn" id="logout">
+        <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>退出</button>
+    </div>
+  </div>
+</aside>
+<main class="content">
+  <div class="topbar">
+    <button type="button" class="tbtn iconbtn" id="openDrawerM" aria-label="打开菜单">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <span class="tb-title wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></span>
+    <button type="button" class="tbtn iconbtn" id="refreshM" aria-label="刷新数据">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>
+  </div>
+  <div class="pagewrap"><div class="inner">
+  <section class="pane">
+
+  <div class="panel on" id="pane-overview">
+    <h2>总览<span class="en">OVERVIEW</span></h2>
+    <div class="stats" id="stats"></div>
+    <h2>运行状态<span class="en">STATUS</span></h2>
+    <div class="card" id="statusCard"><p class="empty">加载中…</p></div>
+  </div>
+
+  <div class="panel" id="pane-users">
+    <h2>同学账号<span class="en">USERS</span></h2>
+    <table><thead><tr><th>用户名</th><th>状态</th><th>Key 来源</th><th>在线</th><th>来源</th><th>注册于</th><th>今日轮数</th><th>操作</th></tr></thead>
+    <tbody id="users"><tr><td colspan="8" class="empty">加载中…</td></tr></tbody></table>
+    <p class="hint">「Key 来源」显示分账模式：站点额度＝统一 Key 计费；自有优先＝同学保存了自己的 DeepSeek Key 时不占站点额度。悬停在线圆点可看实例启动 / 最近活跃时间。</p>
+  </div>
+
+  <div class="panel" id="pane-invites">
+    <h2>生成邀请码<span class="en">INVITES</span><span class="act">发给同学，凭码注册</span></h2>
+    <div class="card">
+      <div class="row">
+        <input class="num" id="invCount" type="number" min="1" max="50" value="5" title="数量">
+        <input id="invNote" placeholder="备注（如：班级群）">
+        <input class="num" id="invDays" type="number" min="0" max="365" value="0" title="有效天数，0=永久">
+        <button class="tbtn" id="invGen" type="button" style="margin:0;padding:8px 18px">生成</button>
+      </div>
+    </div>
+    <h2>邀请码档案<span class="en">HISTORY</span></h2>
+    <table><thead><tr><th>邀请码</th><th>备注</th><th>使用者</th><th>状态</th><th></th></tr></thead>
+    <tbody id="invites"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table>
+  </div>
+
+  <div class="panel" id="pane-resets">
+    <h2>密码重置申请<span class="en">RESET REQUESTS</span><span class="act">同意后把码发给同学，新密码由同学自己设</span></h2>
+    <div id="resetBox"><p class="empty">加载中…</p></div>
+  </div>
+
+  <div class="panel" id="pane-site">
+    <h2>站点设置<span class="en">SITE</span></h2>
+    <div class="card">
+      <label>统一 DEEPSEEK KEY（未设置则同学须自带）</label>
+      <p class="mono" id="siteKeyState" style="margin:0 0 10px;font-size:12.5px;color:var(--ink-3)">加载中…</p>
+      <div class="row">
+        <input id="siteKeyInput" placeholder="粘贴新的 sk- 开头 Key" autocomplete="off">
+        <button class="tbtn" id="siteKeySave" type="button" style="margin:0;padding:8px 18px">保存</button>
+      </div>
+      <p style="color:var(--ink-3);font-size:12.5px;margin:12px 0 0">保存后新拉起的实例立即使用新 Key；在线实例下次拉起时切换。同学在网页「设置」里保存自己的 Key 后，优先用自己的，不消耗站点额度。</p>
+      <h2 style="margin-top:22px">对话限额<span class="en">QUOTA</span></h2>
+      <p class="lead" style="margin:4px 0 0">站点默认每人每日 <b class="mono" id="siteDefaultTurns">—</b> 轮；在「同学账号」里可按人单独设限额（0 = 用默认）。同学自带 Key 的同样计数，规则透明。</p>
+      <p style="color:var(--ink-3);font-size:12.5px;margin:10px 0 0" id="dsModeLine">加载中…</p>
+    </div>
+  </div>
+
+  <div class="panel" id="pane-security">
+    <h2>两步验证<span class="en">2FA · TOTP</span><span class="act">登录需密码 + 手机验证器动态码</span></h2>
+    <div class="card" id="mfaCard"><p class="empty">加载中…</p></div>
+  </div>
+
+  <div class="panel" id="pane-release">
+    <h2>上传新版本<span class="en">PUBLISH</span></h2>
+    <div class="card">
+      <div class="row">
+        <input id="updVer" class="mono" placeholder="x.y.z" autocomplete="off" spellcheck="false" style="max-width:130px;text-align:center">
+        <input id="updNotes" placeholder="更新说明（可选），如：修复课表周次显示错误" maxlength="2000" autocomplete="off">
+      </div>
+      <div class="drop" id="updDrop" tabindex="0" role="button" aria-label="选择或拖入 zip 安装包">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
+        <span class="b" id="updDropMain">点击选择，或拖入 zip 安装包</span>
+        <span>最大 200 MB · 与 npm run publish 共用接口</span>
+      </div>
+      <input type="file" id="updFile" accept=".zip,application/zip" hidden>
+      <div id="updFileBox"></div>
+      <div id="updProg" hidden style="margin-top:14px">
+        <div class="meta"><span id="updPhase">上传中</span><span id="updPct">0%</span></div>
+        <div class="pbar" style="margin-top:6px"><i id="updBar"></i></div>
+        <div style="text-align:right;margin-top:8px"><button class="tbtn" id="updCancel" type="button">取消上传</button></div>
+      </div>
+      <button class="primary" id="updGo" type="button">发布新版本</button>
+      <p class="hint">发布后学生端下次启动 raptor 时提示更新；版本号需大于当前分发版本，否则不会触发更新。</p>
+    </div>
+    <h2>历史版本<span class="en">HISTORY</span><span class="act" id="updCur"></span></h2>
+    <div class="card" id="updCard"><p class="empty">加载中…</p></div>
+  </div>
+
+  <div class="panel" id="pane-keys">
+    <h2>更新后台密钥<span class="en">ADMIN KEYS</span><span class="act">用于命令行发版与后台登录，与主密钥同权</span></h2>
+    <div class="card">
+      <div class="row">
+        <input id="keyName" placeholder="名称（可选），如：发布机 / 值班同学" maxlength="64" autocomplete="off">
+        <button class="tbtn" id="keyGen" type="button" style="margin:0;padding:8px 18px">新建密钥</button>
+      </div>
+      <div id="keyCreated" hidden></div>
+      <table class="plain" style="margin-top:14px"><thead><tr><th>名称</th><th>类型</th><th>创建时间</th><th>最后使用</th><th></th></tr></thead>
+      <tbody id="keys"><tr><td colspan="5" class="empty">加载中…</td></tr></tbody></table>
+      <p class="hint">主密钥来自服务器环境变量 UPDATE_ADMIN_TOKEN，始终可用且不能在这里删除；面板密钥删除后立即失效。明文只在创建时展示一次，之后仅存哈希。</p>
+    </div>
+  </div>
+
+  </section>
+  </div></div>
+</main>
+<div class="drawer-backdrop"></div>
+<script>
+${appJs()}
 </script>
 </body></html>`;
 
