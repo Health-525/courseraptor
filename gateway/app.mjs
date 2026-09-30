@@ -151,6 +151,7 @@ export function createGatewayServer({
     updateAdminToken,
     version: appVersion,
     envDeepseekKeySet,
+    usersDir,
   });
 
   function signSession(userId, expiresAt) {
