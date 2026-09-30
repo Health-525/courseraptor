@@ -325,6 +325,55 @@ export function createRegistry({ stateDir }) {
       return (await readInvites()).invites;
     },
 
+    /** 删除未使用过的邀请码（已产生注册记录的保留作档案） */
+    async deleteInvite(code) {
+      return serialized(async () => {
+        const invites = (await readInvites()).invites;
+        const invite = invites.find((i) => i.code === String(code ?? "").trim());
+        if (!invite) throw new Error("邀请码不存在");
+        const used = (invite.usedBy ?? []).filter((u) => !String(u).startsWith("pending-"));
+        if (used.length) throw new Error("已被使用的邀请码不能删除");
+        await writeInvites(invites.filter((i) => i !== invite));
+        return true;
+      });
+    },
+
+    /**
+     * 删除用户：注册表除名，该用户的重置申请与有效重置码一并清理；
+     * 专属数据目录（/var/lib/raptor-users/<id>）由调用方（网关）负责回收。
+     */
+    async deleteUser(id) {
+      return serialized(async () => {
+        const users = (await readUsers()).users;
+        const next = users.filter((u) => u.id !== id);
+        if (next.length === users.length) throw new Error("用户不存在");
+        await writeUsers(next);
+        const store = await readResets();
+        store.requests = store.requests.filter((r) => r.userId !== id);
+        store.codes = store.codes.filter((c) => c.userId !== id);
+        await writeResets(store);
+        return true;
+      });
+    },
+
+    // ── 管理操作日志（admin-log.json，环形截断 500 条）──────────
+
+    async appendAdminLog(text, ip = "") {
+      return serialized(async () => {
+        const file = path.join(stateDir, "admin-log.json");
+        const store = await readJson(file, { log: [] });
+        store.log.push({ at: new Date().toISOString(), ip: String(ip), text: String(text).slice(0, 200) });
+        if (store.log.length > 500) store.log = store.log.slice(-500);
+        await writeAtomic(file, JSON.stringify(store, null, 2));
+      });
+    },
+
+    /** 最近 200 条，新的在前 */
+    async listAdminLog() {
+      const store = await readJson(path.join(stateDir, "admin-log.json"), { log: [] });
+      return store.log.slice(-200).reverse();
+    },
+
     // ── 密码重置：申请（同学）→ 审批（管理员）→ 一次性码 → 同学自设新密码 ──
     // 管理员只经手重置码，从头到尾不知道新密码。
 

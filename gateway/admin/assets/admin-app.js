@@ -1,13 +1,7 @@
 /**
- * 管理总台前端应用（完全按同学端网页版推导，不沿用旧管理台骨架）。
- *
- * 页面形态 = web 独立页（today / knowledge / schedule）的编辑台变体：
- * 报头（旋转印章 + 楷体标题 + 眉批 + 时钟）+ 左侧窄栏（kicker / 楷体题 /
- * 目录导航 / 运行信息）+ 右侧朱砂顶线卡片列。首页是对话页 hero 与
- * 功能大厅目录行的合体；「同学」页是知识库式的名录 + 个人档案。
- *
- * 交付模式与 chat-app.js 相同：无构建、独立资产，由 ui.mjs 内联进页面。
- * 数据仍走 /admin/api/bootstrap 一次往返；#/hash 路由可直达各管理区。
+ * 管理后台前端应用（Tabler 模板 + vanilla JS，无构建）。
+ * 由 ui.mjs 内联进页面；数据经 /admin/api/bootstrap 一次往返带回，
+ * 动作各自 POST 后整页刷新数据。#/hash 路由切换九个页面。
  */
 (function () {
   "use strict";
@@ -63,55 +57,80 @@
     return Math.floor(up / 60) + " 分钟";
   }
 
-  // 管理区图标：与 web 大厅宫格同一族 1.8px 描线 SVG（24 viewBox）
-  var ICONS = {
-    students:
-      '<svg viewBox="0 0 24 24"><circle cx="9" cy="7" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16 3.5a4 4 0 0 1 0 7"/><path d="M17 14c2.8.5 5 3 5 6.2"/></svg>',
-    access:
-      '<svg viewBox="0 0 24 24"><path d="M4 22h16c1.1 0 2-.9 2-2v-4H2v4c0 1.1.9 2 2 2z"/><path d="M6 13V4c0-1.1.9-2 2-2h8c1.1 0 2 .9 2 2v9"/><path d="M10 6h4"/></svg>',
-    model:
-      '<svg viewBox="0 0 24 24"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></svg>',
-    release:
-      '<svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>',
-    keys:
-      '<svg viewBox="0 0 24 24"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>',
-    security:
-      '<svg viewBox="0 0 24 24"><path d="M12 22s8-3.6 8-10V5.5L12 2 4 5.5V12c0 6.4 8 10 8 10z"/><path d="M9 11.5l2 2 4-4.5"/></svg>',
-  };
+  function btn(label, cls, attrs) {
+    var b = el("button", cls, label);
+    b.type = "button";
+    if (attrs) {
+      Object.keys(attrs).forEach(function (k) {
+        b.setAttribute(k, attrs[k]);
+      });
+    }
+    return b;
+  }
 
-  // ── 路由（#/hash，目录导航与浏览器前进后退共用）──────────
+  // ── 弹窗（Tabler modal 样式，自行控制显隐）───────────────
 
-  var PANES = ["home", "students", "access", "model", "release", "keys", "security"];
+  var backdrop = null;
+
+  function showModal(id) {
+    var m = $(id);
+    if (!m) return;
+    if (!backdrop) {
+      backdrop = el("div", "modal-backdrop fade show");
+      backdrop.setAttribute("data-close-modal", "");
+      document.body.appendChild(backdrop);
+    }
+    m.style.display = "block";
+    m.classList.add("show");
+  }
+
+  function closeModals() {
+    var open = document.querySelectorAll(".modal.show");
+    for (var i = 0; i < open.length; i++) {
+      open[i].classList.remove("show");
+      open[i].style.display = "none";
+    }
+    if (backdrop) backdrop.style.display = "none";
+  }
+
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeModals();
+  });
+
+  // ── 路由 ──────────────────────────────────────────────────
+
+  var PANES = ["home", "users", "invites", "resets", "site", "security", "release", "keys", "log"];
   var current = "home";
-  /** 发版上传进行中不自动刷新数据，避免打断进度条 */
+  /** 发版上传进行中不自动刷新 */
   var uploading = false;
 
   var TITLES = {
-    home: "首页",
-    students: "同学",
-    access: "准入",
-    model: "模型与额度",
-    release: "版本",
-    keys: "密钥",
-    security: "安全",
+    home: ["概览", "服务运行状态与待办"],
+    users: ["用户", "注册同学、额度与实例"],
+    invites: ["邀请码", "注册准入凭证"],
+    resets: ["重置审批", "忘记密码的审批与一次性码"],
+    site: ["站点设置", "统一 Key 与限额"],
+    security: ["安全设置", "管理台两步验证"],
+    release: ["版本发布", "同学端安装包分发"],
+    keys: ["密钥管理", "更新后台面板密钥"],
+    log: ["操作日志", "最近的管理动作"],
   };
 
   function showPane(id, pushHash) {
     if (PANES.indexOf(id) < 0) id = "home";
     current = id;
-    var links = document.querySelectorAll(".cat-btn[data-nav]");
-    for (var i = 0; i < links.length; i++) {
-      links[i].classList.toggle("active", links[i].getAttribute("data-nav") === id);
+    var navItems = document.querySelectorAll("[data-nav-item]");
+    for (var i = 0; i < navItems.length; i++) {
+      navItems[i].classList.toggle("active", navItems[i].getAttribute("data-nav-item") === id);
     }
-    var panels = document.querySelectorAll(".pane .panel");
-    for (var j = 0; j < panels.length; j++) panels[j].classList.remove("on");
+    var pages = document.querySelectorAll(".pane-page");
+    for (var j = 0; j < pages.length; j++) pages[j].classList.remove("on");
     var target = $("pane-" + id);
     if (target) target.classList.add("on");
-    var railTitle = $("railTitle");
-    if (railTitle) railTitle.textContent = TITLES[id] || "首页";
+    var t = TITLES[id] || TITLES.home;
+    $("pageTitle").textContent = t[0];
+    $("pagePretitle").textContent = "ADMIN · " + t[0];
     if (pushHash !== false) location.hash = "#/" + id;
-    var content = document.querySelector("main.content");
-    if (content) content.scrollTop = 0;
     window.scrollTo(0, 0);
   }
 
@@ -120,9 +139,12 @@
     return m ? m[1] : "";
   }
 
-  // ── 全站数据缓存（bootstrap 一次取回，各视图共用）────────
+  // ── 数据 ──────────────────────────────────────────────────
 
-  var store = { overview: null, users: null, invites: null, site: null, resets: null, security: null, update: null };
+  var store = { overview: null, users: null, invites: null, site: null, resets: null, security: null, update: null, log: [] };
+  var userFilterText = "";
+  var userFilterState = "";
+  var quotaTarget = "";
 
   function load() {
     return api("/admin/api/bootstrap").then(function (b) {
@@ -134,153 +156,124 @@
       store.resets = b.resets;
       store.security = b.security;
       store.update = b.update;
-      renderRail();
+      store.log = b.log || [];
+      renderHeader();
       renderHome();
-      renderStudents();
-      renderAccess();
-      renderModel();
+      renderUsers();
+      renderInvites();
+      renderResets();
+      renderSite();
+      renderSecurity();
       renderRelease();
       renderKeys();
-      renderSecurity();
+      renderLog();
     });
   }
 
-  // ── 报头时钟 + 左栏运行信息（rail-meta）──────────────────
-
-  function tickClock() {
-    var now = new Date();
-    var week = ["日", "一", "二", "三", "四", "五", "六"][now.getDay()];
-    var d = $("phDate");
-    var w = $("phWeek");
-    if (d) {
-      d.textContent = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
-    }
-    if (w) w.textContent = "星期" + week + " · 值班中";
-  }
-
-  function renderRail() {
+  function renderHeader() {
     var o = store.overview;
     if (!o) return;
-    var meta = $("railMeta");
-    if (meta) {
-      meta.textContent = "";
-      var lines = [
-        (o.version ? "v" + o.version : "") + " · 运行 " + uptimeText(o.uptimeSec),
-        "在线实例 " + o.online + " / " + o.capacity,
-        "注册同学 " + o.users + " · 可用邀请码 " + o.invitesLeft,
-      ];
-      for (var i = 0; i < lines.length; i++) meta.appendChild(el("div", null, lines[i]));
-    }
-    // 目录导航右侧的等宽计数（待审、在册）
-    var pending = $("navCountAccess");
-    if (pending) {
-      var n = (store.resets && store.resets.pending && store.resets.pending.length) || 0;
-      pending.textContent = n > 0 ? "待审 " + n : "";
-      pending.classList.toggle("warn", n > 0);
-    }
-    var cnt = $("navCountStudents");
-    if (cnt) cnt.textContent = o.users ? String(o.users) : "";
+    $("headerMeta").textContent =
+      (o.version ? "v" + o.version + " · " : "") +
+      "运行 " + uptimeText(o.uptimeSec) +
+      " · 实例 " + o.online + "/" + o.capacity;
   }
 
-  // ── 首页：hero + 功能大厅式目录 ──────────────────────────
-
-  function keyBadge(site) {
-    if (!site) return ["Key 状态未知", ""];
-    if (site.deepseekKeySet) return ["站点 Key 已设置", ""];
-    if (site.envDeepseekKeySet) return ["回退 env Key", ""];
-    return ["Key 未设置", "warn"];
-  }
+  // ── 概览 ──────────────────────────────────────────────────
 
   function renderHome() {
     var o = store.overview;
-    var site = store.site;
     if (!o) return;
     var own = o.ownTurnsToday || 0;
-    $("homeStats").textContent = "";
-    var stats = [
-      [String(o.users), "在册同学"],
-      [o.online + " / " + o.capacity, "在线实例"],
-      [String(o.invitesLeft), "可用邀请码"],
-      [String(o.turnsToday) + (own > 0 ? " +" + own : ""), "今日对话轮数"],
+    var stats = $("homeStats");
+    stats.textContent = "";
+    var cells = [
+      ["注册同学", String(o.users), "users"],
+      ["在线实例", o.online + " / " + o.capacity, "activity"],
+      ["可用邀请码", String(o.invitesLeft), "ticket"],
+      ["今日对话轮数", String(o.turnsToday) + (own > 0 ? " +" + own : ""), "message"],
     ];
-    for (var i = 0; i < stats.length; i++) {
-      var cell = el("div", "hstat");
-      cell.appendChild(el("b", null, stats[i][0]));
-      cell.appendChild(el("span", null, stats[i][1]));
-      $("homeStats").appendChild(cell);
-    }
+    cells.forEach(function (c) {
+      var col = el("div", "col-sm-6 col-lg-3");
+      var card = el("div", "card card-sm");
+      var body = el("div", "card-body");
+      body.appendChild(el("div", "subheader", c[0]));
+      body.appendChild(el("div", "h1 mb-0", c[1]));
+      card.appendChild(body);
+      col.appendChild(card);
+      stats.appendChild(col);
+    });
+
+    // 待办警示：待审批 / Key 未设 / 更新后台未接入 / 2FA 未启用
+    var alerts = $("homeAlerts");
+    alerts.textContent = "";
+    var site = store.site;
     var pend = (store.resets && store.resets.pending && store.resets.pending.length) || 0;
     var upd = store.update && store.update.overview;
-    var kb = keyBadge(site);
-    var cards = [
-      {
-        nav: "students",
-        t: "同学",
-        d: "在册名录与每人档案：状态、来源、Key 模式、用量与实例",
-        badge: o.online > 0 ? "在线 " + o.online : "",
-        warn: false,
-      },
-      { nav: "access", t: "准入", d: "邀请码的生成与档案 · 忘记密码的审批与一次性码", badge: pend > 0 ? "待审 " + pend : "", warn: pend > 0 },
-      { nav: "model", t: "模型与额度", d: "站点统一 DeepSeek Key · 每日对话限额 · 分账统计", badge: kb[0], warn: kb[1] === "warn" },
-      {
-        nav: "release",
-        t: "版本",
-        d: "同学端安装包的网页发版 · 分发版本与回滚",
-        badge: upd && !upd.unavailable && !upd.error && upd.data && upd.data.current ? "分发 v" + upd.data.current.version : "未接入",
-        warn: upd && (upd.unavailable || upd.error),
-      },
-      { nav: "keys", t: "密钥", d: "更新后台面板密钥：命令行发版与后台登录用", badge: "", warn: false },
-      {
-        nav: "security",
-        t: "安全",
-        d: "管理台两步验证（TOTP）：动态码 + 恢复码",
-        badge: store.security && store.security.mfaEnabled ? "已启用" : "未启用",
-        warn: !(store.security && store.security.mfaEnabled),
-      },
-    ];
-    var grid = $("homeDir");
-    grid.textContent = "";
-    for (var j = 0; j < cards.length; j++) {
-      var c = cards[j];
-      var card = el("button", "hall-card");
-      card.type = "button";
-      card.setAttribute("data-nav", c.nav);
-      var top = el("div", "hall-card-top");
-      var ico = el("span", "hall-ico");
-      ico.innerHTML = ICONS[c.nav] || "";
-      top.appendChild(ico);
-      top.appendChild(el("b", null, c.t));
-      if (c.badge) {
-        var badge = el("span", "hall-badge" + (c.warn ? " warn" : ""), c.badge);
-        top.appendChild(badge);
-      }
-      top.appendChild(el("span", "hall-go", "→"));
-      card.appendChild(top);
-      card.appendChild(el("span", null, c.d));
-      grid.appendChild(card);
+    var mfaOn = store.security && store.security.mfaEnabled;
+    var items = [];
+    if (pend > 0) {
+      items.push([
+        "warning",
+        pend + " 条密码重置申请待审批。",
+        '<a class="btn btn-sm btn-warning ms-auto" href="#/resets">去处理</a>',
+      ]);
     }
-    // 页脚运行注记：三层 Key 链路与回收说明（web hall-note 同语言）
-    var note = $("homeNote");
-    if (note) {
-      var keyLine = !site
-        ? ""
-        : site.deepseekKeySet
-          ? "站点统一 Key：面板已设置（" + esc(site.deepseekKeyMasked) + "），新拉起实例即用"
-          : site.envDeepseekKeySet
-            ? "站点统一 Key：面板未设置，回退服务器 env（GATEWAY_DEEPSEEK_KEY）"
-            : "站点统一 Key：未设置——同学须在网页「设置 → AI 模型」填自己的 Key";
-      note.innerHTML =
-        "实例按需拉起、空闲 30 分钟自动回收；每人每日限额默认 " +
-        esc(site ? site.defaultDailyTurns : "—") +
-        " 轮，可在「同学」档案里按人另设。<br>" +
-        keyLine;
+    if (site && !site.deepseekKeySet && !site.envDeepseekKeySet) {
+      items.push([
+        "danger",
+        "站点统一 DeepSeek Key 未设置——同学须自带 Key 才能对话。",
+        '<a class="btn btn-sm btn-danger ms-auto" href="#/site">去设置</a>',
+      ]);
+    }
+    if (upd && (upd.unavailable || upd.error)) {
+      items.push([
+        "secondary",
+        "更新后台未接入：版本发布与密钥管理不可用（检查 GATEWAY_UPDATE_URL / GATEWAY_UPDATE_TOKEN）。",
+        "",
+      ]);
+    }
+    if (!mfaOn) {
+      items.push([
+        "warning",
+        "两步验证未启用，管理台仅凭密码即可登录。",
+        '<a class="btn btn-sm btn-warning ms-auto" href="#/security">去启用</a>',
+      ]);
+    }
+    if (!items.length) {
+      var okCol = el("div", "col-12");
+      okCol.appendChild(el("div", "alert alert-success", "一切正常，没有待办。"));
+      alerts.appendChild(okCol);
+    } else {
+      items.forEach(function (it) {
+        var col = el("div", "col-12");
+        var a = el("div", "alert alert-" + it[0] + " d-flex align-items-center");
+        a.innerHTML = "<div>" + esc(it[1]) + "</div>" + it[2];
+        col.appendChild(a);
+        alerts.appendChild(col);
+      });
+    }
+
+    var list = $("homeLog");
+    list.textContent = "";
+    if (!store.log.length) {
+      list.appendChild(el("li", "list-group-item text-secondary", "暂无记录"));
+    } else {
+      store.log.slice(0, 8).forEach(function (entry) {
+        var li = el("li", "list-group-item d-flex justify-content-between");
+        li.appendChild(el("span", null, entry.text));
+        li.appendChild(el("span", "text-secondary small", fmtTime(entry.at)));
+        list.appendChild(li);
+      });
+    }
+    var badge = $("navResetBadge");
+    if (badge) {
+      badge.hidden = pend === 0;
+      badge.textContent = String(pend);
     }
   }
 
-  // ── 同学：名录 + 个人档案（知识库页的列表 / 详情语言）────
-
-  var studentFilter = "";
-  var openStudent = "";
+  // ── 用户 ──────────────────────────────────────────────────
 
   function inviteByUser() {
     var byUser = {};
@@ -292,228 +285,244 @@
     return byUser;
   }
 
-  function quotaLine(u, defLimit) {
+  function quotaCell(u, defLimit) {
     var limit = u.dailyTurns > 0 ? u.dailyTurns : defLimit;
-    var own = u.ownTurns && u.ownTurns.count ? ' <span class="ok">+自 ' + u.ownTurns.count + "</span>" : "";
-    var lim = u.dailyTurns > 0
-      ? ' <b class="hot" title="个人限额，覆盖站点默认 ' + defLimit + ' 轮">/ ' + limit + "</b>"
-      : " / " + limit;
-    return u.turns.count + lim + own;
+    var text = u.turns.count + " / " + limit;
+    var cell = el("td", "mono");
+    cell.textContent = text;
+    if (u.dailyTurns > 0) {
+      var tip = el("span", "badge bg-warning-lt ms-1", "个人");
+      tip.title = "个人限额，覆盖站点默认 " + defLimit + " 轮";
+      cell.appendChild(tip);
+    }
+    if (u.ownTurns && u.ownTurns.count) {
+      var own = el("span", "badge bg-success-lt ms-1", "+自" + u.ownTurns.count);
+      own.title = "自己 Key 的轮数（不限额）";
+      cell.appendChild(own);
+    }
+    return cell;
   }
 
-  function renderStudents() {
-    var list = store.users || [];
-    var site = store.site || {};
-    var defLimit = Number(site.defaultDailyTurns) || 0;
-    var byUser = inviteByUser();
-    var box = $("studentList");
-    if (!box) return;
-    $("studentCount").textContent = list.length ? "共 " + list.length + " 人" : "";
-    var kw = studentFilter.trim().toLowerCase();
-    var shown = list.filter(function (u) {
-      return !kw || String(u.username).toLowerCase().indexOf(kw) >= 0;
-    });
-    box.textContent = "";
-    if (!list.length) {
-      box.appendChild(el("p", "empty", "还没有同学注册。发出邀请码后，同学在 /register 凭码注册。"));
-      return;
-    }
-    if (!shown.length) {
-      box.appendChild(el("p", "empty", "没有匹配「" + studentFilter + "」的同学"));
-      return;
-    }
-    for (var i = 0; i < shown.length; i++) {
-      var u = shown[i];
-      var row = el("button", "st-row");
-      row.type = "button";
-      row.setAttribute("data-student", u.username);
-      if (u.username === openStudent) row.classList.add("active");
-      var head = el("div", "st-row-top");
-      head.appendChild(el("span", "dot" + (u.online ? "" : " off")));
-      head.appendChild(el("b", null, u.username));
-      if (u.disabled) head.appendChild(el("span", "hall-badge warn", "已停用"));
-      else if (u.online) head.appendChild(el("span", "hall-badge", "在线"));
-      if (u.dsMode === "site") head.appendChild(el("span", "hall-badge", "站点额度"));
-      var q = el("span", "st-quota mono");
-      q.innerHTML = quotaLine(u, defLimit);
-      head.appendChild(q);
-      head.appendChild(el("span", "hall-go", "→"));
-      row.appendChild(head);
-      var inv = byUser[u.username];
-      row.appendChild(el("span", "st-sub", (inv ? (inv.note || "邀请码 " + inv.code) : "来源未知") + " · 注册于 " + fmtDate(u.createdAt)));
-      box.appendChild(row);
-    }
-    renderStudentDossier(defLimit, byUser);
-  }
-
-  function renderStudentDossier(defLimit, byUser) {
-    var box = $("studentDossier");
-    if (!box) return;
-    var u = (store.users || []).filter(function (x) {
-      return x.username === openStudent;
-    })[0];
-    if (!u) {
-      box.hidden = true;
-      box.textContent = "";
-      return;
-    }
-    box.hidden = false;
-    box.textContent = "";
-    var head = el("div", "dos-head");
-    var back = el("button", "tbtn", "← 返回名录");
-    back.type = "button";
-    back.id = "studentBack";
-    head.appendChild(back);
-    head.appendChild(el("span", "dos-name mono", u.username));
-    box.appendChild(head);
-    var inv = byUser[u.username];
+  function userDetailHtml(u, defLimit, inv) {
     var rows = [
       ["状态", u.disabled ? "已停用（无法登录）" : "正常"],
       ["Key 模式", u.dsMode === "site" ? "钉在站点免费额度（自己的 Key 保留不用）" : "自有优先（有自己的 Key 就用自己的）"],
-      ["今日站点轮数", quotaLine(u, defLimit)],
+      ["今日站点轮数", u.turns.count + " / " + (u.dailyTurns > 0 ? u.dailyTurns : defLimit)],
+      ["今日自有轮数", u.ownTurns && u.ownTurns.count ? String(u.ownTurns.count) : "0"],
       ["来源邀请码", inv ? (inv.note ? inv.note + "（" + inv.code + "）" : inv.code) : "—"],
       ["注册于", fmtDate(u.createdAt)],
       [
         "专属实例",
         u.online
-          ? "在线 · 启动 " + fmtTime(u.startedAt) + " · 最近活跃 " + fmtTime(u.lastRequestAt) + (u.restarts > 0 ? " · 曾自动重启 " + u.restarts + " 次" : "")
-          : "未运行（空闲回收，下次访问冷启动 3-5 秒）",
+          ? "在线 · 启动 " + fmtTime(u.startedAt) + " · 最近活跃 " + fmtTime(u.lastRequestAt) + (u.restarts > 0 ? " · 曾重启 " + u.restarts + " 次" : "")
+          : "未运行（空闲回收，下次访问 3-5 秒冷启动）",
       ],
     ];
-    var body = el("div", "dos-body");
-    for (var i = 0; i < rows.length; i++) {
-      var line = el("div", "dos-row");
-      line.appendChild(el("span", "dos-k", rows[i][0]));
-      var v = el("span", "dos-v");
-      if (rows[i][0] === "今日站点轮数") v.innerHTML = rows[i][1];
-      else v.textContent = rows[i][1];
-      line.appendChild(v);
-      body.appendChild(line);
-    }
-    box.appendChild(body);
-    var acts = el("div", "dos-acts");
-    var mk = function (label, what, cls) {
-      var b = el("button", "tbtn" + (cls ? " " + cls : ""), label);
-      b.type = "button";
-      b.setAttribute("data-do", what);
-      b.setAttribute("data-u", u.username);
-      if (what === "quota") b.setAttribute("data-cur", String(u.dailyTurns || 0));
-      return b;
-    };
-    acts.appendChild(mk("设每日限额", "quota"));
-    if (u.disabled) acts.appendChild(mk("恢复登录", "enable"));
-    else acts.appendChild(mk("停用账号", "disable", "danger"));
-    if (u.online) acts.appendChild(mk("回收实例", "kick", "danger"));
-    box.appendChild(acts);
-    var hint = el("p", "dos-hint");
-    hint.textContent = "停用立即禁止登录；回收实例后该同学下次访问重新拉起（新模式与新限额即刻生效）。托管凭证仍加密保留在服务器。";
-    box.appendChild(hint);
+    return rows
+      .map(function (r) {
+        return '<div class="datagrid-item"><div class="datagrid-title">' + esc(r[0]) + '</div><div class="datagrid-content">' + esc(r[1]) + "</div></div>";
+      })
+      .join("");
   }
 
-  // ── 准入：邀请码 + 密码重置 ───────────────────────────────
-
-  function renderAccess() {
-    var invites = store.invites || [];
-    var resets = store.resets || { pending: [], codes: [] };
-    // 邀请码档案
-    var invBox = $("inviteList");
-    if (invBox) {
-      invBox.textContent = "";
-      if (!invites.length) {
-        invBox.appendChild(el("p", "empty", "暂无邀请码，用上方表单生成"));
-      } else {
-        for (var i = 0; i < invites.length; i++) {
-          var inv = invites[i];
-          var users = (inv.usedBy || []).filter(function (u) {
-            return String(u).indexOf("pending-") !== 0;
-          });
-          var used = (inv.usedBy || []).length >= (inv.maxUses || 1);
-          var expired = !used && inv.expiresAt && new Date(inv.expiresAt) < new Date();
-          var state = used ? "已使用" : expired ? "已过期" : inv.expiresAt ? fmtDate(inv.expiresAt) + " 前有效" : "未使用";
-          var row = el("div", "inv-row");
-          var code = el("b", "mono inv-code", inv.code);
-          row.appendChild(code);
-          row.appendChild(el("span", "hall-badge", state));
-          row.appendChild(el("span", "inv-note", inv.note || "—"));
-          row.appendChild(el("span", "inv-used mono", users.length ? users.join("、") : "—"));
-          if (!used && !expired) {
-            var cp = el("button", "tbtn", "复制");
-            cp.type = "button";
-            cp.setAttribute("data-copy", inv.code);
-            row.appendChild(cp);
-          }
-          invBox.appendChild(row);
-        }
-      }
+  function renderUsers() {
+    var list = store.users || [];
+    var site = store.site || {};
+    var defLimit = Number(site.defaultDailyTurns) || 0;
+    var byUser = inviteByUser();
+    var rows = $("userRows");
+    if (!rows) return;
+    var kw = userFilterText.trim().toLowerCase();
+    var shown = list.filter(function (u) {
+      if (kw && String(u.username).toLowerCase().indexOf(kw) < 0) return false;
+      if (userFilterState === "active") return !u.disabled;
+      if (userFilterState === "disabled") return u.disabled;
+      if (userFilterState === "online") return Boolean(u.online);
+      return true;
+    });
+    rows.textContent = "";
+    if (!list.length) {
+      rows.appendChild(el("tr", null, "")).innerHTML = '<td colspan="8" class="text-secondary">还没有同学注册</td>';
+      return;
     }
-    // 重置审批
+    if (!shown.length) {
+      rows.innerHTML = '<tr><td colspan="8" class="text-secondary">没有匹配的用户</td></tr>';
+      return;
+    }
+    shown.forEach(function (u) {
+      var tr = el("tr");
+
+      var name = el("td");
+      name.appendChild(el("span", "mono fw-bold", u.username));
+      tr.appendChild(name);
+
+      var st = el("td");
+      st.innerHTML = u.disabled
+        ? '<span class="badge bg-danger-lt">已停用</span>'
+        : '<span class="badge bg-success-lt">正常</span>';
+      tr.appendChild(st);
+
+      var key = el("td");
+      key.innerHTML =
+        u.dsMode === "site"
+          ? '<span class="badge bg-warning-lt" title="自己的 Key 保留不用">站点额度</span>'
+          : '<span class="badge bg-info-lt" title="有自己的 Key 就用自己的，否则用站点 Key">自有优先</span>';
+      tr.appendChild(key);
+
+      var on = el("td");
+      if (u.online) {
+        var tip =
+          "启动 " + fmtTime(u.startedAt) + " · 最近活跃 " + fmtTime(u.lastRequestAt) +
+          (u.restarts > 0 ? " · 曾重启 " + u.restarts + " 次" : "");
+        on.innerHTML = '<span class="status status-green" title="' + esc(tip) + '"></span> 在线';
+      } else {
+        on.innerHTML = '<span class="status status-secondary"></span> —';
+      }
+      tr.appendChild(on);
+
+      var inv = byUser[u.username];
+      var src = el("td", null, inv ? inv.note || inv.code : "—");
+      if (inv) src.title = inv.note ? "邀请码 " + inv.code : "凭此码注册";
+      tr.appendChild(src);
+
+      tr.appendChild(el("td", "mono", fmtDate(u.createdAt)));
+      tr.appendChild(quotaCell(u, defLimit));
+
+      var acts = el("td");
+      acts.className = "text-end";
+      var group = el("div", "btn-group");
+      group.appendChild(btn("限额", "btn btn-sm btn-outline-secondary", {
+        "data-do": "quota",
+        "data-u": u.username,
+        "data-cur": String(u.dailyTurns || 0),
+      }));
+      group.appendChild(btn("详情", "btn btn-sm btn-outline-secondary", { "data-detail": u.username }));
+      tr.appendChild(acts);
+      acts.appendChild(group);
+      var more = el("div", "btn-group ms-1");
+      if (u.disabled) {
+        more.appendChild(btn("启用", "btn btn-sm btn-outline-success", { "data-do": "enable", "data-u": u.username }));
+      } else {
+        more.appendChild(btn("停用", "btn btn-sm btn-outline-warning", { "data-do": "disable", "data-u": u.username }));
+      }
+      if (u.online) {
+        more.appendChild(btn("回收", "btn btn-sm btn-outline-warning", { "data-do": "kick", "data-u": u.username }));
+      }
+      more.appendChild(btn("删除", "btn btn-sm btn-outline-danger", { "data-do": "delete", "data-u": u.username }));
+      acts.appendChild(more);
+      rows.appendChild(tr);
+    });
+  }
+
+  // ── 邀请码 ────────────────────────────────────────────────
+
+  function renderInvites() {
+    var invites = store.invites || [];
+    var rows = $("inviteRows");
+    if (!rows) return;
+    rows.textContent = "";
+    if (!invites.length) {
+      rows.innerHTML = '<tr><td colspan="5" class="text-secondary">暂无邀请码，用上方表单生成</td></tr>';
+      return;
+    }
+    invites.forEach(function (inv) {
+      var users = (inv.usedBy || []).filter(function (u) {
+        return String(u).indexOf("pending-") !== 0;
+      });
+      var used = (inv.usedBy || []).length >= (inv.maxUses || 1);
+      var expired = !used && inv.expiresAt && new Date(inv.expiresAt) < new Date();
+      var tr = el("tr");
+      tr.appendChild(el("td", "mono", inv.code));
+      tr.appendChild(el("td", null, inv.note || "—"));
+      tr.appendChild(el("td", "mono", users.length ? users.join("、") : "—"));
+      var st = el("td");
+      st.innerHTML = used
+        ? '<span class="badge bg-secondary-lt">已使用</span>'
+        : expired
+          ? '<span class="badge bg-secondary-lt">已过期</span>'
+          : inv.expiresAt
+            ? '<span class="badge bg-info-lt">' + esc(fmtDate(inv.expiresAt)) + " 前有效</span>"
+            : '<span class="badge bg-success-lt">未使用</span>';
+      tr.appendChild(st);
+      var acts = el("td", "text-end");
+      var group = el("div", "btn-group");
+      if (!used && !expired) {
+        group.appendChild(btn("复制", "btn btn-sm btn-outline-secondary", { "data-copy": inv.code }));
+        group.appendChild(btn("删除", "btn btn-sm btn-outline-danger", { "data-invdel": inv.code }));
+      }
+      acts.appendChild(group);
+      tr.appendChild(acts);
+      rows.appendChild(tr);
+    });
+  }
+
+  // ── 重置审批 ──────────────────────────────────────────────
+
+  function renderResets() {
+    var resets = store.resets || { pending: [], codes: [] };
     var pend = resets.pending || [];
     var codes = resets.codes || [];
-    var pendBox = $("resetPending");
-    if (pendBox) {
-      pendBox.textContent = "";
+    var rows = $("resetRows");
+    if (rows) {
+      rows.textContent = "";
       if (!pend.length) {
-        pendBox.appendChild(el("p", "empty", "没有待审批的申请。同学在登录页点「忘记密码」提交后出现在这里。"));
+        rows.innerHTML = '<tr><td colspan="3" class="text-secondary">暂无申请。同学在登录页点「忘记密码」提交后出现在这里。</td></tr>';
       } else {
-        for (var j = 0; j < pend.length; j++) {
-          var q = pend[j];
-          var rrow = el("div", "inv-row");
-          rrow.appendChild(el("b", "mono", q.username));
-          rrow.appendChild(el("span", "inv-used mono", fmtTime(q.requestedAt)));
-          var ok = el("button", "tbtn", "同意并生成码");
-          ok.type = "button";
-          ok.setAttribute("data-approve", q.id);
-          var no = el("button", "tbtn danger", "拒绝");
-          no.type = "button";
-          no.setAttribute("data-reject", q.id);
-          rrow.appendChild(ok);
-          rrow.appendChild(no);
-          pendBox.appendChild(rrow);
-        }
+        pend.forEach(function (q) {
+          var tr = el("tr");
+          tr.appendChild(el("td", "mono fw-bold", q.username));
+          tr.appendChild(el("td", "mono", fmtTime(q.requestedAt)));
+          var acts = el("td", "text-end");
+          var group = el("div", "btn-group");
+          group.appendChild(btn("同意并生成码", "btn btn-sm btn-outline-success", { "data-approve": q.id }));
+          group.appendChild(btn("拒绝", "btn btn-sm btn-outline-danger", { "data-reject": q.id }));
+          acts.appendChild(group);
+          tr.appendChild(acts);
+          rows.appendChild(tr);
+        });
       }
     }
-    var codeBox = $("resetCodes");
-    if (codeBox) {
-      codeBox.textContent = "";
+    var codeRows = $("codeRows");
+    if (codeRows) {
+      codeRows.textContent = "";
       if (!codes.length) {
-        codeBox.appendChild(el("p", "empty", "暂无有效重置码"));
+        codeRows.innerHTML = '<tr><td colspan="4" class="text-secondary">暂无有效重置码</td></tr>';
       } else {
-        for (var k = 0; k < codes.length; k++) {
-          var c = codes[k];
-          var expiredCode = new Date(c.expiresAt) < new Date();
-          var crow = el("div", "inv-row");
-          crow.appendChild(el("span", "mono", c.username));
-          crow.appendChild(el("b", "hot mono", c.code));
-          crow.appendChild(el("span", "inv-used mono", "至 " + fmtTime(c.expiresAt)));
-          if (expiredCode) {
-            crow.appendChild(el("span", "hall-badge", "已过期"));
+        codes.forEach(function (c) {
+          var expired = new Date(c.expiresAt) < new Date();
+          var tr = el("tr");
+          tr.appendChild(el("td", "mono", c.username));
+          tr.appendChild(el("td", "mono fw-bold", c.code));
+          tr.appendChild(el("td", "mono", "至 " + fmtTime(c.expiresAt)));
+          var acts = el("td", "text-end");
+          if (expired) {
+            acts.innerHTML = '<span class="badge bg-secondary-lt">已过期</span>';
           } else {
-            var ccp = el("button", "tbtn", "复制");
-            ccp.type = "button";
-            ccp.setAttribute("data-copy", c.code);
-            crow.appendChild(ccp);
+            var group = el("div", "btn-group");
+            group.appendChild(btn("复制", "btn btn-sm btn-outline-secondary", { "data-copy": c.code }));
+            acts.appendChild(group);
           }
-          codeBox.appendChild(crow);
-        }
+          tr.appendChild(acts);
+          codeRows.appendChild(tr);
+        });
       }
     }
   }
 
-  // ── 模型与额度 ────────────────────────────────────────────
+  // ── 站点设置 ──────────────────────────────────────────────
 
-  function renderModel() {
+  function renderSite() {
     var s = store.site;
     if (!s) return;
-    var state = $("keyState");
-    if (state) {
-      state.textContent = s.deepseekKeySet
-        ? "当前：面板已设置 " + s.deepseekKeyMasked
-        : s.envDeepseekKeySet
-          ? "面板未设置，回退服务器 env 的 GATEWAY_DEEPSEEK_KEY"
-          : "未设置（同学须在网页「设置 → AI 模型」填自己的 Key）";
-    }
-    $("defaultTurns").textContent = s.defaultDailyTurns;
+    $("keyState").textContent = s.deepseekKeySet
+      ? "当前：面板已设置 " + s.deepseekKeyMasked
+      : s.envDeepseekKeySet
+        ? "面板未设置，回退服务器 env 的 GATEWAY_DEEPSEEK_KEY"
+        : "未设置（同学须在「设置 → AI 模型」填自己的 Key）";
+    var box = $("quotaStats");
+    if (!box) return;
     var list = store.users || [];
+    var o = store.overview;
     var pinned = list.filter(function (u) {
       return u.dsMode === "site";
     }).length;
@@ -521,104 +530,88 @@
     var ownActive = list.filter(function (u) {
       return u.ownTurns && u.ownTurns.date === today && u.ownTurns.count > 0;
     }).length;
-    var o = store.overview;
-    var el2 = $("quotaStats");
-    if (el2) {
-      el2.textContent = "";
-      var mk = function (k, v) {
-        var line = el("div", "dos-row");
-        line.appendChild(el("span", "dos-k", k));
-        line.appendChild(el("span", "dos-v mono", v));
-        el2.appendChild(line);
-      };
-      mk("站点默认限额", "每人每日 " + (s.defaultDailyTurns || "—") + " 轮；「同学」档案里可按人另设（0 = 用默认）");
-      mk("今日站点账", (o ? o.turnsToday : "—") + " 轮（统一 Key 计费，受限额拦截）");
-      mk("今日自有账", (o ? o.ownTurnsToday : "—") + " 轮（同学自己的 Key，不占额度仅计数）");
-      mk("Key 模式分布", "共 " + list.length + " 人：钉在站点额度 " + pinned + " 人，其余「自有优先」；今日用自己的 Key 对话过 " + ownActive + " 人");
-    }
+    var rows = [
+      ["站点默认限额", "每人每日 " + s.defaultDailyTurns + " 轮；用户列表里可按人另设（0 = 用默认）"],
+      ["今日站点账", (o ? o.turnsToday : "—") + " 轮（统一 Key 计费，超限拦截）"],
+      ["今日自有账", (o ? o.ownTurnsToday : "—") + " 轮（同学自己的 Key，不占额度仅计数）"],
+      ["Key 模式分布", "共 " + list.length + " 人：钉在站点额度 " + pinned + " 人，其余「自有优先」；今日用自己的 Key 对话过 " + ownActive + " 人"],
+    ];
+    box.innerHTML = rows
+      .map(function (r) {
+        return '<div class="datagrid-item"><div class="datagrid-title">' + esc(r[0]) + '</div><div class="datagrid-content">' + esc(r[1]) + "</div></div>";
+      })
+      .join("");
   }
 
   // ── 安全设置（TOTP）──────────────────────────────────────
 
   function showRecoveryCodes(codes, needRelogin) {
-    var boxEl = $("mfaCodesBox") || $("mfaSetupBox");
-    if (!boxEl) return;
-    boxEl.textContent = "";
-    boxEl.appendChild(el("div", "notice", "恢复码仅此一次展示，请立即抄写或截图保存——手机不在身边时，每枚可替代动态码登录一次："));
-    var p = el("p", "codes");
+    var box = $("mfaCodesBox");
+    if (!box) return;
+    box.textContent = "";
+    box.appendChild(
+      el("div", "alert alert-warning", "恢复码仅此一次展示，请立即抄写或截图保存——手机不在身边时，每枚可替代动态码登录一次："),
+    );
+    var p = el("div", "recovery-codes");
     p.textContent = codes.join("  ·  ");
-    boxEl.appendChild(p);
-    var acts = el("div", "dos-acts");
-    var cp = el("button", "tbtn", "复制全部");
-    cp.type = "button";
-    cp.setAttribute("data-copy", codes.join("\n"));
-    acts.appendChild(cp);
+    box.appendChild(p);
+    var acts = el("div", "d-flex gap-2 mt-2");
+    acts.appendChild(btn("复制全部", "btn btn-outline-secondary", { "data-copy": codes.join("\n") }));
     if (needRelogin) {
-      var go = el("button", "tbtn", "已保存，去重新登录");
-      go.type = "button";
+      var go = btn("已保存，去重新登录", "btn btn-warning");
       go.id = "mfaRelogin";
       acts.appendChild(go);
     }
-    boxEl.appendChild(acts);
-    boxEl.hidden = false;
+    box.appendChild(acts);
+    box.hidden = false;
   }
 
   function renderSecurity() {
     var sec = store.security;
     if (!sec) return;
-    var boxEl = $("mfaCard");
-    if (!boxEl) return;
-    boxEl.textContent = "";
+    var box = $("mfaCard");
+    if (!box) return;
+    box.textContent = "";
     if (!sec.mfaEnabled) {
-      boxEl.appendChild(
-        el(
-          "p",
-          "lead",
-          "当前登录仅需管理密码。建议启用两步验证：之后登录还需输入手机验证器（Google / Microsoft Authenticator、1Password 等）的 6 位动态码，密码泄露也进不来。",
-        ),
-      );
-      var setup = el("button", "tbtn", "启用两步验证");
-      setup.type = "button";
+      box.innerHTML =
+        '<p class="text-secondary mb-2">当前登录仅需管理密码。<b>建议启用两步验证</b>：之后登录还需输入手机验证器（Google / Microsoft Authenticator、1Password 等）的 6 位动态码，密码泄露也进不来。</p>';
+      var setup = btn("启用两步验证", "btn btn-primary");
       setup.id = "mfaSetup";
-      var wrap = el("div", "dos-acts");
-      wrap.appendChild(setup);
-      boxEl.appendChild(wrap);
-      var sbox = el("div", null);
+      box.appendChild(setup);
+      var sbox = el("div");
       sbox.id = "mfaSetupBox";
-      sbox.style.marginTop = "14px";
-      boxEl.appendChild(sbox);
+      sbox.className = "mt-3";
+      box.appendChild(sbox);
       return;
     }
-    boxEl.appendChild(
-      el(
-        "p",
-        "lead",
-        "已启用（" + fmtDate(sec.enabledAt) + " 起）——登录需管理密码 + 6 位动态码。恢复码剩余 " + sec.recoveryLeft + " 枚。",
-      ),
-    );
-    var cbox = el("div", null);
+    box.innerHTML =
+      '<div class="alert alert-success">已启用（' +
+      esc(fmtDate(sec.enabledAt)) +
+      " 起）——登录需管理密码 + 6 位动态码。恢复码剩余 <b>" +
+      sec.recoveryLeft +
+      "</b> 枚。</div>";
+    var cbox = el("div");
     cbox.id = "mfaCodesBox";
-    cbox.style.marginTop = "12px";
-    boxEl.appendChild(cbox);
-    var acts = el("div", "dos-acts");
-    var input = el("input", null);
+    cbox.className = "mt-2";
+    box.appendChild(cbox);
+    var row = el("div", "d-flex flex-wrap gap-2 align-items-center");
+    var input = el("input", "form-control");
     input.id = "mfaCodeInput";
     input.placeholder = "当前动态码（或恢复码）";
     input.autocomplete = "off";
     input.inputMode = "numeric";
-    acts.appendChild(input);
-    var regen = el("button", "tbtn", "重新生成恢复码");
-    regen.type = "button";
+    input.style.maxWidth = "220px";
+    row.appendChild(input);
+    var regen = btn("重新生成恢复码", "btn btn-outline-secondary", null);
     regen.id = "mfaRegen";
-    var off = el("button", "tbtn danger", "关闭两步验证");
-    off.type = "button";
+    var off = btn("关闭两步验证", "btn btn-outline-danger", null);
     off.id = "mfaOff";
-    acts.appendChild(regen);
-    acts.appendChild(off);
-    boxEl.appendChild(acts);
-    var hint = el("p", "dos-hint");
-    hint.textContent = "关闭与重生成都要再验一次动态码，防止会话被劫持后降级安全。手机与恢复码全部丢失时，需 SSH 上机执行 admin.mjs totp off 兜底。";
-    boxEl.appendChild(hint);
+    row.appendChild(regen);
+    row.appendChild(off);
+    box.appendChild(row);
+    box.appendChild(
+      el("div", "text-secondary small mt-2", "关闭与重生成都要再验一次动态码，防止会话被劫持后降级安全。手机与恢复码全丢时，SSH 上机执行 admin.mjs totp off 兜底。"),
+    );
   }
 
   // ── 版本发布 ──────────────────────────────────────────────
@@ -655,16 +648,11 @@
     updState.file = f;
     var box = $("updFileBox");
     box.textContent = "";
-    var chip = el("div", "file-chip");
-    chip.innerHTML =
-      '<svg viewBox="0 0 24 24"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>';
-    chip.appendChild(el("span", "name", f.name));
-    chip.appendChild(el("span", "size", (f.size / 1048576).toFixed(1) + " MB"));
-    var rm = el("button", "tbtn", "移除");
-    rm.type = "button";
-    rm.id = "updClear";
-    chip.appendChild(rm);
-    box.appendChild(chip);
+    var row = el("div", "d-flex align-items-center gap-2 mt-2");
+    row.appendChild(el("span", "badge bg-info-lt", f.name));
+    row.appendChild(el("span", "text-secondary small", (f.size / 1048576).toFixed(1) + " MB"));
+    row.appendChild(btn("移除", "btn btn-sm btn-outline-secondary", { id: "updClear" }));
+    box.appendChild(row);
   }
 
   function updPublish() {
@@ -744,16 +732,11 @@
     if (o.unavailable || o.error) {
       cur.textContent = "";
       card.textContent = "";
-      card.appendChild(el("div", "notice", o.error || "更新后台未接入"));
+      card.appendChild(el("div", "alert alert-warning", o.error || "更新后台未接入"));
       card.appendChild(
-        el(
-          "p",
-          "lead",
-          "在网关环境变量配置 GATEWAY_UPDATE_URL 与 GATEWAY_UPDATE_TOKEN，并部署更新后台（update/update-server.mjs）后，这里会显示版本列表与回滚操作。",
-        ),
+        el("div", "text-secondary", "在网关环境变量配置 GATEWAY_UPDATE_URL 与 GATEWAY_UPDATE_TOKEN，并部署更新后台（update/update-server.mjs）后，这里会显示版本列表与回滚操作。"),
       );
-      var retry = el("button", "tbtn", "重试");
-      retry.type = "button";
+      var retry = btn("重试", "btn btn-outline-secondary");
       retry.id = "updRetry";
       card.appendChild(retry);
       return;
@@ -763,77 +746,88 @@
     prefillVersion(c ? c.version : "");
     card.textContent = "";
     if (!v || v.error || v.unavailable) {
-      card.appendChild(el("p", "empty", (v && (v.error || "无版本")) || "无版本"));
+      card.appendChild(el("div", "text-secondary", (v && (v.error || "无版本")) || "无版本"));
       return;
     }
     var list = v.data.versions || [];
     if (!list.length) {
-      card.appendChild(el("p", "empty", "还没有发布过版本；在上方上传第一个安装包，或在维护者机器上 npm run publish"));
+      card.appendChild(el("div", "text-secondary", "还没有发布过版本；在上方上传第一个安装包，或在维护者机器上 npm run publish"));
       return;
     }
     var total = list.reduce(function (s, r) {
       return s + (r.sizeBytes || 0);
     }, 0);
-    var meta = el("div", "upd-meta");
-    meta.appendChild(el("span", null, "共 " + list.length + " 个版本 · " + mb(total)));
-    meta.appendChild(el("span", null, "设为分发＝学生端下次启动即下载该版本"));
-    card.appendChild(meta);
-    for (var i = 0; i < list.length; i++) {
-      var r = list[i];
-      var row = el("div", "inv-row");
-      var name = el("b", "mono", "v" + r.version);
-      row.appendChild(name);
-      if (r.isCurrent) row.appendChild(el("span", "hall-badge", "分发中"));
-      else if (r.rolledBackAt) row.appendChild(el("span", "hall-badge", "已回滚"));
-      row.appendChild(el("span", "inv-note", r.notes || "—"));
-      row.appendChild(el("span", "inv-used mono", fmtDate(r.publishedAt) + " · " + mb(r.sizeBytes || 0)));
+    card.appendChild(el("div", "text-secondary small mb-2", "共 " + list.length + " 个版本 · " + mb(total) + " · 设为分发＝学生端下次启动即下载该版本"));
+    var wrap = el("div", "list-group list-group-flush");
+    list.forEach(function (r) {
+      var item = el("div", "list-group-item d-flex align-items-center gap-2 flex-wrap");
+      item.appendChild(el("span", "mono fw-bold", "v" + r.version));
+      if (r.isCurrent) item.appendChild(el("span", "badge bg-success-lt", "分发中"));
+      else if (r.rolledBackAt) item.appendChild(el("span", "badge bg-secondary-lt", "已回滚"));
+      item.appendChild(el("span", "text-secondary small", r.notes || "—"));
+      item.appendChild(el("span", "text-secondary small ms-auto mono", fmtDate(r.publishedAt) + " · " + mb(r.sizeBytes || 0)));
       if (!r.isCurrent) {
-        var rb = el("button", "tbtn", "设为分发");
-        rb.type = "button";
-        rb.setAttribute("data-udo", "rollback");
-        rb.setAttribute("data-ver", r.version);
-        var del = el("button", "tbtn danger", "删除");
-        del.type = "button";
-        del.setAttribute("data-udo", "delete");
-        del.setAttribute("data-ver", r.version);
-        row.appendChild(rb);
-        row.appendChild(del);
+        var group = el("div", "btn-group");
+        group.appendChild(btn("设为分发", "btn btn-sm btn-outline-secondary", { "data-udo": "rollback", "data-ver": r.version }));
+        group.appendChild(btn("删除", "btn btn-sm btn-outline-danger", { "data-udo": "delete", "data-ver": r.version }));
+        item.appendChild(group);
       }
-      card.appendChild(row);
-    }
+      wrap.appendChild(item);
+    });
+    card.appendChild(wrap);
   }
 
   // ── 密钥管理 ──────────────────────────────────────────────
 
   function renderKeys() {
     var r = store.update && store.update.keys;
-    var box = $("keyList");
-    if (!box) return;
-    box.textContent = "";
+    var rows = $("keyRows");
+    if (!rows) return;
+    rows.textContent = "";
     if (!r || r.unavailable || r.error) {
-      box.appendChild(el("p", "empty", (r && r.error) || "更新后台未接入"));
+      rows.innerHTML = '<tr><td colspan="5" class="text-secondary">' + esc((r && r.error) || "更新后台未接入") + "</td></tr>";
       return;
     }
     var list = (r.data && r.data.keys) || [];
     if (!list.length) {
-      box.appendChild(el("p", "empty", "没有可用密钥"));
+      rows.innerHTML = '<tr><td colspan="5" class="text-secondary">没有可用密钥</td></tr>';
       return;
     }
-    for (var i = 0; i < list.length; i++) {
-      var k = list[i];
-      var row = el("div", "inv-row");
-      row.appendChild(el("b", "mono", k.name));
-      row.appendChild(el("span", "hall-badge", k.isEnv ? "主密钥" : "面板密钥"));
-      row.appendChild(el("span", "inv-used mono", "建 " + fmtTime(k.createdAt) + " · 用 " + fmtTime(k.lastUsedAt)));
+    list.forEach(function (k) {
+      var tr = el("tr");
+      tr.appendChild(el("td", "mono fw-bold", k.name));
+      tr.appendChild(el("td", null, "")).innerHTML = k.isEnv
+        ? '<span class="badge bg-secondary-lt">主密钥</span>'
+        : '<span class="badge bg-info-lt">面板密钥</span>';
+      tr.appendChild(el("td", "mono", fmtTime(k.createdAt)));
+      tr.appendChild(el("td", "mono", fmtTime(k.lastUsedAt)));
+      var acts = el("td", "text-end");
       if (!k.isEnv) {
-        var del = el("button", "tbtn danger", "删除");
-        del.type = "button";
-        del.setAttribute("data-keydel", k.id);
-        del.setAttribute("data-name", k.name);
-        row.appendChild(del);
+        var group = el("div", "btn-group");
+        group.appendChild(btn("删除", "btn btn-sm btn-outline-danger", { "data-keydel": k.id, "data-name": k.name }));
+        acts.appendChild(group);
       }
-      box.appendChild(row);
+      tr.appendChild(acts);
+      rows.appendChild(tr);
+    });
+  }
+
+  // ── 操作日志 ──────────────────────────────────────────────
+
+  function renderLog() {
+    var rows = $("logRows");
+    if (!rows) return;
+    rows.textContent = "";
+    if (!store.log.length) {
+      rows.innerHTML = '<tr><td colspan="2" class="text-secondary">暂无记录</td></tr>';
+      return;
     }
+    store.log.forEach(function (entry) {
+      var tr = el("tr");
+      tr.appendChild(el("td", "mono text-secondary", fmtTime(entry.at)));
+      tr.appendChild(el("td", null, entry.text));
+      rows.appendChild(tr);
+    });
   }
 
   // ── 事件（委托）──────────────────────────────────────────
@@ -841,7 +835,7 @@
   document.addEventListener("click", function (e) {
     var t = e.target.closest ? e.target.closest("button,a") : null;
     if (!t) return;
-    if (t.id === "refresh" || t.id === "refreshM") {
+    if (t.id === "refresh") {
       load();
       return;
     }
@@ -851,89 +845,66 @@
       });
       return;
     }
-    // 目录导航（rail 与首页宫格共用 data-nav）
-    if (t.classList.contains("cat-btn") || t.classList.contains("hall-card")) {
+    if (t.hasAttribute("data-open-modal")) {
+      showModal(t.getAttribute("data-open-modal"));
+      return;
+    }
+    if (t.hasAttribute("data-close-modal")) {
+      closeModals();
+      return;
+    }
+    if (t.classList.contains("nav-link") && t.hasAttribute("data-nav")) {
       showPane(t.getAttribute("data-nav"));
+      // 窄屏：切页后收起侧栏菜单，别让它盖住内容
+      var menu = document.getElementById("sidebar-menu");
+      if (menu && menu.classList.contains("show")) {
+        menu.classList.remove("show");
+        var toggleBtn = document.querySelector('[data-bs-target="#sidebar-menu"]');
+        if (toggleBtn) toggleBtn.setAttribute("aria-expanded", "false");
+      }
       return;
     }
-    // 同学名录行 → 打开个人档案
-    if (t.classList.contains("st-row")) {
-      openStudent = t.getAttribute("data-student") || "";
-      renderStudents();
-      var dos = $("studentDossier");
-      if (dos) dos.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    var detail = t.getAttribute("data-detail");
+    if (detail) {
+      var u = (store.users || []).filter(function (x) {
+        return x.username === detail;
+      })[0];
+      if (u) {
+        var defLimit = Number((store.site || {}).defaultDailyTurns) || 0;
+        $("userDetailBody").innerHTML = '<div class="datagrid">' + userDetailHtml(u, defLimit, inviteByUser()[u.username] || null) + "</div>";
+        showModal("modalUserDetail");
+      }
       return;
     }
-    if (t.id === "studentBack") {
-      openStudent = "";
-      renderStudents();
-      return;
-    }
-    // 搜索输入在 keyup 里处理；下面是各动作按钮
-    if (t.id === "updGo") {
-      updPublish();
-      return;
-    }
-    if (t.id === "updCancel") {
-      if (updState.xhr) updState.xhr.abort();
-      return;
-    }
-    if (t.id === "updClear") {
-      updState.file = null;
-      $("updFileBox").textContent = "";
-      return;
-    }
-    if (t.id === "updRetry") {
-      load();
-      return;
-    }
-    if (t.id === "invGen") {
-      api("/admin/api/invite", {
-        count: Number($("invCount").value) || 1,
-        note: $("invNote").value,
-        days: Number($("invDays").value) || 0,
-      }).then(load);
-      return;
-    }
-    if (t.id === "keyGen") {
-      api("/admin/api/update/keys", { name: $("keyName").value }).then(function (r) {
-        $("keyName").value = "";
-        if (!r || r.error || r.unavailable) {
-          alert((r && (r.error || "更新后台不可达")) || "创建失败");
+    if (t.id === "userCreateGo") {
+      api("/admin/api/user/create", {
+        username: $("newUsername").value.trim(),
+        password: $("newPassword").value,
+      }).then(function (r) {
+        if (!r || r.error) {
+          alert((r && r.error) || "创建失败");
           return;
         }
-        var token = r.data && r.data.token;
-        var k = r.data && r.data.key;
-        var box = $("keyCreated");
-        box.hidden = false;
-        box.textContent = "";
-        box.appendChild(el("div", "notice", "密钥「" + k.name + "」已创建——明文仅此一次展示，之后无法再查看，请立即复制保存："));
-        var row = el("div", "inv-row");
-        var input = el("input", "mono");
-        input.readOnly = true;
-        input.value = token;
-        input.onfocus = function () {
-          this.select();
-        };
-        row.appendChild(input);
-        var cp = el("button", "tbtn", "复制");
-        cp.type = "button";
-        cp.setAttribute("data-copy", token);
-        row.appendChild(cp);
-        box.appendChild(row);
+        closeModals();
+        $("newUsername").value = "";
+        $("newPassword").value = "";
+        alert("用户 " + r.user.username + " 已创建，可立即登录。");
         load();
       });
       return;
     }
-    if (t.id === "siteKeySave") {
-      var nk = $("siteKeyInput").value.trim();
-      if (nk && !confirm("保存站点统一 DeepSeek Key（新拉起的实例生效），确认？")) return;
-      api("/admin/api/site", { deepseekKey: nk }).then(function (r) {
-        if (r && r.error) {
-          alert(r.error);
+    if (t.id === "quotaGo") {
+      var turns = Number($("quotaValue").value);
+      if (Number.isNaN(turns) || turns < 0) {
+        alert("限额需为不小于 0 的整数（0 = 用站点默认）");
+        return;
+      }
+      api("/admin/api/user/quota", { user: quotaTarget, turns: turns }).then(function (r) {
+        if (!r || r.error) {
+          alert((r && r.error) || "失败");
           return;
         }
-        $("siteKeyInput").value = "";
+        closeModals();
         load();
       });
       return;
@@ -946,27 +917,23 @@
         }
         var box = $("mfaSetupBox");
         box.textContent = "";
-        var qr = el("div", "qr");
+        var qr = el("div", "qr-box");
         qr.innerHTML = r.qrSvg;
         box.appendChild(qr);
         var grouped = r.secret.replace(/(.{4})/g, "$1 ").trim();
         box.appendChild(
-          el(
-            "p",
-            "lead",
-            "用手机验证器扫描二维码（或手输密钥 " + grouped + "），然后输入验证器上当前的 6 位动态码完成绑定：",
-          ),
+          el("div", "text-secondary", "用手机验证器扫描二维码（或手输密钥 " + grouped + "），然后输入当前 6 位动态码完成绑定："),
         );
-        var row = el("div", "inv-row");
-        var input = el("input", null);
+        var row = el("div", "d-flex gap-2 mt-2");
+        var input = el("input", "form-control");
         input.id = "mfaVerifyCode";
         input.placeholder = "6 位动态码";
         input.inputMode = "numeric";
         input.autocomplete = "one-time-code";
         input.maxLength = 6;
+        input.style.maxWidth = "160px";
         row.appendChild(input);
-        var go = el("button", "tbtn", "验证并启用");
-        go.type = "button";
+        var go = btn("验证并启用", "btn btn-primary", null);
         go.id = "mfaEnable";
         row.appendChild(go);
         box.appendChild(row);
@@ -1013,11 +980,40 @@
       });
       return;
     }
+    if (t.id === "updGo") {
+      updPublish();
+      return;
+    }
+    if (t.id === "updCancel") {
+      if (updState.xhr) updState.xhr.abort();
+      return;
+    }
+    if (t.id === "updClear") {
+      updState.file = null;
+      $("updFileBox").textContent = "";
+      return;
+    }
+    if (t.id === "updRetry") {
+      load();
+      return;
+    }
     if (t.hasAttribute("data-copy")) {
       var code = t.getAttribute("data-copy");
       navigator.clipboard.writeText(code).then(function () {
         t.textContent = "已复制";
         t.className = "copy-ok";
+      });
+      return;
+    }
+    var invDel = t.getAttribute("data-invdel");
+    if (invDel) {
+      if (!confirm("删除该邀请码？（未使用才可删，不影响已注册同学）")) return;
+      api("/admin/api/invite/delete", { code: invDel }).then(function (r) {
+        if (!r || r.error) {
+          alert((r && r.error) || "删除失败");
+          return;
+        }
+        load();
       });
       return;
     }
@@ -1040,8 +1036,6 @@
       }
       return;
     }
-    var doWhat = t.getAttribute("data-do");
-    var user = t.getAttribute("data-u");
     var updWhat = t.getAttribute("data-udo");
     var version = t.getAttribute("data-ver");
     if (updWhat && version) {
@@ -1071,13 +1065,21 @@
       });
       return;
     }
+    var doWhat = t.getAttribute("data-do");
+    var user = t.getAttribute("data-u");
     if (!doWhat || !user) return;
     if (doWhat === "quota") {
-      var q = prompt("给 " + user + " 设每日对话轮数限额（0 = 用站点默认）：", t.getAttribute("data-cur") || "0");
-      if (q === null) return;
-      api("/admin/api/user/" + doWhat, { user: user, turns: Number(q) }).then(function (r) {
-        if (r && r.error) {
-          alert(r.error);
+      quotaTarget = user;
+      $("quotaUser").textContent = user + "（当前：0 = 用站点默认；输入 0-100000 的整数）";
+      $("quotaValue").value = t.getAttribute("data-cur") || "0";
+      showModal("modalQuota");
+      return;
+    }
+    if (doWhat === "delete") {
+      if (!confirm("删除用户 " + user + "？账号、登录凭证与其专属数据目录将一并删除，不可恢复，确认？")) return;
+      api("/admin/api/user/delete", { user: user }).then(function (r) {
+        if (!r || r.error) {
+          alert((r && r.error) || "删除失败");
           return;
         }
         load();
@@ -1085,30 +1087,83 @@
       return;
     }
     var confirmText =
-      doWhat === "disable" ? "停用后该同学将立即无法登录，确认？" : "回收后该同学的实例立即停止，下次访问重新拉起，确认？";
+      doWhat === "disable"
+        ? "停用后该同学将立即无法登录，确认？"
+        : "回收后该同学的实例立即停止，下次访问重新拉起，确认？";
     if (!confirm(confirmText)) return;
     api("/admin/api/user/" + doWhat, { user: user }).then(load);
   });
 
-  // 同学名录搜索（知识库 kw-box 同款：/ 聚焦，Esc 清空）
-  (function () {
-    var box = $("studentSearch");
-    if (box) {
-      box.addEventListener("input", function () {
-        studentFilter = box.value;
-        renderStudents();
-      });
-      box.addEventListener("keydown", function (ev) {
-        if (ev.key === "Escape") {
-          box.value = "";
-          studentFilter = "";
-          renderStudents();
+  // 表单提交（阻止默认跳转，走 API）
+  document.addEventListener("submit", function (e) {
+    var f = e.target;
+    if (f.id === "inviteForm") {
+      e.preventDefault();
+      api("/admin/api/invite", {
+        count: Number($("invCount").value) || 1,
+        note: $("invNote").value,
+        days: Number($("invDays").value) || 0,
+      }).then(load);
+    } else if (f.id === "siteKeyForm") {
+      e.preventDefault();
+      var nk = $("siteKeyInput").value.trim();
+      if (nk && !confirm("保存站点统一 DeepSeek Key（新拉起的实例生效），确认？")) return;
+      api("/admin/api/site", { deepseekKey: nk }).then(function (r) {
+        if (r && r.error) {
+          alert(r.error);
+          return;
         }
+        $("siteKeyInput").value = "";
+        load();
+      });
+    } else if (f.id === "keyForm") {
+      e.preventDefault();
+      api("/admin/api/update/keys", { name: $("keyName").value }).then(function (r) {
+        $("keyName").value = "";
+        if (!r || r.error || r.unavailable) {
+          alert((r && (r.error || "更新后台不可达")) || "创建失败");
+          return;
+        }
+        var token = r.data && r.data.token;
+        var k = r.data && r.data.key;
+        var box = $("keyCreated");
+        box.hidden = false;
+        box.textContent = "";
+        box.appendChild(el("div", "alert alert-warning", "密钥「" + k.name + "」已创建——明文仅此一次展示，之后无法再查看，请立即复制保存："));
+        var row = el("div", "d-flex gap-2");
+        var input = el("input", "form-control mono");
+        input.readOnly = true;
+        input.value = token;
+        input.onfocus = function () {
+          this.select();
+        };
+        row.appendChild(input);
+        row.appendChild(btn("复制", "btn btn-outline-secondary", { "data-copy": token }));
+        box.appendChild(row);
+        load();
+      });
+    }
+  });
+
+  // 用户搜索与筛选
+  (function () {
+    var search = $("userSearch");
+    if (search) {
+      search.addEventListener("input", function () {
+        userFilterText = search.value;
+        renderUsers();
+      });
+    }
+    var filter = $("userFilter");
+    if (filter) {
+      filter.addEventListener("change", function () {
+        userFilterState = filter.value;
+        renderUsers();
       });
     }
   })();
 
-  // 上传发版：拖拽区与版本号输入
+  // 上传发版：拖拽与版本号
   (function () {
     var drop = $("updDrop");
     var fileInput = $("updFile");
@@ -1124,14 +1179,14 @@
       });
       drop.addEventListener("dragover", function (e) {
         e.preventDefault();
-        drop.classList.add("on");
+        drop.classList.add("drag-on");
       });
       drop.addEventListener("dragleave", function () {
-        drop.classList.remove("on");
+        drop.classList.remove("drag-on");
       });
       drop.addEventListener("drop", function (e) {
         e.preventDefault();
-        drop.classList.remove("on");
+        drop.classList.remove("drag-on");
         updPickFile(e.dataTransfer.files && e.dataTransfer.files[0]);
       });
       fileInput.addEventListener("change", function () {
@@ -1147,7 +1202,7 @@
     }
   })();
 
-  // 轻量轮询：页面可见且无进行中的上传时，每 60s 重拉一次数据
+  // 页面可见且无上传进行中时，每 60s 轻量刷新
   setInterval(function () {
     if (uploading || document.visibilityState !== "visible") return;
     load();
@@ -1157,10 +1212,6 @@
     var id = paneFromHash();
     if (id && id !== current) showPane(id, false);
   });
-
-  // 报头时钟每 30s 对一次表
-  tickClock();
-  setInterval(tickClock, 30000);
 
   showPane(paneFromHash() || "home", false);
   load();

@@ -7,22 +7,22 @@
  * 鉴权：独立的管理会话 Cookie（raptor_admin，HMAC 签名与同学会话不同名
  * 不同签名域，互不通用）；登录失败同样 5 次锁 15 分钟。
  *
- * 页面形态完全按同学端网页版的独立页（today / knowledge / schedule）
- * 推导，不沿用旧管理台的「侧栏后台」范式：报头（旋转印章 + 楷体标题 +
- * 眉批 + 时钟）+ 左侧窄栏（kicker / 楷体题 / 目录导航 / 运行信息）+
- * 右侧朱砂顶线卡片列。首页 = 对话页 hero + 功能大厅目录行；「同学」页 =
- * 知识库式的名录 + 个人档案。前端应用在 assets/admin-app.js（与
- * chat-app.js 同一交付模式：无构建、静态检查有测试兜底、服务时内联，
- * 单文件交付）。改 admin-app.js 后需重启网关（appJs 有内存缓存）。
+ * 界面基于 Tabler（MIT，vendor 在 assets/vendor/，主流管理后台模板），
+ * 前端应用在 assets/admin-app.js（vanilla JS，无构建，服务时内联进页面）。
+ * 模板静态文件经 /admin/assets/<白名单文件> 下发（公共资源，无鉴权）。
  *
- * 两步验证（TOTP）：在「安全」扫码绑定手机验证器后，登录需管理密码
- * + 6 位动态码（附 10 枚一次性恢复码）。启用/关闭会递增 sessionEpoch，
- * 令既有管理会话立即失效；手机与恢复码全丢时 SSH 上机执行
- * `admin.mjs totp off` 兜底。未绑定则维持仅密码登录，行为与从前一致。
+ * 管理能力：总览 / 用户（增删改停踢）/ 邀请码（生成删）/ 重置审批 /
+ * 站点设置 / 安全设置（TOTP）/ 版本发布 / 密钥管理 / 操作日志。
+ * 全部变更动作写 admin-log.json（环形 500 条，经 bootstrap 带出）。
+ *
+ * 两步验证（TOTP）：在「安全设置」扫码绑定后登录需密码 + 6 位动态码；
+ * 启用/关闭递增 sessionEpoch 令既有管理会话立即失效；手机与恢复码全丢
+ * 时 SSH 上机执行 `admin.mjs totp off` 兜底。
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
 import fs from "node:fs";
+import { rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import QRCode from "qrcode";
@@ -34,25 +34,27 @@ import {
   verifyTotp,
 } from "./totp.mjs";
 
-const APP_JS_PATH = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "assets",
-  "admin-app.js",
-);
+const ADMIN_DIR = path.dirname(fileURLToPath(import.meta.url));
+const APP_JS_PATH = path.join(ADMIN_DIR, "assets", "admin-app.js");
 let appJsCache = null;
 
-/** 读入前端应用并缓存（与 chat-page.ts 的 appJs() 同一模式） */
+/** 读入前端应用并缓存（改 admin-app.js 后需重启网关生效） */
 function appJs() {
   if (appJsCache === null) {
     try {
       appJsCache = fs.readFileSync(APP_JS_PATH, "utf8");
     } catch {
-      // 资产读不到时页面仍可打开，但在控制台明确报因，不渲染一个死页面
       appJsCache = 'console.error("前端脚本缺失：gateway/admin/assets/admin-app.js 不可读");';
     }
   }
   return appJsCache;
 }
+
+/** 模板静态文件白名单（公共资源，不含任何秘密，直接下发可缓存） */
+const ASSET_FILES = new Map([
+  ["tabler.min.css", { file: path.join(ADMIN_DIR, "assets", "vendor", "tabler.min.css"), type: "text/css; charset=utf-8" }],
+  ["tabler.min.js", { file: path.join(ADMIN_DIR, "assets", "vendor", "tabler.min.js"), type: "application/javascript; charset=utf-8" }],
+]);
 
 const ADMIN_COOKIE = "raptor_admin";
 const ADMIN_TTL_MS = 12 * 3600_000;
@@ -94,508 +96,482 @@ function escapeHtml(text) {
     .replaceAll('"', "&quot;");
 }
 
-/** 与 chat-page.ts 同源的红头档案设计令牌 */
-const TOKENS_CSS = `
-:root{color-scheme:light;
---paper:#F6F4ED;--paper-deep:#F0EDE4;--card:#FCFBF7;--shade:#ECE8DD;
---ink:#25221C;--ink-2:#5A554A;--ink-3:#6E6656;
---rule:#E1DCCF;--rule-2:#C9C1AF;
---accent:#AD392C;--accent-deep:#852B22;--accent-soft:#F3E3DE;--accent-line:#E4C4BB;
---ok:#3D6B4F;
---shadow-sm:0 8px 24px rgba(50,42,31,.055);
---serif:Georgia,"Times New Roman","Songti SC",SimSun,serif;
---kai:"KaiTi","STKaiti","Kaiti SC",var(--serif);
---sans:system-ui,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
---mono:ui-monospace,"Cascadia Mono",Consolas,"Liberation Mono",monospace}
-*{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
-::selection{background:var(--accent-soft)}
-:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-button,input,textarea{font-family:inherit}
-button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-body{margin:0;background:var(--paper);color:var(--ink);
-font-family:var(--sans);font-size:16px;line-height:1.7;
--webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+/** 管理台少量自有样式（其余全部交给 Tabler） */
+const OWN_CSS = `
+body{font-family:var(--tblr-font-sans-serif,inherit)}
+.pane-page{display:none}
+.pane-page.on{display:block}
+.qr-box{background:#fff;border:1px solid var(--tblr-border-color);border-radius:4px;
+width:fit-content;padding:8px;margin:4px 0}
+.qr-box svg{display:block;width:200px;height:200px}
+.recovery-codes{font-family:var(--tblr-font-monospace,monospace);font-size:15px;
+letter-spacing:.08em;line-height:2}
+.drop-zone{border:1.5px dashed var(--tblr-border-color);border-radius:4px;
+padding:22px 16px;text-align:center;color:var(--tblr-secondary);cursor:pointer;
+background:var(--tblr-bg-surface-secondary);transition:border-color .15s ease,background .15s ease}
+.drop-zone:hover,.drop-zone.drag-on{border-color:var(--tblr-primary);color:var(--tblr-primary-fg);background:var(--tblr-active-bg)}
+.mono{font-family:var(--tblr-font-monospace,monospace);font-size:.875em}
+.copy-ok{color:var(--tblr-success);font-size:.75rem}
+.log-empty{color:var(--tblr-secondary)}
 `;
 
-/** 登录页 / 未启用页：与同学端登录注册同一副「居中一页纸」骨架 */
-const AUTH_CSS = `
-${TOKENS_CSS}
-body{min-height:100vh;min-height:100dvh;display:grid;place-items:center;
-padding:34px 18px;font-size:16px;overscroll-behavior:none}
-.sheet{width:min(400px,100%)}
-.mast{text-align:center;padding-bottom:20px;position:relative;border-bottom:1px solid var(--rule-2)}
-.mast::after{content:"";position:absolute;left:12%;right:12%;bottom:3px;height:2px;background:var(--accent)}
-.mast img{width:76px;height:76px;object-fit:contain;display:block;margin:0 auto 10px}
-.wordmark{margin:0;font-size:24px;line-height:1.2;letter-spacing:-.035em;font-weight:500}
-.wordmark .course{color:var(--ink-2)}
-.wordmark .raptor{color:var(--accent);font-weight:750}
-.wordmark .badge{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.14em;
-color:var(--accent-deep);background:var(--accent-soft);border:1px solid var(--accent-line);
-border-radius:2px;padding:2px 8px;margin-left:10px;vertical-align:3px}
-.tagline{margin:6px 0 0;font-family:var(--kai);font-size:14.5px;color:var(--ink-3);letter-spacing:.06em}
-.card{margin-top:26px;background:var(--card);border:1px solid var(--rule);
-border-radius:3px;box-shadow:var(--shadow-sm);padding:24px 26px 22px}
-label{display:block;margin:14px 0 6px;font-family:var(--mono);font-size:11px;
-font-weight:600;letter-spacing:.12em;color:var(--ink-3)}
-input{width:100%;padding:10px 12px;background:var(--card);
-border:1px solid var(--rule-2);border-radius:2px;font-size:15px;color:var(--ink);
-transition:border-color .15s ease,box-shadow .15s ease}
-input:hover{border-color:var(--ink-3)}
-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-input:-webkit-autofill{-webkit-box-shadow:0 0 0 40px var(--card) inset;-webkit-text-fill-color:var(--ink)}
-button.primary{display:block;width:100%;margin-top:22px;padding:12px;
-background:var(--accent);color:var(--card);border:1px solid var(--accent);
-border-radius:2px;font-size:15px;font-weight:600;letter-spacing:.14em;cursor:pointer;
-transition:background .15s ease}
-button.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff}
-button.primary:active{transform:translateY(1px)}
-.notice{margin:0 0 4px;padding:9px 12px;background:var(--accent-soft);
-border:1px solid var(--accent-line);border-radius:2px;color:var(--accent-deep);
-font-size:13.5px;line-height:1.6}
-.mono{font-family:var(--mono)}
-@media (max-width:420px){.mast img{width:64px;height:64px}.card{padding:20px 18px 18px}}
-@media (hover:none){input{font-size:16px}}
-`;
+const loginHtml = (error = "", mfa = false) => `<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f8f9fa">
+<title>管理登录 · CourseRaptor</title>
+<link rel="stylesheet" href="/admin/assets/tabler.min.css">
+<style>${OWN_CSS}</style>
+</head>
+<body>
+<div class="page page-center">
+<div class="container container-tight py-4">
+  <div class="text-center mb-4">
+    <span class="navbar-brand navbar-brand-autodark" style="font-size:1.1rem;font-weight:600">
+      CourseRaptor <span class="badge bg-warning-lt ms-2">ADMIN</span>
+    </span>
+  </div>
+  <div class="card card-md">
+    <div class="card-body">
+      <h2 class="h2 text-center mb-4">管理后台登录</h2>
+      ${error ? `<div class="alert alert-danger" role="alert">${escapeHtml(error)}</div>` : ""}
+      <form method="post" action="/admin/login" autocomplete="on">
+        <div class="mb-3">
+          <label class="form-label">管理密码</label>
+          <input type="password" class="form-control" name="password"
+                 autocomplete="current-password" required${mfa ? "" : " autofocus"}
+                 placeholder="请输入管理密码">
+        </div>
+        ${mfa
+          ? `<div class="mb-3">
+          <label class="form-label">动态码（2FA）</label>
+          <input type="text" class="form-control" name="code" inputmode="numeric"
+                 autocomplete="one-time-code" required autofocus
+                 placeholder="验证器 6 位数字（或恢复码）">
+        </div>`
+          : ""}
+        <div class="form-footer">
+          <button type="submit" class="btn btn-primary w-100">进入管理后台</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="text-center text-secondary mt-3">班级互助服务 · CourseRaptor</div>
+</div>
+</div>
+</body>
+</html>`;
 
-/**
- * 管理总台应用壳：today/knowledge 独立页的编辑台变体。
- * 报头（印章 + 楷体题 + 眉批 + 时钟）→ 左窄栏（目录 + 运行信息）→
- * 右侧卡片列（朱砂顶线卡）。窄屏时窄栏叠到卡片列上方（today 页 720 断点同款）。
- */
-const APP_CSS = `
-${TOKENS_CSS}
-.tbtn{background:none;border:1px solid var(--rule-2);color:var(--ink-2);
-min-height:34px;font-size:13px;padding:5px 13px;border-radius:4px;cursor:pointer;
-text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;
-transition:border-color .15s ease,color .15s ease,background .15s ease}
-.tbtn:hover{border-color:var(--accent);color:var(--accent);background:var(--card)}
-.tbtn:active{transform:translateY(1px)}
-.tbtn.danger:hover{border-color:var(--accent-deep);background:var(--accent-soft);color:var(--accent-deep)}
-/* ── 报头（today 页 pagehead 同款）── */
-.pagehead{display:flex;align-items:center;gap:16px;padding:16px 26px;
-border-bottom:1px solid var(--rule);background:var(--paper-deep)}
-.pagehead .seal{flex:none;position:relative;width:44px;height:44px;transform:rotate(-7deg)}
-.pagehead .seal::before{content:"";position:absolute;inset:0;
-border:2px solid var(--accent);border-radius:50%;opacity:.9}
-.pagehead .seal img{position:absolute;top:5px;left:5px;width:34px;height:34px;
-border-radius:50%;object-fit:cover}
-.ph-title{flex:1;min-width:0;display:flex;align-items:baseline;gap:14px}
-.ph-title h1{margin:0;font-family:var(--kai);font-weight:400;font-size:24px;letter-spacing:2px}
-.ph-stamp{font-family:var(--mono);font-size:12px;color:var(--ink-3);letter-spacing:.1em}
-.ph-right{display:flex;align-items:center;gap:12px}
-.ph-clock{text-align:right;font-family:var(--mono);line-height:1.5}
-.ph-date{font-size:13px;color:var(--ink-2)}
-.ph-week{font-size:11px;color:var(--ink-3);letter-spacing:.06em}
-/* ── 正文：左窄栏 + 右卡片列（knowledge 页 main 网格同款）── */
-main.content{max-width:1240px;margin:0 auto;padding:30px 22px 64px;
-display:grid;grid-template-columns:220px minmax(0,1fr);gap:26px;align-items:start}
-.rail{position:sticky;top:22px;padding:8px 4px}
-.rail-kicker{margin:0 0 6px;color:var(--accent-deep);font-family:var(--mono);
-font-size:11px;letter-spacing:.18em}
-.rail-title{margin:0;font-family:var(--kai);font-size:30px;font-weight:400;line-height:1.25}
-.cat-nav{display:flex;flex-direction:column;gap:4px;margin-top:16px}
-.cat-btn{display:flex;justify-content:space-between;align-items:baseline;gap:8px;
-background:none;border:1px solid transparent;padding:6px 8px;border-radius:4px;
-color:var(--ink-2);font-size:14px;cursor:pointer;font-family:inherit;text-align:left;
-transition:background .15s ease,color .15s ease}
-.cat-btn:hover{background:var(--card);color:var(--ink)}
-.cat-btn.active{border-color:var(--rule-2);background:var(--card);color:var(--accent-deep)}
-.cat-count{font-family:var(--mono);font-size:11px;color:var(--ink-3)}
-.cat-count.warn{color:var(--accent-deep);font-weight:600}
-.rail-meta{margin-top:18px;padding-top:14px;border-top:1px solid var(--rule-2);
-font-family:var(--mono);font-size:12px;line-height:1.8;color:var(--ink-3)}
-/* ── 卡片（knowledge 页 card 同款：朱砂顶线 + 等宽栏头）── */
-.card{border:1px solid var(--rule-2);border-top:2px solid var(--accent);
-background:var(--card);box-shadow:var(--shadow-sm)}
-.card + .card{margin-top:22px}
-.card > h2{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
-margin:0;padding:13px 18px 10px;border-bottom:1px solid var(--rule);
-font-family:var(--mono);font-size:13px;font-weight:600;
-letter-spacing:.18em;color:var(--ink-2)}
-.card > h2 .cnote{font-family:var(--mono);font-weight:400;font-size:12px;
-letter-spacing:.03em;color:var(--ink-3);text-align:right}
-.cbody{padding:14px 18px 16px;display:grid;gap:10px;align-content:start}
-.lead{margin:4px 0 6px;font-size:15px;color:var(--ink-2)}
-.chint{margin:2px 0 0;font-size:12.5px;color:var(--ink-3);line-height:1.7}
-.empty{padding:22px 0;text-align:center;color:var(--ink-3);font-size:13.5px}
-.skel{color:var(--ink-3);margin:6px 0}
-.mono{font-family:var(--mono);font-size:13px}
-b.hot,.hot{color:var(--accent-deep)}
-.ok{color:var(--ok)}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;
-background:var(--ok);margin-right:7px;vertical-align:1px}
-.dot.off{background:var(--rule-2)}
-.notice{margin:0;padding:9px 12px;background:var(--accent-soft);
-border:1px solid var(--accent-line);border-radius:2px;color:var(--accent-deep);
-font-size:13.5px;line-height:1.6}
-.copy-ok{color:var(--ok);font-family:var(--mono);font-size:11px;cursor:default;
-border:0;background:none;padding:3px 0}
-/* ── 首页：hero（chat 页同款）+ 数据行 + 大厅目录行 ── */
-.panel{display:none}
-.panel.on{display:block}
-.hero{display:flex;min-height:220px;flex-direction:column;align-items:center;
-justify-content:center;text-align:center;padding:10px 16px 26px}
-.hero .seal{position:relative;width:104px;height:104px;transform:rotate(-7deg)}
-.hero .seal::before{content:"";position:absolute;inset:0;border:2.5px solid var(--accent);
-border-radius:50%;opacity:.85}
-.hero .seal::after{content:"";position:absolute;inset:6px;border:1px solid var(--accent-line);border-radius:50%}
-.hero .seal img{position:absolute;top:12px;left:12px;width:80px;height:80px;
-border-radius:50%;object-fit:cover}
-.hero-kicker{margin:18px 0 10px;font-family:var(--mono);font-size:11px;
-letter-spacing:.3em;color:var(--accent-deep)}
-.hero h2{margin:0 0 10px;font-family:var(--kai);font-weight:400;font-size:30px;letter-spacing:2px}
-.hero p{margin:0 auto;max-width:520px;font-size:15px;color:var(--ink-2)}
-.hstats{display:grid;grid-template-columns:repeat(4,1fr);margin:0 0 26px;
-border-top:1px solid var(--rule-2);border-bottom:1px solid var(--rule)}
-.hstat{padding:13px 10px 11px;text-align:center;border-left:1px solid var(--rule)}
-.hstat:first-child{border-left:0}
-.hstat b{display:block;font-family:var(--mono);font-size:23px;font-weight:600;letter-spacing:-.02em}
-.hstat span{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--ink-3)}
-/* 大厅目录行（chat 页 hall-card 同款语言）*/
-.hall-sec{display:flex;align-items:baseline;justify-content:space-between;
-margin:0 0 6px;padding-bottom:6px;font-family:var(--mono);font-size:12px;
-font-weight:600;letter-spacing:.14em;color:var(--ink-3);border-bottom:1px solid var(--rule)}
-.hall-sec span:last-child{font-weight:400;letter-spacing:.04em}
-.hall-grid{display:grid;grid-template-columns:1fr}
-.hall-card{position:relative;display:flex;flex-direction:column;gap:4px;
-text-align:left;width:100%;border:0;border-bottom:1px solid var(--rule);
-background:none;padding:12px 6px 12px 15px;cursor:pointer;font-family:inherit;
-transition:background .15s ease}
-.hall-grid .hall-card:last-child{border-bottom-color:transparent}
-.hall-card::before{content:"";position:absolute;left:0;top:10px;bottom:10px;
-width:3px;background:var(--accent);opacity:0;transition:opacity .15s ease}
-.hall-card:hover{background:var(--paper-deep)}
-.hall-card:hover::before{opacity:1}
-.hall-card:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-.hall-card-top{display:flex;align-items:center;gap:9px}
-.hall-ico{flex:none;width:28px;height:28px;display:inline-flex;align-items:center;
-justify-content:center;background:var(--accent-soft);color:var(--accent-deep);border-radius:4px}
-.hall-ico svg{display:block;width:15px;height:15px;fill:none;stroke:currentColor;
-stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.hall-card b{flex:1;min-width:0;font-size:15px;font-weight:600;
-overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}
-.hall-go{flex:none;color:var(--rule-2);font-size:14px;
-transition:color .15s ease,transform .15s ease}
-.hall-card:hover .hall-go{color:var(--accent);transform:translateX(2px)}
-.hall-card > span{font-family:var(--mono);font-size:12px;color:var(--ink-3);
-letter-spacing:.02em;line-height:1.6}
-.hall-badge{flex:none;font-family:var(--mono);font-size:11px;letter-spacing:.04em;
-color:var(--accent-deep);background:var(--accent-soft);padding:1px 8px;
-border-radius:2px;white-space:nowrap}
-.hall-badge.warn{background:var(--accent);color:var(--card);font-weight:600}
-.hall-note{margin:16px 2px 0;font-family:var(--mono);font-size:12px;
-color:var(--ink-3);line-height:1.8}
-/* ── 同学：名录行 + 档案卡 ── */
-.kw-box{width:100%;padding:7px 10px;border:1px solid var(--rule-2);
-border-radius:4px;background:var(--card);color:var(--ink);font-size:14px;font-family:inherit}
-.kw-box:focus{outline:none;border-color:var(--accent)}
-.st-row{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;
-border:1px solid var(--rule);background:var(--card);border-radius:4px;
-padding:10px 12px 10px 14px;cursor:pointer;font-family:inherit;position:relative;
-transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}
-.st-row::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;
-border-radius:4px 0 0 4px;background:var(--accent);opacity:0;transition:opacity .15s ease}
-.st-row:hover{border-color:var(--rule-2);background:var(--paper-deep)}
-.st-row:hover::before,.st-row.active::before{opacity:1}
-.st-row.active{border-color:var(--accent-line);box-shadow:var(--shadow-sm)}
-.st-row-top{display:flex;align-items:center;gap:9px}
-.st-row-top b{font-size:15px;font-weight:600}
-.st-quota{margin-left:auto;color:var(--ink-2);font-size:12.5px}
-.st-sub{font-family:var(--mono);font-size:12px;color:var(--ink-3)}
-.dos .dos-head{display:flex;align-items:center;gap:12px;padding:12px 18px 0}
-.dos-name{font-size:16px;font-weight:600;color:var(--accent-deep)}
-.dos-body{padding:6px 18px 4px}
-.dos-row{display:grid;grid-template-columns:110px minmax(0,1fr);gap:12px;
-padding:7px 0;border-bottom:1px dashed var(--rule)}
-.dos-row:last-child{border-bottom:0}
-.dos-k{font-family:var(--mono);font-size:12px;color:var(--ink-3);
-letter-spacing:.06em;padding-top:2px}
-.dos-v{font-size:14px;color:var(--ink)}
-.dos-acts{display:flex;gap:10px;flex-wrap:wrap;align-items:center;
-padding:8px 18px 14px;border-top:1px solid var(--rule);margin-top:8px}
-.dos-acts input{width:200px}
-.dos-hint{margin:0 18px 16px;font-family:var(--mono);font-size:11.5px;
-color:var(--ink-3);line-height:1.7}
-/* ── 通行条目行（邀请码 / 重置 / 版本 / 密钥共用）── */
-.inv-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;
-padding:9px 2px;border-bottom:1px dashed var(--rule)}
-.inv-row:last-child{border-bottom:0}
-.inv-row b{font-size:14px}
-.inv-row input{flex:1;min-width:200px}
-.inv-code{letter-spacing:.04em}
-.inv-note{flex:1;min-width:120px;font-size:13.5px;color:var(--ink-2);
-overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.inv-used{font-size:12px;color:var(--ink-3)}
-.row{display:flex;gap:10px;flex-wrap:wrap}
-.row input{flex:1;min-width:120px}
-.row .num{max-width:90px;text-align:center}
-input,textarea{padding:8px 11px;background:var(--card);border:1px solid var(--rule-2);
-border-radius:4px;font-size:14.5px;color:var(--ink);
-transition:border-color .15s ease,box-shadow .15s ease}
-input:hover,textarea:hover{border-color:var(--ink-3)}
-input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
-textarea{resize:vertical;font-size:14px}
-.ks{font-size:12.5px;color:var(--ink-3);margin:0}
-/* ── 版本发布：上传 ── */
-.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;
-gap:5px;padding:22px 16px;border:1.5px dashed var(--rule-2);border-radius:4px;
-background:var(--paper-deep);color:var(--ink-3);font-size:12px;text-align:center;
-cursor:pointer;transition:border-color .15s ease,color .15s ease,background .15s ease}
-.drop svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;
-stroke-linecap:round;stroke-linejoin:round;opacity:.75}
-.drop .b{font-size:13.5px;color:var(--ink-2)}
-.drop:hover,.drop:focus-visible,.drop.on{border-color:var(--accent);
-color:var(--accent-deep);background:var(--accent-soft);outline:none}
-.file-chip{display:flex;align-items:center;gap:10px;padding:10px 12px;
-background:var(--card);border:1px solid var(--rule);border-radius:4px}
-.file-chip svg{width:18px;height:18px;flex:none;stroke:var(--accent);fill:none;
-stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.file-chip .name{flex:1;min-width:0;font-size:13.5px;color:var(--ink);
-overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.file-chip .size{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);white-space:nowrap}
-.pbar{height:8px;background:var(--paper-deep);border:1px solid var(--rule);
-border-radius:2px;overflow:hidden}
-.pbar i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s ease}
-.upd-meta{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
-font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--ink-3)}
-button.primary{display:block;width:100%;margin-top:14px;padding:12px;
-background:var(--accent);color:var(--card);border:1px solid var(--accent);
-border-radius:4px;font-size:15px;font-weight:600;letter-spacing:.14em;cursor:pointer;
-transition:background .15s ease}
-button.primary:hover{background:var(--accent-deep);border-color:var(--accent-deep);color:#fff}
-button.primary:active{transform:translateY(1px)}
-/* ── 安全：扫码 ── */
-.qr{background:#fff;border:1px solid var(--rule);border-radius:4px;
-width:fit-content;padding:10px;margin:6px 0 8px}
-.qr svg{display:block;width:184px;height:184px}
-.codes{font-family:var(--mono);font-size:15px;letter-spacing:.08em;line-height:2.1;
-margin:10px 0 0;color:var(--ink)}
-/* ── 窄屏（today 页 720 断点同思路，管理台用 960）── */
-@media (max-width:960px){
-main.content{display:block;padding:22px 14px 56px}
-.rail{position:static;padding:0 0 18px}
-.cat-nav{flex-direction:row;flex-wrap:wrap}
-.pagehead{flex-wrap:wrap;padding:12px 16px;gap:10px 12px}
-.pagehead .seal{width:38px;height:38px}
-.pagehead .seal img{top:4px;left:4px;width:30px;height:30px}
-.ph-title h1{font-size:20px}
-.ph-right{width:100%;flex-wrap:wrap;justify-content:flex-end}
-.ph-clock{flex:1 1 100%}
-.hstats{grid-template-columns:repeat(2,1fr)}
-.hstat:nth-child(3){border-left:0}
-.hstat{border-top:1px solid var(--rule)}
-.hstat:nth-child(-n+2){border-top:0}
-.hero .seal{width:84px;height:84px}
-.hero .seal img{top:10px;left:10px;width:64px;height:64px}
-.hero h2{font-size:24px}
-.dos-row{grid-template-columns:1fr;gap:2px;padding:8px 0}
-}
-@media (hover:none){input,textarea{font-size:16px}}
-`;
+const disabledHtml = () => `<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>未启用 · CourseRaptor 管理</title>
+<link rel="stylesheet" href="/admin/assets/tabler.min.css">
+</head>
+<body>
+<div class="page page-center">
+<div class="container container-tight py-4">
+  <div class="card card-md">
+    <div class="card-body">
+      <h2 class="h2 text-center mb-4">管理后台未启用</h2>
+      <div class="alert alert-warning">服务器未设置 <span class="mono">GATEWAY_ADMIN_PASSWORD</span></div>
+      <p class="text-secondary">在 <span class="mono">/etc/raptor-gateway.env</span> 加入该变量并
+      <span class="mono">systemctl restart raptor-gateway</span> 即可开启；期间可继续用
+      <span class="mono">admin.mjs</span> 命令行管理。</p>
+    </div>
+  </div>
+</div>
+</div>
+</body>
+</html>`;
 
-const authShell = (title, body) => `<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#F0EDE4">
-<link rel="icon" href="/logo.png">
-<title>${escapeHtml(title)} · CourseRaptor 管理</title><style>${AUTH_CSS}</style></head><body>
-<main class="sheet">
-<header class="mast">
-<img src="/logo.png" alt="CourseRaptor 印章">
-<h1 class="wordmark"><span class="course">Course</span><span class="raptor">Raptor</span><span class="badge">ADMIN</span></h1>
-<p class="tagline">班级互助服务 · 管理台</p>
-</header>
-${body}
-</main></body></html>`;
+/** 侧栏图标：Tabler Icons 描线 SVG（24 viewBox，stroke 1.5） */
+const I = {
+  home: '<path d="M5 12l-2 0l9 -9l9 9l-2 0"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7"/><path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6"/>',
+  users:
+    '<path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/>',
+  ticket:
+    '<path d="M15 5l0 2"/><path d="M15 11l0 2"/><path d="M15 17l0 2"/><path d="M5 5a2 2 0 0 0 -2 2v3a2 2 0 0 1 0 4v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2v-3a2 2 0 0 1 0 -4v-3a2 2 0 0 0 -2 -2h-14z"/>',
+  key: '<path d="M10.3 13.7l-.3 .3l-4 4l-2.5 .5l.5 -2.5l4 -4l.3 -.3"/><path d="M21 14a5 5 0 1 0 -8.54 -3.54l-9 9l1.5 1.5l3 3l2 -2l-2 -2l2 -2l2 2l2 -2"/>',
+  shield:
+    '<path d="M12 3l8 4v5c0 5.5 -3.8 9.74 -8 11c-4.2 -1.26 -8 -5.5 -8 -11v-5l8 -4"/><path d="M9 12l2 2l4 -4"/>',
+  rocket:
+    '<path d="M7 12a5 5 0 0 1 5 -5a5 5 0 0 1 5 5a5 5 0 0 1 -5 5a5 5 0 0 1 -5 -5"/><path d="M12 17v7"/><path d="M9 21h6"/>',
+  adjustments:
+    '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="14" cy="12" r="2"/><circle cx="10" cy="18" r="2"/>',
+  history:
+    '<path d="M12 8v4l3 3"/><path d="M3.05 11a9 9 0 1 1 .5 4"/><path d="M3 15l-2 -4l4 1"/>',
+  clipboard:
+    '<path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 3h6v4h-6z"/>',
+};
+const icon = (name) =>
+  `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[name]}</svg>`;
 
-const loginHtml = (error = "", mfa = false) =>
-  authShell(
-    "管理登录",
-    `<section class="card">
-${error ? `<div class="notice">${escapeHtml(error)}</div>` : ""}
-<form method="post" action="/admin/login">
-<label>管理密码 PASSWORD</label>
-<input name="password" type="password" autocomplete="current-password" required${mfa ? "" : " autofocus"} placeholder="请输入管理密码">
-${mfa ? `<label>动态码 2FA CODE</label>
-<input name="code" inputmode="numeric" autocomplete="one-time-code" required autofocus placeholder="验证器 6 位数字（或恢复码）" style="letter-spacing:.3em">` : ""}
-<button type="submit" class="primary">进入管理台</button>
-</form></section>`,
-  );
+const NAV = [
+  { group: "总览", items: [["home", "概览", "home"]] },
+  {
+    group: "管理",
+    items: [
+      ["users", "用户", "users"],
+      ["invites", "邀请码", "ticket"],
+      ["resets", "重置审批", "key"],
+    ],
+  },
+  {
+    group: "配置",
+    items: [
+      ["site", "站点设置", "adjustments"],
+      ["security", "安全设置", "shield"],
+    ],
+  },
+  {
+    group: "发布",
+    items: [
+      ["release", "版本发布", "rocket"],
+      ["keys", "密钥管理", "key"],
+    ],
+  },
+  { group: "系统", items: [["log", "操作日志", "history"]] },
+];
 
-const disabledHtml = () =>
-  authShell(
-    "未启用",
-    `<section class="card" style="width:min(460px,100%)">
-<div class="notice">管理后台未启用：服务器未设置 <span class="mono">GATEWAY_ADMIN_PASSWORD</span>。</div>
-<p style="color:var(--ink-2)">在 <span class="mono">/etc/raptor-gateway.env</span> 加入该变量并
-<span class="mono">systemctl restart raptor-gateway</span> 即可开启；期间可继续用
-<span class="mono">admin.mjs</span> 命令行管理。</p></section>`,
-  );
+const navHtml = NAV.map((group) => {
+  const items = group.items
+    .map(
+      ([id, label, ic]) => `<li class="nav-item" data-nav-item="${id}">
+      <a class="nav-link" href="#/${id}" data-nav="${id}">
+        <span class="nav-link-icon d-md-none d-lg-inline-block">${icon(ic)}</span>
+        <span class="nav-link-title">${label}</span>${id === "resets" ? '<span class="badge bg-danger ms-auto" id="navResetBadge" hidden></span>' : ""}
+      </a>
+    </li>`,
+    )
+    .join("");
+  return `<li class="nav-header">${group.group}</li>${items}`;
+}).join("");
 
 const dashboardHtml = () => `<!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#F0EDE4">
-<link rel="icon" href="/logo.png">
-<title>管理总台 · CourseRaptor</title><style>${APP_CSS}</style></head><body>
-<header class="pagehead">
-<span class="seal" aria-hidden="true"><img src="/logo.png" alt="" width="34" height="34"></span>
-<div class="ph-title">
-<h1>管理总台</h1>
-<span class="ph-stamp">COURSERAPTOR · ADMIN DESK</span>
-</div>
-<div class="ph-right">
-<div class="ph-clock">
-<div class="ph-date" id="phDate"></div>
-<div class="ph-week" id="phWeek"></div>
-</div>
-<button type="button" class="tbtn" id="refresh">刷新数据</button>
-<button type="button" class="tbtn" id="logout">退出</button>
-</div>
-</header>
-<main class="content">
-<aside class="rail" aria-label="管理目录">
-<p class="rail-kicker">OPERATIONS</p>
-<h2 class="rail-title" id="railTitle">首页</h2>
-<nav class="cat-nav" aria-label="管理区">
-<button type="button" class="cat-btn active" data-nav="home"><span>首页</span></button>
-<button type="button" class="cat-btn" data-nav="students"><span>同学</span><span class="cat-count" id="navCountStudents"></span></button>
-<button type="button" class="cat-btn" data-nav="access"><span>准入</span><span class="cat-count" id="navCountAccess"></span></button>
-<button type="button" class="cat-btn" data-nav="model"><span>模型与额度</span></button>
-<button type="button" class="cat-btn" data-nav="release"><span>版本</span></button>
-<button type="button" class="cat-btn" data-nav="keys"><span>密钥</span></button>
-<button type="button" class="cat-btn" data-nav="security"><span>安全</span></button>
-</nav>
-<div class="rail-meta" id="railMeta">读取中…</div>
-</aside>
-<div class="col">
-<section class="pane">
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#f8f9fa">
+<title>管理后台 · CourseRaptor</title>
+<link rel="stylesheet" href="/admin/assets/tabler.min.css">
+<style>${OWN_CSS}</style>
+</head>
+<body>
+<div class="page">
+  <aside class="navbar navbar-vertical navbar-expand-lg">
+    <div class="container-fluid">
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu"
+              aria-controls="sidebar-menu" aria-expanded="false" aria-label="展开 / 收起菜单">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <h1 class="navbar-brand navbar-brand-autodark">
+        <a href="#/home" class="text-decoration-none">Course<span class="text-primary fw-bold">Raptor</span>
+          <span class="badge bg-warning-lt ms-1">ADMIN</span></a>
+      </h1>
+      <div class="collapse navbar-collapse" id="sidebar-menu">
+        <ul class="navbar-nav pt-lg-3">
+          ${navHtml}
+        </ul>
+      </div>
+    </div>
+  </aside>
 
-<div class="panel on" id="pane-home">
-<div class="hero">
-<div class="seal" aria-hidden="true"><img src="/logo.png" alt="" width="80" height="80"></div>
-<p class="hero-kicker">ADMIN DESK</p>
-<h2>今日值班。</h2>
-<p>同学在网页版里注册、对话、查课表——这里守护这条链路：账号、额度、Key 与版本。</p>
-</div>
-<div class="hstats" id="homeStats"></div>
-<div class="hall-sec"><span>管理目录</span><span>DIRECTORY</span></div>
-<div class="hall-grid" id="homeDir"></div>
-<p class="hall-note" id="homeNote"></p>
+  <div class="page-wrapper">
+    <header class="navbar navbar-expand-md d-none d-lg-flex d-print-none">
+      <div class="container-xl">
+        <div class="navbar-nav flex-row order-md-last">
+          <div class="d-none d-md-flex me-2 text-secondary small" id="headerMeta"></div>
+          <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="refresh">
+            ${icon("history")} 刷新
+          </button>
+          <button type="button" class="btn btn-sm btn-outline-danger" id="logout">退出</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="page-wrapper">
+      <div class="page-header d-print-none">
+        <div class="container-xl">
+          <div class="row g-2 align-items-center">
+            <div class="col">
+              <div class="page-pretitle" id="pagePretitle">ADMIN</div>
+              <h2 class="page-title" id="pageTitle">概览</h2>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="container-xl">
+
+          <div class="pane-page on" id="pane-home">
+            <div class="row row-deck row-cards" id="homeStats"></div>
+            <div class="row row-deck row-cards mt-3" id="homeAlerts"></div>
+            <div class="row row-deck row-cards mt-3">
+              <div class="col-lg-6">
+                <div class="card">
+                  <div class="card-header"><h3 class="card-title">快捷操作</h3></div>
+                  <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                      <a href="#/invites" class="btn btn-outline-primary">${icon("ticket")} 生成邀请码</a>
+                      <button type="button" class="btn btn-outline-primary" data-open-modal="modalUserCreate">${icon("users")} 新增用户</button>
+                      <a href="#/release" class="btn btn-outline-primary">${icon("rocket")} 上传版本</a>
+                      <a href="#/site" class="btn btn-outline-primary">${icon("adjustments")} 站点 Key</a>
+                      <a href="#/security" class="btn btn-outline-primary">${icon("shield")} 两步验证</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-6">
+                <div class="card">
+                  <div class="card-header"><h3 class="card-title">最近操作</h3>
+                    <div class="card-actions"><a href="#/log" class="btn btn-link">全部 →</a></div></div>
+                  <div class="card-body p-0">
+                    <ul class="list-group list-group-flush" id="homeLog"><li class="list-group-item text-secondary">读取中…</li></ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pane-page" id="pane-users">
+            <div class="card">
+              <div class="card-header">
+                <h3 class="card-title">用户列表</h3>
+                <div class="card-actions">
+                  <div class="input-icon input-icon-sm me-2">
+                    <input type="search" class="form-control form-control-sm" id="userSearch" placeholder="搜索用户名…">
+                  </div>
+                  <select class="form-select form-select-sm w-auto me-2" id="userFilter">
+                    <option value="">全部状态</option>
+                    <option value="active">正常</option>
+                    <option value="disabled">已停用</option>
+                    <option value="online">在线</option>
+                  </select>
+                  <button type="button" class="btn btn-primary btn-sm" data-open-modal="modalUserCreate">
+                    ${icon("users")} 新增用户
+                  </button>
+                </div>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                  <thead><tr>
+                    <th>用户名</th><th>状态</th><th>Key 来源</th><th>在线</th>
+                    <th>来源</th><th>注册于</th><th>今日轮数</th><th class="w-1"></th>
+                  </tr></thead>
+                  <tbody id="userRows"><tr><td colspan="8" class="text-secondary">读取中…</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="pane-page" id="pane-invites">
+            <div class="card mb-3">
+              <div class="card-header"><h3 class="card-title">生成邀请码</h3></div>
+              <div class="card-body">
+                <form class="row g-2 align-items-end" id="inviteForm">
+                  <div class="col-auto"><label class="form-label text-secondary">数量</label>
+                    <input type="number" class="form-control" id="invCount" min="1" max="50" value="5" style="width:90px"></div>
+                  <div class="col"><label class="form-label text-secondary">备注（如：班级群）</label>
+                    <input type="text" class="form-control" id="invNote" maxlength="100"></div>
+                  <div class="col-auto"><label class="form-label text-secondary">有效天数（0=永久）</label>
+                    <input type="number" class="form-control" id="invDays" min="0" max="365" value="0" style="width:130px"></div>
+                  <div class="col-auto"><button type="submit" class="btn btn-primary">生成</button></div>
+                </form>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">邀请码列表</h3></div>
+              <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                  <thead><tr><th>邀请码</th><th>备注</th><th>使用者</th><th>状态</th><th class="w-1"></th></tr></thead>
+                  <tbody id="inviteRows"><tr><td colspan="5" class="text-secondary">读取中…</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="pane-page" id="pane-resets">
+            <div class="card mb-3">
+              <div class="card-header"><h3 class="card-title">待审批申请</h3>
+                <div class="card-actions text-secondary">同意后把一次性码发给同学，新密码由同学自己设</div></div>
+              <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                  <thead><tr><th>用户名</th><th>申请时间</th><th class="w-1"></th></tr></thead>
+                  <tbody id="resetRows"><tr><td colspan="3" class="text-secondary">读取中…</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">有效重置码</h3>
+                <div class="card-actions text-secondary">24 小时内有效 · 用后即焚</div></div>
+              <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                  <thead><tr><th>用户名</th><th>重置码</th><th>过期时间</th><th class="w-1"></th></tr></thead>
+                  <tbody id="codeRows"><tr><td colspan="4" class="text-secondary">读取中…</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="pane-page" id="pane-site">
+            <div class="card mb-3">
+              <div class="card-header"><h3 class="card-title">站点统一 DeepSeek Key</h3>
+                <div class="card-actions text-secondary">同学端「设置 → AI 模型」的统一 Key</div></div>
+              <div class="card-body">
+                <div class="mb-2 text-secondary" id="keyState">读取中…</div>
+                <form class="d-flex gap-2" id="siteKeyForm">
+                  <input type="text" class="form-control" id="siteKeyInput" placeholder="粘贴新的 sk- 开头 Key" autocomplete="off">
+                  <button type="submit" class="btn btn-primary flex-shrink-0">保存</button>
+                </form>
+                <div class="text-secondary small mt-2">保存后新拉起的实例立即使用新 Key；在线实例下次拉起时切换。同学保存自己的 Key 后优先用自己的，不消耗站点额度。</div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">对话限额与分账</h3></div>
+              <div class="card-body" id="quotaStats"><div class="text-secondary">读取中…</div></div>
+            </div>
+          </div>
+
+          <div class="pane-page" id="pane-security">
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">两步验证（TOTP）</h3>
+                <div class="card-actions text-secondary">登录需密码 + 手机验证器动态码</div></div>
+              <div class="card-body" id="mfaCard"><div class="text-secondary">读取中…</div></div>
+            </div>
+          </div>
+
+          <div class="pane-page" id="pane-release">
+            <div class="card mb-3">
+              <div class="card-header"><h3 class="card-title">上传新版本</h3>
+                <div class="card-actions text-secondary">同学端安装包 · 与 npm run publish 共用接口</div></div>
+              <div class="card-body">
+                <div class="row g-2 mb-2">
+                  <div class="col-auto"><input type="text" class="form-control mono" id="updVer" placeholder="x.y.z" style="width:130px;text-align:center" autocomplete="off" spellcheck="false"></div>
+                  <div class="col"><input type="text" class="form-control" id="updNotes" placeholder="更新说明（可选），如：修复课表周次显示错误" maxlength="2000" autocomplete="off"></div>
+                </div>
+                <div class="drop-zone" id="updDrop" tabindex="0" role="button" aria-label="选择或拖入 zip 安装包">
+                  <div>点击选择，或拖入 zip 安装包（最大 200 MB）</div>
+                </div>
+                <input type="file" id="updFile" accept=".zip,application/zip" hidden>
+                <div id="updFileBox"></div>
+                <div id="updProg" hidden class="mt-2">
+                  <div class="d-flex justify-content-between small text-secondary"><span id="updPhase">上传中</span><span id="updPct">0%</span></div>
+                  <div class="progress progress-sm mt-1"><div class="progress-bar" id="updBar" style="width:0%"></div></div>
+                  <div class="text-end mt-1"><button type="button" class="btn btn-sm btn-outline-secondary" id="updCancel">取消上传</button></div>
+                </div>
+                <button type="button" class="btn btn-primary mt-2" id="updGo">发布新版本</button>
+                <div class="text-secondary small mt-2">发布后学生端下次启动 raptor 时提示更新；版本号需大于当前分发版本，否则不触发更新。</div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">历史版本</h3>
+                <div class="card-actions text-secondary" id="updCur"></div></div>
+              <div class="card-body" id="updCard"><div class="text-secondary">读取中…</div></div>
+            </div>
+          </div>
+
+          <div class="pane-page" id="pane-keys">
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">更新后台密钥</h3>
+                <div class="card-actions text-secondary">命令行发版与后台登录用，与主密钥同权</div></div>
+              <div class="card-body">
+                <form class="d-flex gap-2 mb-2" id="keyForm">
+                  <input type="text" class="form-control" id="keyName" placeholder="名称（可选），如：发布机 / 值班同学" maxlength="64" autocomplete="off">
+                  <button type="submit" class="btn btn-primary flex-shrink-0">新建密钥</button>
+                </form>
+                <div id="keyCreated" hidden></div>
+                <div class="table-responsive mt-2">
+                  <table class="table table-vcenter card-table">
+                    <thead><tr><th>名称</th><th>类型</th><th>创建时间</th><th>最后使用</th><th class="w-1"></th></tr></thead>
+                    <tbody id="keyRows"><tr><td colspan="5" class="text-secondary">读取中…</td></tr></tbody>
+                  </table>
+                </div>
+                <div class="text-secondary small mt-2">主密钥来自服务器环境变量 UPDATE_ADMIN_TOKEN，始终可用且不能在这里删除；面板密钥删除后立即失效。明文只在创建时展示一次。</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="pane-page" id="pane-log">
+            <div class="card">
+              <div class="card-header"><h3 class="card-title">操作日志</h3>
+                <div class="card-actions text-secondary">最近 200 条管理动作</div></div>
+              <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                  <thead><tr><th style="width:170px">时间</th><th>操作</th></tr></thead>
+                  <tbody id="logRows"><tr><td colspan="2" class="text-secondary">读取中…</td></tr></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
-<div class="panel" id="pane-students">
-<section class="card">
-<h2>同学名录<span class="cnote" id="studentCount"></span></h2>
-<div class="cbody">
-<input class="kw-box" id="studentSearch" type="search" placeholder="搜索用户名…" aria-label="搜索同学">
-<div id="studentList"><p class="skel">…</p></div>
-</div>
-</section>
-<section class="card dos" id="studentDossier" hidden></section>
-</div>
-
-<div class="panel" id="pane-access">
-<section class="card">
-<h2>邀请码<span class="cnote">发给同学，凭码在 /register 注册</span></h2>
-<div class="cbody">
-<div class="row">
-<input class="num" id="invCount" type="number" min="1" max="50" value="5" title="数量">
-<input id="invNote" placeholder="备注（如：班级群）">
-<input class="num" id="invDays" type="number" min="0" max="365" value="0" title="有效天数，0=永久">
-<button class="tbtn" id="invGen" type="button" style="margin:0">生成</button>
-</div>
-<div id="inviteList"><p class="skel">…</p></div>
-</div>
-</section>
-<section class="card">
-<h2>密码重置申请<span class="cnote">同意后把码发给同学，新密码由同学自己设</span></h2>
-<div class="cbody"><div id="resetPending"><p class="skel">…</p></div></div>
-</section>
-<section class="card">
-<h2>有效重置码<span class="cnote">24 小时内有效 · 用后即焚</span></h2>
-<div class="cbody"><div id="resetCodes"><p class="skel">…</p></div></div>
-</section>
+<!-- 新增用户 -->
+<div class="modal modal-blur" id="modalUserCreate" tabindex="-1" style="display:none" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">新增用户</h5>
+        <button type="button" class="btn-close" data-close-modal aria-label="关闭"></button></div>
+      <div class="modal-body">
+        <div class="mb-3"><label class="form-label">用户名</label>
+          <input type="text" class="form-control" id="newUsername" placeholder="字母 / 数字 / _ / -，2-32 位" autocomplete="off"></div>
+        <div class="mb-3"><label class="form-label">初始密码（至少 8 位）</label>
+          <input type="text" class="form-control mono" id="newPassword" placeholder="同学登录后可自行修改" autocomplete="off"></div>
+        <div class="text-secondary small">不走邀请码直接建号；账号建好即可登录。</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link link-secondary" data-close-modal>取消</button>
+        <button type="button" class="btn btn-primary" id="userCreateGo">创建</button>
+      </div>
+    </div>
+  </div>
 </div>
 
-<div class="panel" id="pane-model">
-<section class="card">
-<h2>站点 DeepSeek Key<span class="cnote">网页「设置 → AI 模型」的统一 Key</span></h2>
-<div class="cbody">
-<p class="mono ks" id="keyState">…</p>
-<div class="row">
-<input id="siteKeyInput" placeholder="粘贴新的 sk- 开头 Key" autocomplete="off">
-<button class="tbtn" id="siteKeySave" type="button" style="margin:0">保存</button>
-</div>
-<p class="chint">保存后新拉起的实例立即使用新 Key；在线实例下次拉起时切换。同学在网页「设置」里保存自己的 Key 后，优先用自己的，不消耗站点额度。</p>
-</div>
-</section>
-<section class="card">
-<h2>对话限额与分账<span class="cnote">站点统一 Key 计费，自有 Key 只计数</span></h2>
-<div class="cbody"><div id="quotaStats"><p class="skel">…</p></div></div>
-</section>
-</div>
-
-<div class="panel" id="pane-release">
-<section class="card">
-<h2>上传新版本<span class="cnote">同学端安装包 · 与 npm run publish 共用接口</span></h2>
-<div class="cbody">
-<div class="row">
-<input id="updVer" class="mono" placeholder="x.y.z" autocomplete="off" spellcheck="false" style="max-width:130px;text-align:center">
-<input id="updNotes" placeholder="更新说明（可选），如：修复课表周次显示错误" maxlength="2000" autocomplete="off">
-</div>
-<div class="drop" id="updDrop" tabindex="0" role="button" aria-label="选择或拖入 zip 安装包">
-<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5"/><path d="M12 3v12"/></svg>
-<span class="b">点击选择，或拖入 zip 安装包</span>
-<span>最大 200 MB</span>
-</div>
-<input type="file" id="updFile" accept=".zip,application/zip" hidden>
-<div id="updFileBox"></div>
-<div id="updProg" hidden>
-<div class="upd-meta"><span id="updPhase">上传中</span><span id="updPct">0%</span></div>
-<div class="pbar" style="margin-top:6px"><i id="updBar"></i></div>
-<div style="text-align:right;margin-top:8px"><button class="tbtn" id="updCancel" type="button">取消上传</button></div>
-</div>
-<button class="primary" id="updGo" type="button">发布新版本</button>
-<p class="chint">发布后学生端下次启动 raptor 时提示更新；版本号需大于当前分发版本，否则不会触发更新。</p>
-</div>
-</section>
-<section class="card">
-<h2>历史版本<span class="cnote" id="updCur"></span></h2>
-<div class="cbody"><div id="updCard"><p class="skel">…</p></div></div>
-</section>
+<!-- 设限额 -->
+<div class="modal modal-blur" id="modalQuota" tabindex="-1" style="display:none" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">设置每日限额</h5>
+        <button type="button" class="btn-close" data-close-modal aria-label="关闭"></button></div>
+      <div class="modal-body">
+        <div class="mb-2 text-secondary" id="quotaUser"></div>
+        <input type="number" class="form-control" id="quotaValue" min="0" max="100000" placeholder="0 = 用站点默认">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-link link-secondary" data-close-modal>取消</button>
+        <button type="button" class="btn btn-primary" id="quotaGo">保存</button>
+      </div>
+    </div>
+  </div>
 </div>
 
-<div class="panel" id="pane-keys">
-<section class="card">
-<h2>更新后台密钥<span class="cnote">命令行发版与后台登录用，与主密钥同权</span></h2>
-<div class="cbody">
-<div class="row">
-<input id="keyName" placeholder="名称（可选），如：发布机 / 值班同学" maxlength="64" autocomplete="off">
-<button class="tbtn" id="keyGen" type="button" style="margin:0">新建密钥</button>
-</div>
-<div id="keyCreated" hidden></div>
-<div id="keyList"><p class="skel">…</p></div>
-<p class="chint">主密钥来自服务器环境变量 UPDATE_ADMIN_TOKEN，始终可用且不能在这里删除；面板密钥删除后立即失效。明文只在创建时展示一次，之后仅存哈希。</p>
-</div>
-</section>
+<!-- 用户详情 -->
+<div class="modal modal-blur" id="modalUserDetail" tabindex="-1" style="display:none" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">用户详情</h5>
+        <button type="button" class="btn-close" data-close-modal aria-label="关闭"></button></div>
+      <div class="modal-body" id="userDetailBody"></div>
+    </div>
+  </div>
 </div>
 
-<div class="panel" id="pane-security">
-<section class="card">
-<h2>两步验证<span class="cnote">登录需密码 + 手机验证器动态码</span></h2>
-<div class="cbody" id="mfaCard"><p class="skel">…</p></div>
-</section>
-</div>
-
-</section>
-</div>
-</main>
+<script src="/admin/assets/tabler.min.js"></script>
 <script>
 ${appJs()}
 </script>
-</body></html>`;
+</body>
+</html>`;
 
 export function createAdminUi({
   registry,
@@ -608,12 +584,22 @@ export function createAdminUi({
   updateAdminToken = "",
   version = "",
   envDeepseekKeySet = false,
+  usersDir = "",
 }) {
   const enabled = typeof password === "string" && password.length >= 8;
   const failures = new Map();
   // 扫码绑定流程的中间态：只存内存，未走完「验证并启用」就丢弃（重启作废重来）
   let pendingSetup = null;
   const PENDING_SETUP_TTL_MS = 10 * 60_000;
+
+  /** 管理动作落一笔日志：等落盘再响应（失败不影响主流程） */
+  const audit = async (ip, text) => {
+    try {
+      await registry.appendAdminLog(text, ip);
+    } catch {
+      /* 日志失败不阻断管理动作 */
+    }
+  };
 
   /**
    * 代理访问同机部署的更新分发后台（update/update-server.mjs，回环端口）。
@@ -718,6 +704,27 @@ export function createAdminUi({
 
   const sendJson = (res, status, data) => send(res, status, JSON.stringify(data), "application/json; charset=utf-8");
 
+  /** 模板静态文件（白名单）：公共资源，长缓存 */
+  async function handleAsset(req, res, pathname) {
+    if (req.method !== "GET") return false;
+    const name = pathname.slice("/admin/assets/".length);
+    const asset = ASSET_FILES.get(name);
+    if (!asset) return false;
+    try {
+      const body = await fs.promises.readFile(asset.file);
+      res.writeHead(200, {
+        "content-type": asset.type,
+        "cache-control": "public, max-age=86400",
+        "content-length": body.length,
+      });
+      res.end(body);
+    } catch {
+      res.writeHead(404);
+      res.end();
+    }
+    return true;
+  }
+
   /** 返回 true 表示已处理该请求 */
   async function handle(req, res, pathname) {
     const ip = req.socket.remoteAddress || "unknown";
@@ -730,6 +737,8 @@ export function createAdminUi({
       sendJson(res, 404, { error: "管理后台未启用" });
       return true;
     }
+
+    if (await handleAsset(req, res, pathname)) return true;
 
     // 两步验证状态每次请求现读：启用/关闭后无需重启即生效；
     // sessionEpoch 参与会话签名，状态一变所有旧管理会话立即失效
@@ -777,6 +786,7 @@ export function createAdminUi({
         }
       }
       failures.delete(ip);
+      await audit(ip, "登录管理台");
       const expiresAt = Date.now() + ADMIN_TTL_MS;
       send(res, 303, "", "text/html; charset=utf-8", {
         location: "/admin",
@@ -787,6 +797,7 @@ export function createAdminUi({
 
     if (req.method === "POST" && pathname === "/admin/logout") {
       if (!sessionFrom(req, epoch)) return false;
+      await audit(ip, "退出管理台");
       send(res, 303, "", "text/html; charset=utf-8", {
         location: "/admin",
         "set-cookie": `${ADMIN_COOKIE}=; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=0`,
@@ -800,7 +811,7 @@ export function createAdminUi({
         return true;
       }
       if (pathname.startsWith("/admin/api/update/")) {
-        return await handleUpdateApi(req, res, pathname);
+        return await handleUpdateApi(req, res, pathname, ip);
       }
       if (pathname === "/admin/api/site") {
         if (req.method === "GET") {
@@ -824,6 +835,7 @@ export function createAdminUi({
           }
           await registry.setSiteSettings({ deepseekKey: key });
           console.log(`[gw-admin] 站点 DeepSeek Key 已${key ? "更新" : "清空"}（新拉起的实例生效）`);
+          await audit(ip, `站点 DeepSeek Key ${key ? "更新" : "清空"}`);
           sendJson(res, 200, { ok: true });
           return true;
         }
@@ -920,6 +932,7 @@ export function createAdminUi({
       });
       pendingSetup = null;
       console.log("[gw-admin] 管理台两步验证已启用（TOTP），恢复码已生成");
+      await audit(ip, "启用两步验证（TOTP）");
       sendJson(res, 200, { ok: true, recoveryCodes: plainCodes });
       return true;
     }
@@ -941,6 +954,7 @@ export function createAdminUi({
       await registry.clearAdminTotp();
       pendingSetup = null;
       console.log("[gw-admin] 管理台两步验证已关闭（恢复仅密码登录）");
+      await audit(ip, "关闭两步验证");
       sendJson(res, 200, { ok: true });
       return true;
     }
@@ -962,13 +976,14 @@ export function createAdminUi({
       const plainCodes = generateRecoveryCodes(10);
       await registry.setAdminTotp({ ...verdict.doc, recovery: plainCodes.map(hashRecoveryCode) });
       console.log("[gw-admin] 管理台恢复码已重新生成（旧恢复码全部作废）");
+      await audit(ip, "重新生成恢复码");
       sendJson(res, 200, { ok: true, recoveryCodes: plainCodes });
       return true;
     }
 
-    // 一次往返带回全部面板数据：跨公网链路 RTT 大，多个串行请求是「卡」的主因
+    // 一次往返带回全部面板数据：跨公网链路 RTT 大，串行请求是「卡」的主因
     if (req.method === "GET" && pathname === "/admin/api/bootstrap") {
-      const [overview, users, invites, site, resets, totp, updOverview, updVersions, updKeys] =
+      const [overview, users, invites, site, resets, totp, updOverview, updVersions, updKeys, log] =
         await Promise.all([
           ownOverview(),
           registry.listUsers(),
@@ -979,6 +994,7 @@ export function createAdminUi({
           callUpdateApi("GET", "/admin/api/overview"),
           callUpdateApi("GET", "/admin/api/versions"),
           callUpdateApi("GET", "/admin/api/keys"),
+          registry.listAdminLog(),
         ]);
       sendJson(res, 200, {
         overview,
@@ -999,6 +1015,7 @@ export function createAdminUi({
           defaultDailyTurns,
         },
         update: { overview: updOverview, versions: updVersions, keys: updKeys },
+        log,
       });
       return true;
     }
@@ -1009,6 +1026,7 @@ export function createAdminUi({
       try {
         const result = await registry.approveResetRequest(String(body.id ?? ""));
         console.log(`[gw-admin] 同意 ${result.username} 的重置申请，一次性码已生成（24h 有效）`);
+        await audit(ip, `同意 ${result.username} 的密码重置申请`);
         sendJson(res, 200, { ok: true, ...result });
       } catch (error) {
         sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
@@ -1019,6 +1037,7 @@ export function createAdminUi({
       const body = await readJsonBody(req);
       try {
         await registry.rejectResetRequest(String(body.id ?? ""));
+        await audit(ip, `拒绝密码重置申请 ${String(body.id ?? "")}`);
         sendJson(res, 200, { ok: true });
       } catch (error) {
         sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
@@ -1046,7 +1065,35 @@ export function createAdminUi({
         expiresDays: Math.max(0, Math.min(Number(body.days) || 0, 365)),
       });
       console.log(`[gw-admin] 生成 ${created.length} 个邀请码${body.note ? `（${body.note}）` : ""}`);
+      await audit(ip, `生成 ${created.length} 个邀请码${body.note ? `（${body.note}）` : ""}`);
       sendJson(res, 200, { ok: true, created });
+      return true;
+    }
+    if (req.method === "POST" && pathname === "/admin/api/invite/delete") {
+      const body = await readJsonBody(req);
+      try {
+        await registry.deleteInvite(String(body.code ?? ""));
+        console.log(`[gw-admin] 删除邀请码 ${String(body.code ?? "")}`);
+        await audit(ip, `删除邀请码 ${String(body.code ?? "")}`);
+        sendJson(res, 200, { ok: true });
+      } catch (error) {
+        sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+      }
+      return true;
+    }
+    if (req.method === "POST" && pathname === "/admin/api/user/create") {
+      const body = await readJsonBody(req);
+      try {
+        const user = await registry.createUser({
+          username: String(body.username ?? "").trim(),
+          password: String(body.password ?? ""),
+        });
+        console.log(`[gw-admin] 新建用户 ${user.username}（${user.id}）`);
+        await audit(ip, `新建用户 ${user.username}`);
+        sendJson(res, 200, { ok: true, user });
+      } catch (error) {
+        sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+      }
       return true;
     }
     if (req.method === "POST" && pathname.startsWith("/admin/api/user/")) {
@@ -1062,6 +1109,7 @@ export function createAdminUi({
         try {
           await registry.setDailyTurns(user.id, body.turns);
           console.log(`[gw-admin] ${user.username} 每日限额 → ${Number(body.turns) || 0}`);
+          await audit(ip, `${user.username} 每日限额 → ${Number(body.turns) || 0}`);
         } catch (error) {
           sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
           return true;
@@ -1069,17 +1117,34 @@ export function createAdminUi({
       } else if (action === "disable" || action === "enable") {
         await registry.setDisabled(user.id, action === "disable");
         console.log(`[gw-admin] ${action} ${user.username}`);
+        await audit(ip, `${action === "disable" ? "停用" : "启用"} ${user.username}`);
       } else if (action === "kick") {
         spawner.kick(user.id);
         console.log(`[gw-admin] kick ${user.username}`);
+        await audit(ip, `回收 ${user.username} 的实例`);
       } else if (action === "reset-pass") {
         try {
           await registry.setPassword(user.id, String(body.password ?? ""));
           console.log(`[gw-admin] reset-pass ${user.username}`);
+          await audit(ip, `重置 ${user.username} 的密码`);
         } catch (error) {
           sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
           return true;
         }
+      } else if (action === "delete") {
+        // 顺序：先回收实例，再除名，最后清数据目录（含加密凭证）
+        spawner.kick(user.id);
+        try {
+          await registry.deleteUser(user.id);
+        } catch (error) {
+          sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+          return true;
+        }
+        if (usersDir) {
+          await rm(path.join(usersDir, user.id), { recursive: true, force: true }).catch(() => {});
+        }
+        console.log(`[gw-admin] 删除用户 ${user.username}（${user.id}）及其数据目录`);
+        await audit(ip, `删除用户 ${user.username}（含数据目录）`);
       } else {
         sendJson(res, 404, { error: "未知操作" });
         return true;
@@ -1087,12 +1152,16 @@ export function createAdminUi({
       sendJson(res, 200, { ok: true });
       return true;
     }
+    if (req.method === "GET" && pathname === "/admin/api/log") {
+      sendJson(res, 200, await registry.listAdminLog());
+      return true;
+    }
     sendJson(res, 404, { error: "not found" });
     return true;
   }
 
   /** 版本发布段：全部代理到更新后台，鉴权由网关管理会话承担 */
-  async function handleUpdateApi(req, res, pathname) {
+  async function handleUpdateApi(req, res, pathname, ip = "unknown") {
     if (req.method !== "GET" && req.method !== "POST") {
       sendJson(res, 404, { error: "not found" });
       return true;
@@ -1138,6 +1207,7 @@ export function createAdminUi({
         });
         const data = await upstream.json().catch(() => ({}));
         console.log(`[gw-admin] 发版 v${version}: ${upstream.ok ? "ok" : data?.error ?? upstream.status}`);
+        await audit(ip, `发版 v${version}${upstream.ok ? "" : "（失败）"}`);
         if (!upstream.ok) {
           sendJson(res, upstream.status === 401 ? 502 : upstream.status, {
             error: data?.error ?? `更新后台返回 ${upstream.status}`,
@@ -1157,6 +1227,7 @@ export function createAdminUi({
         version: String(body.version ?? ""),
       });
       console.log(`[gw-admin] 版本回滚请求 v${body.version}: ${result.error ?? "ok"}`);
+      await audit(ip, `版本回滚 → v${body.version}${result.error ? "（失败）" : ""}`);
       sendJson(res, result.error ? 400 : 200, result);
       return true;
     }
@@ -1166,6 +1237,7 @@ export function createAdminUi({
         version: String(body.version ?? ""),
       });
       console.log(`[gw-admin] 版本删除请求 v${body.version}: ${result.error ?? "ok"}`);
+      await audit(ip, `删除版本 v${body.version}${result.error ? "（失败）" : ""}`);
       sendJson(res, result.error ? 400 : 200, result);
       return true;
     }
@@ -1181,6 +1253,7 @@ export function createAdminUi({
           name: String(body.name ?? ""),
         });
         console.log(`[gw-admin] 新建更新后台密钥「${result.data?.key?.name ?? ""}」: ${result.error ?? "ok"}`);
+        await audit(ip, `新建更新后台密钥「${result.data?.key?.name ?? ""}」${result.error ? "（失败）" : ""}`);
         sendJson(res, result.error ? 400 : 200, result);
         return true;
       }
@@ -1191,6 +1264,7 @@ export function createAdminUi({
         id: String(body.id ?? ""),
       });
       console.log(`[gw-admin] 删除更新后台密钥 ${String(body.id ?? "")}: ${result.error ?? "ok"}`);
+      await audit(ip, `删除更新后台密钥 ${String(body.id ?? "")}${result.error ? "（失败）" : ""}`);
       sendJson(res, result.error ? 400 : 200, result);
       return true;
     }
