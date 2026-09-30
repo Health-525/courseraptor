@@ -1,0 +1,11 @@
+# dist/ 是构建产物但随仓库提交（服务器 git pull + restart 即生效，无需机上构建）
+node_modules/
+*.local
+logs/
+*.log
+.env
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+*.suo
+*.sw?

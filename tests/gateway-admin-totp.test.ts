@@ -104,11 +104,10 @@ async function adminLogin(
   password: string,
   code = "",
 ): Promise<{ status: number; cookie: string; text: string }> {
-  const res = await fetch(`${base}/admin/login`, {
+  const res = await fetch(`${base}/admin/api/login`, {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams(code ? { password, code } : { password }),
-    redirect: "manual",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password, code }),
   });
   return {
     status: res.status,
@@ -120,7 +119,7 @@ async function adminLogin(
 /** 登录 + 拿到已登录 Cookie；MFA 开启时自动补当前动态码 */
 async function loginOk(base: string, secret?: string) {
   const result = await adminLogin(base, "admin-master-pw", secret ? codeAt(secret) : "");
-  assert.equal(result.status, 303, `登录应成功：${result.text.slice(0, 200)}`);
+  assert.equal(result.status, 200, `登录应成功：${result.text.slice(0, 200)}`);
   return result.cookie;
 }
 
@@ -214,10 +213,11 @@ test("MFA 全链路：扫码绑定→旧会话注销→密码+动态码登录→
   const backendPort = await startBackend(t);
   const { base, registry } = await startGateway(t, backendPort);
 
-  // 未启用：登录页没有动态码输入框，bootstrap 报 mfaEnabled=false
-  const anonPage = await (await fetch(`${base}/admin`)).text();
-  assert.match(anonPage, /管理密码/);
-  assert.doesNotMatch(anonPage, /动态码/);
+  // 未启用：会话探测声明无需动态码，bootstrap 报 mfaEnabled=false
+  const anonSession = (await (await fetch(`${base}/admin/api/session`)).json()) as {
+    mfaRequired: boolean;
+  };
+  assert.equal(anonSession.mfaRequired, false);
 
   // 仅密码登录（MFA 关闭时行为与从前一致）
   const cookieA = await loginOk(base);
@@ -264,17 +264,18 @@ test("MFA 全链路：扫码绑定→旧会话注销→密码+动态码登录→
     401,
   );
 
-  // 登录页出现动态码输入框；少码 / 错码都进不去
-  const mfaPage = await (await fetch(`${base}/admin`)).text();
-  assert.match(mfaPage, /动态码/);
-  assert.match(mfaPage, /one-time-code/);
+  // 会话探测声明需要动态码；少码 / 错码都进不去
+  const sessionInfo = (await (await fetch(`${base}/admin/api/session`)).json()) as {
+    mfaRequired: boolean;
+  };
+  assert.equal(sessionInfo.mfaRequired, true, "SPA 登录页应据 session 接口显示动态码输入框");
   assert.equal((await adminLogin(base, "admin-master-pw")).status, 401, "缺动态码拒绝");
   assert.equal((await adminLogin(base, "admin-master-pw", "000000")).status, 401, "错码拒绝");
 
   // 密码 + 当前动态码：进入（绑定那枚码在首登窗口内仍可用——防重放自首登起收紧）
   const firstCode = codeAt(secret);
   const login2 = await adminLogin(base, "admin-master-pw", firstCode);
-  assert.equal(login2.status, 303);
+  assert.equal(login2.status, 200);
   const cookieB = login2.cookie;
   const boot2 = (
     await json(await fetch(`${base}/admin/api/bootstrap`, { headers: { cookie: cookieB } }))
@@ -290,7 +291,7 @@ test("MFA 全链路：扫码绑定→旧会话注销→密码+动态码登录→
   // 恢复码可替代动态码登录：小写 + 去连字符也应命中（归一化）；用后即焚
   const lower = recoveryCodes[0].toLowerCase().replace("-", "");
   const viaRecovery = await adminLogin(base, "admin-master-pw", lower);
-  assert.equal(viaRecovery.status, 303);
+  assert.equal(viaRecovery.status, 200);
   const cookieC = viaRecovery.cookie;
   const boot3 = (
     await json(await fetch(`${base}/admin/api/bootstrap`, { headers: { cookie: cookieC } }))
@@ -397,5 +398,5 @@ test("MFA 恢复码重生成：需验码、旧码全作废、新码可用", asyn
 
   // 旧恢复码全部作废，新恢复码可用
   assert.equal((await adminLogin(base, "admin-master-pw", firstSet[0])).status, 401);
-  assert.equal((await adminLogin(base, "admin-master-pw", secondSet[0])).status, 303);
+  assert.equal((await adminLogin(base, "admin-master-pw", secondSet[0])).status, 200);
 });

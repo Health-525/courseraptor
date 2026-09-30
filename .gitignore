@@ -1,6 +1,8 @@
 node_modules/
 .env
 dist/
+# 管理台前端构建产物随仓库提交（服务器 git pull + restart 即生效，不在机上构建）
+!admin/dist/
 downloads/
 memory.json
 session.json
