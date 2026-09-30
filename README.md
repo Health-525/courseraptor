@@ -12,13 +12,11 @@
 [![License: ISC](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
 [![Vercel AI SDK](https://img.shields.io/badge/Vercel%20AI%20SDK-v7-black.svg)](https://ai-sdk.dev)
 [![LLM](https://img.shields.io/badge/LLM-DeepSeek-4D6BFE.svg)](https://www.deepseek.com)
-
-[![教务系统](https://img.shields.io/badge/%E6%95%99%E5%8A%A1-%E6%AD%A3%E6%96%B9%E6%96%B0%E7%89%88-success.svg)](#-技术栈)
-[![已收录](https://img.shields.io/badge/%E5%B7%B2%E6%94%B6%E5%BD%95-%E4%B8%AD%E5%9B%BD%E7%8B%AC%E7%AB%8B%E5%BC%80%E5%8F%91%E8%80%85%E5%88%97%E8%A1%A8-9B59B6)](https://github.com/1c7/chinese-independent-developer/blob/master/.github/pages/README-Programmer-Edition.md)
-[![Last Commit](https://img.shields.io/github/last-commit/Health-525/courseraptor?color=orange)](https://github.com/Health-525/courseraptor/commits/main)
 [![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social)](https://github.com/Health-525/courseraptor)
 
-**[🚀 快速开始](#-快速开始) · [🖥️ 界面预览](#️-界面预览) · [✨ 核心能力](#-核心能力) · [🔒 隐私承诺](#-隐私承诺) · [🧩 项目架构](#-项目架构) · [🏗️ 技术栈](#-技术栈) · [⚠️ 免责声明](#️-免责声明与使用建议) · [📖 完整文档](docs/capabilities.md)**
+**[简体中文](README.md) · [English](README.en.md)**
+
+**[🚀 快速开始](#-快速开始) · [🖥️ 界面预览](#️-界面预览) · [✨ 核心能力](#-核心能力) · [🔒 隐私承诺](#-隐私承诺) · [🧩 项目架构](#-项目架构) · [🏗️ 技术栈](#-技术栈) · [📚 文档与社区](#-文档与社区) · [❓ 常见问题](#-常见问题)**
 
 </div>
 
@@ -45,6 +43,18 @@
 ## 🚀 快速开始
 
 同一个 agent，两种入口：终端里敲 `raptor` 直接对话，或浏览器打开 `http://localhost:3210` 用网页版。思考过程、工具调用、每轮问答都会归档进会话历史。不想开对话、只想脚本化查数据？见下方「方式三」无头命令行。
+
+### 🎮 零门槛先体验：离线演示（可选）
+
+还没配教务账号和 API Key？克隆源码后（按下方「方式二」完成 `git clone` 与 `npm install`），一行命令即可体验正式网页界面：
+
+```bash
+npm run demo
+```
+
+- **虚构示例数据 + 剧本式回答**：不读取本机凭证、不连教务系统、不调用模型、对话不落盘
+- 打开终端打印的地址（通常 `http://127.0.0.1:3211`），即可体验与正式版一致的界面和交互
+- 想看真实 AI 对同样的虚构数据做分析：在 `.env` 配好 `DEEPSEEK_API_KEY` 后改跑 `npm run demo:live`（回复来自真实模型、工具仍返回虚构数据，API 用量可能产生费用；没配 Key 会自动退回离线剧本）
 
 <details>
 <summary><b>💻 系统要求</b>（点开查看）</summary>
@@ -153,7 +163,7 @@ Agent 默认可调用 **31 个工具**，覆盖十大能力线。完整参数表
 
 ---
 
-## 📡 已知状态（2026-09）
+## 📡 已知状态与边界
 
 - 学期交界期课表/考试查询为**候选学期探测**，不依赖日历日期推断；开学日期按校历维护（未知学期按 9 月/3 月第一个周一估算并标注）。
 - 课表查询自动叠加**放假/调休覆盖**：假期日整周标注「放假」、调休补课日按被换周几的课表补出行；具体安排由 agent 读教务处通知后经 `set_holidays` 落盘到 `data/term-holidays.json`。
@@ -188,12 +198,27 @@ Agent 默认可调用 **31 个工具**，覆盖十大能力线。完整参数表
 ├── bin/raptor.cjs      # 全局命令入口
 ├── docs/               # 文档与素材
 ├── skills/njtech-jwgl/ # 教务无头查询技能（SKILL.md + references/ + scripts/query.ts）
-└── src/
-    ├── core/           # 学校无关内核：agent/记忆/文档/日历/附件/知识库等 + 通用工具
-    ├── adapters/       # 学校适配层：core/school.ts 定义的 SchoolAdapter 端口
-    │   └── njtech/     # 南京工业大学实现（登录/课表/成绩/考试/选课/通知 + 教务工具）
-    └── channels/       # 输出渠道：cli（终端 TUI）、web（网页）、qq（机器人）
+├── src/                # 公用核心（与运行形态无关）
+│   ├── core/           # 学校无关内核：agent/记忆/日历/文档/附件/知识库等 + 通用工具
+│   ├── adapters/       # 学校适配层：core/school.ts 定义的 SchoolAdapter 端口
+│   │   └── njtech/     # 南京工业大学实现（登录/课表/成绩/考试/选课/通知 + 教务工具）
+│   └── channels/       # 输出渠道：web（网页版）
+└── local/              # 本地版入口：cli（终端 TUI）、qq（机器人）、demo（离线演示）
 ```
+
+---
+
+## 📚 文档与社区
+
+| 想做什么 | 去哪里 |
+|------|------|
+| 看全部 31 个工具的参数、耗时、环境变量、教务模块覆盖 | [完整能力文档](docs/capabilities.md) |
+| 我是同学，想看图文上手指南 | [同学使用指南](docs/student-guide.md) |
+| 查环境变量、凭证、QQ 机器人等配置项 | [配置参考](docs/configuration.md) |
+| 给自己的学校写适配层 | [适配指南](docs/adapter-guide.md) |
+| 看做了什么、接下来做什么 | [路线图](docs/roadmap.md) |
+| 参与贡献 / 报安全问题 / 行为准则 | [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md) · [行为准则](CODE_OF_CONDUCT.md) |
+| 提问、交流、反馈 | [GitHub Discussions](https://github.com/Health-525/courseraptor/discussions) |
 
 ---
 
@@ -236,7 +261,22 @@ rm -f credentials.enc session.json memory.json qq-allowlist.json
 
 ## ❓ 常见问题
 
-详见 [GitHub Discussions](https://github.com/Health-525/courseraptor/discussions) 或 `docs/faq.md`（待建立）。
+**双击安装包没反应，或被系统 / 杀软拦截？**
+安装包未做代码签名（exe 是自释放启动器、zip 里的 `runtime\node.exe` 是 Node 官方运行时），SmartScreen 弹窗选「更多信息 → 仍要运行」，或把安装 / 解压目录加入杀软信任区（见上文「方式一」的说明）。
+
+**没有 DeepSeek API Key，能先用吗？**
+可以先跑上面的离线演示，零凭证体验界面。正式对话需要自己的 Key（在 DeepSeek 开放平台注册获取，按量计费）；教务账号可以跳过，之后在网页「功能大厅 → 设置 → 教务账号」补填。
+
+**网页打不开，或提示端口被占用？**
+以终端启动时打印的实际地址为准（默认 `http://127.0.0.1:3210`，被占用会自动换端口）；页面表现异常先 `Ctrl+F5` 强刷缓存。
+
+**课表 / 考试查出来是空的，或学期不对？**
+学期交界期为候选学期探测，不依赖日历日期推断，可在对话里切换学期重查；开学日期按校历维护，未知学期按 9 月 / 3 月第一个周一估算并标注（见上文「已知状态与边界」）。
+
+**我的数据都存在哪，怎么彻底删除？**
+全部在本机：`data/`、`credentials.enc`、`session.json`、`memory.json` 等，删除步骤见下文「🗑️ 卸载与清理」。
+
+更多问题欢迎到 [GitHub Discussions](https://github.com/Health-525/courseraptor/discussions) 提问。
 
 ---
 
