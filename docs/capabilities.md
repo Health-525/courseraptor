@@ -206,34 +206,44 @@ npm run qq
 
 ```
 ├── bin/raptor.cjs           # 全局命令入口（npm link 后任意目录敲 raptor）
-├── docs/                    # 吉祥物 & 素材
-└── src/
-    ├── index.ts             # 入口：终端对话 UI（QQ 已配置时一并拉起）
-    ├── agent.ts             # agent 定义（系统提示词 + 工具装配）
-    ├── config.ts            # .env 配置加载（按项目根解析，任意目录启动均可）
-    ├── pomodoro.ts          # 番茄钟引擎（计时落盘 + 进行中/最近记录查询）
-    ├── attachments.ts       # 附件/本地文件流水线（缓存 + 表格概览 + 长文分页/关键词定位 + 验证码 OCR + Firecrawl 兜底）
-    ├── attachment-store.ts  # 附件缓存库（data/attachments 落盘索引，免重下；删除锁死缓存目录）
-    ├── spreadsheet.ts       # 表格引擎（xlsx/xls/csv 结构化：筛选/排序/去重统计/分页）
-    ├── sandbox-js.ts        # run_js 沙箱（node:vm 裸上下文，限时限量，无网络磁盘）
-    ├── weather.ts           # 天气（Open-Meteo 免密钥：地名两轮解析 + WMO 码中文化 + 带伞穿衣建议）
-    ├── todo-reminders.ts    # 待办到期提醒（每小时扫描 7 天窗口：去重落盘 + 桌面 toast + QQ 主动推送）
-    ├── knowledge.ts         # 知识库（对话沉淀的知识条目：课表课程归类 + subject 自定义分类 + 本地存储）
-    ├── memory/              # 两层记忆（长期事实条目 + 短期会话捕获恢复）
-    ├── qq/                  # QQ 官方机器人桥（bridge + 消息格式化 + 主动推送 + 文件日志）
-    ├── jwgl/                # 教务协议层
-    │   ├── auth.ts          # 登录（RSA + CSRF）
-    │   ├── http.ts          # 带 Cookie 管理的 HTTP 客户端
-    │   ├── crypto.ts        # 正方 RSA 密码加密
-    │   ├── academics.ts     # 课表 / 考试（学期探测 + 周次计算 + 节次时间）
-    │   ├── grades.ts        # 成绩 + GPA + 通识六类统计
-    │   ├── portal.ts        # 学籍 / 已选课 / 重修 / 实验成绩
-    │   ├── news.ts          # 教务处官网通知（列表 / 正文 / 附件提取）
-    │   ├── xk.ts            # 选课协议（加密串 / 多轮次 / 教学班查询）
-    │   └── types.ts
-    ├── web/                 # 网页版：聊天页 + 功能大厅 + /today 日程页 + /knowledge 知识库页 + 今日简报数据组装
-    └── tools/               # agent 工具（默认 30 个）+ 会话缓存管理
+├── docs/                    # 文档与素材（能力清单 / 配置参考 / 适配指南等）
+├── skills/njtech-jwgl/      # 教务无头查询技能（SKILL.md + references/ + scripts/query.ts）
+├── src/                     # 公用核心（与运行形态无关）
+│   ├── core/                # 学校无关内核
+│   │   ├── agent.ts         # agent 定义（系统提示词 + 工具装配）
+│   │   ├── config.ts        # .env 配置加载（按项目根解析，任意目录启动均可）
+│   │   ├── school.ts        # SchoolAdapter 端口（学校适配层实现的契约）
+│   │   ├── credentials.ts   # 凭证加密读写（AES-256-GCM，落盘 credentials.enc）
+│   │   ├── http.ts          # 通用 HTTP 客户端（线性退避重试 + 全局限速令牌桶）
+│   │   ├── attachments.ts / attachment-store.ts  # 附件与本地文件流水线（缓存 + 表格概览 + 长文分页/关键词定位 + 验证码 OCR）
+│   │   ├── spreadsheet.ts   # 表格引擎（xlsx/xls/csv 结构化：筛选/排序/去重统计/分页）
+│   │   ├── sandbox-js.ts    # run_js 沙箱（node:vm 裸上下文，限时限量，无网络磁盘）
+│   │   ├── weather.ts       # 天气（Open-Meteo 免密钥：地名两轮解析 + WMO 码中文化 + 带伞穿衣建议）
+│   │   ├── todo-reminders.ts # 待办到期提醒（每小时扫描 7 天窗口：去重落盘 + 桌面 toast + QQ 主动推送）
+│   │   ├── knowledge.ts     # 知识库（对话沉淀的知识条目：课表课程归类 + subject 自定义分类 + 本地存储）
+│   │   ├── pomodoro.ts      # 番茄钟引擎（计时落盘 + 进行中/最近记录查询）
+│   │   ├── calendar/        # 校历（放假/调休落盘 + 整学期 .ics 导出与订阅发布）
+│   │   ├── document/        # 文档生成（Word/Excel/PPT/PDF 渲染 + 跨格式转换）
+│   │   ├── memory/          # 两层记忆（长期事实条目 + 短期会话捕获恢复）
+│   │   └── tools/           # 学校无关 agent 工具（文档/文件/知识库/记忆/待办提醒/番茄钟/设置/时间/天气）
+│   ├── adapters/            # 学校适配层
+│   │   └── njtech/          # 南京工业大学实现
+│   │       ├── auth.ts / crypto.ts  # 登录（RSA + CSRF）
+│   │       ├── academics.ts # 课表 / 考试（学期探测 + 周次计算 + 节次时间）
+│   │       ├── grades.ts    # 成绩 + GPA + 通识六类统计
+│   │       ├── portal.ts    # 学籍 / 已选课 / 重修 / 实验成绩
+│   │       ├── news.ts      # 教务处官网通知（列表 / 正文 / 附件提取，含内嵌 PDF）
+│   │       ├── xk.ts        # 选课协议（加密串 / 多轮次 / 教学班查询）
+│   │       └── tools/       # 教务工具（课表/成绩/考试/学籍/选课/通知/日历/选课冲突对比）
+│   └── channels/
+│       └── web/             # 网页版：聊天页 + 功能大厅 + /today 日程页 + /knowledge 知识库页 + 今日简报
+└── local/                   # 本地版入口
+    ├── cli/                 # 终端 TUI（raptor 命令；QQ 已配置时一并拉起）
+    ├── qq/                  # QQ 官方机器人桥（bridge + 消息格式化 + 主动推送 + 会话归档）
+    └── demo/                # 离线演示（虚构数据 + 剧本回答，复用正式网页视图）
 ```
+
+> 顶层其余目录为分发与文档辅助，不影响本地运行，不在此展开。
 
 ---
 
