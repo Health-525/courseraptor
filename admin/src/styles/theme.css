@@ -1,63 +1,98 @@
-:root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+/**
+ * CourseRaptor 管理台视觉令牌 ——「墨绿迅猛龙」
+ * 侧栏与登录品牌面用深墨绿做恒定锚点（亮暗两套主题都不变），
+ * 内容区亮模式为暖纸色、暗模式为墨绿近黑；主色是可用的迅猛龙绿。
+ * 全部走 CSS 变量，暗色由 <html class="dark"> 切换。
+ */
 
-  --sidebar: var(--background);
-  --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: var(--accent);
-  --sidebar-accent-foreground: var(--accent-foreground);
-  --sidebar-border: var(--border);
-  --sidebar-ring: var(--ring);
+:root {
+  --radius: 0.5rem;
+
+  /* 内容区：暖纸底（带极淡绿倾向，摆脱中性灰模板感） */
+  --background: oklch(0.983 0.005 125);
+  --foreground: oklch(0.235 0.02 160);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.235 0.02 160);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.235 0.02 160);
+
+  /* 主色：迅猛龙绿（按钮用白字，对比度够） */
+  --primary: oklch(0.47 0.1 158);
+  --primary-foreground: oklch(0.985 0.005 120);
+
+  /* 次级/弱化：鼠尾草绿灰 */
+  --secondary: oklch(0.955 0.012 135);
+  --secondary-foreground: oklch(0.32 0.03 158);
+  --muted: oklch(0.955 0.01 135);
+  --muted-foreground: oklch(0.5 0.022 150);
+  --accent: oklch(0.94 0.025 145);
+  --accent-foreground: oklch(0.3 0.04 158);
+
+  --destructive: oklch(0.577 0.215 27);
+  --border: oklch(0.905 0.012 135);
+  --input: oklch(0.905 0.012 135);
+  --ring: oklch(0.55 0.1 158);
+
+  /* 数据可视化：绿系为主，琥珀、青为辅 */
+  --chart-1: oklch(0.55 0.12 158);
+  --chart-2: oklch(0.65 0.1 185);
+  --chart-3: oklch(0.75 0.13 85);
+  --chart-4: oklch(0.45 0.07 165);
+  --chart-5: oklch(0.82 0.09 95);
+
+  /* 侧栏：深墨绿恒定（品牌锚点，不随主题翻白） */
+  --sidebar: oklch(0.225 0.028 168);
+  --sidebar-foreground: oklch(0.88 0.015 140);
+  --sidebar-primary: oklch(0.68 0.13 158);
+  --sidebar-primary-foreground: oklch(0.16 0.02 168);
+  --sidebar-accent: oklch(0.31 0.035 166);
+  --sidebar-accent-foreground: oklch(0.95 0.01 130);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.68 0.13 158);
 }
 
 .dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.14 0.04 259.21);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
+  /* 暗模式：墨绿近黑，不用纯灰 */
+  --background: oklch(0.165 0.012 165);
+  --foreground: oklch(0.93 0.01 130);
+
+  --card: oklch(0.205 0.015 165);
+  --card-foreground: oklch(0.93 0.01 130);
+  --popover: oklch(0.205 0.015 165);
+  --popover-foreground: oklch(0.93 0.01 130);
+
+  /* 暗模式主色提亮为浅绿，配深字（亮色按钮在暗底更精神） */
+  --primary: oklch(0.76 0.13 158);
+  --primary-foreground: oklch(0.18 0.03 168);
+
+  --secondary: oklch(0.27 0.018 160);
+  --secondary-foreground: oklch(0.88 0.015 135);
+  --muted: oklch(0.26 0.015 160);
+  --muted-foreground: oklch(0.68 0.02 145);
+  --accent: oklch(0.29 0.03 160);
+  --accent-foreground: oklch(0.93 0.012 135);
+
+  --destructive: oklch(0.66 0.19 25);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  --ring: oklch(0.7 0.12 158);
+
+  --chart-1: oklch(0.68 0.13 158);
+  --chart-2: oklch(0.7 0.1 185);
+  --chart-3: oklch(0.78 0.13 85);
+  --chart-4: oklch(0.55 0.07 165);
+  --chart-5: oklch(0.84 0.09 95);
+
+  /* 侧栏比内容再深一档，保持层次 */
+  --sidebar: oklch(0.145 0.014 168);
+  --sidebar-foreground: oklch(0.87 0.015 140);
+  --sidebar-primary: oklch(0.72 0.13 158);
+  --sidebar-primary-foreground: oklch(0.14 0.02 168);
+  --sidebar-accent: oklch(0.24 0.03 166);
+  --sidebar-accent-foreground: oklch(0.95 0.01 130);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-ring: oklch(0.72 0.13 158);
 }
 
 @theme inline {
