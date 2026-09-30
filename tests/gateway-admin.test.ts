@@ -4,7 +4,6 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import vm from "node:vm";
 
 const { createGatewayServer } = await import("../gateway/app.mjs");
 const { createRegistry } = await import("../gateway/registry.mjs");
@@ -85,11 +84,10 @@ async function startGateway(
 }
 
 async function adminLogin(base: string, password: string) {
-  const res = await fetch(`${base}/admin/login`, {
+  const res = await fetch(`${base}/admin/api/login`, {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ password }),
-    redirect: "manual",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password }),
   });
   return { status: res.status, cookie: res.headers.get("set-cookie") ?? "" };
 }
@@ -111,15 +109,20 @@ test("管理台：密码登录→会话→总览/用户/邀请码/动作全链�
     adminPassword: "admin-master-pw",
   });
 
-  // 未登录：页面是登录表单，API 401
+  // 未登录：页面是 React SPA 的 index.html（登录态由前端经 /admin/api/session 探测），API 401
   const anonPage = await fetch(`${base}/admin`);
-  assert.match(await anonPage.text(), /管理密码/);
+  assert.equal(anonPage.status, 200);
+  assert.match(await anonPage.text(), /<div id="root">/);
+  const anonSession = (await (await fetch(`${base}/admin/api/session`)).json()) as {
+    authed: boolean;
+  };
+  assert.equal(anonSession.authed, false);
   assert.equal((await fetch(`${base}/admin/api/overview`)).status, 401);
 
-  // 错误密码 401，正确密码 303 + 管理会话 Cookie
+  // 错误密码 401，正确密码 200 + 管理会话 Cookie（JSON 登录）
   assert.equal((await adminLogin(base, "wrong-password")).status, 401);
   const login = await adminLogin(base, "admin-master-pw");
-  assert.equal(login.status, 303);
+  assert.equal(login.status, 200);
   assert.match(login.cookie, /raptor_admin=/);
   assert.match(login.cookie, /HttpOnly/);
   const cookie = login.cookie;
@@ -718,22 +721,44 @@ test("注册·邀请码绑定：用户名被占不废码，bootstrap 带出码�
   assert.deepEqual(used.usedBy, ["newmate"]);
 });
 
-test("管理台页面：内嵌脚本必须是合法 JavaScript（防编辑事故回归）", async (t) => {
+test("管理台 SPA：index 下发、前端路由回落、资产防穿越、API 未知 404", async (t) => {
   const backendPort = await startBackend(t);
   const { base } = await startGateway(t, { backendPort, adminPassword: "admin-master-pw" });
-  const cookie = (await adminLogin(base, "admin-master-pw")).cookie;
-  const html = await (await fetch(`${base}/admin`, { headers: { cookie } })).text();
-  const match = /<script>([\s\S]*)<\/script>/.exec(html);
-  assert.ok(match, "仪表盘应包含内嵌脚本");
-  // 只编译不执行：语法错误（如括号不闭合）在这里抛出
-  new vm.Script(match[1]);
-  // 模板字符串会把未加倍的 \d / \. 吞成 d / .——脚本仍合法但正则失效，
-  // 曾导致发版校验把合法版本号拒掉；这里断言发到浏览器的正则完好
-  assert.ok(
-    match[1].includes("/^\\d+\\.\\d+\\.\\d+$/.test(ver)"),
-    "版本号正则应原样出现在发到浏览器的脚本里",
-  );
-  assert.ok(match[1].includes("/\\.zip$/i.test(f.name)"), "zip 后缀正则应原样保留");
+
+  // 入口是 React SPA 的 index.html，引用构建产物资产
+  const html = await (await fetch(`${base}/admin`)).text();
+  assert.match(html, /<div id="root">/);
+  const assetRef = /(?:src|href)="(\/admin\/assets\/[^"]+)"/.exec(html);
+  assert.ok(assetRef, "index.html 应引用 /admin/assets/ 构建产物");
+  const asset = await fetch(`${base}${assetRef[1]}`);
+  assert.equal(asset.status, 200);
+  assert.match(asset.headers.get("cache-control") ?? "", /immutable/, "带哈希的构建产物应长缓存");
+
+  // 前端路由（如 /admin/users）回落 index.html，不 404
+  const spaRoute = await fetch(`${base}/admin/users`);
+  assert.equal(spaRoute.status, 200);
+  assert.match(await spaRoute.text(), /<div id="root">/);
+
+  // 资产目录不存在的文件 404（不回落 index.html，避免吞掉资源错误）
+  assert.equal((await fetch(`${base}/admin/assets/nope.js`)).status, 404);
+  const traversal = await fetch(`${base}/admin/assets/..%2f..%2f..%2fetc%2fpasswd`);
+  assert.ok(traversal.status === 404 || traversal.status === 400, "不得读 dist 外的文件");
+
+  // API 未知路径仍是 JSON 404（不回落 SPA）
+  const unknownApi = await fetch(`${base}/admin/api/nope`, {
+    headers: { cookie: (await adminLogin(base, "admin-master-pw")).cookie },
+  });
+  assert.equal(unknownApi.status, 404);
+  assert.match(unknownApi.headers.get("content-type") ?? "", /application\/json/);
+
+  // 会话探测接口：登录后 authed=true
+  const session = (await (
+    await fetch(`${base}/admin/api/session`, {
+      headers: { cookie: (await adminLogin(base, "admin-master-pw")).cookie },
+    })
+  ).json()) as { authed: boolean; mfaRequired: boolean };
+  assert.equal(session.authed, true);
+  assert.equal(session.mfaRequired, false);
 });
 
 test("按人限额与站点 Key 管理", async (t) => {

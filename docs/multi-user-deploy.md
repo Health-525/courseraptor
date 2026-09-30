@@ -100,12 +100,14 @@ cd /opt/courseraptor && sudo -u raptor GATEWAY_STATE_DIR=/var/lib/raptor-gateway
 ### 网页管理台（推荐）
 
 `/etc/raptor-gateway.env` 里设置 `GATEWAY_ADMIN_PASSWORD`（至少 8 位）后，
-浏览器打开 **http://<服务器IP>:8080/admin** 输密码即可。管理台基于
-**Tabler** 模板（MIT，vendor 在 `gateway/admin/assets/vendor/`，经
-`/admin/assets/` 白名单下发），主流侧栏 + 顶栏后台布局，手机端自动收起
-为汉堡菜单；前端应用在 `gateway/admin/assets/admin-app.js`（vanilla JS
-无构建，服务时内联，**改后需重启网关**）。页面按 `#/hash` 路由切换，
-可见时每 60 秒自动轻量刷新：
+浏览器打开 **http://<服务器IP>:8080/admin** 输密码即可。管理台是
+**React 单页应用**（`admin/` 目录，基于 shadcn-admin 模板裁剪：React 19 +
+Vite + Tailwind + shadcn/ui），侧栏 + 顶栏布局，自带深浅色主题与移动端
+抽屉侧栏。**构建产物 `admin/dist` 随仓库提交**，网关直接下发——服务器
+升级流程不变（`git pull` + `restart`，机上无需 Node 构建链）；改前端在
+`admin/` 下 `npm run build` 后**连同 dist 一起提交**（CI 会校验产物新鲜度，
+漏提交会红灯）。登录走 JSON 接口（`/admin/api/login`），页面可见时每
+60 秒自动轻量刷新：
 
 - **概览**：统计卡（注册 / 在线 / 可用邀请码 / 今日轮数）+ 待办警示条
   （待审批、Key 未设、更新后台未接入、两步验证未启用）+ 快捷操作 +

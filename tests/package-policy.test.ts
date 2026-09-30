@@ -73,6 +73,27 @@ test("网关与更新后台照常分发，落地页与技能包不进学生端�
   }
 });
 
+test("管理台前端只分发构建产物：admin/dist 进包，源码与依赖不进", () => {
+  for (const file of [
+    "admin/dist",
+    "admin/dist/index.html",
+    "admin/dist/assets/index-CWa5foPH.js",
+    "admin/dist/images/favicon.svg",
+  ]) {
+    assert.equal(shouldPackagePath(file), true, file);
+  }
+  for (const file of [
+    "admin",
+    "admin/package.json",
+    "admin/src/main.tsx",
+    "admin/node_modules/react/index.js",
+    "admin/vite.config.ts",
+    "admin/dist/assets/app.js.map",
+  ]) {
+    assert.equal(shouldPackagePath(file), false, file);
+  }
+});
+
 test("更新保护全部本地数据，同时允许应用源码更新", () => {
   for (const file of [
     "data",

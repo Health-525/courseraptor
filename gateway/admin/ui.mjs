@@ -7,9 +7,13 @@
  * 鉴权：独立的管理会话 Cookie（raptor_admin，HMAC 签名与同学会话不同名
  * 不同签名域，互不通用）；登录失败同样 5 次锁 15 分钟。
  *
- * 界面基于 Tabler（MIT，vendor 在 assets/vendor/，主流管理后台模板），
- * 前端应用在 assets/admin-app.js（vanilla JS，无构建，服务时内联进页面）。
- * 模板静态文件经 /admin/assets/<白名单文件> 下发（公共资源，无鉴权）。
+ * 前端：admin/ 目录的 React SPA（shadcn-admin 模板裁剪，Vite 构建），
+ * 构建产物 admin/dist 提交进仓库，这里只做静态下发（服务器部署仍是
+ * git pull + restart，无需在机上跑构建）。index.html 不缓存，assets/
+ * 里的带哈希文件长缓存；非 API 的未知路径回落 index.html（前端路由）。
+ *
+ * 登录走 JSON 接口：POST /admin/api/login {password, code}（成功 200+Cookie，
+ * 失败 401，锁定 429）；GET /admin/api/session 查询会话与是否需要动态码。
  *
  * 管理能力：总览 / 用户（增删改停踢）/ 邀请码（生成删）/ 重置审批 /
  * 站点设置 / 安全设置（TOTP）/ 版本发布 / 密钥管理 / 操作日志。
@@ -35,26 +39,8 @@ import {
 } from "./totp.mjs";
 
 const ADMIN_DIR = path.dirname(fileURLToPath(import.meta.url));
-const APP_JS_PATH = path.join(ADMIN_DIR, "assets", "admin-app.js");
-let appJsCache = null;
-
-/** 读入前端应用并缓存（改 admin-app.js 后需重启网关生效） */
-function appJs() {
-  if (appJsCache === null) {
-    try {
-      appJsCache = fs.readFileSync(APP_JS_PATH, "utf8");
-    } catch {
-      appJsCache = 'console.error("前端脚本缺失：gateway/admin/assets/admin-app.js 不可读");';
-    }
-  }
-  return appJsCache;
-}
-
-/** 模板静态文件白名单（公共资源，不含任何秘密，直接下发可缓存） */
-const ASSET_FILES = new Map([
-  ["tabler.min.css", { file: path.join(ADMIN_DIR, "assets", "vendor", "tabler.min.css"), type: "text/css; charset=utf-8" }],
-  ["tabler.min.js", { file: path.join(ADMIN_DIR, "assets", "vendor", "tabler.min.js"), type: "application/javascript; charset=utf-8" }],
-]);
+/** React 管理台的构建产物（admin/dist，随仓库分发，服务器无需构建） */
+const DIST_DIR = path.resolve(ADMIN_DIR, "..", "..", "admin", "dist");
 
 const ADMIN_COOKIE = "raptor_admin";
 const ADMIN_TTL_MS = 12 * 3600_000;
@@ -88,490 +74,49 @@ function readJsonBody(req) {
   });
 }
 
-function escapeHtml(text) {
-  return String(text)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
-/** 管理台少量自有样式（其余全部交给 Tabler） */
-const OWN_CSS = `
-body{font-family:var(--tblr-font-sans-serif,inherit)}
-.pane-page{display:none}
-.pane-page.on{display:block}
-.qr-box{background:#fff;border:1px solid var(--tblr-border-color);border-radius:4px;
-width:fit-content;padding:8px;margin:4px 0}
-.qr-box svg{display:block;width:200px;height:200px}
-.recovery-codes{font-family:var(--tblr-font-monospace,monospace);font-size:15px;
-letter-spacing:.08em;line-height:2}
-.drop-zone{border:1.5px dashed var(--tblr-border-color);border-radius:4px;
-padding:22px 16px;text-align:center;color:var(--tblr-secondary);cursor:pointer;
-background:var(--tblr-bg-surface-secondary);transition:border-color .15s ease,background .15s ease}
-.drop-zone:hover,.drop-zone.drag-on{border-color:var(--tblr-primary);color:var(--tblr-primary-fg);background:var(--tblr-active-bg)}
-.mono{font-family:var(--tblr-font-monospace,monospace);font-size:.875em}
-.copy-ok{color:var(--tblr-success);font-size:.75rem}
-.log-empty{color:var(--tblr-secondary)}
-`;
-
-const loginHtml = (error = "", mfa = false) => `<!doctype html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#f8f9fa">
-<title>管理登录 · CourseRaptor</title>
-<link rel="stylesheet" href="/admin/assets/tabler.min.css">
-<style>${OWN_CSS}</style>
-</head>
-<body>
-<div class="page page-center">
-<div class="container container-tight py-4">
-  <div class="text-center mb-4">
-    <span class="navbar-brand navbar-brand-autodark" style="font-size:1.1rem;font-weight:600">
-      CourseRaptor <span class="badge bg-warning-lt ms-2">ADMIN</span>
-    </span>
-  </div>
-  <div class="card card-md">
-    <div class="card-body">
-      <h2 class="h2 text-center mb-4">管理后台登录</h2>
-      ${error ? `<div class="alert alert-danger" role="alert">${escapeHtml(error)}</div>` : ""}
-      <form method="post" action="/admin/login" autocomplete="on">
-        <div class="mb-3">
-          <label class="form-label">管理密码</label>
-          <input type="password" class="form-control" name="password"
-                 autocomplete="current-password" required${mfa ? "" : " autofocus"}
-                 placeholder="请输入管理密码">
-        </div>
-        ${mfa
-          ? `<div class="mb-3">
-          <label class="form-label">动态码（2FA）</label>
-          <input type="text" class="form-control" name="code" inputmode="numeric"
-                 autocomplete="one-time-code" required autofocus
-                 placeholder="验证器 6 位数字（或恢复码）">
-        </div>`
-          : ""}
-        <div class="form-footer">
-          <button type="submit" class="btn btn-primary w-100">进入管理后台</button>
-        </div>
-      </form>
-    </div>
-  </div>
-  <div class="text-center text-secondary mt-3">班级互助服务 · CourseRaptor</div>
-</div>
-</div>
-</body>
-</html>`;
-
 const disabledHtml = () => `<!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>未启用 · CourseRaptor 管理</title>
-<link rel="stylesheet" href="/admin/assets/tabler.min.css">
+<style>
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+background:#f6f8fb;color:#1e293b;display:flex;min-height:100vh;align-items:center;justify-content:center}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:32px;max-width:460px;margin:16px}
+h2{margin:0 0 16px;font-size:20px;text-align:center}
+.warn{background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:10px 12px;font-size:14px}
+p{color:#64748b;font-size:14px;line-height:1.7}
+code{background:#f1f5f9;border-radius:4px;padding:2px 6px;font-size:13px}
+</style>
 </head>
 <body>
-<div class="page page-center">
-<div class="container container-tight py-4">
-  <div class="card card-md">
-    <div class="card-body">
-      <h2 class="h2 text-center mb-4">管理后台未启用</h2>
-      <div class="alert alert-warning">服务器未设置 <span class="mono">GATEWAY_ADMIN_PASSWORD</span></div>
-      <p class="text-secondary">在 <span class="mono">/etc/raptor-gateway.env</span> 加入该变量并
-      <span class="mono">systemctl restart raptor-gateway</span> 即可开启；期间可继续用
-      <span class="mono">admin.mjs</span> 命令行管理。</p>
-    </div>
-  </div>
-</div>
+<div class="card">
+  <h2>管理后台未启用</h2>
+  <div class="warn">服务器未设置 <code>GATEWAY_ADMIN_PASSWORD</code></div>
+  <p>在 <code>/etc/raptor-gateway.env</code> 加入该变量并
+  <code>systemctl restart raptor-gateway</code> 即可开启；期间可继续用
+  <code>admin.mjs</code> 命令行管理。</p>
 </div>
 </body>
 </html>`;
 
-/** 侧栏图标：Tabler Icons 描线 SVG（24 viewBox，stroke 1.5） */
-const I = {
-  home: '<path d="M5 12l-2 0l9 -9l9 9l-2 0"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7"/><path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6"/>',
-  users:
-    '<path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0"/><path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0 -3 -3.85"/>',
-  ticket:
-    '<path d="M15 5l0 2"/><path d="M15 11l0 2"/><path d="M15 17l0 2"/><path d="M5 5a2 2 0 0 0 -2 2v3a2 2 0 0 1 0 4v3a2 2 0 0 0 2 2h14a2 2 0 0 0 2 -2v-3a2 2 0 0 1 0 -4v-3a2 2 0 0 0 -2 -2h-14z"/>',
-  key: '<path d="M10.3 13.7l-.3 .3l-4 4l-2.5 .5l.5 -2.5l4 -4l.3 -.3"/><path d="M21 14a5 5 0 1 0 -8.54 -3.54l-9 9l1.5 1.5l3 3l2 -2l-2 -2l2 -2l2 2l2 -2"/>',
-  shield:
-    '<path d="M12 3l8 4v5c0 5.5 -3.8 9.74 -8 11c-4.2 -1.26 -8 -5.5 -8 -11v-5l8 -4"/><path d="M9 12l2 2l4 -4"/>',
-  rocket:
-    '<path d="M7 12a5 5 0 0 1 5 -5a5 5 0 0 1 5 5a5 5 0 0 1 -5 5a5 5 0 0 1 -5 -5"/><path d="M12 17v7"/><path d="M9 21h6"/>',
-  adjustments:
-    '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/><circle cx="8" cy="6" r="2"/><circle cx="14" cy="12" r="2"/><circle cx="10" cy="18" r="2"/>',
-  history:
-    '<path d="M12 8v4l3 3"/><path d="M3.05 11a9 9 0 1 1 .5 4"/><path d="M3 15l-2 -4l4 1"/>',
-  clipboard:
-    '<path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2"/><path d="M9 3h6v4h-6z"/>',
+/** 静态文件的 MIME（构建产物里出现的扩展名） */
+const CONTENT_TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".mjs": "application/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".ico": "image/x-icon",
+  ".json": "application/json; charset=utf-8",
+  ".txt": "text/plain; charset=utf-8",
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".webp": "image/webp",
 };
-const icon = (name) =>
-  `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[name]}</svg>`;
-
-const NAV = [
-  { group: "总览", items: [["home", "概览", "home"]] },
-  {
-    group: "管理",
-    items: [
-      ["users", "用户", "users"],
-      ["invites", "邀请码", "ticket"],
-      ["resets", "重置审批", "key"],
-    ],
-  },
-  {
-    group: "配置",
-    items: [
-      ["site", "站点设置", "adjustments"],
-      ["security", "安全设置", "shield"],
-    ],
-  },
-  {
-    group: "发布",
-    items: [
-      ["release", "版本发布", "rocket"],
-      ["keys", "密钥管理", "key"],
-    ],
-  },
-  { group: "系统", items: [["log", "操作日志", "history"]] },
-];
-
-const navHtml = NAV.map((group) => {
-  const items = group.items
-    .map(
-      ([id, label, ic]) => `<li class="nav-item" data-nav-item="${id}">
-      <a class="nav-link" href="#/${id}" data-nav="${id}">
-        <span class="nav-link-icon d-md-none d-lg-inline-block">${icon(ic)}</span>
-        <span class="nav-link-title">${label}</span>${id === "resets" ? '<span class="badge bg-danger ms-auto" id="navResetBadge" hidden></span>' : ""}
-      </a>
-    </li>`,
-    )
-    .join("");
-  return `<li class="nav-header">${group.group}</li>${items}`;
-}).join("");
-
-const dashboardHtml = () => `<!doctype html>
-<html lang="zh-CN">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#f8f9fa">
-<title>管理后台 · CourseRaptor</title>
-<link rel="stylesheet" href="/admin/assets/tabler.min.css">
-<style>${OWN_CSS}</style>
-</head>
-<body>
-<div class="page">
-  <aside class="navbar navbar-vertical navbar-expand-lg">
-    <div class="container-fluid">
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu"
-              aria-controls="sidebar-menu" aria-expanded="false" aria-label="展开 / 收起菜单">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <h1 class="navbar-brand navbar-brand-autodark">
-        <a href="#/home" class="text-decoration-none">Course<span class="text-primary fw-bold">Raptor</span>
-          <span class="badge bg-warning-lt ms-1">ADMIN</span></a>
-      </h1>
-      <div class="collapse navbar-collapse" id="sidebar-menu">
-        <ul class="navbar-nav pt-lg-3">
-          ${navHtml}
-        </ul>
-      </div>
-    </div>
-  </aside>
-
-  <div class="page-wrapper">
-    <header class="navbar navbar-expand-md d-none d-lg-flex d-print-none">
-      <div class="container-xl">
-        <div class="navbar-nav flex-row order-md-last">
-          <div class="d-none d-md-flex me-2 text-secondary small" id="headerMeta"></div>
-          <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="refresh">
-            ${icon("history")} 刷新
-          </button>
-          <button type="button" class="btn btn-sm btn-outline-danger" id="logout">退出</button>
-        </div>
-      </div>
-    </header>
-
-    <div class="page-wrapper">
-      <div class="page-header d-print-none">
-        <div class="container-xl">
-          <div class="row g-2 align-items-center">
-            <div class="col">
-              <div class="page-pretitle" id="pagePretitle">ADMIN</div>
-              <h2 class="page-title" id="pageTitle">概览</h2>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="page-body">
-        <div class="container-xl">
-
-          <div class="pane-page on" id="pane-home">
-            <div class="row row-deck row-cards" id="homeStats"></div>
-            <div class="row row-deck row-cards mt-3" id="homeAlerts"></div>
-            <div class="row row-deck row-cards mt-3">
-              <div class="col-lg-6">
-                <div class="card">
-                  <div class="card-header"><h3 class="card-title">快捷操作</h3></div>
-                  <div class="card-body">
-                    <div class="d-flex flex-wrap gap-2">
-                      <a href="#/invites" class="btn btn-outline-primary">${icon("ticket")} 生成邀请码</a>
-                      <button type="button" class="btn btn-outline-primary" data-open-modal="modalUserCreate">${icon("users")} 新增用户</button>
-                      <a href="#/release" class="btn btn-outline-primary">${icon("rocket")} 上传版本</a>
-                      <a href="#/site" class="btn btn-outline-primary">${icon("adjustments")} 站点 Key</a>
-                      <a href="#/security" class="btn btn-outline-primary">${icon("shield")} 两步验证</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-lg-6">
-                <div class="card">
-                  <div class="card-header"><h3 class="card-title">最近操作</h3>
-                    <div class="card-actions"><a href="#/log" class="btn btn-link">全部 →</a></div></div>
-                  <div class="card-body p-0">
-                    <ul class="list-group list-group-flush" id="homeLog"><li class="list-group-item text-secondary">读取中…</li></ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="pane-page" id="pane-users">
-            <div class="card">
-              <div class="card-header">
-                <h3 class="card-title">用户列表</h3>
-                <div class="card-actions">
-                  <div class="input-icon input-icon-sm me-2">
-                    <input type="search" class="form-control form-control-sm" id="userSearch" placeholder="搜索用户名…">
-                  </div>
-                  <select class="form-select form-select-sm w-auto me-2" id="userFilter">
-                    <option value="">全部状态</option>
-                    <option value="active">正常</option>
-                    <option value="disabled">已停用</option>
-                    <option value="online">在线</option>
-                  </select>
-                  <button type="button" class="btn btn-primary btn-sm" data-open-modal="modalUserCreate">
-                    ${icon("users")} 新增用户
-                  </button>
-                </div>
-              </div>
-              <div class="table-responsive">
-                <table class="table table-vcenter card-table">
-                  <thead><tr>
-                    <th>用户名</th><th>状态</th><th>Key 来源</th><th>在线</th>
-                    <th>来源</th><th>注册于</th><th>今日轮数</th><th class="w-1"></th>
-                  </tr></thead>
-                  <tbody id="userRows"><tr><td colspan="8" class="text-secondary">读取中…</td></tr></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <div class="pane-page" id="pane-invites">
-            <div class="card mb-3">
-              <div class="card-header"><h3 class="card-title">生成邀请码</h3></div>
-              <div class="card-body">
-                <form class="row g-2 align-items-end" id="inviteForm">
-                  <div class="col-auto"><label class="form-label text-secondary">数量</label>
-                    <input type="number" class="form-control" id="invCount" min="1" max="50" value="5" style="width:90px"></div>
-                  <div class="col"><label class="form-label text-secondary">备注（如：班级群）</label>
-                    <input type="text" class="form-control" id="invNote" maxlength="100"></div>
-                  <div class="col-auto"><label class="form-label text-secondary">有效天数（0=永久）</label>
-                    <input type="number" class="form-control" id="invDays" min="0" max="365" value="0" style="width:130px"></div>
-                  <div class="col-auto"><button type="submit" class="btn btn-primary">生成</button></div>
-                </form>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-header"><h3 class="card-title">邀请码列表</h3></div>
-              <div class="table-responsive">
-                <table class="table table-vcenter card-table">
-                  <thead><tr><th>邀请码</th><th>备注</th><th>使用者</th><th>状态</th><th class="w-1"></th></tr></thead>
-                  <tbody id="inviteRows"><tr><td colspan="5" class="text-secondary">读取中…</td></tr></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <div class="pane-page" id="pane-resets">
-            <div class="card mb-3">
-              <div class="card-header"><h3 class="card-title">待审批申请</h3>
-                <div class="card-actions text-secondary">同意后把一次性码发给同学，新密码由同学自己设</div></div>
-              <div class="table-responsive">
-                <table class="table table-vcenter card-table">
-                  <thead><tr><th>用户名</th><th>申请时间</th><th class="w-1"></th></tr></thead>
-                  <tbody id="resetRows"><tr><td colspan="3" class="text-secondary">读取中…</td></tr></tbody>
-                </table>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-header"><h3 class="card-title">有效重置码</h3>
-                <div class="card-actions text-secondary">24 小时内有效 · 用后即焚</div></div>
-              <div class="table-responsive">
-                <table class="table table-vcenter card-table">
-                  <thead><tr><th>用户名</th><th>重置码</th><th>过期时间</th><th class="w-1"></th></tr></thead>
-                  <tbody id="codeRows"><tr><td colspan="4" class="text-secondary">读取中…</td></tr></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <div class="pane-page" id="pane-site">
-            <div class="card mb-3">
-              <div class="card-header"><h3 class="card-title">站点统一 DeepSeek Key</h3>
-                <div class="card-actions text-secondary">同学端「设置 → AI 模型」的统一 Key</div></div>
-              <div class="card-body">
-                <div class="mb-2 text-secondary" id="keyState">读取中…</div>
-                <form class="d-flex gap-2" id="siteKeyForm">
-                  <input type="text" class="form-control" id="siteKeyInput" placeholder="粘贴新的 sk- 开头 Key" autocomplete="off">
-                  <button type="submit" class="btn btn-primary flex-shrink-0">保存</button>
-                </form>
-                <div class="text-secondary small mt-2">保存后新拉起的实例立即使用新 Key；在线实例下次拉起时切换。同学保存自己的 Key 后优先用自己的，不消耗站点额度。</div>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-header"><h3 class="card-title">对话限额与分账</h3></div>
-              <div class="card-body" id="quotaStats"><div class="text-secondary">读取中…</div></div>
-            </div>
-          </div>
-
-          <div class="pane-page" id="pane-security">
-            <div class="card">
-              <div class="card-header"><h3 class="card-title">两步验证（TOTP）</h3>
-                <div class="card-actions text-secondary">登录需密码 + 手机验证器动态码</div></div>
-              <div class="card-body" id="mfaCard"><div class="text-secondary">读取中…</div></div>
-            </div>
-          </div>
-
-          <div class="pane-page" id="pane-release">
-            <div class="card mb-3">
-              <div class="card-header"><h3 class="card-title">上传新版本</h3>
-                <div class="card-actions text-secondary">同学端安装包 · 与 npm run publish 共用接口</div></div>
-              <div class="card-body">
-                <div class="row g-2 mb-2">
-                  <div class="col-auto"><input type="text" class="form-control mono" id="updVer" placeholder="x.y.z" style="width:130px;text-align:center" autocomplete="off" spellcheck="false"></div>
-                  <div class="col"><input type="text" class="form-control" id="updNotes" placeholder="更新说明（可选），如：修复课表周次显示错误" maxlength="2000" autocomplete="off"></div>
-                </div>
-                <div class="drop-zone" id="updDrop" tabindex="0" role="button" aria-label="选择或拖入 zip 安装包">
-                  <div>点击选择，或拖入 zip 安装包（最大 200 MB）</div>
-                </div>
-                <input type="file" id="updFile" accept=".zip,application/zip" hidden>
-                <div id="updFileBox"></div>
-                <div id="updProg" hidden class="mt-2">
-                  <div class="d-flex justify-content-between small text-secondary"><span id="updPhase">上传中</span><span id="updPct">0%</span></div>
-                  <div class="progress progress-sm mt-1"><div class="progress-bar" id="updBar" style="width:0%"></div></div>
-                  <div class="text-end mt-1"><button type="button" class="btn btn-sm btn-outline-secondary" id="updCancel">取消上传</button></div>
-                </div>
-                <button type="button" class="btn btn-primary mt-2" id="updGo">发布新版本</button>
-                <div class="text-secondary small mt-2">发布后学生端下次启动 raptor 时提示更新；版本号需大于当前分发版本，否则不触发更新。</div>
-              </div>
-            </div>
-            <div class="card">
-              <div class="card-header"><h3 class="card-title">历史版本</h3>
-                <div class="card-actions text-secondary" id="updCur"></div></div>
-              <div class="card-body" id="updCard"><div class="text-secondary">读取中…</div></div>
-            </div>
-          </div>
-
-          <div class="pane-page" id="pane-keys">
-            <div class="card">
-              <div class="card-header"><h3 class="card-title">更新后台密钥</h3>
-                <div class="card-actions text-secondary">命令行发版与后台登录用，与主密钥同权</div></div>
-              <div class="card-body">
-                <form class="d-flex gap-2 mb-2" id="keyForm">
-                  <input type="text" class="form-control" id="keyName" placeholder="名称（可选），如：发布机 / 值班同学" maxlength="64" autocomplete="off">
-                  <button type="submit" class="btn btn-primary flex-shrink-0">新建密钥</button>
-                </form>
-                <div id="keyCreated" hidden></div>
-                <div class="table-responsive mt-2">
-                  <table class="table table-vcenter card-table">
-                    <thead><tr><th>名称</th><th>类型</th><th>创建时间</th><th>最后使用</th><th class="w-1"></th></tr></thead>
-                    <tbody id="keyRows"><tr><td colspan="5" class="text-secondary">读取中…</td></tr></tbody>
-                  </table>
-                </div>
-                <div class="text-secondary small mt-2">主密钥来自服务器环境变量 UPDATE_ADMIN_TOKEN，始终可用且不能在这里删除；面板密钥删除后立即失效。明文只在创建时展示一次。</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="pane-page" id="pane-log">
-            <div class="card">
-              <div class="card-header"><h3 class="card-title">操作日志</h3>
-                <div class="card-actions text-secondary">最近 200 条管理动作</div></div>
-              <div class="table-responsive">
-                <table class="table table-vcenter card-table">
-                  <thead><tr><th style="width:170px">时间</th><th>操作</th></tr></thead>
-                  <tbody id="logRows"><tr><td colspan="2" class="text-secondary">读取中…</td></tr></tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- 新增用户 -->
-<div class="modal modal-blur" id="modalUserCreate" tabindex="-1" style="display:none" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">新增用户</h5>
-        <button type="button" class="btn-close" data-close-modal aria-label="关闭"></button></div>
-      <div class="modal-body">
-        <div class="mb-3"><label class="form-label">用户名</label>
-          <input type="text" class="form-control" id="newUsername" placeholder="字母 / 数字 / _ / -，2-32 位" autocomplete="off"></div>
-        <div class="mb-3"><label class="form-label">初始密码（至少 8 位）</label>
-          <input type="text" class="form-control mono" id="newPassword" placeholder="同学登录后可自行修改" autocomplete="off"></div>
-        <div class="text-secondary small">不走邀请码直接建号；账号建好即可登录。</div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-link link-secondary" data-close-modal>取消</button>
-        <button type="button" class="btn btn-primary" id="userCreateGo">创建</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- 设限额 -->
-<div class="modal modal-blur" id="modalQuota" tabindex="-1" style="display:none" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">设置每日限额</h5>
-        <button type="button" class="btn-close" data-close-modal aria-label="关闭"></button></div>
-      <div class="modal-body">
-        <div class="mb-2 text-secondary" id="quotaUser"></div>
-        <input type="number" class="form-control" id="quotaValue" min="0" max="100000" placeholder="0 = 用站点默认">
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-link link-secondary" data-close-modal>取消</button>
-        <button type="button" class="btn btn-primary" id="quotaGo">保存</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- 用户详情 -->
-<div class="modal modal-blur" id="modalUserDetail" tabindex="-1" style="display:none" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title">用户详情</h5>
-        <button type="button" class="btn-close" data-close-modal aria-label="关闭"></button></div>
-      <div class="modal-body" id="userDetailBody"></div>
-    </div>
-  </div>
-</div>
-
-<script src="/admin/assets/tabler.min.js"></script>
-<script>
-${appJs()}
-</script>
-</body>
-</html>`;
 
 export function createAdminUi({
   registry,
@@ -704,25 +249,42 @@ export function createAdminUi({
 
   const sendJson = (res, status, data) => send(res, status, JSON.stringify(data), "application/json; charset=utf-8");
 
-  /** 模板静态文件（白名单）：公共资源，长缓存 */
-  async function handleAsset(req, res, pathname) {
-    if (req.method !== "GET") return false;
-    const name = pathname.slice("/admin/assets/".length);
-    const asset = ASSET_FILES.get(name);
-    if (!asset) return false;
+  /**
+   * 下发 admin/dist 里的构建产物。/admin/xxx 映射 dist/xxx，路径先净化
+   * （拒绝 ..、反斜杠、空段），解析后再确认仍落在 DIST_DIR 内（双保险）。
+   * assets/ 下的文件名带内容哈希 → 一年不变缓存；其余（index.html 等）不缓存。
+   * 找不到文件返回 false（调用方决定 404 还是回落 index.html）。
+   */
+  async function serveDistFile(res, rel) {
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(rel)) return false;
+    const file = path.join(DIST_DIR, rel);
+    if (file !== DIST_DIR && !file.startsWith(DIST_DIR + path.sep)) return false;
+    let body;
     try {
-      const body = await fs.promises.readFile(asset.file);
-      res.writeHead(200, {
-        "content-type": asset.type,
-        "cache-control": "public, max-age=86400",
-        "content-length": body.length,
-      });
-      res.end(body);
+      body = await fs.promises.readFile(file);
     } catch {
-      res.writeHead(404);
-      res.end();
+      return false;
     }
+    const ext = path.extname(file).toLowerCase();
+    const type = CONTENT_TYPES[ext] ?? "application/octet-stream";
+    const hashed = rel.startsWith("assets/");
+    res.writeHead(200, {
+      "content-type": type,
+      "cache-control": hashed ? "public, max-age=31536000, immutable" : "no-store",
+      "content-length": body.length,
+    });
+    res.end(body);
     return true;
+  }
+
+  async function serveIndex(res) {
+    if (await serveDistFile(res, "index.html")) return;
+    // dist 缺失（一般是开发态没跑 admin 构建）：给出可操作的提示而不是白屏
+    send(
+      res,
+      500,
+      "管理台前端未构建：请在仓库 admin/ 目录执行 npm install && npm run build（产物 admin/dist 随仓库提交）",
+    );
   }
 
   /** 返回 true 表示已处理该请求 */
@@ -738,38 +300,60 @@ export function createAdminUi({
       return true;
     }
 
-    if (await handleAsset(req, res, pathname)) return true;
-
     // 两步验证状态每次请求现读：启用/关闭后无需重启即生效；
     // sessionEpoch 参与会话签名，状态一变所有旧管理会话立即失效
     const totpDoc = await registry.getAdminTotp();
     const epoch = totpDoc?.sessionEpoch ?? 0;
     const mfaOn = Boolean(totpDoc);
 
+    // ── 前端 SPA：静态产物 + 前端路由回落 ─────────────────────
     if (req.method === "GET" && pathname === "/admin") {
-      send(res, 200, sessionFrom(req, epoch) ? dashboardHtml() : loginHtml("", mfaOn));
+      await serveIndex(res);
+      return true;
+    }
+    if (req.method === "GET" && pathname.startsWith("/admin/")) {
+      const rel = pathname.slice("/admin/".length);
+      if (rel !== "api" && !rel.startsWith("api/")) {
+        // assets/ 找不到就是 404（不回落 index.html，避免吞掉资源错误）
+        if (rel.startsWith("assets/")) {
+          if (await serveDistFile(res, rel)) return true;
+          res.writeHead(404);
+          res.end();
+          return true;
+        }
+        // 其余未知路径交给前端路由（/admin/sign-in、/admin/users 等）
+        if (!(await serveDistFile(res, rel))) await serveIndex(res);
+        return true;
+      }
+      // /admin/api/* 的 GET 落到下面的 API 分支
+    }
+
+    // ── 会话探测：登录页据此决定是否显示动态码输入框 ──────────
+    if (req.method === "GET" && pathname === "/admin/api/session") {
+      sendJson(res, 200, {
+        authed: Boolean(sessionFrom(req, epoch)),
+        mfaRequired: mfaOn,
+        version,
+      });
       return true;
     }
 
-    if (req.method === "POST" && pathname === "/admin/login") {
+    // ── 登录 / 退出（JSON）───────────────────────────────────
+    if (req.method === "POST" && pathname === "/admin/api/login") {
       const lockSec = checkThrottle(ip);
       if (lockSec) {
-        send(res, 429, loginHtml(`尝试次数过多，请 ${lockSec} 秒后再试`, mfaOn));
+        sendJson(res, 429, { error: `尝试次数过多，请 ${lockSec} 秒后再试`, retryAfterSec: lockSec });
         return true;
       }
-      const body = await readJsonOrForm(req);
+      const body = await readJsonBody(req);
       const pass = String(body.password ?? "");
-      const fail = (message) => {
+      const fail = (message, status = 401) => {
         recordFailure(ip);
         const locked = Boolean(failures.get(ip)?.lockedUntil);
-        send(
-          res,
-          401,
-          loginHtml(
-            locked ? `密码或动态码错误次数过多，已锁定 ${LOCK_DURATION_MS / 60000} 分钟` : message,
-            mfaOn,
-          ),
-        );
+        sendJson(res, status, {
+          error: locked ? `密码或动态码错误次数过多，已锁定 ${LOCK_DURATION_MS / 60000} 分钟` : message,
+          locked,
+        });
         return true;
       };
       if (!passwordOk(pass)) return fail("管理密码不正确");
@@ -788,18 +372,15 @@ export function createAdminUi({
       failures.delete(ip);
       await audit(ip, "登录管理台");
       const expiresAt = Date.now() + ADMIN_TTL_MS;
-      send(res, 303, "", "text/html; charset=utf-8", {
-        location: "/admin",
+      send(res, 200, JSON.stringify({ ok: true }), "application/json; charset=utf-8", {
         "set-cookie": `${ADMIN_COOKIE}=${expiresAt}.${sign(expiresAt, epoch)}; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=${ADMIN_TTL_MS / 1000}`,
       });
       return true;
     }
 
-    if (req.method === "POST" && pathname === "/admin/logout") {
-      if (!sessionFrom(req, epoch)) return false;
-      await audit(ip, "退出管理台");
-      send(res, 303, "", "text/html; charset=utf-8", {
-        location: "/admin",
+    if (req.method === "POST" && pathname === "/admin/api/logout") {
+      if (sessionFrom(req, epoch)) await audit(ip, "退出管理台");
+      send(res, 200, JSON.stringify({ ok: true }), "application/json; charset=utf-8", {
         "set-cookie": `${ADMIN_COOKIE}=; Path=/admin; HttpOnly; SameSite=Lax; Max-Age=0`,
       });
       return true;
@@ -1270,32 +851,6 @@ export function createAdminUi({
     }
     sendJson(res, 404, { error: "not found" });
     return true;
-  }
-
-  /** 登录表单是 application/x-www-form-urlencoded，其余是 JSON */
-  async function readJsonOrForm(req) {
-    if (String(req.headers["content-type"] ?? "").includes("application/json")) {
-      return readJsonBody(req);
-    }
-    const chunks = [];
-    let size = 0;
-    return new Promise((resolve, reject) => {
-      req.on("data", (chunk) => {
-        size += chunk.length;
-        if (size > MAX_JSON_BODY) {
-          reject(new Error("请求体过大"));
-          req.destroy();
-        }
-        chunks.push(chunk);
-      });
-      req.on("end", () => {
-        const params = new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
-        const out = {};
-        for (const [k, v] of params) out[k] = v;
-        resolve(out);
-      });
-      req.on("error", reject);
-    });
   }
 
   return { handle };

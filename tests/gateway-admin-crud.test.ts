@@ -1,6 +1,6 @@
 /**
  * 管理台 v3 新增能力测试：新增用户 / 删除用户（含数据目录回收）/
- * 删除邀请码 / 操作审计日志 / Tabler 静态资产下发。
+ * 删除邀请码 / 操作审计日志 / 构建产物静态下发。
  */
 
 import assert from "node:assert/strict";
@@ -9,6 +9,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 const { createGatewayServer } = await import("../gateway/app.mjs");
 const { createRegistry } = await import("../gateway/registry.mjs");
@@ -82,13 +83,12 @@ async function startGateway(
 }
 
 async function adminLogin(base: string) {
-  const res = await fetch(`${base}/admin/login`, {
+  const res = await fetch(`${base}/admin/api/login`, {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ password: "admin-master-pw" }),
-    redirect: "manual",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password: "admin-master-pw" }),
   });
-  assert.equal(res.status, 303);
+  assert.equal(res.status, 200);
   return res.headers.get("set-cookie") ?? "";
 }
 
@@ -241,36 +241,50 @@ test("管理台：操作写审计日志，bootstrap 带出", async (t) => {
   assert.equal(log.length, boot.log.length);
 });
 
-test("管理台：Tabler 静态资产白名单下发，未知资产 404", async (t) => {
+test("管理台：构建产物按内容类型下发、白名单外路径 404", async (t) => {
   const backendPort = await startBackend(t);
   const usersDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-ast-"));
   t.after(() => fs.rmSync(usersDir, { recursive: true, force: true }));
   const { base } = await startGateway(t, { backendPort, usersDir });
 
-  const css = await fetch(`${base}/admin/assets/tabler.min.css`);
-  assert.equal(css.status, 200);
-  assert.match(css.headers.get("content-type") ?? "", /text\/css/);
-  const body = await css.text();
-  assert.match(body, /Tabler/);
+  // 从提交的 dist/index.html 里取一个真实资产引用（顺带保证 dist 已提交）
+  const distRoot = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "admin",
+    "dist",
+  );
+  const indexHtml = fs.readFileSync(path.join(distRoot, "index.html"), "utf8");
+  const ref = /(?:src|href)="(\/admin\/assets\/[^"]+)"/.exec(indexHtml);
+  assert.ok(ref, "admin/dist/index.html 应引用构建产物");
+  const rel = ref[1].replace("/admin/", "");
+  assert.ok(fs.existsSync(path.join(distRoot, rel)), "index.html 引用的资产应存在于 admin/dist");
 
-  const js = await fetch(`${base}/admin/assets/tabler.min.js`);
-  assert.equal(js.status, 200);
+  // js 与 css 都能下发且内容类型正确
+  for (const ext of ["js", "css"]) {
+    const file = fs
+      .readdirSync(path.join(distRoot, "assets"))
+      .find((name) => name.endsWith(`.${ext}`));
+    assert.ok(file, `assets 里应有 .${ext} 产物`);
+    const res = await fetch(`${base}/admin/assets/${file}`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type") ?? "", ext === "js" ? /javascript/ : /text\/css/);
+  }
 
   const traversal = await fetch(`${base}/admin/assets/..%2f..%2f..%2fetc%2fpasswd`);
-  assert.ok(traversal.status === 404 || traversal.status === 400, "白名单外的路径不得读文件");
+  assert.ok(traversal.status === 404 || traversal.status === 400, "dist 外的路径不得读文件");
 
-  const unknown = await fetch(`${base}/admin/assets/nope.min.css`);
+  const unknown = await fetch(`${base}/admin/assets/nope.js`);
   assert.equal(unknown.status, 404);
 });
 
-test("管理台页面：模板引用与内嵌脚本齐备", async (t) => {
+test("管理台页面：SPA 入口可服务（登录与否一致）", async (t) => {
   const backendPort = await startBackend(t);
   const usersDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-page-"));
   t.after(() => fs.rmSync(usersDir, { recursive: true, force: true }));
   const { base } = await startGateway(t, { backendPort, usersDir });
   const cookie = await adminLogin(base);
   const html = await (await fetch(`${base}/admin`, { headers: { cookie } })).text();
-  assert.match(html, /\/admin\/assets\/tabler\.min\.css/);
-  assert.match(html, /id="pane-home"/);
-  assert.match(html, /id="pane-log"/);
+  assert.match(html, /<div id="root">/);
+  assert.match(html, /\/admin\/assets\//);
 });
