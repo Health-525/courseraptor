@@ -15,8 +15,10 @@ import { test } from "node:test";
 import {
   _setPdfTextParserForTest,
   _setWebvpnPdfFetchForTest,
+  clearNewsMemo,
   fetchJwcArticle,
   fetchJwcNews,
+  fetchJwcNewsMemo,
 } from "../src/adapters/njtech/news";
 
 function installFetch(respond: (url: string) => string | Buffer) {
@@ -178,3 +180,25 @@ test("PDF 直连被校外拦截时降级 WebVPN 二进制通道", async () => {
 
 // 数据目录无关紧要，但保持与其他测试一致的隔离姿势
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-jwgl-news-"));
+
+// ── 进程内 5 分钟快照：面板与 get_news 工具共享，不双抓 ──────────
+test("fetchJwcNewsMemo：TTL 内重复调用共享同一份快照（面板+工具不双抓三页）", async () => {
+  clearNewsMemo();
+  let fetches = 0;
+  const restore = installFetch(() => {
+    fetches += 1;
+    return LIST_HTML;
+  });
+  try {
+    const a = await fetchJwcNewsMemo(30);
+    const b = await fetchJwcNewsMemo(30);
+    assert.ok(a.items.length > 0);
+    assert.equal(a.via, "direct");
+    assert.equal(a.staleAt, undefined, "新鲜结果不携带 staleAt");
+    assert.equal(b.items.length, a.items.length);
+    assert.equal(fetches, 3, "三个板块只抓一轮；第二次调用应命中进程内快照");
+  } finally {
+    restore();
+    clearNewsMemo();
+  }
+});

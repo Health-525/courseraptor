@@ -299,6 +299,37 @@ function isValidNewsCache(parsed: unknown): parsed is NewsCacheEnvelope {
   );
 }
 
+// ── 进程内 5 分钟快照：get_news 工具与网页通知面板共用 ────────────
+// 通知是公共数据（对所有人相同），「面板刚看过 + 对话里又问一次」不该
+// 触发两轮全量抓取（直连或 WebVPN 都是三个板块三页请求）。只缓存新鲜
+// 结果；降级快照（staleAt）不进缓存——下次调用照常重试真实通道。
+
+const NEWS_MEMO_TTL_MS = 5 * 60_000;
+let newsMemo: { result: JwcNewsResult; at: number } | null = null;
+let newsMemoInflight: Promise<JwcNewsResult> | null = null;
+
+export async function fetchJwcNewsMemo(maxItems = 20): Promise<JwcNewsResult> {
+  if (newsMemo && Date.now() - newsMemo.at < NEWS_MEMO_TTL_MS) {
+    return newsMemo.result;
+  }
+  if (newsMemoInflight) return newsMemoInflight;
+  newsMemoInflight = (async () => {
+    const result = await fetchJwcNewsDetailed([], maxItems);
+    if (result.staleAt === undefined) newsMemo = { result, at: Date.now() };
+    return result;
+  })();
+  try {
+    return await newsMemoInflight;
+  } finally {
+    newsMemoInflight = null;
+  }
+}
+
+/** 测试用：清掉进程内快照与在途请求 */
+export function clearNewsMemo(): void {
+  newsMemo = null;
+}
+
 /**
  * 抓取教务处通知（兼容原契约：只回列表，不抛错）。
  * welcome 横幅与网页通知面板走这个入口，失败时按各自 UI 降级展示。

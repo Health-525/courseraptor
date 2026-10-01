@@ -12,7 +12,8 @@ import {
   type SpecialDayRecord,
   specialOnDate,
 } from "../../../core/calendar/holidays";
-import { saveScheduleCache } from "../../../core/schedule-cache";
+import type { ScheduleResult } from "../../../core/model";
+import { loadScheduleCache, saveScheduleCache } from "../../../core/schedule-cache";
 import {
   annotateWeekGroups,
   buildWeekIndex,
@@ -41,18 +42,35 @@ export const scheduleTools = {
       if (semester && !parsed) {
         return { error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
       }
-      // 会话失效自动重登一次：死 cookie 熬满 25 分钟 TTL 期间不再持续报错
-      const r = await withAuthRetry((c) => fetchScheduleSmart(c, parsed?.year, parsed?.semester));
-      // 拿不到 ≠ 没有：断网/会话失效必须如实说，不能让用户以为这学期没课
-      if (!r.ok) {
-        return {
-          error: `课表查询失败：${r.error}。这与「课表为空」不是一回事，请检查网络或稍后重试。`,
-        };
+      let term: ScheduleResult;
+      let staleAt: number | undefined;
+      try {
+        // 会话失效自动重登一次：死 cookie 熬满 25 分钟 TTL 期间不再持续报错
+        const r = await withAuthRetry((c) => fetchScheduleSmart(c, parsed?.year, parsed?.semester));
+        if (r.ok) {
+          term = r.data;
+          // 未指定学期（即自动探测的最新学期）时顺带刷新本地缓存，
+          // TUI 启动面板读缓存就够，不必每次登录都请求教务系统
+          if (!semester) saveScheduleCache(term);
+        } else {
+          // 拿不到 ≠ 没有：优先回退「最后已知课表」（磁盘缓存本来就是它），
+          // 完全没有缓存才如实报错，不让用户白跑一趟
+          const cached = loadScheduleCache();
+          if (!cached) {
+            return {
+              error: `课表查询失败：${r.error}。这与「课表为空」不是一回事，请检查网络或稍后重试。`,
+            };
+          }
+          term = cached.schedule;
+          staleAt = cached.savedAt;
+        }
+      } catch (e) {
+        // 网络/登录层故障但本地有最后已知课表：先给结果，如实标注不新鲜
+        const cached = loadScheduleCache();
+        if (!cached) throw e;
+        term = cached.schedule;
+        staleAt = cached.savedAt;
       }
-      const term = r.data;
-      // 未指定学期（即自动探测的最新学期）时顺带刷新本地缓存，
-      // TUI 启动面板读缓存就够，不必每次登录都请求教务系统
-      if (!semester) saveScheduleCache(term);
       const week = currentWeekOf(term.year, term.semester);
       // 假期/调休按日期叠周需要 week1Monday；currentWeekOf 在假期里返回 null，
       // 但周分组照样要标注，所以直接从真值源取
@@ -100,6 +118,10 @@ export const scheduleTools = {
           ? undefined
           : "尚无放假/调休落盘记录。法定节假日（国庆/元旦/清明/五一/端午/中秋/寒暑假）的具体安排以教务处通知为准：用户问放假安排、或问的课表周临近节假日时，先 get_news 查「放假/调休」相关通知，读到就 read_notice + set_holidays 落盘；查无通知再按「按国务院文件执行、另行通知」回答。",
         todaySpecial: today ? { date: todayIso, ...today } : undefined,
+        staleNote:
+          staleAt !== undefined
+            ? `⚠️ 教务在线查询失败，这是本地缓存的最后已知课表（保存于 ${new Date(staleAt).toLocaleString("zh-CN")}），可能已过期；网络恢复后再问一次课表即可刷新。`
+            : undefined,
         note:
           term.courses.length === 0 ? "课表已查通但无排课（假期或学期未排课属正常）" : undefined,
       };

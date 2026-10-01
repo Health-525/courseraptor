@@ -9,7 +9,7 @@ import { fetchAttachment } from "../../../core/attachments";
 import { config } from "../../../core/config";
 import { loadUserGrade } from "../../../core/memory/longterm";
 import { relevanceOf } from "../../../core/notices";
-import { fetchJwcArticle, fetchJwcNewsDetailed } from "../news";
+import { fetchJwcArticle, fetchJwcNewsMemo } from "../news";
 
 // ── 通知相关性 ────────────────────────────────────────────────
 // 教务处一次发十几条，其中大半跟具体某个学生无关。过去全靠模型逐条判断，
@@ -30,7 +30,9 @@ export const newsTools = {
       limit: z.number().int().min(1).max(30).default(10).describe("返回条数（默认 10）"),
     }),
     execute: async ({ category, limit }) => {
-      const { items: fetched, via, staleAt } = await fetchJwcNewsDetailed([], 30);
+      // 5 分钟进程内快照：网页通知面板刚看过的话，这里直接复用，
+      // 不再重复抓官网三页（对所有人相同的公共数据）
+      const { items: fetched, via, staleAt } = await fetchJwcNewsMemo(30);
       const filtered = category ? fetched.filter((i) => i.category === category) : fetched;
       const grade = await loadUserGrade();
       const scored = filtered.slice(0, limit).map((i) => {
