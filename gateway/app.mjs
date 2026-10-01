@@ -724,6 +724,11 @@ else { input.type = "password"; this.textContent = "显示"; }
           ownUsed,
           hasOwnKey,
           ownKeyActive,
+          /* 同学选的来源（dsMode=site 钉在站点；空串=跟随，没存 Key 时实际仍
+             走站点额度）。前端开关按「选择」渲染而不是按 ownKeyActive「实际
+             生效」渲染——否则没存 Key 的同学点「自己的 Key」会被立刻刷回
+             站点，连填 Key 的入口都看不到 */
+          dsMode: user.dsMode === "site" ? "site" : "own",
           source: user.dailyTurns > 0 ? "personal" : "site",
         });
         finish(200);

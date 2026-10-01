@@ -2556,8 +2556,13 @@ document.getElementById("newSession").addEventListener("click", doNewSession);
 document.getElementById("newSessionM").addEventListener("click", doNewSession);
 
 /* Key 来源二选一（仅托管版显示）：site=站点免费额度 / own=自己的 Key。
-   切到 site 时若已存有自己的 Key，先确认再清掉（网关重启实例生效） */
-function setDsMode(m, interactive) {
+   切换只改网关上的模式标记，永不删 Key——随时可切回，无需重填，所以
+   不需要任何确认弹窗（原生 confirm 在 iOS 主屏独立窗口里会被静默忽略，
+   表现为点了没反应；本项目其余处也一律用 armed 两步确认而非 confirm）。
+   开关按「同学的选择」渲染：没存 Key 时点「自己的 Key」是引导填 Key 的
+   中间态，绝不能被额度接口按「实际生效」推导的值弹回站点 */
+let dsUiMode = "";
+function setDsMode(m) {
   var site = document.getElementById("dsSite");
   var own = document.getElementById("dsOwn");
   var keyRow = document.getElementById("sKeyRow");
@@ -2565,36 +2570,49 @@ function setDsMode(m, interactive) {
   site.setAttribute("aria-pressed", m === "site" ? "true" : "false");
   own.setAttribute("aria-pressed", m === "own" ? "true" : "false");
   if (keyRow) keyRow.style.display = m === "own" ? "" : "none";
-  if (!interactive) return;
-  if (m === "site" && own.getAttribute("aria-pressed") !== "false") return;
+}
+function dsSay(text, good) {
+  var el = document.getElementById("setMsg");
+  if (!el) return;
+  el.className = "setmsg" + (good ? " good" : "");
+  el.textContent = text;
+}
+function postDsMode(m) {
+  fetch("/api/ds-mode", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ mode: m }),
+  })
+    .then(function (r) {
+      return r.ok;
+    })
+    .then(function (okFlag) {
+      if (!okFlag) {
+        dsSay("切换失败，请稍后再试。");
+        return;
+      }
+      dsUiMode = m;
+      setDsMode(m);
+      if (m === "own") {
+        var kk = document.getElementById("sKey");
+        if (kk && !kk.value) {
+          dsSay("在下方填入 API Key 并点「保存设置」，保存后即用自己的 Key。");
+          kk.focus();
+        }
+      } else {
+        dsSay("已切换到站点免费额度；自己的 Key 已保留，随时可切回。", true);
+      }
+      refreshQuota();
+    })
+    .catch(function () {
+      dsSay("网络错误，切换失败。");
+    });
 }
 document.addEventListener("click", function (e) {
   var t = e.target.closest ? e.target.closest(".ds-opt") : null;
   if (!t) return;
-  if (t.id === "dsSite") {
-    if (!confirm("切换到站点免费额度？你保存的 API Key 会保留，之后可随时切回，无需重填。")) return;
-    fetch("/api/ds-mode", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "site" }) })
-      .then(function (r) { return r.ok; })
-      .then(function (okFlag) {
-        if (!okFlag) { alert("切换失败，请稍后再试"); return; }
-        setDsMode("site", false);
-        refreshQuota();
-      })
-      .catch(function () { alert("网络错误"); });
-    return;
-  }
-  if (t.id === "dsOwn") {
-    /* 有已保存的 Key：直接切回自己的；没有：显示输入框，保存后自动生效 */
-    fetch("/api/ds-mode", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ mode: "own" }) })
-      .then(function (r) { return r.ok; })
-      .then(function (okFlag) {
-        setDsMode("own", false);
-        if (!okFlag) { var kk = document.getElementById("sKey"); if (kk) kk.focus(); }
-        else refreshQuota();
-      })
-      .catch(function () { setDsMode("own", false); });
-    return;
-  }
+  if (t.id === "dsSite") postDsMode("site");
+  else if (t.id === "dsOwn") postDsMode("own");
 });
 
 /* 站点托管版的免费额度展示：/api/quota 由多用户网关提供；本地版与演示页
@@ -2606,10 +2624,15 @@ function refreshQuota() {
       var el = document.getElementById("curQuota");
       if (!el || !q) return;
       el.hidden = false;
+      /* 开关跟「同学的选择」走：本页点过的选择优先；没有点过时按服务端
+         选择推导——钉在站点的显示站点，跟随模式且已存 Key 的显示自有，
+         跟随但没存 Key 的（新同学默认态）显示站点 */
+      var ui =
+        dsUiMode || (q.dsMode === "site" ? "site" : q.hasOwnKey ? "own" : "site");
       var mode = document.getElementById("dsMode");
       if (mode) {
         mode.hidden = false;
-        setDsMode(q.ownKeyActive ? "own" : "site", false);
+        setDsMode(ui);
       }
       var accEl = document.getElementById("curAccount");
       if (accEl && q.username) accEl.textContent = "当前登录账号：" + q.username;
@@ -2621,8 +2644,11 @@ function refreshQuota() {
       el.textContent = q.ownKeyActive
         ? "✓ 正在使用自己的 DeepSeek Key（今日 " + (q.ownUsed || 0) + " 轮，不占站点额度）" +
           (q.remaining !== undefined ? "；站点免费额度保留：剩余 " + q.remaining + " 次" : "")
-        : "站点免费对话：今日已用 " + q.used + "/" + q.limit + "，剩余 " + q.remaining + " 次" +
-          (q.hasOwnKey ? "（已保存自己的 Key，上方可随时切换）" : "；填自己的 Key 后不占站点额度");
+        : q.hasOwnKey
+          ? "站点免费对话：今日已用 " + q.used + "/" + q.limit + "，剩余 " + q.remaining + " 次（已保存自己的 Key，上方可随时切换）"
+          : ui === "own"
+            ? "已选择用自己的 Key：填入并保存后生效；保存前仍可用站点免费额度"
+            : "站点免费对话：今日已用 " + q.used + "/" + q.limit + "，剩余 " + q.remaining + " 次；填自己的 Key 后不占站点额度";
     })
     .catch(function () {});
 }

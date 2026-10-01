@@ -939,6 +939,7 @@ test("学生端额度接口与自带 Key 豁免", async (t) => {
     ownUsed: 0,
     hasOwnKey: false,
     ownKeyActive: false,
+    dsMode: "own",
     source: "site",
   });
   const blocked = await fetch(`${base}/api/chat`, {
@@ -969,9 +970,11 @@ test("学生端额度接口与自带 Key 豁免", async (t) => {
   const q4 = (await (await fetch(`${base}/api/quota`, { headers: { cookie } })).json()) as {
     hasOwnKey: boolean;
     ownKeyActive: boolean;
+    dsMode: string;
   };
   assert.equal(q4.hasOwnKey, true, "Key 保留未删");
   assert.equal(q4.ownKeyActive, false, "但不再生效");
+  assert.equal(q4.dsMode, "site", "同学的选择如实下发，前端开关据此渲染");
   const blocked2 = await fetch(`${base}/api/chat`, {
     method: "POST",
     headers: { cookie },
