@@ -221,7 +221,7 @@ export function knowledgePage(
   <aside class="kn-rail" aria-label="知识分类">
     <p class="rail-kicker">KNOWLEDGE BASE</p>
     <h2 class="rail-title">我的知识</h2>
-    <input class="kw-box" id="kwBox" type="search" placeholder="搜索标题 / 内容…" aria-label="搜索知识">
+    <input class="kw-box" id="kwBox" type="search" enterkeyhint="search" placeholder="搜索标题 / 内容…" aria-label="搜索知识">
     <p class="kw-hint">按 / 聚焦 · Esc 清空</p>
     <div class="sort-row" id="sortRow" role="group" aria-label="排序方式">
       <button type="button" class="sort-btn active" data-sort="updated">最近更新</button>

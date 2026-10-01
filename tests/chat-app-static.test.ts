@@ -91,6 +91,7 @@ const BUILTINS = new Set([
   "removeEventListener",
   "requestAnimationFrame",
   "requestIdleCallback",
+  "ResizeObserver",
   "Response",
   "scroll",
   "scrollBy",

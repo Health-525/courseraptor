@@ -553,6 +553,26 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .fhint { margin: 6px 4px 0; text-align: right; font-family: var(--mono);
            font-size: 12px; letter-spacing: .08em; color: var(--ink-3); }
 
+  /* ── 回到最新：上翻离底后浮现的悬浮圆钮，钉在输入条上方右缘。
+     bottom 由 JS 按输入条实际高度写进 --jump-bottom（textarea 长高、
+     提示词行收起都会跟着走），键盘占位 --vkb 一并叠加；显隐由 JS 按
+     智能滚动的 pinned 标记控制，贴底自动隐去 ── */
+  .jump { position: fixed; z-index: 30;
+          right: max(18px, env(safe-area-inset-right));
+          bottom: calc(var(--jump-bottom, 96px) + var(--vkb, 0px));
+          width: 42px; height: 42px; border-radius: 50%;
+          display: inline-flex; align-items: center; justify-content: center;
+          border: 1px solid var(--rule-2); background: var(--card);
+          color: var(--ink-2); box-shadow: var(--shadow-sm); cursor: pointer;
+          transition: border-color .15s ease, color .15s ease, transform .15s ease; }
+  /* 上面的 display:inline-flex 会盖过 hidden 属性的 UA 样式，必须显式让位 */
+  .jump[hidden] { display: none; }
+  .jump svg { display: block; width: 18px; height: 18px; fill: none;
+              stroke: currentColor; stroke-width: 2;
+              stroke-linecap: round; stroke-linejoin: round; }
+  .jump:hover { border-color: var(--accent); color: var(--accent); }
+  .jump:active { transform: translateY(1px); }
+
   .dclose { border: 0; background: none; color: var(--ink-3); cursor: pointer;
             font-size: 15px; padding: 2px 5px; border-radius: 3px; }
   .dclose:hover { color: var(--accent); }
@@ -1124,6 +1144,20 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .tool summary, .think summary { min-height: 40px; }
     /* 消息操作行（复制/重试）与附件下载行同理 */
     .acts .tbtn, .frow a.tbtn { min-height: 38px; }
+    /* 会话 ⋯ 菜单、设置栏目、附件删除钮补到能点的尺寸 */
+    .smenu button { min-height: 38px; }
+    .set-tab { min-height: 38px; }
+    .upchip button { min-width: 32px; min-height: 32px; }
+    /* 按压反馈：这些行/卡此前只有桌面 hover 态，触屏按下没有丝毫回应；
+       给一记纸面压深（accent 族给朱砂浅底），松手即散——不用 JS */
+    .hall-card:active, .sess li:active, .ds-opt:active, .set-tab:active,
+    .model-card:active, .hall-item:active { background: var(--shade); }
+    .chip:active { background: var(--accent-soft); border-color: var(--accent);
+                   color: var(--accent-deep); }
+    .tool summary:active, .think summary:active { background: var(--paper-deep); }
+    /* 键盘弹出（输入条内聚焦）时收起提示词行：打字期间把屏幕让给消息区，
+       失焦即回来；仅触屏生效，桌面聚焦不打扰点提示词 */
+    form:focus-within .quickbar { display: none; }
   }
 </style>
 </head>
