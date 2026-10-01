@@ -246,8 +246,8 @@ export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } 
       <div class="ph-date" id="phDate"></div>
       <div class="ph-week" id="phWeek"></div>
     </div>
-    <a class="tbtn" id="svgWeekBtn" href="/api/schedule/image?mode=week" title="下载当前查看的这一周课表 PNG（彩色课格，手机直接保存；纯本地渲染）">导出本周 PNG</a>
-    <a class="tbtn" id="svgTermBtn" href="/api/schedule/image?mode=term" title="下载整学期汇总课表 PNG（课格标注周次；红头档案/SVG 风格可在对话里说一声换）">整学期 PNG</a>
+    <a class="tbtn" id="svgWeekBtn" href="/api/schedule/image?mode=week" target="_blank" title="在新标签页预览当前周课表 PNG（手机长按、电脑右键即可存图；纯本地渲染）">本周图片</a>
+    <a class="tbtn" id="svgTermBtn" href="/api/schedule/image?mode=term" target="_blank" title="在新标签页预览整学期课表 PNG（手机长按、电脑右键即可存图）">整学期图片</a>
     <a class="tbtn" href="/today">今日日程</a>
     <a class="tbtn" href="/">返回对话</a>
   </div>
@@ -466,7 +466,7 @@ function render(b) {
   }
   renderWeek(b);
   renderSrc(b);
-  /* PNG 导出按钮：演示模式没有真实缓存、假期没有当前周，都先藏起来 */
+  /* 图片导出按钮：演示模式没有真实缓存、假期没有当前周，都先藏起来 */
   const svgWeekBtn = $("svgWeekBtn");
   const svgTermBtn = $("svgTermBtn");
   if (DEMO_DATA) {
@@ -477,7 +477,7 @@ function render(b) {
   } else {
     svgWeekBtn.style.display = "";
     svgWeekBtn.href = "/api/schedule/image?mode=week&week=" + displayedWeek;
-    svgWeekBtn.textContent = selectedWeek ? "导出第 " + displayedWeek + " 周 PNG" : "导出本周 PNG";
+    svgWeekBtn.textContent = selectedWeek ? "第 " + displayedWeek + " 周图片" : "本周图片";
   }
   document.title = "课表 · " + (b.term.weekLabel || "CourseRaptor");
   if (!DEMO_DATA) {

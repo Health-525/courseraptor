@@ -187,9 +187,11 @@ test("color：每门课稳定配色，品牌小字落款与顶条在场", () => 
   assert.ok(colorOf(r.svg), "term 图里应能找到课格底色");
   assert.equal(colorOf(r.svg), colorOf(w.svg), "同一门课跨形态颜色稳定");
   // 品牌元素：顶部朱砂条 + 右下落款小字
-  assert.ok(r.svg.includes('height="3" fill="#AD392C"'), "顶部朱砂细条");
+  assert.ok(r.svg.includes('height="2" fill="#AD392C"'), "顶部朱砂细条");
   assert.ok(r.svg.includes("COURSERAPTOR · 生成于"), "底部小字落款");
   assert.ok(r.svg.includes("Microsoft YaHei"), "color 风格用黑体系而非楷体");
+  // 最佳实践版式：零网格线——不再有满格底盘（gridRule 底色外框）
+  assert.ok(!r.svg.includes('fill="#F0EDE6" stroke='), "color 不画网格底盘");
 });
 
 test("color+logo：logo 以 data URI 嵌入（印章与落款）", () => {
@@ -233,7 +235,7 @@ test("端点：无课表缓存时如实报错", async () => {
   assert.ok(body.error, "无缓存应返回 error 字段而不是空图");
 });
 
-test("端点：默认 PNG 彩色，SVG/经典风可显式指定", async () => {
+test("端点：默认 PNG 彩色且 inline 可预览，download=1 才强制下载", async () => {
   const url = (await startChatWeb())!;
   saveScheduleCache({
     year: 2026,
@@ -244,10 +246,19 @@ test("端点：默认 PNG 彩色，SVG/经典风可显式指定", async () => {
 
   const png = await fetch(`${url}/api/schedule/image?mode=term`);
   assert.match(png.headers.get("content-type") ?? "", /image\/png/);
-  assert.match(png.headers.get("content-disposition") ?? "", /schedule-term-2026-1\.png/);
+  assert.match(
+    png.headers.get("content-disposition") ?? "",
+    /^inline; .*schedule-term-2026-1\.png/,
+  );
   const pngBytes = Buffer.from(await png.arrayBuffer());
   assert.equal(pngBytes[0], 0x89, "PNG 魔数");
   assert.ok(pngBytes.length > 1000);
+
+  const dl = await fetch(`${url}/api/schedule/image?mode=term&download=1`);
+  assert.match(
+    dl.headers.get("content-disposition") ?? "",
+    /^attachment; .*schedule-term-2026-1\.png/,
+  );
 
   const week = await fetch(`${url}/api/schedule/image?mode=week&week=2`);
   assert.match(week.headers.get("content-disposition") ?? "", /schedule-week2-2026-1\.png/);
@@ -262,4 +273,5 @@ test("端点：默认 PNG 彩色，SVG/经典风可显式指定", async () => {
   const classicSvg = await classic.text();
   assert.ok(classicSvg.includes("最优化方法"));
   assert.ok(classicSvg.includes("COURSERAPTOR · SCHEDULE"), "classic 页头品牌行保留");
+  assert.ok(classicSvg.includes('fill="#E1DCCF" stroke='), "classic 保留满格网格底盘");
 });
