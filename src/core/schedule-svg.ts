@@ -348,11 +348,9 @@ function courseCard(opts: {
 }): string {
   const { x, y, w, h, course, withWeeks, skin, style } = opts;
   const inner = w - 8 - 3;
-  // 并排分栏的窄卡放不下「地点 · 教师」整行时优先保地点（教师名让位）
-  const narrow = w < skin.dayW * 0.7;
-  const meta1 = narrow
-    ? course.location?.trim() || "地点待定"
-    : [course.location?.trim() || "地点待定", course.teacher?.trim()].filter(Boolean).join(" · ");
+  // 元信息只留地点（与 /schedule 网页课格同口径）：导出图是给同学自己
+  // 看的，教师名不参与找教室，窄格里的版面留给课名
+  const meta1 = course.location?.trim() || "地点待定";
   const meta2 = withWeeks ? weeksLabel(course.weeks) : "";
   const metas = [meta1, meta2].filter(Boolean);
 

@@ -2,7 +2,7 @@
  * 课表 SVG 导出测试
  *
  * 钉住的行为：
- * 1. term 整学期汇总：课格带课名/地点/教师/周次，XML 正确转义；
+ * 1. term 整学期汇总：课格带课名/地点/周次（不带教师名），XML 正确转义；
  * 2. 同一时段不同周次的课（冲突）并排分栏，计数值如实；
  * 3. 无节次课程落脚注不入格；周末没课的尾列自动收掉；
  * 4. week 单周：放假日清空并画竖排放假块、调休按被补周几换课表、
@@ -77,7 +77,7 @@ function assertWellFormed(svg: string): void {
 
 // ── term 整学期汇总 ─────────────────────────────────────────────────
 
-test("term：课名/地点/教师/周次入图，XML 转义正确", () => {
+test("term：课名/地点/周次入图（不带教师名），XML 转义正确", () => {
   const r = renderTermScheduleSVG({
     courses: fixtureCourses(),
     termLabel: TERM_LABEL,
@@ -86,7 +86,8 @@ test("term：课名/地点/教师/周次入图，XML 转义正确", () => {
   assertWellFormed(r.svg);
   assert.ok(r.svg.includes(TERM_LABEL));
   assert.ok(r.svg.includes("最优化方法"));
-  assert.ok(r.svg.includes("仁智楼518 · 张三"), "地点与教师合并成一行元信息");
+  assert.ok(r.svg.includes("仁智楼518"), "地点是元信息主体");
+  assert.ok(!r.svg.includes("张三"), "导出图不带教师名");
   assert.ok(r.svg.includes("1-16周"), "周次原文要标注周");
   assert.ok(r.svg.includes("&lt;提高班&gt;"), "课名中的尖括号必须转义");
   assert.ok(!r.svg.includes("<提高班>"), "不允许裸尖括号内容");
