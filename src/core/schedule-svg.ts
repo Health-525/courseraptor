@@ -29,23 +29,23 @@ const FONT_MONO = "ui-monospace, Cascadia Mono, Consolas, Liberation Mono, monos
 const FONT_SANS = "Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif";
 
 /**
- * color 风格的课色盘：12 个同亮度（L≈92%）的马卡龙底色轮转。
- * 关键实践：颜色只出现在卡片底，文字一律中性墨色——
- * 彩色文字 + 彩色底是「花」的根源，统一亮度则怎么排都不打架。
+ * 课色盘：12 个同亮度、带纸感的稳定底色（课名哈希定色，跨周/跨形态同课同色）。
+ * 关键实践：颜色只出现在卡片底，文字一律中性墨色——彩色文字 + 彩色底
+ * 是「花」的根源，统一亮度则怎么排都不打架。
  */
 const COURSE_PALETTE = [
-  "#FAE7E3", // 朱红（呼应品牌朱砂）
-  "#FBEDDF", // 杏橙
-  "#FAF4D9", // 芥黄
-  "#F1F6E5", // 黄绿
-  "#EAF4E9", // 苔绿
-  "#E8F4F1", // 青
-  "#E7F0F9", // 天蓝
-  "#ECEBF8", // 蓝紫
-  "#F0EDF9", // 紫
-  "#F9ECF1", // 藕粉
-  "#F4EEE5", // 岩棕
-  "#F0F2F4", // 灰蓝
+  "#F3E1DB", // 朱红（呼应品牌朱砂）
+  "#F4E4CE", // 杏橙
+  "#F2ECC9", // 芥黄
+  "#EDF3D9", // 黄绿
+  "#E7F1E2", // 苔绿
+  "#E5F0EA", // 青
+  "#E4EDF5", // 天蓝
+  "#E8E7F4", // 蓝紫
+  "#EDE9F4", // 紫
+  "#F4E5EB", // 藕粉
+  "#F0E8DB", // 岩棕
+  "#ECEEF2", // 灰蓝
 ] as const;
 
 /** djb2（与日历 UID 同款哈希）：课色随课名稳定，跨周/跨形态同课同色 */
@@ -53,6 +53,11 @@ function courseColorOf(title: string): string {
   let h = 5381;
   for (let i = 0; i < title.length; i++) h = ((h << 5) + h + title.charCodeAt(i)) | 0;
   return COURSE_PALETTE[Math.abs(h) % COURSE_PALETTE.length];
+}
+
+/** 两个整数日期串的紧凑区间（"10/12-10/18"），周模式副题用 */
+function shortDate(d: Date): string {
+  return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 
 /** 风格皮肤：配色 + 字体 + 几何尺寸一次打包，布局代码只认皮肤不看风格名 */
@@ -69,7 +74,6 @@ interface Skin {
   accentSoft: string;
   /** 今天列铺底 */
   todayCol: string;
-  card: string; // classic 的课格底色（color 用课色）
   cardRadius: number;
   cardShadow: boolean;
   titleFont: string;
@@ -116,7 +120,6 @@ const SKINS: Record<ScheduleStyle, Skin> = {
     accentDeep: "#852B22",
     accentSoft: "#F3E3DE",
     todayCol: "#F3E3DE",
-    card: "#FCFBF7",
     cardRadius: 3,
     cardShadow: true,
     titleFont: FONT_KAI,
@@ -152,7 +155,6 @@ const SKINS: Record<ScheduleStyle, Skin> = {
     accentDeep: "#852B22",
     accentSoft: "#F6E3DD",
     todayCol: "#F8E7DA",
-    card: "#FFFFFF",
     cardRadius: 9,
     cardShadow: false,
     titleFont: FONT_SANS,
@@ -368,7 +370,6 @@ function courseCard(opts: {
   const meta1 = course.location?.trim() || "地点待定";
   const meta2 = withWeeks ? weeksLabel(course.weeks) : "";
   const metas = [meta1, meta2].filter(Boolean);
-
   const metaH = metas.length * skin.metaLh;
   const nameMax = Math.max(
     1,
@@ -376,11 +377,12 @@ function courseCard(opts: {
   );
   const nameLines = fitLines(course.title, inner, skin.nameSize, nameMax);
 
-  const color = style === "color" ? courseColorOf(course.title) : null;
-  const cardFill = color ?? skin.card;
+  // 每门课一个稳定纸色卡底（两风格共用同一份课色盘，课格不再清一色）；
+  // classic 另有朱砂边条 + 投影保持档案卡质感
+  const cardFill = courseColorOf(course.title);
   // 中性文字：颜色只在底，课名一律墨色，元信息比 classic 深一档灰
   const nameFill = skin.ink;
-  const metaFill = color ? skin.ink2 : skin.ink3;
+  const metaFill = style === "color" ? skin.ink2 : skin.ink3;
 
   const contentH = nameLines.length * skin.nameLh + (metas.length ? 4 + metaH : 0);
   let ty = y + (h - contentH) / 2 + skin.nameSize; // 首行基线
@@ -439,6 +441,9 @@ interface TableMeta {
 
 function buildScheduleSvg(opts: {
   termLabel: string;
+  /** 页头主标题：导出的「主体」——周模式是「第 N 周课表」，学期名进副题 */
+  title: string;
+  /** 副题小字：学期名（+周模式的日期区间） */
   subtitle: string;
   days: DayColumn[];
   meta: TableMeta;
@@ -447,7 +452,7 @@ function buildScheduleSvg(opts: {
   /** 项目 logo（data URI）：classic 嵌进印章、color 做页脚落款；缺省回退纯文字画法 */
   logoDataUri?: string;
 }): ScheduleSvgResult {
-  const { termLabel, subtitle, days, meta, now, style } = opts;
+  const { termLabel, title, subtitle, days, meta, now, style } = opts;
   const logo = opts.logoDataUri;
   const s = SKINS[style];
 
@@ -519,16 +524,16 @@ function buildScheduleSvg(opts: {
     }
     p.push(
       `</g>`,
-      `<text x="${s.margin + 44}" y="${s.margin + 26}" font-family="${s.titleFont}" font-size="21" letter-spacing="1" fill="${s.ink}">${esc(termLabel)}</text>`,
+      `<text x="${s.margin + 44}" y="${s.margin + 26}" font-family="${s.titleFont}" font-size="21" letter-spacing="1" fill="${s.ink}">${esc(title)}</text>`,
       `<text x="${s.margin + 44}" y="${s.margin + 46}" font-family="${FONT_MONO}" font-size="10.5" letter-spacing="2" fill="${s.ink3}">COURSERAPTOR · SCHEDULE — ${esc(subtitle)}</text>`,
       `<text x="${width - s.margin}" y="${s.margin + 46}" text-anchor="end" font-family="${FONT_MONO}" font-size="10.5" fill="${s.ink3}">生成于 ${stampOf(now)}</text>`,
       `<line x1="${s.margin}" y1="${s.margin + 58}" x2="${width - s.margin}" y2="${s.margin + 58}" stroke="${s.gridBorder}" stroke-width="1"/>`,
     );
   } else {
-    // color 页头：朱砂小竖条 + 学期名；右侧周次副题（时间戳只在页脚落款，不重复）
+    // color 页头：朱砂小竖条 + 主体大标题（第 N 周）；右侧副题（学期名等）
     p.push(
       `<rect x="${s.margin}" y="${s.margin + 12}" width="4" height="18" rx="2" fill="${s.accent}"/>`,
-      `<text x="${s.margin + 12}" y="${s.margin + 27}" font-family="${s.titleFont}" font-size="16" font-weight="700" fill="${s.ink}">${esc(termLabel)}</text>`,
+      `<text x="${s.margin + 12}" y="${s.margin + 27}" font-family="${s.titleFont}" font-size="16" font-weight="700" fill="${s.ink}">${esc(title)}</text>`,
       `<text x="${width - s.margin}" y="${s.margin + 27}" text-anchor="end" font-family="${s.titleFont}" font-size="11" font-weight="600" fill="${s.ink2}">${esc(subtitle)}</text>`,
     );
   }
@@ -539,7 +544,7 @@ function buildScheduleSvg(opts: {
       `<rect x="${tableX}" y="${tableY}" width="${tableW}" height="${gridH}" fill="${s.gridRule}" stroke="${s.gridBorder}" stroke-width="1"/>`,
       // 左上角「节次」
       `<rect x="${tableX}" y="${tableY}" width="${s.timeW}" height="${s.headH}" fill="${s.bg}"/>`,
-      `<text x="${tableX + s.timeW - 8}" y="${tableY + s.headH / 2 + 4}" text-anchor="end" font-family="${FONT_MONO}" font-size="11" letter-spacing="2" fill="${s.ink3}">节次</text>`,
+      `<text x="${tableX + s.timeW / 2}" y="${tableY + s.headH / 2 + 4}" text-anchor="middle" font-family="${FONT_MONO}" font-size="11" letter-spacing="2" fill="${s.ink3}">节次</text>`,
     );
   } else {
     // color：今天列整列极淡底（帮视线追踪，强调交给日头胶囊），时间轨一条细竖线
@@ -609,23 +614,22 @@ function buildScheduleSvg(opts: {
     }
   });
 
-  // 节次列（classic 另画格底；color 只有文字，无格线）
+  // 节次列（classic 另画格底；color 只有文字，无格线）。
+  // 节号与时间是「居中双行」：右对齐会把窄数字和宽时间挤在同一右缘，
+  // 视觉上互相打架；分两行居中后上下各归其位
+  const timeCx = tableX + s.timeW / 2;
   for (let period = 1; period <= periodCount; period++) {
     const y = tableY + s.headH + GAP + (period - 1) * rowPitch;
     const range = periodTimes[String(period)];
     if (s.gridLines) {
-      p.push(
-        `<rect x="${tableX}" y="${y}" width="${s.timeW}" height="${s.rowH}" fill="${s.bg}"/>`,
-        `<text x="${tableX + s.timeW - 8}" y="${y + s.rowH / 2 - 3}" text-anchor="end" font-family="${FONT_MONO}" font-size="12" fill="${s.ink2}">${period}</text>`,
-      );
-    } else {
-      p.push(
-        `<text x="${tableX + s.timeW - 8}" y="${y + s.rowH / 2 - 3}" text-anchor="end" font-family="${FONT_MONO}" font-size="11.5" fill="${s.ink2}">${period}</text>`,
-      );
+      p.push(`<rect x="${tableX}" y="${y}" width="${s.timeW}" height="${s.rowH}" fill="${s.bg}"/>`);
     }
+    p.push(
+      `<text x="${timeCx}" y="${y + s.rowH / 2 - 6}" text-anchor="middle" font-family="${FONT_MONO}" font-size="${s.gridLines ? 12.5 : 12}" font-weight="700" fill="${s.ink2}">${period}</text>`,
+    );
     if (range) {
       p.push(
-        `<text x="${tableX + s.timeW - 8}" y="${y + s.rowH / 2 + 12}" text-anchor="end" font-family="${FONT_MONO}" font-size="9" fill="${s.ink3}">${esc(range)}</text>`,
+        `<text x="${timeCx}" y="${y + s.rowH / 2 + 13}" text-anchor="middle" font-family="${FONT_MONO}" font-size="8.5" fill="${s.ink3}">${esc(range)}</text>`,
       );
     }
     if (s.gridLines) {
@@ -745,7 +749,8 @@ export function renderTermScheduleSVG(opts: {
 
   return buildScheduleSvg({
     termLabel,
-    subtitle: "整学期课表汇总",
+    title: "整学期课表",
+    subtitle: termLabel,
     days,
     meta: { withWeeks: true },
     now,
@@ -798,9 +803,11 @@ export function renderWeekScheduleSVG(opts: {
     });
   }
 
+  const sunday = datePlusDays(week1Monday, (week - 1) * 7 + 6);
   return buildScheduleSvg({
     termLabel,
-    subtitle: `第 ${week} 周课表（${isoOf(monday)} 起）`,
+    title: `第 ${week} 周课表`,
+    subtitle: `${termLabel} · ${shortDate(monday)}-${shortDate(sunday)}`,
     days,
     meta: { withWeeks: false },
     now,

@@ -166,7 +166,7 @@ test("color：每门课稳定配色，品牌小字落款与顶条在场", () => 
   assertWellFormed(r.svg);
   // 课格用色盘底色（断言至少出现一个色盘值）
   assert.ok(
-    /#FAE7E3|#FBEDDF|#FAF4D9|#F1F6E5|#EAF4E9|#E8F4F1|#E7F0F9|#ECEBF8|#F0EDF9|#F9ECF1|#F4EEE5|#F0F2F4/.test(
+    /#F3E1DB|#F4E4CE|#F2ECC9|#EDF3D9|#E7F1E2|#E5F0EA|#E4EDF5|#E8E7F4|#EDE9F4|#F4E5EB|#F0E8DB|#ECEEF2/.test(
       r.svg,
     ),
     "彩色课格应使用色盘",
