@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * 打 Windows x64「单文件 exe」：复用 package-portable 的便携 zip，作为资源嵌进一个
  * .NET 启动器（Windows 自带的 csc.exe 编译，不需要第三方打包器，也不做代码签名）。
@@ -18,8 +19,16 @@
  * 前提：同 package-portable（Windows、联网、PowerShell、curl），外加 .NET Framework 4.x 的 csc.exe。
  */
 
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,8 +41,20 @@ const version = pkg.version;
 const ARTIFACT = `courseraptor-v${version}-portable-win-x64.exe`;
 const RESOURCE_ID = "raptor.portable.zip"; // 与 exe-launcher.cs 的 ResourceId 一致
 const CSC_CANDIDATES = [
-  path.join(process.env.SystemRoot ?? "C:\\Windows", "Microsoft.NET", "Framework64", "v4.0.30319", "csc.exe"),
-  path.join(process.env.SystemRoot ?? "C:\\Windows", "Microsoft.NET", "Framework", "v4.0.30319", "csc.exe"),
+  path.join(
+    process.env.SystemRoot ?? "C:\\Windows",
+    "Microsoft.NET",
+    "Framework64",
+    "v4.0.30319",
+    "csc.exe",
+  ),
+  path.join(
+    process.env.SystemRoot ?? "C:\\Windows",
+    "Microsoft.NET",
+    "Framework",
+    "v4.0.30319",
+    "csc.exe",
+  ),
 ];
 
 const keep = process.argv.includes("--keep");
@@ -56,7 +77,9 @@ const JSZip = (await import("jszip")).default;
 const zip = await JSZip.loadAsync(readFileSync(finalZip));
 const stray = Object.keys(zip.files).filter((name) => !name.startsWith(`${PORTABLE_TOP_DIR}/`));
 if (stray.length > 0) {
-  throw new Error(`便携 zip 存在顶层目录之外的条目（示例：${stray.slice(0, 3).join("、")}），exe 释放会错位。`);
+  throw new Error(
+    `便携 zip 存在顶层目录之外的条目（示例：${stray.slice(0, 3).join("、")}），exe 释放会错位。`,
+  );
 }
 // 启动器释放用普通路径（不用 \\?\ 前缀，.NET 路径校验会拒绝其中的 '?'），
 // 总长必须离 MAX_PATH=260 有余量：默认安装根 %LOCALAPPDATA%\CourseRaptor 约 40-60 字符。
@@ -67,9 +90,13 @@ for (const name of Object.keys(zip.files)) {
   if (rel > maxRel) maxRel = rel;
 }
 if (maxRel > MAX_REL) {
-  throw new Error(`zip 条目相对路径最长 ${maxRel} 字符，超过 ${MAX_REL} 护栏：exe 释放可能撞 MAX_PATH，需要改造启动器后再发版。`);
+  throw new Error(
+    `zip 条目相对路径最长 ${maxRel} 字符，超过 ${MAX_REL} 护栏：exe 释放可能撞 MAX_PATH，需要改造启动器后再发版。`,
+  );
 }
-console.log(`zip 顶层目录约定校验通过（${Object.keys(zip.files).length} 条，最长相对路径 ${maxRel} 字符）`);
+console.log(
+  `zip 顶层目录约定校验通过（${Object.keys(zip.files).length} 条，最长相对路径 ${maxRel} 字符）`,
+);
 
 // ── 3) 图标：docs/courseraptor-mascot.png 缩到 256，包成单图 PNG-in-ICO ──
 const iconIco = path.join(work, "app.ico");
@@ -117,7 +144,8 @@ writeFileSync(
 
 // ── 5) csc 编译：zip 作为托管资源嵌入 ──
 const csc = CSC_CANDIDATES.find((p) => existsSync(p));
-if (!csc) throw new Error("未找到 .NET Framework 自带的 csc.exe，请确认已启用 .NET Framework 4.x。");
+if (!csc)
+  throw new Error("未找到 .NET Framework 自带的 csc.exe，请确认已启用 .NET Framework 4.x。");
 const exeOut = path.join(work, "courseraptor.exe");
 console.log("csc 编译启动器（嵌入 zip，稍等）...");
 execSync(

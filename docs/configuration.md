@@ -26,6 +26,8 @@
 | `RAPTOR_UPDATE_SERVER` | 维护者本地覆盖 HTTPS 更新服务地址；分发包可内置地址 |
 | `UPDATE_SERVER_URL` / `UPDATE_ADMIN_TOKEN` | 仅维护者发版需要，见[维护指南](maintainers.md) |
 
+验证码识别用的英文 OCR 模型（`eng.traineddata`，约 5MB）由 tesseract.js 首次识别时自动下载缓存在项目根，属运行数据、不入库；安装包会把它带进去供离线使用。维护者在干净机器上打包前可运行 `npm run fetch:ocr` 预取（`--force` 强制重取），下载地址与 tesseract.js 默认 CDN 一致。
+
 `RAPTOR_DEMO_PORT` 默认 3211。演示入口不加载 `.env`，需在终端环境变量中指定，例如 Windows PowerShell：
 
 ```powershell

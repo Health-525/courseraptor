@@ -13,7 +13,7 @@ const projectRoot = path.join(__dirname, "..");
 const result = spawnSync(
   process.execPath,
   ["--import", pathToFileURL(require.resolve("tsx")).href, "./local/cli/index.ts"],
-  { cwd: projectRoot, stdio: "inherit" }
+  { cwd: projectRoot, stdio: "inherit" },
 );
 
 if (result.error) {

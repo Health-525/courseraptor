@@ -69,8 +69,7 @@ export function createRegistry({ stateDir }) {
   const resetsFile = path.join(stateDir, "reset-requests.json");
   const readResets = () => readJson(resetsFile, { requests: [], codes: [] });
   const writeResets = (store) => writeAtomic(resetsFile, JSON.stringify(store, null, 2));
-  const writeInvites = (invites) =>
-    writeAtomic(invitesFile, JSON.stringify({ invites }, null, 2));
+  const writeInvites = (invites) => writeAtomic(invitesFile, JSON.stringify({ invites }, null, 2));
 
   const registry = {
     /** 明文密码只在散列前短暂存在，永不落盘 */
@@ -362,7 +361,11 @@ export function createRegistry({ stateDir }) {
       return serialized(async () => {
         const file = path.join(stateDir, "admin-log.json");
         const store = await readJson(file, { log: [] });
-        store.log.push({ at: new Date().toISOString(), ip: String(ip), text: String(text).slice(0, 200) });
+        store.log.push({
+          at: new Date().toISOString(),
+          ip: String(ip),
+          text: String(text).slice(0, 200),
+        });
         if (store.log.length > 500) store.log = store.log.slice(-500);
         await writeAtomic(file, JSON.stringify(store, null, 2));
       });

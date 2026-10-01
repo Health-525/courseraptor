@@ -24,9 +24,7 @@ import { createSpawner } from "./spawner.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const env = process.env;
-const { version: appVersion } = JSON.parse(
-  readFileSync(path.join(ROOT, "package.json"), "utf8"),
-);
+const { version: appVersion } = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8"));
 
 const secret = env.GATEWAY_SECRET;
 if (!secret || secret.length < 16) {
@@ -47,8 +45,7 @@ const spawner = createSpawner({
   // 管理台改站点 Key 后，新拉起的实例即用新值（已在线实例重启后切换）
   getDeepseekKey: () => registry.getSiteSettings().then((s) => s.deepseekKey),
   // 同学钉在「站点免费额度」模式时，实例禁用其保存的自己 Key（Key 保留不删）
-  getForceSiteKey: (userId) =>
-    registry.findUserById(userId).then((u) => u?.dsMode === "site"),
+  getForceSiteKey: (userId) => registry.findUserById(userId).then((u) => u?.dsMode === "site"),
   maxConcurrent: Number(env.GATEWAY_MAX_CONCURRENT) || 4,
   idleMinutes: Number(env.GATEWAY_IDLE_MINUTES) || 30,
 });
@@ -77,10 +74,14 @@ server.headersTimeout = 76_000;
 server.listen(port, host, () => {
   console.log(`✅ CourseRaptor 多用户网关已启动：http://${host}:${port}`);
   console.log(`   用户数据目录：${usersDir}`);
-  console.log(`   并发上限 ${env.GATEWAY_MAX_CONCURRENT || 4} · 空闲回收 ${env.GATEWAY_IDLE_MINUTES || 30} 分钟 · 每日每人 ${env.GATEWAY_DAILY_TURNS || 100} 轮`);
-  console.log(env.GATEWAY_ADMIN_PASSWORD
-    ? "   网页管理台：http://" + host + ":" + port + "/admin"
-    : "   网页管理台未启用（设置 GATEWAY_ADMIN_PASSWORD 开启）；命令行：node gateway/admin/cli.mjs invite");
+  console.log(
+    `   并发上限 ${env.GATEWAY_MAX_CONCURRENT || 4} · 空闲回收 ${env.GATEWAY_IDLE_MINUTES || 30} 分钟 · 每日每人 ${env.GATEWAY_DAILY_TURNS || 100} 轮`,
+  );
+  console.log(
+    env.GATEWAY_ADMIN_PASSWORD
+      ? "   网页管理台：http://" + host + ":" + port + "/admin"
+      : "   网页管理台未启用（设置 GATEWAY_ADMIN_PASSWORD 开启）；命令行：node gateway/admin/cli.mjs invite",
+  );
 });
 
 let closing = false;

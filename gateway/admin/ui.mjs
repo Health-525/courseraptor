@@ -31,8 +31,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import QRCode from "qrcode";
 import {
-  generateTotpSecret,
   generateRecoveryCodes,
+  generateTotpSecret,
   hashRecoveryCode,
   otpauthUri,
   verifyTotp,
@@ -152,7 +152,10 @@ export function createAdminUi({
    */
   async function callUpdateApi(method, path, body) {
     if (!updateServerUrl || !updateAdminToken) {
-      return { unavailable: true, error: "更新后台未接入（网关未配置 GATEWAY_UPDATE_URL / GATEWAY_UPDATE_TOKEN）" };
+      return {
+        unavailable: true,
+        error: "更新后台未接入（网关未配置 GATEWAY_UPDATE_URL / GATEWAY_UPDATE_TOKEN）",
+      };
     }
     try {
       const res = await fetch(`${updateServerUrl.replace(/\/$/, "")}${path}`, {
@@ -169,7 +172,10 @@ export function createAdminUi({
       if (!res.ok) return { error: data?.error ?? `更新后台返回 ${res.status}` };
       return { data };
     } catch (error) {
-      return { unavailable: true, error: `更新后台不可达：${error instanceof Error ? error.message : String(error)}` };
+      return {
+        unavailable: true,
+        error: `更新后台不可达：${error instanceof Error ? error.message : String(error)}`,
+      };
     }
   }
 
@@ -247,7 +253,8 @@ export function createAdminUi({
     res.end(body);
   }
 
-  const sendJson = (res, status, data) => send(res, status, JSON.stringify(data), "application/json; charset=utf-8");
+  const sendJson = (res, status, data) =>
+    send(res, status, JSON.stringify(data), "application/json; charset=utf-8");
 
   /**
    * 下发 admin/dist 里的构建产物。/admin/xxx 映射 dist/xxx，路径先净化
@@ -342,7 +349,10 @@ export function createAdminUi({
     if (req.method === "POST" && pathname === "/admin/api/login") {
       const lockSec = checkThrottle(ip);
       if (lockSec) {
-        sendJson(res, 429, { error: `尝试次数过多，请 ${lockSec} 秒后再试`, retryAfterSec: lockSec });
+        sendJson(res, 429, {
+          error: `尝试次数过多，请 ${lockSec} 秒后再试`,
+          retryAfterSec: lockSec,
+        });
         return true;
       }
       const body = await readJsonBody(req);
@@ -351,7 +361,9 @@ export function createAdminUi({
         recordFailure(ip);
         const locked = Boolean(failures.get(ip)?.lockedUntil);
         sendJson(res, status, {
-          error: locked ? `密码或动态码错误次数过多，已锁定 ${LOCK_DURATION_MS / 60000} 分钟` : message,
+          error: locked
+            ? `密码或动态码错误次数过多，已锁定 ${LOCK_DURATION_MS / 60000} 分钟`
+            : message,
           locked,
         });
         return true;
@@ -361,12 +373,17 @@ export function createAdminUi({
         const verdict = await verifyAdminCode(totpDoc, body.code);
         if (!verdict.ok) {
           return fail(
-            verdict.replay ? "这枚动态码刚用过，请等验证器出下一枚（30 秒内）" : "动态码不正确或已过期",
+            verdict.replay
+              ? "这枚动态码刚用过，请等验证器出下一枚（30 秒内）"
+              : "动态码不正确或已过期",
           );
         }
         await registry.setAdminTotp(verdict.doc);
         if (verdict.recoveryUsed) {
-          console.log("[gw-admin] 管理台以恢复码登录（已消耗一枚，剩 %d 枚）", verdict.doc.recovery.length);
+          console.log(
+            "[gw-admin] 管理台以恢复码登录（已消耗一枚，剩 %d 枚）",
+            verdict.doc.recovery.length,
+          );
         }
       }
       failures.delete(ip);
@@ -410,12 +427,18 @@ export function createAdminUi({
         if (req.method === "POST") {
           const body = await readJsonBody(req);
           const key = String(body.deepseekKey ?? "").trim();
-          if (body.deepseekKey !== undefined && key !== "" && (!key.startsWith("sk-") || key.length < 20)) {
+          if (
+            body.deepseekKey !== undefined &&
+            key !== "" &&
+            (!key.startsWith("sk-") || key.length < 20)
+          ) {
             sendJson(res, 400, { error: "DeepSeek Key 应以 sk- 开头且长度足够" });
             return true;
           }
           await registry.setSiteSettings({ deepseekKey: key });
-          console.log(`[gw-admin] 站点 DeepSeek Key 已${key ? "更新" : "清空"}（新拉起的实例生效）`);
+          console.log(
+            `[gw-admin] 站点 DeepSeek Key 已${key ? "更新" : "清空"}（新拉起的实例生效）`,
+          );
           await audit(ip, `站点 DeepSeek Key ${key ? "更新" : "清空"}`);
           sendJson(res, 200, { ok: true });
           return true;
@@ -481,7 +504,11 @@ export function createAdminUi({
       const secret = generateTotpSecret();
       pendingSetup = { secret, createdAt: Date.now() };
       const uri = otpauthUri({ secret });
-      sendJson(res, 200, { secret, uri, qrSvg: await QRCode.toString(uri, { type: "svg", margin: 1 }) });
+      sendJson(res, 200, {
+        secret,
+        uri,
+        qrSvg: await QRCode.toString(uri, { type: "svg", margin: 1 }),
+      });
       return true;
     }
     if (req.method === "POST" && pathname === "/admin/api/totp/enable") {
@@ -497,7 +524,9 @@ export function createAdminUi({
       const body = await readJsonBody(req);
       const verdict = verifyTotp(pendingSetup.secret, String(body.code ?? "").trim());
       if (!verdict.ok) {
-        sendJson(res, 400, { error: "动态码不正确，请确认验证器已添加 CourseRaptor 且手机时间正常" });
+        sendJson(res, 400, {
+          error: "动态码不正确，请确认验证器已添加 CourseRaptor 且手机时间正常",
+        });
         return true;
       }
       const plainCodes = generateRecoveryCodes(10);
@@ -528,7 +557,9 @@ export function createAdminUi({
       if (!verdict.ok) {
         recordFailure(ip);
         sendJson(res, 401, {
-          error: verdict.replay ? "这枚动态码刚用过，请等验证器出下一枚（30 秒内）" : "动态码不正确或已过期",
+          error: verdict.replay
+            ? "这枚动态码刚用过，请等验证器出下一枚（30 秒内）"
+            : "动态码不正确或已过期",
         });
         return true;
       }
@@ -550,7 +581,9 @@ export function createAdminUi({
       if (!verdict.ok) {
         recordFailure(ip);
         sendJson(res, 401, {
-          error: verdict.replay ? "这枚动态码刚用过，请等验证器出下一枚（30 秒内）" : "动态码不正确或已过期",
+          error: verdict.replay
+            ? "这枚动态码刚用过，请等验证器出下一枚（30 秒内）"
+            : "动态码不正确或已过期",
         });
         return true;
       }
@@ -631,7 +664,11 @@ export function createAdminUi({
     }
     if (req.method === "GET" && pathname === "/admin/api/users") {
       const users = await registry.listUsers();
-      sendJson(res, 200, users.map((u) => ({ ...u, ...decorateUser(u.id) })));
+      sendJson(
+        res,
+        200,
+        users.map((u) => ({ ...u, ...decorateUser(u.id) })),
+      );
       return true;
     }
     if (req.method === "GET" && pathname === "/admin/api/invites") {
@@ -645,7 +682,9 @@ export function createAdminUi({
         note: String(body.note ?? "").slice(0, 100),
         expiresDays: Math.max(0, Math.min(Number(body.days) || 0, 365)),
       });
-      console.log(`[gw-admin] 生成 ${created.length} 个邀请码${body.note ? `（${body.note}）` : ""}`);
+      console.log(
+        `[gw-admin] 生成 ${created.length} 个邀请码${body.note ? `（${body.note}）` : ""}`,
+      );
       await audit(ip, `生成 ${created.length} 个邀请码${body.note ? `（${body.note}）` : ""}`);
       sendJson(res, 200, { ok: true, created });
       return true;
@@ -764,7 +803,9 @@ export function createAdminUi({
         return true;
       }
       if (!updateServerUrl || !updateAdminToken) {
-        sendJson(res, 400, { error: "更新后台未接入（网关未配置 GATEWAY_UPDATE_URL / GATEWAY_UPDATE_TOKEN）" });
+        sendJson(res, 400, {
+          error: "更新后台未接入（网关未配置 GATEWAY_UPDATE_URL / GATEWAY_UPDATE_TOKEN）",
+        });
         return true;
       }
       const declared = Number(req.headers["content-length"] ?? 0);
@@ -787,7 +828,9 @@ export function createAdminUi({
           signal: AbortSignal.timeout(30 * 60_000),
         });
         const data = await upstream.json().catch(() => ({}));
-        console.log(`[gw-admin] 发版 v${version}: ${upstream.ok ? "ok" : data?.error ?? upstream.status}`);
+        console.log(
+          `[gw-admin] 发版 v${version}: ${upstream.ok ? "ok" : (data?.error ?? upstream.status)}`,
+        );
         await audit(ip, `发版 v${version}${upstream.ok ? "" : "（失败）"}`);
         if (!upstream.ok) {
           sendJson(res, upstream.status === 401 ? 502 : upstream.status, {
@@ -798,7 +841,9 @@ export function createAdminUi({
         sendJson(res, 200, data);
       } catch (error) {
         // 浏览器中途取消时 req 流出错，同样落在这里；响应无人接收，安全
-        sendJson(res, 502, { error: `更新后台不可达：${error instanceof Error ? error.message : String(error)}` });
+        sendJson(res, 502, {
+          error: `更新后台不可达：${error instanceof Error ? error.message : String(error)}`,
+        });
       }
       return true;
     }
@@ -833,8 +878,13 @@ export function createAdminUi({
         const result = await callUpdateApi("POST", "/admin/api/keys", {
           name: String(body.name ?? ""),
         });
-        console.log(`[gw-admin] 新建更新后台密钥「${result.data?.key?.name ?? ""}」: ${result.error ?? "ok"}`);
-        await audit(ip, `新建更新后台密钥「${result.data?.key?.name ?? ""}」${result.error ? "（失败）" : ""}`);
+        console.log(
+          `[gw-admin] 新建更新后台密钥「${result.data?.key?.name ?? ""}」: ${result.error ?? "ok"}`,
+        );
+        await audit(
+          ip,
+          `新建更新后台密钥「${result.data?.key?.name ?? ""}」${result.error ? "（失败）" : ""}`,
+        );
         sendJson(res, result.error ? 400 : 200, result);
         return true;
       }

@@ -854,7 +854,10 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     if (url === "/vendor/marked.min.js") {
       const buf = loadStaticOnce(MARKED_UMD);
       if (buf) {
-        res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" });
+        res.writeHead(200, {
+          "content-type": "text/javascript; charset=utf-8",
+          "cache-control": "public, max-age=86400",
+        });
         res.end(buf);
       } else {
         res.writeHead(404);

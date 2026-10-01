@@ -26,7 +26,11 @@ async function decryptStore(file) {
   }
   if (raw?.v !== 1 || !raw.salt || !raw.iv || !raw.tag || !raw.data) return null;
   try {
-    const decipher = createDecipheriv("aes-256-gcm", deriveKey(raw.salt), Buffer.from(raw.iv, "base64"));
+    const decipher = createDecipheriv(
+      "aes-256-gcm",
+      deriveKey(raw.salt),
+      Buffer.from(raw.iv, "base64"),
+    );
     decipher.setAuthTag(Buffer.from(raw.tag, "base64"));
     const plain = Buffer.concat([
       decipher.update(Buffer.from(raw.data, "base64")),

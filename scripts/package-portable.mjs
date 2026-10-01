@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * 打 Windows x64「便携包」：内置 Node 运行时 + 生产依赖，同学解压后双击 start.bat 即用，
  * 无需自己安装 Node.js、无需联网 npm ci。
@@ -19,8 +20,17 @@
  * 被 package-exe.mjs import 复用；导出 buildPortable()，import 时不执行。
  */
 
-import { cpSync, mkdirSync, readFileSync, writeFileSync, existsSync, rmSync, statSync, copyFileSync } from "node:fs";
 import { execSync } from "node:child_process";
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -78,9 +88,11 @@ export function buildPortable({ keep = false } = {}) {
   const unzipPs1 = path.join(work, "unzip-runtime.ps1");
   writeFileSync(
     unzipPs1,
-    ["param([string]$Archive, [string]$Destination)", "$ErrorActionPreference='Stop'", "Expand-Archive -LiteralPath $Archive -DestinationPath $Destination -Force"].join(
-      "\r\n",
-    ),
+    [
+      "param([string]$Archive, [string]$Destination)",
+      "$ErrorActionPreference='Stop'",
+      "Expand-Archive -LiteralPath $Archive -DestinationPath $Destination -Force",
+    ].join("\r\n"),
     "utf8",
   );
   execSync(
@@ -120,9 +132,12 @@ export function buildPortable({ keep = false } = {}) {
 
   // ── 5) 冒烟测试：用内置 node 跑只读自检，证明解压即用能启动 ──
   console.log("冒烟测试：runtime\\node.exe 运行 doctor ...");
-  execSync(`"${path.join(runtimeDir, "node.exe")}" "${path.join(appDir, "scripts", "doctor.mjs")}"`, {
-    stdio: "inherit",
-  });
+  execSync(
+    `"${path.join(runtimeDir, "node.exe")}" "${path.join(appDir, "scripts", "doctor.mjs")}"`,
+    {
+      stdio: "inherit",
+    },
+  );
 
   // ── 6) 打 zip：手工写条目，条目统一用正斜杠 '/'、保留顶层 CourseRaptor/ 前缀 ──
   //  .NET Framework 的 ZipFile.CreateFromDirectory 会用 '\' 分隔条目，非标准、命令行 unzip 会踩坑。
@@ -150,12 +165,15 @@ export function buildPortable({ keep = false } = {}) {
     "  $n += 1",
     "}",
     "$zip.Dispose()",
-    "Write-Output (\"zip 条目数: $n -> $out\")",
+    'Write-Output ("zip 条目数: $n -> $out")',
   ].join("\r\n");
   writeFileSync(zipPs1, zipScript, "utf8");
-  execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${zipPs1}" -src "${portable}" -out "${outZip}"`, {
-    stdio: "inherit",
-  });
+  execSync(
+    `powershell -NoProfile -ExecutionPolicy Bypass -File "${zipPs1}" -src "${portable}" -out "${outZip}"`,
+    {
+      stdio: "inherit",
+    },
+  );
 
   // ── 7) 产物搬到临时根目录的固定文件名（供上传步骤使用），再清理工作区 ──
   const finalZip = path.join(tmpdir(), ARTIFACT);

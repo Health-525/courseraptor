@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * 发版：bump package.json 版本 -> 提交 -> 打 tag -> 推送。
  * 同学端 raptor 启动时对比 GitHub master 上的版本号即会提示更新（src/core/update-check.ts）。
@@ -9,8 +10,8 @@
  * 前提：工作区干净（改动先提交），推送成功前发版不算完成，失败时按提示手动 push。
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const pkgPath = fileURLToPath(new URL("../package.json", import.meta.url));
@@ -50,7 +51,7 @@ try {
 } catch (e) {
   console.error(
     `⚠️ 推送失败：${e.message.split("\n")[0]}\n` +
-      `   手动补推即可完成发版：git push origin ${branch} && git push origin ${tag}`
+      `   手动补推即可完成发版：git push origin ${branch} && git push origin ${tag}`,
   );
   process.exit(1);
 }

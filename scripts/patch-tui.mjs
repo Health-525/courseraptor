@@ -12,8 +12,8 @@
  *    重绘（库的重绘只挂在这个事件上）。
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const require = createRequire(import.meta.url);
 // 包主入口就是 dist/index.js
@@ -45,8 +45,11 @@ if (!source.includes("globalThis.__raptorWelcome")) {
   // 空状态 return 的位置在 `_sections.length === 0` 分支里，
   // 原版和旧版补丁只有 return 的内容不同，统一按这个锚点替换
   // （锚点分组已含 "return "，这里只给表达式）
-  const anchor = new RegExp("(_sections\\)\\.length === 0\\) \\{\\n\\s*return )[^;]+;");
-  const next = patched.replace(anchor, `$1(globalThis.__raptorWelcome ?? ${JSON.stringify(fallbackLines)});`);
+  const anchor = /(_sections\)\.length === 0\) \{\n\s*return )[^;]+;/;
+  const next = patched.replace(
+    anchor,
+    `$1(globalThis.__raptorWelcome ?? ${JSON.stringify(fallbackLines)});`,
+  );
   if (next !== patched) {
     patched = next;
     applied.push("欢迎页");
