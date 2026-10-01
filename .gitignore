@@ -20,6 +20,8 @@ skills/upstream-*/
 update-data/
 .spec-workflow/
 .tmp-banner/
+# 根目录临时脚本/状态（会话工作产物，含 .tmp-banner/ 一类前缀）
+.tmp-*
 .openai/
 .zcode/
 # 本地临时产物（Playwright MCP 抓取、UI 截图、架构图草稿、大厅主图快照）

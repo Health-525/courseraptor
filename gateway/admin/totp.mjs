@@ -73,7 +73,11 @@ function hotp(secretBytes, counter) {
  * 命中返回 { ok: true, counter }；码本身对但已过水位返回 { ok: false, replay: true }，
  * 便于上层提示「等下一枚」而不是笼统的「不正确」。
  */
-export function verifyTotp(secretBase32, candidate, { window = 1, now = Date.now(), lastUsedCounter = -1 } = {}) {
+export function verifyTotp(
+  secretBase32,
+  candidate,
+  { window = 1, now = Date.now(), lastUsedCounter = -1 } = {},
+) {
   const candidateCode = String(candidate ?? "").replace(/\s+/g, "");
   if (!/^\d{6}$/.test(candidateCode)) return { ok: false };
   const secretBytes = base32Decode(secretBase32);
@@ -105,7 +109,10 @@ export function otpauthUri({ secret, issuer = "CourseRaptor", account = "admin" 
 export function generateRecoveryCodes(count = 10) {
   const codes = [];
   for (let i = 0; i < count; i++) {
-    const chars = Array.from({ length: 10 }, () => RECOVERY_ALPHABET[randomInt(RECOVERY_ALPHABET.length)]);
+    const chars = Array.from(
+      { length: 10 },
+      () => RECOVERY_ALPHABET[randomInt(RECOVERY_ALPHABET.length)],
+    );
     codes.push(`${chars.slice(0, 5).join("")}-${chars.slice(5).join("")}`);
   }
   return codes;

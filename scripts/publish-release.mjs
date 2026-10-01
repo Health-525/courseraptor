@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 /**
  * 发版：bump 版本 -> 打包工作区 zip -> 发布到更新后台。
  * 同学端 raptor 启动时即会提示，/update 一键更新。
@@ -13,8 +14,8 @@
  *   UPDATE_ADMIN_TOKEN=后台启动时设的发布密钥
  */
 
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -86,7 +87,10 @@ if (!updateCheckSource.includes(placeholderLine)) {
 }
 writeFileSync(
   stagedUpdateCheck,
-  updateCheckSource.replace(placeholderLine, `const DEFAULT_UPDATE_SERVER = ${JSON.stringify(SERVER)};`),
+  updateCheckSource.replace(
+    placeholderLine,
+    `const DEFAULT_UPDATE_SERVER = ${JSON.stringify(SERVER)};`,
+  ),
 );
 
 function compress(dir, out) {
@@ -124,7 +128,9 @@ try {
   rmSync(publishWork, { recursive: true, force: true }); // 发布成功才清理，失败要留 zip 重试
 } catch (e) {
   console.error(`❌ 发布失败：${e.message}`);
-  console.error(`   手动重试：curl -X POST "${SERVER}/publish" -H "x-admin-token: $UPDATE_ADMIN_TOKEN" ` +
-    `-H "x-version: ${version}" --data-binary @"${zipFile}"`);
+  console.error(
+    `   手动重试：curl -X POST "${SERVER}/publish" -H "x-admin-token: $UPDATE_ADMIN_TOKEN" ` +
+      `-H "x-version: ${version}" --data-binary @"${zipFile}"`,
+  );
   process.exit(1);
 }

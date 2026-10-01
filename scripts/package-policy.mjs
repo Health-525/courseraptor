@@ -1,14 +1,36 @@
 /** 安装包只包含应用代码与明确选定的公开资料；个人运行数据不参与分发。 */
 const ROOT_FILES = new Set([
-  "package.json", "package-lock.json", "tsconfig.json", "biome.json", "start.bat",
-  "README.md", "README.en.md", "LICENSE", "CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md", ".env.example", ".gitignore",
+  "package.json",
+  "package-lock.json",
+  "tsconfig.json",
+  "biome.json",
+  "start.bat",
+  "README.md",
+  "README.en.md",
+  "LICENSE",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
+  "CODE_OF_CONDUCT.md",
+  ".env.example",
+  ".gitignore",
   "eng.traineddata",
 ]);
 const CODE_DIRS = new Set(["src", "local", "bin", "scripts", "tests", "gateway", "update"]);
 const DOC_FILES = new Set([
-  "courseraptor-logo.png", "courseraptor-mascot.png", "screenshot-demo.jpg",
-  "student-guide.md", "configuration.md", "capabilities.md", "roadmap.md", "promotion.md",
-  "maintainers.md", "hero-banner.png", "social-preview.jpg", "brand-prompt.md", "github-best-practices.md", "launch-post.md",
+  "courseraptor-logo.png",
+  "courseraptor-mascot.png",
+  "screenshot-demo.jpg",
+  "student-guide.md",
+  "configuration.md",
+  "capabilities.md",
+  "roadmap.md",
+  "promotion.md",
+  "maintainers.md",
+  "hero-banner.png",
+  "social-preview.jpg",
+  "brand-prompt.md",
+  "github-best-practices.md",
+  "launch-post.md",
 ]);
 
 export function shouldPackagePath(relativePath) {
@@ -23,7 +45,9 @@ export function shouldPackagePath(relativePath) {
   if (parts[0] === "admin") {
     return (
       parts[1] === "dist" &&
-      !parts.slice(2).some((part) => part.startsWith(".") || /\.(?:log|enc|pem|key|bak|map)$/.test(part))
+      !parts
+        .slice(2)
+        .some((part) => part.startsWith(".") || /\.(?:log|enc|pem|key|bak|map)$/.test(part))
     );
   }
   if (!CODE_DIRS.has(parts[0])) return false;

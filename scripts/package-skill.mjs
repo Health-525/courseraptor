@@ -17,8 +17,8 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { createRequire } from "node:module";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -94,8 +94,14 @@ function crc32(buf) {
 }
 
 function dosDateTime(date) {
-  const time = ((date.getHours() & 0x1f) << 11) | ((date.getMinutes() & 0x3f) << 5) | ((date.getSeconds() / 2) & 0x1f);
-  const day = (((date.getFullYear() - 1980) & 0x7f) << 9) | (((date.getMonth() + 1) & 0x0f) << 5) | (date.getDate() & 0x1f);
+  const time =
+    ((date.getHours() & 0x1f) << 11) |
+    ((date.getMinutes() & 0x3f) << 5) |
+    ((date.getSeconds() / 2) & 0x1f);
+  const day =
+    (((date.getFullYear() - 1980) & 0x7f) << 9) |
+    (((date.getMonth() + 1) & 0x0f) << 5) |
+    (date.getDate() & 0x1f);
   return { time, day };
 }
 
@@ -203,9 +209,15 @@ export async function buildSkillPackage({ projectRoot = REPO_ROOT, outDir } = {}
   // 2) 静态文件
   fs.copyFileSync(path.join(skillSrc, "package", "SKILL.md"), path.join(skillDir, "SKILL.md"));
   fs.copyFileSync(path.join(skillSrc, "package", "README.md"), path.join(skillDir, "README.md"));
-  fs.copyFileSync(path.join(skillSrc, "package", ".env.example"), path.join(skillDir, ".env.example"));
+  fs.copyFileSync(
+    path.join(skillSrc, "package", ".env.example"),
+    path.join(skillDir, ".env.example"),
+  );
   for (const file of fs.readdirSync(path.join(skillSrc, "references"))) {
-    fs.copyFileSync(path.join(skillSrc, "references", file), path.join(skillDir, "references", file));
+    fs.copyFileSync(
+      path.join(skillSrc, "references", file),
+      path.join(skillDir, "references", file),
+    );
   }
 
   // 3) zip（条目带 njtech-jwgl/ 前缀，解压即得技能目录）

@@ -1,5 +1,4 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import http from "node:http";
 import {
   createReadStream,
   existsSync,
@@ -10,6 +9,7 @@ import {
   unlinkSync,
 } from "node:fs";
 import { readFile, rename, stat, writeFile } from "node:fs/promises";
+import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -73,15 +73,6 @@ function semverRank(version) {
   return major * 1_000_000 + minor * 1_000 + patch;
 }
 
-function requireAdmin(req, res, adminToken) {
-  const token = req.headers["x-admin-token"];
-  if (typeof token !== "string" || !tokenOk(token, adminToken)) {
-    sendJson(res, 401, { error: "管理员密钥无效" });
-    return false;
-  }
-  return true;
-}
-
 const landingHtml = (meta) => `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CourseRaptor 下载</title><style>
@@ -114,7 +105,10 @@ export function createUpdateServer({
     if (Array.isArray(parsed?.keys)) {
       panelKeys = parsed.keys.filter(
         (k) =>
-          k && typeof k.id === "string" && typeof k.name === "string" && typeof k.tokenHash === "string",
+          k &&
+          typeof k.id === "string" &&
+          typeof k.name === "string" &&
+          typeof k.tokenHash === "string",
       );
     }
   } catch {
@@ -414,14 +408,16 @@ export function createUpdateServer({
       if (req.method === "POST" && pathname === "/publish") {
         if (!(await checkAdmin(req, res))) return;
         const version = String(req.headers["x-version"] ?? "");
-        if (!SEMVER_RE.test(version)) return sendJson(res, 400, { error: "x-version 必须是 x.y.z" });
+        if (!SEMVER_RE.test(version))
+          return sendJson(res, 400, { error: "x-version 必须是 x.y.z" });
         let notes = "";
         try {
           notes = decodeURIComponent(String(req.headers["x-notes"] ?? ""));
         } catch {
           return sendJson(res, 400, { error: "x-notes 编码不正确" });
         }
-        if (notes.length > 2000) return sendJson(res, 400, { error: "更新说明不能超过 2000 个字符" });
+        if (notes.length > 2000)
+          return sendJson(res, 400, { error: "更新说明不能超过 2000 个字符" });
         const body = await readBody(req, MAX_PACKAGE_BODY);
         if (!body.length) return sendJson(res, 400, { error: "zip 包体为空" });
         await writeAtomic(zipPath(version), body);
@@ -440,7 +436,8 @@ export function createUpdateServer({
 
       if (req.method === "GET" && pathname === "/download") {
         const meta = await readMeta();
-        if (!meta || !existsSync(zipPath(meta.version))) return sendJson(res, 404, { error: "还没有发布过版本" });
+        if (!meta || !existsSync(zipPath(meta.version)))
+          return sendJson(res, 404, { error: "还没有发布过版本" });
         const size = (await stat(zipPath(meta.version))).size;
         res.writeHead(200, {
           "content-type": "application/zip",

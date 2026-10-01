@@ -19,7 +19,10 @@ export interface AdminTotpDoc {
 }
 
 export interface Registry {
-  createUser(options: { username: string; password: string }): Promise<{ id: string; username: string }>;
+  createUser(options: {
+    username: string;
+    password: string;
+  }): Promise<{ id: string; username: string }>;
   findUserByName(username: string): Promise<RegistryUser | null>;
   findUserById(id: string): Promise<RegistryUser | null>;
   authenticate(
@@ -38,8 +41,20 @@ export interface Registry {
   clearAdminTotp(): Promise<void>;
   createResetRequest(userId: string, username: string): Promise<{ id: string }>;
   listResetRequests(): Promise<{
-    pending: Array<{ id: string; userId: string; username: string; requestedAt: string; status: string }>;
-    codes: Array<{ code: string; userId: string; username: string; createdAt: string; expiresAt: string }>;
+    pending: Array<{
+      id: string;
+      userId: string;
+      username: string;
+      requestedAt: string;
+      status: string;
+    }>;
+    codes: Array<{
+      code: string;
+      userId: string;
+      username: string;
+      createdAt: string;
+      expiresAt: string;
+    }>;
   }>;
   approveResetRequest(id: string): Promise<{ code: string; username: string; expiresAt: string }>;
   rejectResetRequest(id: string): Promise<void>;
@@ -51,12 +66,16 @@ export interface Registry {
     count?: number;
     note?: string;
     expiresDays?: number;
-  }): Promise<Array<{ code: string; note: string; maxUses: number; usedBy: string[]; expiresAt: string }>>;
+  }): Promise<
+    Array<{ code: string; note: string; maxUses: number; usedBy: string[]; expiresAt: string }>
+  >;
   consumeInvite(code: string): Promise<boolean>;
   /** 注册中途失败时释放 pending 占位，码退回可再次消费 */
   releaseInvite(code: string): Promise<void>;
   markInviteUsed(code: string, username: string): Promise<void>;
-  listInvites(): Promise<Array<{ code: string; note: string; maxUses: number; usedBy: string[]; expiresAt: string }>>;
+  listInvites(): Promise<
+    Array<{ code: string; note: string; maxUses: number; usedBy: string[]; expiresAt: string }>
+  >;
 }
 
 export function createRegistry(options: { stateDir: string }): Registry;

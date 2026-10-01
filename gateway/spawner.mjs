@@ -151,7 +151,9 @@ export function createSpawner({
       const effectiveRestarts =
         Date.now() - instance.startedAt > UPTIME_RESET_MS ? 0 : instance.restarts;
       if (effectiveRestarts < MAX_RESTARTS) {
-        void Promise.all([currentSiteKey(), forceSiteKey(userId)]).then(([key, force]) => spawnInstance(userId, effectiveRestarts + 1, key, force));
+        void Promise.all([currentSiteKey(), forceSiteKey(userId)]).then(([key, force]) =>
+          spawnInstance(userId, effectiveRestarts + 1, key, force),
+        );
       }
     });
 

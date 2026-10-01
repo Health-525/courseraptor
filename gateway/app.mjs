@@ -13,8 +13,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
-import { createAdminUi } from "./admin/ui.mjs";
 import { ownDeepseekKeyActive } from "./admin/credentials-peek.mjs";
+import { createAdminUi } from "./admin/ui.mjs";
 
 const COOKIE_NAME = "raptor_sess";
 const SESSION_TTL_MS = 7 * 24 * 3600_000;
@@ -164,9 +164,7 @@ export function createGatewayServer({
     if (!value) return null;
     const [userId, expiresAt, mac] = value.split(".");
     if (!userId || !expiresAt || !mac) return null;
-    const expected = createHmac("sha256", secret)
-      .update(`${userId}.${expiresAt}`)
-      .digest("hex");
+    const expected = createHmac("sha256", secret).update(`${userId}.${expiresAt}`).digest("hex");
     const a = Buffer.from(mac);
     const b = Buffer.from(expected);
     if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
@@ -191,7 +189,7 @@ export function createGatewayServer({
 
   // ── 页面（红头档案风：与正式网页版同一套设计令牌，见 chat-page.ts）──
 
-  const layout = (title, body, error = "") => `<!doctype html>
+  const layout = (title, body) => `<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#F6F4ED">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -530,7 +528,11 @@ else { input.type = "password"; this.textContent = "显示"; }
           console.log(`[gw] ${user.username} 提交了密码重置申请`);
         }
         // 无论用户名是否存在都回同一句话，避免探测已注册用户名
-        sendHtml(res, 200, forgotPage("", "申请已提交。请到班级群联系管理员，同意后会收到一个一次性重置码。"));
+        sendHtml(
+          res,
+          200,
+          forgotPage("", "申请已提交。请到班级群联系管理员，同意后会收到一个一次性重置码。"),
+        );
         return;
       }
       if (req.method === "POST" && pathname === "/reset-password") {
@@ -702,7 +704,9 @@ else { input.type = "password"; this.textContent = "显示"; }
         const mode = body.mode === "site" ? "site" : "";
         await registry.setDsMode(user.id, mode);
         spawner.kick(user.id);
-        console.log(`[gw] ${user.username} Key 模式 → ${mode === "site" ? "站点免费额度" : "跟随（有自己的 Key 即用）"}`);
+        console.log(
+          `[gw] ${user.username} Key 模式 → ${mode === "site" ? "站点免费额度" : "跟随（有自己的 Key 即用）"}`,
+        );
         sendJson(res, 200, { ok: true });
         finish(200);
         return;
