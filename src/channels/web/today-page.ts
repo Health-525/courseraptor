@@ -21,6 +21,7 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#F6F4ED">
 <link rel="icon" type="image/png" href="/logo.png">
 <title>今日日程 · CourseRaptor</title>
 <style>
