@@ -19,6 +19,7 @@
     "postinstall": "node scripts/patch-tui.mjs",
     "release": "node scripts/release.mjs",
     "publish": "node scripts/publish-release.mjs",
+    "package:skill": "node scripts/package-skill.mjs",
     "server": "node update/update-server.mjs",
     "gateway": "node gateway/gateway.mjs",
     "test": "node --import tsx --test tests/*.test.ts",
