@@ -99,6 +99,21 @@ export interface SchoolAuth {
 export interface SchoolNotices {
   fetchNews(existing?: NewsItem[], maxItems?: number): Promise<NewsItem[]>;
   fetchArticle(url: string): Promise<SchoolArticle>;
+  /**
+   * 带通道与降级信息、进程内短 TTL 快照的列表抓取：网页通知面板与
+   * get_news 工具共用同一份快照，一轮里「面板看过 + 对话又问」不重复
+   * 抓官网三页。可选端口：适配器不实现时调用方回退 fetchNews。
+   */
+  fetchNewsMemo?(maxItems?: number): Promise<SchoolNewsSnapshot>;
+}
+
+/** fetchNewsMemo 的返回形状：items 之外如实说明通道与新鲜度 */
+export interface SchoolNewsSnapshot {
+  items: NewsItem[];
+  /** 本次实际使用的通道；校外被拦时为 webvpn */
+  via: "direct" | "webvpn";
+  /** 非空表示本次返回的是落盘缓存快照（直连与 WebVPN 都失败了） */
+  staleAt?: number;
 }
 
 /** 课表 / 考试抓取（欢迎面板与网页今日页共用） */

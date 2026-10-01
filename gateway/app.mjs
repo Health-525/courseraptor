@@ -159,6 +159,12 @@ export function createGatewayServer({
     return `${userId}.${expiresAt}.${mac}`;
   }
 
+  // 报头印章只读一次进内存（失败缓存住 rejection：文件缺失是持久态，
+  // 不会因为反复重试而自愈，404 语义不变）
+  let logoPromise = null;
+  const logoBuffer = () =>
+    (logoPromise ??= readFile(path.join(projectRoot, "docs", "courseraptor-logo.png")));
+
   function sessionFrom(req) {
     const value = parseCookies(req)[COOKIE_NAME];
     if (!value) return null;
@@ -495,7 +501,8 @@ else { input.type = "password"; this.textContent = "显示"; }
           return;
         }
         try {
-          const logo = await readFile(path.join(projectRoot, "docs", "courseraptor-logo.png"));
+          // 读一次进内存：登录页轮询/多同学并发打开时不再每请求读盘
+          const logo = await logoBuffer();
           res.writeHead(200, {
             "content-type": "image/png",
             "cache-control": "public, max-age=86400",

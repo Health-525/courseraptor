@@ -85,7 +85,20 @@ export function enrollYearFromStudentId(username: string): number {
  * @param cookie - 登录后的 cookie
  * @param username - 学号（前四位用于推入学年份）
  */
+// ── 进程内短 TTL（见 fetchAllGrades 开头的快照命中逻辑）──────────
+const GRADES_MEMO_TTL_MS = 10 * 60_000;
+let gradesMemo: { result: GradeResult; at: number } | null = null;
+
+/** 测试用：清掉进程内成绩快照 */
+export function clearGradesMemo(): void {
+  gradesMemo = null;
+}
 export async function fetchAllGrades(cookie: string, username: string): Promise<GradeResult> {
+  // 10 分钟进程内快照：一轮要串行打 (学年数×2) 个学期接口（大四 ≈10 个），
+  // 同一会话里连问两个成绩问题不该打两遍。失败路径（抛错）不会走到这里以下
+  if (gradesMemo && Date.now() - gradesMemo.at < GRADES_MEMO_TTL_MS) {
+    return gradesMemo.result;
+  }
   const client = createClient(BASE, cookie);
 
   const all: GradeCourse[] = [];
@@ -171,7 +184,7 @@ export async function fetchAllGrades(cookie: string, username: string): Promise<
   }
   const gpa = tc > 0 ? (tg / tc).toFixed(2) : "0.00";
 
-  return {
+  const result: GradeResult = {
     gpa,
     /** 注意语义：这是「计入 GPA 的必修课学分和」，不是总修学分 */
     requiredCredits: tc,
@@ -183,6 +196,8 @@ export async function fetchAllGrades(cookie: string, username: string): Promise<
     allCourses: deduped,
     failedTerms,
   };
+  gradesMemo = { result, at: Date.now() };
+  return result;
 }
 
 /** 重修先保留已通过记录，再比较分数；未知状态不能覆盖有效成绩。 */

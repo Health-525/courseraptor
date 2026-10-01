@@ -255,3 +255,116 @@ test("getCookie 并发调用共享同一次登录（不再触发登录风暴）"
     invalidateAuthCache();
   }
 });
+
+// ── 4. 查询性能：进程内快照 + 失败回退缓存 ─────────────────────
+
+const { clearGradesMemo, fetchAllGrades } = await import("../src/adapters/njtech/grades");
+const { saveScheduleCache } = await import("../src/core/schedule-cache");
+const { saveExamCache } = await import("../src/core/exam-cache");
+const { scheduleTools } = await import("../src/adapters/njtech/tools/schedule");
+const { gradesTools } = await import("../src/adapters/njtech/tools/grades");
+
+const asTool = (t: unknown) =>
+  t as { execute: (input: Record<string, unknown>) => Promise<Record<string, unknown>> };
+
+test("fetchAllGrades：TTL 内重复调用零新增教务请求（大四一年 ~10 个学期接口不再打两遍）", async () => {
+  looseRate();
+  clearGradesMemo();
+  let calls = 0;
+  const mock = installMock(() => {
+    calls += 1;
+    return {
+      status: 200,
+      chunks: [
+        Buffer.from(
+          JSON.stringify({
+            items: [
+              {
+                kcmc: "高等数学A",
+                kch: "MATH1",
+                cj: 92,
+                xf: "4",
+                kcxzmc: "必修",
+                xnmmc: "2025-2026",
+                xqmmc: "1",
+              },
+            ],
+          }),
+        ),
+      ],
+    };
+  });
+  try {
+    const a = await fetchAllGrades("JSESSIONID=t", "20230101");
+    const b = await fetchAllGrades("JSESSIONID=t", "20230101");
+    assert.equal(a.gpa, "4.00");
+    assert.equal(b.gpa, "4.00", "第二次调用应返回同一份结果");
+    const perRound = (new Date().getFullYear() - 2023 + 1) * 2;
+    assert.equal(calls, perRound, `首轮 ${perRound} 个学期请求后，第二次应零新增`);
+  } finally {
+    mock.restore();
+    clearGradesMemo();
+  }
+});
+
+test("get_schedule：教务在线失败时回退最后已知课表，如实标注不新鲜", async () => {
+  looseRate();
+  invalidateAuthCache();
+  saveScheduleCache({
+    year: 2026,
+    semester: 3,
+    label: "2025-2026-2",
+    courses: [
+      {
+        title: "高等数学A",
+        weekday: 1,
+        periods: [2, 3],
+        weeks: "1-16",
+        location: "同和楼 101",
+        teacher: "张三",
+      },
+    ],
+  });
+  // 登录成功，但课表接口全线不可达
+  const queue = [...loginQueue("s1")];
+  const mock = installMock(() => queue.shift() ?? { status: 0, networkError: "教务线路不可达" });
+  try {
+    const out = await asTool(scheduleTools.get_schedule).execute({});
+    assert.match(String(out.staleNote ?? ""), /本地缓存/, "必须带「本地缓存」的如实提示");
+    assert.equal(out.total, 1);
+    assert.equal(out.term, "2025-2026-2");
+  } finally {
+    mock.restore();
+    invalidateAuthCache();
+  }
+});
+
+test("get_exams：教务在线失败时回退最后已知考试安排，如实标注不新鲜", async () => {
+  looseRate();
+  invalidateAuthCache();
+  saveExamCache({
+    year: 2026,
+    semester: 3,
+    label: "2026-2027-1",
+    exams: [
+      {
+        subject: "线性代数",
+        date: "2026-12-30",
+        time: "14:00-16:00",
+        location: "仁智楼 202",
+        seatNumber: "12",
+      },
+    ],
+  });
+  const queue = [...loginQueue("s1")];
+  const mock = installMock(() => queue.shift() ?? { status: 0, networkError: "教务线路不可达" });
+  try {
+    const out = await asTool(gradesTools.get_exams).execute({});
+    assert.match(String(out.staleNote ?? ""), /本地缓存/);
+    assert.equal(out.total, 1);
+    assert.equal(out.term, "2026-2027-1");
+  } finally {
+    mock.restore();
+    invalidateAuthCache();
+  }
+});

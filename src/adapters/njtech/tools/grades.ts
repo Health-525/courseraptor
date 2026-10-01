@@ -5,8 +5,9 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { config } from "../../../core/config";
-import { saveExamCache } from "../../../core/exam-cache";
+import { loadExamCache, saveExamCache } from "../../../core/exam-cache";
 import { saveGradesCache } from "../../../core/grades-cache";
+import type { ExamResult } from "../../../core/model";
 import { summarizeAcademics, summarizeGeneralElectives } from "../academic-summary";
 import { fetchExamsSmart, parseSemesterString } from "../academics";
 import { fetchAllGrades } from "../grades";
@@ -83,14 +84,31 @@ export const gradesTools = {
       if (semester && !parsed) {
         return { error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
       }
-      const r = await withAuthRetry((c) => fetchExamsSmart(c, parsed?.year, parsed?.semester));
-      if (!r.ok) {
-        return { error: `考试查询失败：${r.error}（不是「暂无考试」，是没查到）` };
+      let data: ExamResult;
+      let staleAt: number | undefined;
+      try {
+        const r = await withAuthRetry((c) => fetchExamsSmart(c, parsed?.year, parsed?.semester));
+        if (r.ok) {
+          data = r.data;
+          // 未指定学期（自动探测的最新学期）时顺带刷新本地缓存，
+          // 「今日档案」日程页读缓存就能展示临近考试，不必登录教务系统
+          if (!semester) saveExamCache(data);
+        } else {
+          // 拿不到 ≠ 没有：优先回退最后已知考试安排，没有缓存才报错
+          const cached = loadExamCache();
+          if (!cached) {
+            return { error: `考试查询失败：${r.error}（不是「暂无考试」，是没查到）` };
+          }
+          data = cached.exams;
+          staleAt = cached.savedAt;
+        }
+      } catch (e) {
+        const cached = loadExamCache();
+        if (!cached) throw e;
+        data = cached.exams;
+        staleAt = cached.savedAt;
       }
-      // 未指定学期（自动探测的最新学期）时顺带刷新本地缓存，
-      // 「今日档案」日程页读缓存就能展示临近考试，不必登录教务系统
-      if (!semester) saveExamCache(r.data);
-      const { label, exams } = r.data;
+      const { label, exams } = data;
       return {
         term: label,
         total: exams.length,
@@ -101,6 +119,10 @@ export const gradesTools = {
           location: e.location,
           seatNumber: e.seatNumber || undefined,
         })),
+        staleNote:
+          staleAt !== undefined
+            ? `⚠️ 教务在线查询失败，这是本地缓存的最后已知考试安排（保存于 ${new Date(staleAt).toLocaleString("zh-CN")}），可能已过期；网络恢复后再问一次即可刷新。`
+            : undefined,
         note: exams.length === 0 ? "该学期暂无考试安排" : undefined,
       };
     },

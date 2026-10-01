@@ -64,6 +64,8 @@ export const njtechSchool: SchoolAdapter = {
   notices: {
     fetchNews: (existing, maxItems) => news.fetchJwcNews(existing, maxItems),
     fetchArticle: (url) => news.fetchJwcArticle(url),
+    // 面板与 get_news 共用的 5 分钟进程内快照（见 news.ts 的 fetchJwcNewsMemo）
+    fetchNewsMemo: (maxItems) => news.fetchJwcNewsMemo(maxItems),
   },
   tools: njtechTools,
   promptSections: njtechPromptSections,

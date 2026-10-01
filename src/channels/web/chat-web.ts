@@ -169,52 +169,46 @@ interface ScoredNewsSnapshot {
   items: ScoredNewsItem[];
   gradeBasis: string | null;
   fetchedAt: number;
+  /** 非空表示这次是降级快照（官网直连与 WebVPN 都失败），前端要提示不新鲜 */
+  staleAt?: number;
 }
 
 /**
- * 教务处通知的服务端缓存：官网三页现场抓取要数秒，功能大厅每次
- * 开面板都会打一次 /api/news，5 分钟内复用同一份快照即可。
- * 空结果与异常一律不缓存——不把网络抖动固化成「近期没有通知」。
- * in-flight 复用挡住并发请求下的重复抓取。
+ * 教务处通知的评分视图。官网抓取与 5 分钟 TTL 缓存在适配器的
+ * fetchNewsMemo 里（get_news 工具与这里共用同一份快照，面板刚看过、
+ * 对话里再问不会重复抓三页）；这里只负责按同学年级打相关性分。
+ * 走 fetchNews（吞错版）的旧路径会让「抓取失败」显示成「无通知」，
+ * 现在失败会如实抛给 /api/news 的 catch 上报。
  */
-const NEWS_CACHE_TTL_MS = 5 * 60 * 1000;
-let newsCache: ScoredNewsSnapshot | null = null;
-let newsInflight: Promise<ScoredNewsSnapshot> | null = null;
-
 async function scoredNewsSnapshot(): Promise<ScoredNewsSnapshot> {
-  if (newsCache && Date.now() - newsCache.fetchedAt < NEWS_CACHE_TTL_MS) {
-    return newsCache;
-  }
-  if (newsInflight) return newsInflight;
-  newsInflight = (async () => {
-    const items = (await school().notices?.fetchNews([], 30)) ?? [];
-    const grade = await loadUserGrade();
-    const scored = items.slice(0, 10).map((i) => {
-      const { level, reason } = relevanceOf(i.title, grade);
-      return {
-        title: i.title,
-        date: i.date,
-        category: i.category,
-        relevance: level,
-        relevanceReason: reason,
-        url: i.url,
-        restricted: i.restricted ?? undefined,
+  const notices = school().notices;
+  const raw = notices?.fetchNewsMemo
+    ? await notices.fetchNewsMemo(30)
+    : {
+        items: (await notices?.fetchNews([], 30)) ?? [],
+        via: "direct" as const,
+        staleAt: undefined,
       };
-    });
-    // 只有一页都没有才视为「本轮无数据」不缓存；部分成功的结果照常缓存
-    const snapshot: ScoredNewsSnapshot = {
-      items: scored,
-      gradeBasis: grade,
-      fetchedAt: Date.now(),
+  const grade = await loadUserGrade();
+  const scored = raw.items.slice(0, 10).map((i) => {
+    const { level, reason } = relevanceOf(i.title, grade);
+    return {
+      title: i.title,
+      date: i.date,
+      category: i.category,
+      relevance: level,
+      relevanceReason: reason,
+      url: i.url,
+      restricted: i.restricted ?? undefined,
     };
-    if (scored.length > 0) newsCache = snapshot;
-    return snapshot;
-  })();
-  try {
-    return await newsInflight;
-  } finally {
-    newsInflight = null;
-  }
+  });
+  return {
+    items: scored,
+    gradeBasis: grade,
+    // 降级快照的时间要如实反映抓取时刻，不能拿「现在」冒充
+    fetchedAt: raw.staleAt ?? Date.now(),
+    staleAt: raw.staleAt,
+  };
 }
 
 /** 与 agent.ts 的 ToolLoopAgent 对齐的最小接口：网页端每轮都带全量历史，
@@ -958,13 +952,14 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return;
     }
     if (url === "/api/news") {
-      // 教务处官网公开页，无需登录；TTL 缓存见 scoredNewsSnapshot，失败如实降级
+      // 教务处官网公开页，无需登录；TTL 缓存在适配器 fetchNewsMemo，失败如实降级
       try {
         const snapshot = await scoredNewsSnapshot();
         json(res, {
           items: snapshot.items,
           gradeBasis: snapshot.gradeBasis ?? undefined,
           fetchedAt: snapshot.fetchedAt,
+          staleAt: snapshot.staleAt,
         });
       } catch (e) {
         json(res, { items: [], error: e instanceof Error ? e.message : String(e) });
