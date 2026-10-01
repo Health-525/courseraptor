@@ -11,7 +11,7 @@ import { summarizeAcademics, summarizeGeneralElectives } from "../academic-summa
 import { fetchExamsSmart, parseSemesterString } from "../academics";
 import { fetchAllGrades } from "../grades";
 import { fetchLabGradesSmart } from "../portal";
-import { getCookie } from "../session";
+import { withAuthRetry } from "../session";
 
 export const gradesTools = {
   /** 成绩查询 */
@@ -20,8 +20,8 @@ export const gradesTools = {
       "查询全部学期的成绩与 GPA、已获学分、未通过/待确认课程及通识分类概览。重复课程取最高有效成绩；只统计已通过课程的学分，不代替培养方案或毕业审核。",
     inputSchema: z.object({}),
     execute: async () => {
-      const cookie = await getCookie();
-      const result = await fetchAllGrades(cookie, config.jwglUsername);
+      // 会话失效自动重登一次；全部学期失败时 fetchAllGrades 会抛错，坏数据不会落进缓存
+      const result = await withAuthRetry((c) => fetchAllGrades(c, config.jwglUsername));
 
       const generalElectives = summarizeGeneralElectives(result.allCourses);
 
@@ -83,8 +83,7 @@ export const gradesTools = {
       if (semester && !parsed) {
         return { error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
       }
-      const cookie = await getCookie();
-      const r = await fetchExamsSmart(cookie, parsed?.year, parsed?.semester);
+      const r = await withAuthRetry((c) => fetchExamsSmart(c, parsed?.year, parsed?.semester));
       if (!r.ok) {
         return { error: `考试查询失败：${r.error}（不是「暂无考试」，是没查到）` };
       }
@@ -122,8 +121,9 @@ export const gradesTools = {
       if (semester && !parsed) {
         return { error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
       }
-      const cookie = await getCookie();
-      const { label, items } = await fetchLabGradesSmart(cookie, parsed?.year, parsed?.semester);
+      const { label, items } = await withAuthRetry((c) =>
+        fetchLabGradesSmart(c, parsed?.year, parsed?.semester),
+      );
       return {
         term: label,
         total: items.length,

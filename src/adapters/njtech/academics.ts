@@ -4,6 +4,7 @@
  */
 
 import { specialDaysOfWeek, type WeekSpecialDay } from "../../core/calendar/holidays";
+import { RaptorError, SESSION_EXPIRED_MESSAGE } from "../../core/errors";
 import { createClient, type FetchResult, httpFailure } from "../../core/http";
 import type {
   CourseData,
@@ -16,6 +17,11 @@ import type {
 } from "../../core/model";
 import { BASE } from "./auth";
 import { currentWeekOf as resolveCurrentWeek } from "./term-dates";
+import { isSessionExpired } from "./xk";
+
+/** 会话失效哨兵：fetchXxxFor 向 Smart 层传递用，Smart 层据此抛 SESSION_EXPIRED，
+    供 session.withAuthRetry 换新 cookie 自动重试 */
+const SESSION_DOWN = SESSION_EXPIRED_MESSAGE;
 
 export type { ExamResult, ScheduleResult, SkwjSegment, TermRef, WeekGroup } from "../../core/model";
 export {
@@ -244,6 +250,9 @@ export async function fetchScheduleSmart(
   for (const c of candidates) {
     const r = await fetchScheduleFor(cookie, c.year, c.semester);
     if (!r.ok) {
+      if (r.error === SESSION_DOWN) {
+        throw new RaptorError("SESSION_EXPIRED", "教务会话已失效（可能被服务端提前下线）");
+      }
       failures.push(`${termLabel(c.year, c.semester)}：${r.error}`);
       continue;
     }
@@ -281,6 +290,11 @@ async function fetchScheduleFor(
   if (failure) return { ok: false, error: failure };
   if (!resp.body || resp.body.length < 10) {
     return { ok: false, error: `课表接口返回空响应（HTTP ${resp.status}）` };
+  }
+  // 会话被服务端提前踢掉时正方 302 回登录页——必须显式区分，
+  // 否则会被当成「页面改版」误导排障方向，也错过自动重登的时机
+  if (isSessionExpired(resp.body)) {
+    return { ok: false, error: SESSION_DOWN };
   }
 
   let data: { kbList?: Array<Record<string, unknown>> };
@@ -409,6 +423,9 @@ export async function fetchExamsSmart(
   for (const c of candidates) {
     const r = await fetchExamsFor(cookie, c.year, c.semester);
     if (!r.ok) {
+      if (r.error === SESSION_DOWN) {
+        throw new RaptorError("SESSION_EXPIRED", "教务会话已失效（可能被服务端提前下线）");
+      }
       failures.push(`${termLabel(c.year, c.semester)}：${r.error}`);
       continue;
     }
@@ -440,6 +457,9 @@ async function fetchExamsFor(
 
   const failure = httpFailure(resp);
   if (failure) return { ok: false, error: failure };
+  if (isSessionExpired(resp.body)) {
+    return { ok: false, error: SESSION_DOWN };
+  }
 
   try {
     const data = JSON.parse(resp.body) as { items?: Array<Record<string, unknown>> };

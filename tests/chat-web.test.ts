@@ -1161,3 +1161,34 @@ test("注入的 fetch 包装：写请求自动带 token，GET 不带且保留原
   assert.equal((delInit.headers as Headers).get("x-csrf-token"), token, "DELETE 自动带上 token");
   assert.equal(calls[2].init?.headers, undefined, "GET 不应被改写");
 });
+
+// ── 畸形 URL 健壮性：半截百分号编码不得杀掉服务 ───────────────────
+// 回归背景：decodeURIComponent("%") 抛 URIError，handle 是 async 且此前无兜底，
+// Node 24 默认把未处理 rejection 当致命错误直接退出进程——一个畸形请求
+// 就能让整个对话服务（含 TUI）消失。
+
+test("畸形会话 URL（GET/PATCH/DELETE）一律 404，服务保持存活", async () => {
+  const base = (await startChatWeb())!;
+
+  // GET：只读请求，不带 CSRF 也能到达路由层
+  const get = await fetch(`${base}/api/sessions/%`);
+  assert.equal(get.status, 404, "GET 畸形 id 应 404 而不是 500/连接重置");
+
+  // PATCH / DELETE：写请求带上 CSRF token 走完整链路
+  const token = await csrfToken();
+  const patch = await fetch(`${base}/api/sessions/%`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", "x-csrf-token": token },
+    body: JSON.stringify({ title: "x" }),
+  });
+  assert.equal(patch.status, 404, "PATCH 畸形 id 应 404");
+  const del = await fetch(`${base}/api/sessions/%E0%A4`, {
+    method: "DELETE",
+    headers: { "x-csrf-token": token },
+  });
+  assert.equal(del.status, 404, "DELETE 畸形 id 应 404");
+
+  // 服务必须还活着：页面照常返回
+  const page = await fetch(base);
+  assert.equal(page.status, 200, "经历畸形请求后服务仍存活");
+});

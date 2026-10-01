@@ -4,7 +4,7 @@
  */
 
 import { config } from "../../core/config";
-import { RaptorError } from "../../core/errors";
+import { isSessionExpiredError, RaptorError } from "../../core/errors";
 import { withRetry } from "../../core/http";
 import { loginJwgl } from "./auth";
 import { openXkSession, type XkSession } from "./xk";
@@ -32,15 +32,46 @@ interface AuthCache {
 let authCache: AuthCache | null = null;
 const AUTH_TTL_MS = 25 * 60 * 1000; // 25 分钟（保守于 30 分钟会话）
 
-/** 获取登录 cookie（缓存复用，失效/被强制时重建） */
+/** 登录去重：一轮对话里模型并行调多个教务工具时，并发 getCookie 只触发一次真实登录 */
+let authInflight: Promise<string> | null = null;
+
+/** 获取登录 cookie（缓存复用，失效/被强制时重建；并发调用共享同一次登录） */
 export async function getCookie(force = false): Promise<string> {
   requireJwglCredentials();
   if (!force && authCache && Date.now() - authCache.createdAt < AUTH_TTL_MS) {
     return authCache.cookie;
   }
-  const { cookie } = await loginWithRetry();
-  authCache = { cookie, createdAt: Date.now() };
-  return cookie;
+  if (!authInflight) {
+    authInflight = loginWithRetry()
+      .then(({ cookie }) => {
+        authCache = { cookie, createdAt: Date.now() };
+        return cookie;
+      })
+      .finally(() => {
+        authInflight = null;
+      });
+  }
+  return authInflight;
+}
+
+/** 普通登录 cookie 失效（被服务端提前踢下线等）时清除缓存，下一次 getCookie 重新登录 */
+export function invalidateAuthCache(): void {
+  authCache = null;
+}
+
+/** 带「会话失效自动重登一次」的查询执行器：fetch 层识别出登录页后抛
+    SESSION_EXPIRED，这里换新 cookie 重试一次，仍失败才把错误交给上层。
+    避免死 cookie 熬满 25 分钟 TTL 期间所有教务查询持续报错。 */
+export async function withAuthRetry<T>(fn: (cookie: string) => Promise<T>): Promise<T> {
+  let cookie = await getCookie();
+  try {
+    return await fn(cookie);
+  } catch (e) {
+    if (!isSessionExpiredError(e)) throw e;
+    invalidateAuthCache();
+    cookie = await getCookie(true);
+    return await fn(cookie);
+  }
 }
 
 // ── 选课会话（含 xkkzId/csrftoken 与预热上下文）─────────────────

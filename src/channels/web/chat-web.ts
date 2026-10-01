@@ -331,8 +331,11 @@ async function maybeStartQQBridge(): Promise<string> {
 
 // ── 轮次串行化 ──────────────────────────────────────────────
 
-/** 串行化：上一轮没跑完时新请求排队，避免并发把会话文件写花 */
-let turnChain: Promise<void> = Promise.resolve();
+/** 按会话串行化：同一会话上一轮没跑完时新请求排队，避免并发把会话文件写花。
+ * 跨会话不互相排队——此前全局单链会让抢课这类长轮次（最长 600s）把
+ * 另一个标签页的普通提问整个卡住。落盘（appendRound 等）是同步原子写，
+ * 不同会话交错追加不会丢数据。轮次结束后删键，Map 不随会话数增长。 */
+const sessionTurns = new Map<string, Promise<void>>();
 
 // ── fullStream 事件（同 inline.ts 的宽松视图，字段按需取用）──────
 
@@ -411,7 +414,24 @@ function listen(port: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
       if (requestForbidden(req, res)) return;
-      void handle(req, res);
+      // 处理器的意外异常在这里兜底回 500：放任成未处理 rejection 会把
+      // 整个进程带崩（Node 24 默认 unhandledRejection = 退出），
+      // 一个畸形请求不该杀掉对话服务和终端 UI
+      handle(req, res).catch((e) => {
+        try {
+          if (!res.headersSent) {
+            res.writeHead(500, { "content-type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ error: "服务器内部错误" }));
+          } else if (!res.writableEnded) {
+            res.end();
+          }
+        } catch {
+          /* socket 已断开：无从响应 */
+        }
+        console.error(
+          `[chat-web] 请求处理异常 ${req.method} ${req.url}：${e instanceof Error ? e.message : String(e)}`,
+        );
+      });
     });
     // unref：不让网页服务拖住进程退出——终端 UI 退出时主程序该走就走
     server.unref();
@@ -621,6 +641,17 @@ const SESSIONS_PREFIX = "/api/sessions/";
 const SESSION_ID_RE = /^[0-9A-Za-z_-]{1,64}$/;
 const sidOf = (v: unknown): string =>
   typeof v === "string" && SESSION_ID_RE.test(v) ? v : DEFAULT_ID;
+
+/** 解码 URL 里的会话 id 段。半截百分号编码（如「/api/sessions/%」）会让
+ * decodeURIComponent 抛 URIError——按无效会话返回 null（404），绝不让它
+ * 变成未处理 rejection 把整个服务带崩（Node 24 默认直接退出进程）。 */
+function decodeSessionSegment(url: string): string | null {
+  try {
+    return decodeURIComponent(url.slice(SESSIONS_PREFIX.length));
+  } catch {
+    return null;
+  }
+}
 
 // ── 设置：教务账号 + DeepSeek Key（复用 /key 的「校验→热生效→加密落盘」）──
 
@@ -1030,7 +1061,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return;
     }
     if (url.startsWith(SESSIONS_PREFIX)) {
-      const raw = decodeURIComponent(url.slice(SESSIONS_PREFIX.length));
+      const raw = decodeSessionSegment(url) ?? "";
       const s = SESSION_ID_RE.test(raw) ? getSession(raw) : null;
       if (!s) {
         json(res, { error: "会话不存在" }, 404);
@@ -1177,7 +1208,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     }
   }
   if (req.method === "PATCH" && url.startsWith(SESSIONS_PREFIX)) {
-    const raw = decodeURIComponent(url.slice(SESSIONS_PREFIX.length));
+    const raw = decodeSessionSegment(url) ?? "";
     if (!SESSION_ID_RE.test(raw)) {
       json(res, { error: "会话不存在" }, 404);
       return;
@@ -1220,7 +1251,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     return;
   }
   if (req.method === "DELETE" && url.startsWith(SESSIONS_PREFIX)) {
-    const raw = decodeURIComponent(url.slice(SESSIONS_PREFIX.length));
+    const raw = decodeSessionSegment(url) ?? "";
     const ok = SESSION_ID_RE.test(raw) && deleteSession(raw);
     json(res, ok ? { ok: true } : { error: "会话不存在" }, ok ? 200 : 404);
     return;
@@ -1287,15 +1318,17 @@ async function handleChat(req: http.IncomingMessage, res: http.ServerResponse) {
     if (!res.writableEnded) abort.abort();
   });
 
-  // 排队执行：串行化对会话存档的读写。本轮全部事件发完后必须 res.end()
+  // 排队执行：对本会话的存档读写做串行化。本轮全部事件发完后必须 res.end()
   // 关闭 SSE——不关的话浏览器/测试的 reader 永远等不到流结束
-  const prev = turnChain;
-  turnChain = prev
+  const prev = sessionTurns.get(sessionId) ?? Promise.resolve();
+  const next = prev
     .then(() => runTurn(agent, sessionId, message, uploads, send, abort.signal))
     .catch(() => {})
     .finally(() => {
+      if (sessionTurns.get(sessionId) === next) sessionTurns.delete(sessionId);
       if (!res.writableEnded) res.end();
     });
+  sessionTurns.set(sessionId, next);
   await prev;
 }
 

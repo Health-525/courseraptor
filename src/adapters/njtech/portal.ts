@@ -6,9 +6,11 @@
  * （返回「系统维护页面」），任何客户端均不可用。
  */
 
-import { createClient } from "../../core/http";
+import { RaptorError } from "../../core/errors";
+import { createClient, httpError } from "../../core/http";
 import { candidateXnxqList, termLabel } from "./academics";
 import { BASE } from "./auth";
+import { isSessionExpired } from "./xk";
 
 function queryBody(extra: Record<string, string> = {}): string {
   const params: Record<string, string> = {
@@ -33,7 +35,13 @@ const PROFILE_URL = "/xsxxxggl/xsgrxxwh_cxXsgrxx.html";
 export async function fetchProfile(cookie: string): Promise<Record<string, string>> {
   const client = createClient(BASE, cookie);
   const r = await client.req(PROFILE_URL, { method: "GET" });
+  const failure = httpError(r);
+  if (failure) throw failure;
   const html = r.body ?? "";
+  // 会话失效时拿到的是登录页而非档案页，解析出来会是「空档案」——必须显式失败
+  if (isSessionExpired(html)) {
+    throw new RaptorError("SESSION_EXPIRED", "教务会话已失效（可能被服务端提前下线）");
+  }
   const out: Record<string, string> = {};
   // class="form-group" 与 "form-group xxx" 两种写法，且引号后可能带空格
   for (const block of html.match(/<div class="form-group[^"]*"\s*>[\s\S]*?<\/div>/g) ?? []) {
@@ -66,6 +74,13 @@ export async function fetchRetakeCourses(cookie: string): Promise<RetakeCourse[]
     method: "POST",
     body: queryBody(),
   });
+  // 断网/会话失效/改版曾被 catch 吞成「没有可重修课程」——故障必须如实上报，
+  // 「空列表」只留给真实的空结果（news.ts 的阶梯降级是本文件范本）
+  const failure = httpError(r);
+  if (failure) throw failure;
+  if (isSessionExpired(r.body ?? "")) {
+    throw new RaptorError("SESSION_EXPIRED", "教务会话已失效（可能被服务端提前下线）");
+  }
   try {
     const items = JSON.parse(r.body ?? "{}").items ?? [];
     return items.map(
@@ -78,7 +93,7 @@ export async function fetchRetakeCourses(cookie: string): Promise<RetakeCourse[]
       }),
     );
   } catch {
-    return [];
+    throw new RaptorError("PARSE", "可重修课程接口响应无法解析（页面结构可能已改版）");
   }
 }
 
@@ -107,6 +122,12 @@ export async function fetchEnrolledClasses(cookie: string): Promise<EnrolledClas
     method: "POST",
     body: queryBody(),
   });
+  // 同 fetchRetakeCourses：故障与「真实的空已选列表」必须可区分
+  const failure = httpError(r);
+  if (failure) throw failure;
+  if (isSessionExpired(r.body ?? "")) {
+    throw new RaptorError("SESSION_EXPIRED", "教务会话已失效（可能被服务端提前下线）");
+  }
   try {
     const items = JSON.parse(r.body ?? "{}").items ?? [];
     const seen = new Set<string>();
@@ -129,7 +150,7 @@ export async function fetchEnrolledClasses(cookie: string): Promise<EnrolledClas
     }
     return out;
   } catch {
-    return [];
+    throw new RaptorError("PARSE", "已选教学班接口响应无法解析（页面结构可能已改版）");
   }
 }
 
@@ -149,19 +170,41 @@ export async function fetchLabGradesSmart(
   const client = createClient(BASE, cookie);
   const candidates = xnm && xqm ? [{ year: xnm, semester: xqm }] : candidateXnxqList();
 
+  // 候选学期探测与故障上报并行：逐个候选「成功但空」继续往前试（合法的空学期）；
+  // 但要区分「探测到学期、确实没有实验成绩」与「一个学期都没查通」——后者是故障
+  let lastFailure: string | null = null;
+  let anySucceeded = false;
+
   for (const c of candidates) {
     const r = await client.req("/xssygl/sycjcx_cxSycjcxIndex.html?doType=query", {
       method: "POST",
       body: queryBody({ xnm: String(c.year), xqm: String(c.semester) }),
     });
+    const failure = httpError(r);
+    if (failure) {
+      lastFailure = `${termLabel(c.year, c.semester)}：${failure.message}`;
+      continue;
+    }
+    if (isSessionExpired(r.body ?? "")) {
+      throw new RaptorError("SESSION_EXPIRED", "教务会话已失效（可能被服务端提前下线）");
+    }
     try {
       const items = JSON.parse(r.body ?? "{}").items ?? [];
+      anySucceeded = true;
       if (items.length > 0) {
         return { ...c, label: termLabel(c.year, c.semester), items };
       }
     } catch {
+      lastFailure = `${termLabel(c.year, c.semester)}：响应无法解析`;
       /* 试下一个候选学期 */
     }
+  }
+
+  if (!anySucceeded && lastFailure) {
+    throw new RaptorError(
+      "UPSTREAM",
+      `实验成绩查询失败：${lastFailure}（不是「暂无实验成绩」，是没查到）`,
+    );
   }
 
   const first = candidates[0];
