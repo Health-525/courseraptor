@@ -5,7 +5,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { fetchEnrolledClasses, fetchProfile, fetchRetakeCourses } from "../portal";
-import { getCookie } from "../session";
+import { withAuthRetry } from "../session";
 
 export const studentTools = {
   /** 学籍个人信息 */
@@ -14,8 +14,7 @@ export const studentTools = {
       "查询学籍个人信息：姓名、学号、性别、学院、专业、班级、年级、学制、入学/毕业日期等（从教务系统个人信息页解析）。需要确认用户身份信息、或查询班级/专业信息时调用。",
     inputSchema: z.object({}),
     execute: async () => {
-      const cookie = await getCookie();
-      const profile = await fetchProfile(cookie);
+      const profile = await withAuthRetry((c) => fetchProfile(c));
       // 敏感字段打码（只留前4后4），避免完整证件/卡号进入模型上下文
       const SENSITIVE = /证件号码|银行卡|考生号/;
       const masked: Record<string, string> = {};
@@ -44,8 +43,7 @@ export const studentTools = {
       "查询本学期已选的课程教学班列表：课程名、教学班、教师、上课时间、地点、学分、课程性质（必修/选修）。注意：与课表（get_schedule）互补，这里按教学班维度、含选课属性。",
     inputSchema: z.object({}),
     execute: async () => {
-      const cookie = await getCookie();
-      const classes = await fetchEnrolledClasses(cookie);
+      const classes = await withAuthRetry((c) => fetchEnrolledClasses(c));
       return {
         total: classes.length,
         courses: classes,
@@ -62,8 +60,7 @@ export const studentTools = {
       keyword: z.string().optional().describe("课程名关键词过滤（可选）"),
     }),
     execute: async ({ keyword }) => {
-      const cookie = await getCookie();
-      const all = await fetchRetakeCourses(cookie);
+      const all = await withAuthRetry((c) => fetchRetakeCourses(c));
       const filtered = keyword ? all.filter((c) => c.courseName.includes(keyword)) : all;
       return {
         total: filtered.length,

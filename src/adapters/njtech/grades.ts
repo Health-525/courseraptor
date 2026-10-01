@@ -11,9 +11,11 @@
  * 4. 拿不到的学期要报告，不能静默变成「没有这门课的成绩」。
  */
 
+import { RaptorError } from "../../core/errors";
 import { createClient, httpError, withRetry } from "../../core/http";
 import type { GradeCourse, GradeResult } from "../../core/model";
 import { BASE } from "./auth";
+import { isSessionExpired } from "./xk";
 
 // ── GPA 计算 ────────────────────────────────────────────────
 
@@ -104,6 +106,12 @@ export async function fetchAllGrades(cookie: string, username: string): Promise<
           // 传输层失败要进入重试，而不是被 JSON.parse 吞成「空学期」
           const failure = httpError(resp);
           if (failure) throw failure;
+          // 会话失效（302 回登录页）换 cookie 重登才有救，同一死 cookie 重试无意义
+          if (isSessionExpired(resp.body)) {
+            throw new RaptorError("SESSION_EXPIRED", "教务会话已失效（可能被服务端提前下线）", {
+              retryable: false,
+            });
+          }
 
           const data = JSON.parse(resp.body) as { items?: Array<Record<string, unknown>> };
           return (data.items ?? []).map(
@@ -128,11 +136,21 @@ export async function fetchAllGrades(cookie: string, username: string): Promise<
   };
 
   // 遍历所有学年学期
+  const attempted = (endYear - startYear + 1) * 2;
   for (let y = startYear; y <= endYear; y++) {
     for (const q of [3, 12]) {
       const term = await fetchTerm(y, q);
       if (term) all.push(...term);
     }
+  }
+
+  // 全部学期都失败：不能把「GPA 0.00 + 零课程」当成功结果交出去——
+  // 工具层会把它落进成绩缓存，坏数据覆盖好缓存
+  if (attempted > 0 && failedTerms.length >= attempted) {
+    throw new RaptorError(
+      "UPSTREAM",
+      `全部 ${attempted} 个学期的成绩查询均失败（${failedTerms[0]}）；已放弃，未污染本地成绩缓存`,
+    );
   }
 
   // 去重取最高分。键 = 课程号 + 课程性质：

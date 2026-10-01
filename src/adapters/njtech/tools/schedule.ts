@@ -23,7 +23,7 @@ import {
   resolveWeek1Monday,
   WEEKDAY_NAMES,
 } from "../academics";
-import { getCookie } from "../session";
+import { withAuthRetry } from "../session";
 
 export const scheduleTools = {
   /** 课表查询 */
@@ -41,8 +41,8 @@ export const scheduleTools = {
       if (semester && !parsed) {
         return { error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
       }
-      const cookie = await getCookie();
-      const r = await fetchScheduleSmart(cookie, parsed?.year, parsed?.semester);
+      // 会话失效自动重登一次：死 cookie 熬满 25 分钟 TTL 期间不再持续报错
+      const r = await withAuthRetry((c) => fetchScheduleSmart(c, parsed?.year, parsed?.semester));
       // 拿不到 ≠ 没有：断网/会话失效必须如实说，不能让用户以为这学期没课
       if (!r.ok) {
         return {
