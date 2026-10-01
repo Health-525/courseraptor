@@ -21,6 +21,8 @@ process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-svg-
 
 await import("../src/adapters");
 const { renderTermScheduleSVG, renderWeekScheduleSVG } = await import("../src/core/schedule-svg");
+const { scheduleSvgToPng } = await import("../src/core/schedule-png");
+const { loadLogoDataUri } = await import("../src/core/brand");
 const { recordSpecialDays } = await import("../src/core/calendar/holidays");
 const { saveScheduleCache } = await import("../src/core/schedule-cache");
 const { startChatWeb } = await import("../src/channels/web/chat-web");
@@ -152,16 +154,85 @@ test("week：单双周过滤——单周课只出现在单周", () => {
   assert.ok(odd.svg.includes("体育"), "第 3 周是单周，体育应该在");
 });
 
+// ── color 彩色课格风格 + PNG ────────────────────────────────────────
+
+test("color：每门课稳定配色，品牌小字落款与顶条在场", () => {
+  const r = renderTermScheduleSVG({
+    courses: fixtureCourses(),
+    termLabel: TERM_LABEL,
+    style: "color",
+  });
+  assertWellFormed(r.svg);
+  // 课格用色盘底色（断言至少出现一个色盘值）
+  assert.ok(
+    /#FCE7E3|#FCEBD9|#FAF1CC|#EDF5E0|#E4F3E4|#DFF1EE|#E3EDFA|#E5E9FA|#ECE7F8|#F9E5ED|#F1E8DD|#E7EBEF/.test(
+      r.svg,
+    ),
+    "彩色课格应使用色盘",
+  );
+  // 同一门课跨形态同色：两份渲染里「最优化方法」的卡片底色一致
+  const w = renderWeekScheduleSVG({
+    courses: fixtureCourses(),
+    week: 3,
+    week1Monday: WEEK1_MONDAY,
+    termLabel: TERM_LABEL,
+    style: "color",
+  });
+  const colorOf = (svg: string) =>
+    svg
+      .slice(svg.indexOf("最优化方法") - 300, svg.indexOf("最优化方法"))
+      .match(/#F[A-F0-9]{5}/g)
+      ?.pop();
+  assert.ok(colorOf(r.svg), "term 图里应能找到课格底色");
+  assert.equal(colorOf(r.svg), colorOf(w.svg), "同一门课跨形态颜色稳定");
+  // 品牌元素：顶部朱砂条 + 右下落款小字
+  assert.ok(r.svg.includes('height="3" fill="#AD392C"'), "顶部朱砂细条");
+  assert.ok(r.svg.includes("COURSERAPTOR · 生成于"), "底部小字落款");
+  assert.ok(r.svg.includes("Microsoft YaHei"), "color 风格用黑体系而非楷体");
+});
+
+test("color+logo：logo 以 data URI 嵌入（印章与落款）", () => {
+  const logo = loadLogoDataUri();
+  assert.ok(logo, "仓库里应能读到 logo");
+  const color = renderTermScheduleSVG({
+    courses: fixtureCourses(),
+    termLabel: TERM_LABEL,
+    style: "color",
+    logoDataUri: logo,
+  });
+  assert.ok(color.svg.includes('href="data:image/png;base64,'), "color 落款嵌 logo");
+  const classic = renderTermScheduleSVG({
+    courses: fixtureCourses(),
+    termLabel: TERM_LABEL,
+    style: "classic",
+    logoDataUri: logo,
+  });
+  assert.ok(classic.svg.includes('clip-path="url(#sealClip)"'), "classic 印章嵌 logo");
+});
+
+test("PNG：2 倍宽光栅化出合法位图", () => {
+  const r = renderTermScheduleSVG({
+    courses: fixtureCourses(),
+    termLabel: TERM_LABEL,
+    style: "color",
+  });
+  const png = scheduleSvgToPng(r.svg, r.width * 2);
+  assert.ok(png.length > 1000, "PNG 应有实际内容");
+  assert.equal(png[0], 0x89);
+  assert.equal(png[1], 0x50); // \x89PNG 魔数
+  assert.ok(png.toString("latin1").includes("IHDR"), "PNG 头块");
+});
+
 // ── 网页直链端点 ────────────────────────────────────────────────────
 
 test("端点：无课表缓存时如实报错", async () => {
   const url = (await startChatWeb())!;
-  const res = await fetch(`${url}/api/schedule/svg?mode=term`);
+  const res = await fetch(`${url}/api/schedule/image?mode=term`);
   const body = (await res.json()) as { error?: string };
   assert.ok(body.error, "无缓存应返回 error 字段而不是空图");
 });
 
-test("端点：term 与指定周两种形态按 attachment 下发 SVG", async () => {
+test("端点：默认 PNG 彩色，SVG/经典风可显式指定", async () => {
   const url = (await startChatWeb())!;
   saveScheduleCache({
     year: 2026,
@@ -170,15 +241,24 @@ test("端点：term 与指定周两种形态按 attachment 下发 SVG", async ()
     courses: fixtureCourses(),
   });
 
-  const term = await fetch(`${url}/api/schedule/svg?mode=term`);
-  assert.match(term.headers.get("content-type") ?? "", /image\/svg\+xml/);
-  assert.match(term.headers.get("content-disposition") ?? "", /schedule-term-2026-1\.svg/);
-  const termSvg = await term.text();
-  assert.ok(termSvg.includes("最优化方法"));
+  const png = await fetch(`${url}/api/schedule/image?mode=term`);
+  assert.match(png.headers.get("content-type") ?? "", /image\/png/);
+  assert.match(png.headers.get("content-disposition") ?? "", /schedule-term-2026-1\.png/);
+  const pngBytes = Buffer.from(await png.arrayBuffer());
+  assert.equal(pngBytes[0], 0x89, "PNG 魔数");
+  assert.ok(pngBytes.length > 1000);
 
-  const week = await fetch(`${url}/api/schedule/svg?mode=week&week=2`);
-  assert.match(week.headers.get("content-disposition") ?? "", /schedule-week2-2026-1\.svg/);
-  const weekSvg = await week.text();
-  assert.ok(weekSvg.includes("第 2 周课表"), "单周图副标题要标周次");
-  assert.ok(!weekSvg.includes("体育"), "第 2 周双周无体育");
+  const week = await fetch(`${url}/api/schedule/image?mode=week&week=2`);
+  assert.match(week.headers.get("content-disposition") ?? "", /schedule-week2-2026-1\.png/);
+  const weekSvgText = (await fetch(`${url}/api/schedule/image?mode=week&week=2&format=svg`).then(
+    (r) => r.text(),
+  )) as string;
+  assert.ok(weekSvgText.includes("第 2 周课表"), "单周图副标题要标周次");
+  assert.ok(!weekSvgText.includes("体育"), "第 2 周双周无体育");
+
+  const classic = await fetch(`${url}/api/schedule/image?mode=term&format=svg&style=classic`);
+  assert.match(classic.headers.get("content-type") ?? "", /image\/svg\+xml/);
+  const classicSvg = await classic.text();
+  assert.ok(classicSvg.includes("最优化方法"));
+  assert.ok(classicSvg.includes("COURSERAPTOR · SCHEDULE"), "classic 页头品牌行保留");
 });

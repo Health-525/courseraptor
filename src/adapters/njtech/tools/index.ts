@@ -8,7 +8,7 @@
  * - grades.ts           成绩 / 考试 / 实验成绩（3）
  * - student.ts          学籍 / 已选 / 重修（3）
  * - news.ts             通知列表 / 正文 / 附件（3）
- * - calendar.ts         日历导出与发布、课表 SVG 图（3）
+ * - calendar.ts         日历导出与发布、课表图片（3）
  *
  * 抢课相关工具按 config.enableGrab 条件构建，而不是全建好再 delete——
  * 类型内容和运行时内容保持一致，TS 才帮得上忙。
