@@ -79,6 +79,12 @@ interface Skin {
   seal: boolean;
   /** 顶部朱砂细条（color 的品牌小节） */
   brandBar: boolean;
+  /** 画不画满格网格线（classic 红头档案要格线；color 卡片浮底、零格线噪音） */
+  gridLines: boolean;
+  /** 今天日头用朱砂胶囊垫名（color 的现代标记，替代整列铺底的唯一强调） */
+  todayPill: boolean;
+  /** 课格与所在格位边缘的留白 */
+  cardPad: number;
   margin: number;
   titleH: number;
   timeW: number;
@@ -92,7 +98,6 @@ interface Skin {
 }
 
 const GAP = 1; // 网格缝：底色透出来当格线（与网页 gap:1px 同款）
-const CARD_PAD = 4; // 课格与格线之间留白
 const CARD_GAP = 4; // 并排分栏之间的缝
 
 const SKINS: Record<ScheduleStyle, Skin> = {
@@ -118,6 +123,9 @@ const SKINS: Record<ScheduleStyle, Skin> = {
     dayFont: FONT_KAI,
     seal: true,
     brandBar: false,
+    gridLines: true,
+    todayPill: false,
+    cardPad: 4,
     margin: 28,
     titleH: 70,
     timeW: 88,
@@ -141,7 +149,7 @@ const SKINS: Record<ScheduleStyle, Skin> = {
     accentSoft: "#F6E3DD",
     todayCol: "#F8E7DA",
     card: "#FFFFFF",
-    cardRadius: 6,
+    cardRadius: 8,
     cardShadow: false,
     titleFont: FONT_SANS,
     nameFont: FONT_SANS,
@@ -151,6 +159,9 @@ const SKINS: Record<ScheduleStyle, Skin> = {
     dayFont: FONT_SANS,
     seal: false,
     brandBar: true,
+    gridLines: false,
+    todayPill: true,
+    cardPad: 5,
     margin: 20,
     titleH: 50,
     timeW: 76,
@@ -348,11 +359,9 @@ function courseCard(opts: {
 }): string {
   const { x, y, w, h, course, withWeeks, skin, style } = opts;
   const inner = w - 8 - 3;
-  // 并排分栏的窄卡放不下「地点 · 教师」整行时优先保地点（教师名让位）
-  const narrow = w < skin.dayW * 0.7;
-  const meta1 = narrow
-    ? course.location?.trim() || "地点待定"
-    : [course.location?.trim() || "地点待定", course.teacher?.trim()].filter(Boolean).join(" · ");
+  // 元信息只留地点（与 /schedule 网页课格同口径）：导出图是给同学自己
+  // 看的，教师名不参与找教室，窄格里的版面留给课名
+  const meta1 = course.location?.trim() || "地点待定";
   const meta2 = withWeeks ? weeksLabel(course.weeks) : "";
   const metas = [meta1, meta2].filter(Boolean);
 
@@ -483,7 +492,7 @@ function buildScheduleSvg(opts: {
   );
   if (s.brandBar) {
     // color 风格的品牌小节①：顶部一条朱砂细条（信笺口条），不抢课表主体
-    p.push(`<rect x="0" y="0" width="${width}" height="3" fill="${s.accent}"/>`);
+    p.push(`<rect x="0" y="0" width="${width}" height="2" fill="${s.accent}"/>`);
   }
   if (s.seal) {
     // classic 页头：朱砂印章（有 logo 嵌图、缺文件回退「课」字）+ 楷体学期名 + mono 副题 + 右侧时间戳
@@ -519,73 +528,122 @@ function buildScheduleSvg(opts: {
     );
   }
 
-  // 网格底色 + 外框（缝里透出的就是格线）
-  p.push(
-    `<rect x="${tableX}" y="${tableY}" width="${tableW}" height="${gridH}" fill="${s.gridRule}" stroke="${s.gridBorder}" stroke-width="1"/>`,
-    // 左上角「节次」
-    `<rect x="${tableX}" y="${tableY}" width="${s.timeW}" height="${s.headH}" fill="${s.bg}"/>`,
-    `<text x="${tableX + s.timeW - 8}" y="${tableY + s.headH / 2 + 4}" text-anchor="end" font-family="${FONT_MONO}" font-size="11" letter-spacing="2" fill="${s.ink3}">节次</text>`,
-  );
+  // ── 表格底盘：classic 满格网格线（缝透底当线）；color 零格线，卡片浮底 ──
+  if (s.gridLines) {
+    p.push(
+      `<rect x="${tableX}" y="${tableY}" width="${tableW}" height="${gridH}" fill="${s.gridRule}" stroke="${s.gridBorder}" stroke-width="1"/>`,
+      // 左上角「节次」
+      `<rect x="${tableX}" y="${tableY}" width="${s.timeW}" height="${s.headH}" fill="${s.bg}"/>`,
+      `<text x="${tableX + s.timeW - 8}" y="${tableY + s.headH / 2 + 4}" text-anchor="end" font-family="${FONT_MONO}" font-size="11" letter-spacing="2" fill="${s.ink3}">节次</text>`,
+    );
+  } else {
+    // color：今天列整列极淡底（帮视线追踪，强调交给日头胶囊），时间轨一条细竖线
+    const todayIdx = days.findIndex((d) => d.isToday);
+    if (todayIdx >= 0) {
+      p.push(
+        `<rect x="${tableX + s.timeW + GAP + todayIdx * dayPitch}" y="${tableY}" width="${s.dayW}" height="${gridH}" fill="${s.todayCol}"/>`,
+      );
+    }
+    p.push(
+      `<line x1="${tableX + s.timeW}" y1="${tableY}" x2="${tableX + s.timeW}" y2="${tableY + gridH}" stroke="${s.gridRule}" stroke-width="1"/>`,
+    );
+  }
 
   // 日头
   days.forEach((d, i) => {
     const x = tableX + s.timeW + GAP + i * dayPitch;
-    p.push(
-      `<rect x="${x}" y="${tableY}" width="${s.dayW}" height="${s.headH}" fill="${d.isToday ? s.todayCol : s.bg}"/>`,
-    );
-    if (d.isToday) {
-      p.push(`<rect x="${x}" y="${tableY}" width="${s.dayW}" height="2" fill="${s.accent}"/>`);
+    if (s.gridLines) {
+      p.push(
+        `<rect x="${x}" y="${tableY}" width="${s.dayW}" height="${s.headH}" fill="${d.isToday ? s.todayCol : s.bg}"/>`,
+      );
+      if (d.isToday) {
+        p.push(`<rect x="${x}" y="${tableY}" width="${s.dayW}" height="2" fill="${s.accent}"/>`);
+      }
+      const mainX = d.headerSub ? x + 10 : x + s.dayW / 2;
+      p.push(
+        `<text x="${mainX}" y="${tableY + (d.headerSub ? 19 : s.headH / 2 + 5)}" ${d.headerSub ? "" : 'text-anchor="middle"'} font-family="${s.dayFont}" font-size="15.5" fill="${d.isToday ? s.accentDeep : s.ink}">${esc(d.headerMain)}</text>`,
+      );
+      if (d.headerSub) {
+        p.push(
+          `<text x="${x + 10}" y="${tableY + 33}" font-family="${FONT_MONO}" font-size="10" fill="${s.ink3}">${esc(d.headerSub)}</text>`,
+        );
+      }
+      if (d.tag) {
+        const tagW = measure(d.tag, 9, 0.62) + 8;
+        p.push(
+          `<rect x="${x + s.dayW - tagW - 8}" y="${tableY + 8}" width="${tagW}" height="15" rx="2" fill="${s.accentSoft}"/>`,
+          `<text x="${x + s.dayW - tagW - 8 + tagW / 2}" y="${tableY + 19}" text-anchor="middle" font-family="${FONT_MONO}" font-size="9" fill="${s.accentDeep}">${esc(d.tag)}</text>`,
+        );
+      }
+      return;
     }
-    const mainX = d.headerSub ? x + 10 : x + s.dayW / 2;
-    p.push(
-      `<text x="${mainX}" y="${tableY + (d.headerSub ? 19 : s.headH / 2 + 5)}" ${d.headerSub ? "" : 'text-anchor="middle"'} font-family="${s.dayFont}" font-size="${style === "color" ? 13.5 : 15.5}" font-weight="${style === "color" ? 600 : 400}" fill="${d.isToday ? s.accentDeep : s.ink}">${esc(d.headerMain)}</text>`,
-    );
+    // color 日头：星期名居中 + 日期小字；今天朱砂胶囊垫名（白字）替代整列强调
+    const cx = x + s.dayW / 2;
+    if (d.isToday && s.todayPill) {
+      const pillW = measure(d.headerMain, 12.5, 0.56) + 18;
+      p.push(
+        `<rect x="${round1(cx - pillW / 2)}" y="${tableY + 3}" width="${round1(pillW)}" height="21" rx="10.5" fill="${s.accent}"/>`,
+        `<text x="${cx}" y="${tableY + 18}" text-anchor="middle" font-family="${s.dayFont}" font-size="12.5" font-weight="700" fill="#FFFFFF">${esc(d.headerMain)}</text>`,
+      );
+    } else {
+      p.push(
+        `<text x="${cx}" y="${tableY + 18}" text-anchor="middle" font-family="${s.dayFont}" font-size="13.5" font-weight="600" fill="${s.ink}">${esc(d.headerMain)}</text>`,
+      );
+    }
     if (d.headerSub) {
       p.push(
-        `<text x="${x + 10}" y="${tableY + 33}" font-family="${FONT_MONO}" font-size="10" fill="${s.ink3}">${esc(d.headerSub)}</text>`,
+        `<text x="${cx}" y="${tableY + 33}" text-anchor="middle" font-family="${FONT_MONO}" font-size="9.5" fill="${d.isToday ? s.accentDeep : s.ink3}">${esc(d.headerSub)}</text>`,
       );
     }
     if (d.tag) {
-      const tagW = measure(d.tag, 9, 0.62) + 8;
+      const tagW = measure(d.tag, 9, 0.62) + 10;
       p.push(
-        `<rect x="${x + s.dayW - tagW - 8}" y="${tableY + 8}" width="${tagW}" height="15" rx="2" fill="${s.accentSoft}"/>`,
-        `<text x="${x + s.dayW - tagW - 8 + tagW / 2}" y="${tableY + 19}" text-anchor="middle" font-family="${FONT_MONO}" font-size="9" fill="${s.accentDeep}">${esc(d.tag)}</text>`,
+        `<rect x="${x + s.dayW - tagW - 4}" y="${tableY + 4}" width="${tagW}" height="15" rx="7.5" fill="${s.accentSoft}"/>`,
+        `<text x="${x + s.dayW - tagW - 4 + tagW / 2}" y="${tableY + 15}" text-anchor="middle" font-family="${FONT_MONO}" font-size="9" fill="${s.accentDeep}">${esc(d.tag)}</text>`,
       );
     }
   });
 
-  // 节次列 + 空格底（今天列铺底）
+  // 节次列（classic 另画格底；color 只有文字，无格线）
   for (let period = 1; period <= periodCount; period++) {
     const y = tableY + s.headH + GAP + (period - 1) * rowPitch;
     const range = periodTimes[String(period)];
-    p.push(
-      `<rect x="${tableX}" y="${y}" width="${s.timeW}" height="${s.rowH}" fill="${s.bg}"/>`,
-      `<text x="${tableX + s.timeW - 8}" y="${y + s.rowH / 2 - 3}" text-anchor="end" font-family="${FONT_MONO}" font-size="12" fill="${s.ink2}">${period}</text>`,
-    );
+    if (s.gridLines) {
+      p.push(
+        `<rect x="${tableX}" y="${y}" width="${s.timeW}" height="${s.rowH}" fill="${s.bg}"/>`,
+        `<text x="${tableX + s.timeW - 8}" y="${y + s.rowH / 2 - 3}" text-anchor="end" font-family="${FONT_MONO}" font-size="12" fill="${s.ink2}">${period}</text>`,
+      );
+    } else {
+      p.push(
+        `<text x="${tableX + s.timeW - 8}" y="${y + s.rowH / 2 - 3}" text-anchor="end" font-family="${FONT_MONO}" font-size="11.5" fill="${s.ink2}">${period}</text>`,
+      );
+    }
     if (range) {
       p.push(
         `<text x="${tableX + s.timeW - 8}" y="${y + s.rowH / 2 + 12}" text-anchor="end" font-family="${FONT_MONO}" font-size="9" fill="${s.ink3}">${esc(range)}</text>`,
       );
     }
-    days.forEach((d, i) => {
-      const x = tableX + s.timeW + GAP + i * dayPitch;
-      p.push(
-        `<rect x="${x}" y="${y}" width="${s.dayW}" height="${s.rowH}" fill="${d.isToday ? s.todayCol : s.bg}"/>`,
-      );
-    });
+    if (s.gridLines) {
+      days.forEach((d2, i2) => {
+        const x = tableX + s.timeW + GAP + i2 * dayPitch;
+        p.push(
+          `<rect x="${x}" y="${y}" width="${s.dayW}" height="${s.rowH}" fill="${d2.isToday ? s.todayCol : s.bg}"/>`,
+        );
+      });
+    }
   }
 
   // 整列放假（周模式）：虚线框 + 竖排名（旋转 90° 的「国庆节 放假」）
   days.forEach((d, i) => {
     if (!d.holiday) return;
     const x = tableX + s.timeW + GAP + i * dayPitch;
-    const top = tableY + s.headH + GAP + CARD_PAD;
-    const h = gridH - s.headH - GAP - CARD_PAD * 2;
+    const top = tableY + s.headH + GAP + s.cardPad;
+    const h = gridH - s.headH - GAP - s.cardPad * 2;
     const label = `${d.holiday} 放假`;
     // rotate(-90) 后基线竖直、字形向基线左侧延伸，中心点右移半个字高才居中
     const cx = x + s.dayW / 2 + 7.5;
     p.push(
-      `<rect x="${x + CARD_PAD}" y="${top}" width="${s.dayW - CARD_PAD * 2}" height="${h}" rx="3" fill="none" stroke="${s.gridBorder}" stroke-dasharray="4 3"/>`,
+      `<rect x="${x + s.cardPad}" y="${top}" width="${s.dayW - s.cardPad * 2}" height="${h}" rx="${style === "color" ? 8 : 3}" fill="none" stroke="${s.gridBorder}" stroke-dasharray="4 3"/>`,
       `<text x="${cx}" y="${top + h / 2}" text-anchor="middle" font-family="${FONT_KAI}" font-size="15" letter-spacing="3" fill="${s.accentDeep}" transform="rotate(-90 ${cx} ${top + h / 2})">${esc(label)}</text>`,
     );
   });
@@ -595,10 +653,10 @@ function buildScheduleSvg(opts: {
     if (d.holiday) return;
     const x = tableX + s.timeW + GAP + i * dayPitch;
     for (const sl of d.slots) {
-      const colW = (s.dayW - CARD_PAD * 2 - (sl.cols - 1) * CARD_GAP) / sl.cols;
-      const cx = x + CARD_PAD + sl.col * (colW + CARD_GAP);
-      const top = tableY + s.headH + GAP + (sl.start - 1) * rowPitch + CARD_PAD;
-      const h = (sl.end - sl.start + 1) * rowPitch - GAP - CARD_PAD * 2;
+      const colW = (s.dayW - s.cardPad * 2 - (sl.cols - 1) * CARD_GAP) / sl.cols;
+      const cx = x + s.cardPad + sl.col * (colW + CARD_GAP);
+      const top = tableY + s.headH + GAP + (sl.start - 1) * rowPitch + s.cardPad;
+      const h = (sl.end - sl.start + 1) * rowPitch - GAP - s.cardPad * 2;
       p.push(
         courseCard({
           x: round1(cx),

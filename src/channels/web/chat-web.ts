@@ -536,7 +536,12 @@ const FILE_MIME: Record<string, string> = {
   ".csv": "text/csv; charset=utf-8",
   ".txt": "text/plain; charset=utf-8",
   ".md": "text/markdown; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml; charset=utf-8",
 };
+
+/** 这些类型浏览器能直接看：聊天里点开是预览而不是塞进下载夹（图片长按/右键即存） */
+const INLINE_MIME = new Set(["image/png", "image/svg+xml; charset=utf-8", "application/pdf"]);
 
 /** 工具产物路径是否确实落在 generated 目录内（与 QQ 桥 sendFile 同一道护栏） */
 function insideGenerated(filePath: string): boolean {
@@ -575,12 +580,13 @@ async function serveGeneratedFile(rawName: string, res: http.ServerResponse): Pr
     const stat = await fs.promises.stat(target);
     if (!stat.isFile()) throw new Error("not a file");
     const mime = FILE_MIME[path.extname(name).toLowerCase()] ?? "application/octet-stream";
-    // 文件名常含中文：ASCII 兜底 + RFC 5987 编码双写
+    // 文件名常含中文：ASCII 兜底 + RFC 5987 编码双写；图片/PDF 用 inline 让浏览器直接看
     const ascii = name.replace(/[^\x20-\x7E]/g, "_").replace(/"/g, "");
+    const disposition = INLINE_MIME.has(mime) ? "inline" : "attachment";
     res.writeHead(200, {
       "content-type": mime,
       "content-length": buf.length,
-      "content-disposition": `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+      "content-disposition": `${disposition}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`,
       "cache-control": "no-store",
     });
     res.end(buf);
@@ -977,9 +983,9 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return;
     }
     if (url === "/api/schedule/image" || url.startsWith("/api/schedule/image?")) {
-      // 课表图片直链下载（/schedule 页按钮）：只读本地缓存渲染，零登录零模型，
-      // 与对话工具 export_schedule_image 同一渲染器。默认 PNG 彩色课格（手机
-      // 直接存图），format=svg/style=classic 可换矢量或红头档案风。直链与待办 .ics 同款
+      // 课表图片直链（/schedule 页按钮）：只读本地缓存渲染，零登录零模型，
+      // 与对话工具 export_schedule_image 同一渲染器。默认 PNG 彩色课格。
+      // 默认 inline——浏览器/手机直接看图（长按或右键另存），?download=1 才强制下载
       const params = new URL(url, "http://127.0.0.1").searchParams;
       const mode = params.get("mode") === "week" ? "week" : "term";
       const format = params.get("format") === "svg" ? "svg" : "png";
@@ -1039,14 +1045,14 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         const png = scheduleSvgToPng(svg, svgWidth * 2);
         res.writeHead(200, {
           "content-type": "image/png",
-          "content-disposition": `attachment; filename="${filename}.png"`,
+          "content-disposition": `${params.get("download") === "1" ? "attachment" : "inline"}; filename="${filename}.png"`,
           "cache-control": "no-store",
         });
         res.end(png);
       } else {
         res.writeHead(200, {
           "content-type": "image/svg+xml; charset=utf-8",
-          "content-disposition": `attachment; filename="${filename}.svg"`,
+          "content-disposition": `${params.get("download") === "1" ? "attachment" : "inline"}; filename="${filename}.svg"`,
           "cache-control": "no-store",
         });
         res.end(svg);

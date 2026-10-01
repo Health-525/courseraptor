@@ -2,7 +2,7 @@
  * 课表 SVG 导出测试
  *
  * 钉住的行为：
- * 1. term 整学期汇总：课格带课名/地点/教师/周次，XML 正确转义；
+ * 1. term 整学期汇总：课格带课名/地点/周次（不带教师名），XML 正确转义；
  * 2. 同一时段不同周次的课（冲突）并排分栏，计数值如实；
  * 3. 无节次课程落脚注不入格；周末没课的尾列自动收掉；
  * 4. week 单周：放假日清空并画竖排放假块、调休按被补周几换课表、
@@ -77,7 +77,7 @@ function assertWellFormed(svg: string): void {
 
 // ── term 整学期汇总 ─────────────────────────────────────────────────
 
-test("term：课名/地点/教师/周次入图，XML 转义正确", () => {
+test("term：课名/地点/周次入图（不带教师名），XML 转义正确", () => {
   const r = renderTermScheduleSVG({
     courses: fixtureCourses(),
     termLabel: TERM_LABEL,
@@ -86,7 +86,8 @@ test("term：课名/地点/教师/周次入图，XML 转义正确", () => {
   assertWellFormed(r.svg);
   assert.ok(r.svg.includes(TERM_LABEL));
   assert.ok(r.svg.includes("最优化方法"));
-  assert.ok(r.svg.includes("仁智楼518 · 张三"), "地点与教师合并成一行元信息");
+  assert.ok(r.svg.includes("仁智楼518"), "地点是元信息主体");
+  assert.ok(!r.svg.includes("张三"), "导出图不带教师名");
   assert.ok(r.svg.includes("1-16周"), "周次原文要标注周");
   assert.ok(r.svg.includes("&lt;提高班&gt;"), "课名中的尖括号必须转义");
   assert.ok(!r.svg.includes("<提高班>"), "不允许裸尖括号内容");
@@ -186,9 +187,11 @@ test("color：每门课稳定配色，品牌小字落款与顶条在场", () => 
   assert.ok(colorOf(r.svg), "term 图里应能找到课格底色");
   assert.equal(colorOf(r.svg), colorOf(w.svg), "同一门课跨形态颜色稳定");
   // 品牌元素：顶部朱砂条 + 右下落款小字
-  assert.ok(r.svg.includes('height="3" fill="#AD392C"'), "顶部朱砂细条");
+  assert.ok(r.svg.includes('height="2" fill="#AD392C"'), "顶部朱砂细条");
   assert.ok(r.svg.includes("COURSERAPTOR · 生成于"), "底部小字落款");
   assert.ok(r.svg.includes("Microsoft YaHei"), "color 风格用黑体系而非楷体");
+  // 最佳实践版式：零网格线——不再有满格底盘（gridRule 底色外框）
+  assert.ok(!r.svg.includes('fill="#F0EDE6" stroke='), "color 不画网格底盘");
 });
 
 test("color+logo：logo 以 data URI 嵌入（印章与落款）", () => {
@@ -232,7 +235,7 @@ test("端点：无课表缓存时如实报错", async () => {
   assert.ok(body.error, "无缓存应返回 error 字段而不是空图");
 });
 
-test("端点：默认 PNG 彩色，SVG/经典风可显式指定", async () => {
+test("端点：默认 PNG 彩色且 inline 可预览，download=1 才强制下载", async () => {
   const url = (await startChatWeb())!;
   saveScheduleCache({
     year: 2026,
@@ -243,10 +246,19 @@ test("端点：默认 PNG 彩色，SVG/经典风可显式指定", async () => {
 
   const png = await fetch(`${url}/api/schedule/image?mode=term`);
   assert.match(png.headers.get("content-type") ?? "", /image\/png/);
-  assert.match(png.headers.get("content-disposition") ?? "", /schedule-term-2026-1\.png/);
+  assert.match(
+    png.headers.get("content-disposition") ?? "",
+    /^inline; .*schedule-term-2026-1\.png/,
+  );
   const pngBytes = Buffer.from(await png.arrayBuffer());
   assert.equal(pngBytes[0], 0x89, "PNG 魔数");
   assert.ok(pngBytes.length > 1000);
+
+  const dl = await fetch(`${url}/api/schedule/image?mode=term&download=1`);
+  assert.match(
+    dl.headers.get("content-disposition") ?? "",
+    /^attachment; .*schedule-term-2026-1\.png/,
+  );
 
   const week = await fetch(`${url}/api/schedule/image?mode=week&week=2`);
   assert.match(week.headers.get("content-disposition") ?? "", /schedule-week2-2026-1\.png/);
@@ -261,4 +273,5 @@ test("端点：默认 PNG 彩色，SVG/经典风可显式指定", async () => {
   const classicSvg = await classic.text();
   assert.ok(classicSvg.includes("最优化方法"));
   assert.ok(classicSvg.includes("COURSERAPTOR · SCHEDULE"), "classic 页头品牌行保留");
+  assert.ok(classicSvg.includes('fill="#E1DCCF" stroke='), "classic 保留满格网格底盘");
 });
