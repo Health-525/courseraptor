@@ -90,7 +90,8 @@ export function drainGeneratedRound(roundId: string): DeliverableFile[] {
   return out;
 }
 
-function sanitize(name: string): string {
+/** 文件名净化（去非法字符、收敛空白、限长）；模型自拟的文件名也走同一道闸 */
+export function sanitizeFileBase(name: string): string {
   const cleaned = name
     .replace(/[\\/:*?"<>|\r\n\t]+/g, "")
     .replace(/\s+/g, " ")
@@ -122,7 +123,7 @@ export async function generateAndSave(
   const ext = FORMAT_EXT[spec.format];
   const given = opts?.filename?.trim();
   const baseRaw = given ? stripExt(given) : suggestBaseName(spec);
-  const base = sanitize(baseRaw);
+  const base = sanitizeFileBase(baseRaw);
   const filePath = uniquePath(dir, base, ext);
   await fsp.writeFile(filePath, buffer);
   const file: GeneratedFile = {
