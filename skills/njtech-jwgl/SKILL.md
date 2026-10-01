@@ -119,3 +119,4 @@ agent 已内置 31 个工具，其中 NJTech 教务相关工具的名称与语�
 
 - 本技能是 `src/adapters/njtech` 的**只读封装**：不要在本技能里复制教务协议逻辑，改了要同步回 `src/adapters/njtech`。
 - 新增查询能力时，优先在 `src/adapters/njtech` 暴露纯函数，再在 `scripts/query.ts` 加一个薄命令。
+- 发布独立包：`npm run package:skill` → `dist/skill/njtech-jwgl/`（整目录拷进 `~/.workbuddy/skills/` 即用）+ `dist/njtech-jwgl-skill-v*.zip`。独立包的 SKILL.md / README / .env.example 在 `package/` 下维护，随打包复制；`tests/skill-package.test.ts` 钉住自包含与无泄漏契约。
