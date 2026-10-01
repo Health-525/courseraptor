@@ -1,5 +1,5 @@
 /**
- * 日历工具：export_calendar（本机 .ics）/ publish_calendar（GitHub/Gitee 发布，手机订阅）
+ * 日历与课表图工具：export_calendar（本机 .ics）/ publish_calendar（GitHub/Gitee 发布，手机订阅）/ export_schedule_svg（课表 SVG 图）
  */
 
 import fsp from "node:fs/promises";
@@ -13,6 +13,8 @@ import { generatedDir, recordDeliverable, uniquePath } from "../../../core/docum
 import { publishCalendarToGitee } from "../../../core/gitee-publish";
 import { publishCalendarToGithub } from "../../../core/github-publish";
 import type { CourseData, ExamData } from "../../../core/model";
+import { renderTermScheduleSVG, renderWeekScheduleSVG } from "../../../core/schedule-svg";
+import { school } from "../../../core/school";
 import {
   fetchExamsSmart,
   fetchScheduleSmart,
@@ -137,6 +139,92 @@ export const calendarTools = {
           !g.courses.length && !g.exams.length
             ? "课表与考试均已查通但本学期无数据，日历里只有假期标记（如有）"
             : undefined,
+      };
+    },
+  }),
+
+  /** 课表 SVG 导出（整学期汇总 / 单周） */
+  export_schedule_svg: tool({
+    description:
+      "把课表导出为 SVG 矢量图（红头档案风格周网格：节次×星期、课名/地点/教师、周次标注）。两种形态：term=整学期汇总（默认，经典课表样式，课格标注「2-16周(单)」这类周次，适合做壁纸或打印）、week=单周实际课表（自动处理放假与调休补课，可指定周次，默认本周）。用户说「导出课表图片」「生成课表 SVG」「把课表做成图/壁纸」时调用。文件存 data/generated 并回绝对路径；SVG 放大不糊，浏览器/微信可直接打开。",
+    inputSchema: z.object({
+      mode: z
+        .enum(["term", "week"])
+        .default("term")
+        .describe("term=整学期汇总课表（默认）；week=某一教学周的实际课表（含放假调休）"),
+      week: z
+        .number()
+        .int()
+        .min(1)
+        .max(30)
+        .optional()
+        .describe("week 模式的教学周次（第几周）；不填则本周。term 模式忽略此参数"),
+      semester: z
+        .string()
+        .optional()
+        .describe("指定学期，格式如「2026-2027-1」；不填则自动探测最新学期"),
+    }),
+    execute: async ({ mode, week, semester }) => {
+      const g = await gatherCalendar(semester, "schedule");
+      if (!g.ok) return { error: `课表图导出失败：${g.error}` };
+
+      const semPart = `${g.term.year}-${g.term.semester === 3 ? 1 : 2}`;
+      let svgResult: ReturnType<typeof renderTermScheduleSVG>;
+      let base: string;
+      let resolvedWeek: number | undefined;
+
+      if (mode === "week") {
+        const terms = school().terms;
+        const current = terms.weekOf(g.term.year, g.term.semester);
+        const maxWeek = Math.max(1, ...g.courses.flatMap((c) => terms.expandWeeks(c.weeks)));
+        resolvedWeek = week ?? current?.week;
+        if (resolvedWeek == null) {
+          return {
+            error: `当前不在教学周内（${g.term.label}），请指定周次（1-${maxWeek}）再导出单周课表。`,
+          };
+        }
+        if (resolvedWeek > maxWeek) {
+          return { error: `本学期课表只到第 ${maxWeek} 周，没有第 ${resolvedWeek} 周的课。` };
+        }
+        const week1Monday = resolveWeek1Monday(g.term.year, g.term.semester).week1Monday;
+        svgResult = renderWeekScheduleSVG({
+          courses: g.courses,
+          week: resolvedWeek,
+          week1Monday,
+          termLabel: g.term.label,
+        });
+        base = `schedule-week${resolvedWeek}-${semPart}`;
+      } else {
+        svgResult = renderTermScheduleSVG({ courses: g.courses, termLabel: g.term.label });
+        base = `schedule-term-${semPart}`;
+      }
+
+      const dir = generatedDir();
+      await fsp.mkdir(dir, { recursive: true });
+      const filePath = uniquePath(dir, base, ".svg");
+      await fsp.writeFile(filePath, svgResult.svg, "utf8");
+      const file = {
+        filename: path.basename(filePath),
+        filePath,
+        bytes: Buffer.byteLength(svgResult.svg, "utf8"),
+      };
+      recordDeliverable(file);
+
+      const { counts } = svgResult;
+      return {
+        file,
+        term: g.term.label,
+        mode,
+        ...(resolvedWeek != null ? { week: resolvedWeek } : {}),
+        counts: {
+          课格: counts.cells,
+          课程条目: counts.courses,
+          ...(counts.splitSlots ? { 并排时段: counts.splitSlots } : {}),
+          ...(counts.unscheduled ? { 未排节次: counts.unscheduled } : {}),
+        },
+        usage:
+          "SVG 是矢量图，任意放大不糊：浏览器或微信直接打开即可看；做壁纸/打印直接用，需要 PNG 时用浏览器打开截图即可。",
+        note: !g.courses.length ? "本学期课表为空，图里只有空网格" : undefined,
       };
     },
   }),
