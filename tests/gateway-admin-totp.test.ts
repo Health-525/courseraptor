@@ -400,3 +400,67 @@ test("MFA 恢复码重生成：需验码、旧码全作废、新码可用", asyn
   assert.equal((await adminLogin(base, "admin-master-pw", firstSet[0])).status, 401);
   assert.equal((await adminLogin(base, "admin-master-pw", secondSet[0])).status, 200);
 });
+
+// ── 高危 TOTP 接口的防爆破节流 ─────────────────────────────────
+// 回归背景：/totp/disable 与 /totp/recovery 此前只 recordFailure 不
+// checkThrottle——会话被劫持的攻击者可无限制爆破 6 位动态码关闭两步验证。
+
+test("TOTP 高危接口：连续错码 5 次后第 6 次被锁定 429", async (t) => {
+  const backendPort = await startBackend(t);
+  const { base, registry } = await startGateway(t, backendPort);
+
+  const secret = totp.base32Encode(Buffer.from("throttle-secret-01"));
+  await registry.setAdminTotp({
+    secret,
+    enabledAt: new Date().toISOString(),
+    recovery: [],
+    lastUsedCounter: -1,
+    sessionEpoch: 1,
+  });
+  const cookie = await loginOk(base, secret);
+
+  const post = async (code: string) =>
+    fetch(`${base}/admin/api/totp/disable`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ code }),
+    });
+
+  for (let i = 1; i <= 5; i++) {
+    const res = await post("000000");
+    assert.equal(res.status, 401, `第 ${i} 次错码应 401`);
+  }
+  const locked = await post("000000");
+  assert.equal(locked.status, 429, "第 6 次必须被锁定（429），不能继续放行爆破");
+  const body = (await locked.json()) as { retryAfterSec?: number };
+  assert.ok(body.retryAfterSec && body.retryAfterSec > 0, "429 应带剩余锁定秒数");
+});
+
+test("TOTP 高危接口：recovery 重生成同样受节流保护", async (t) => {
+  const backendPort = await startBackend(t);
+  const { base, registry } = await startGateway(t, backendPort);
+
+  const secret = totp.base32Encode(Buffer.from("throttle-secret-02"));
+  await registry.setAdminTotp({
+    secret,
+    enabledAt: new Date().toISOString(),
+    recovery: [],
+    lastUsedCounter: -1,
+    sessionEpoch: 1,
+  });
+  const cookie = await loginOk(base, secret);
+
+  const post = async (code: string) =>
+    fetch(`${base}/admin/api/totp/recovery`, {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie },
+      body: JSON.stringify({ code }),
+    });
+
+  for (let i = 1; i <= 5; i++) {
+    const res = await post("111111");
+    assert.equal(res.status, 401);
+  }
+  const locked = await post("111111");
+  assert.equal(locked.status, 429, "recovery 重生成第 6 次错码也必须锁定");
+});

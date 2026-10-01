@@ -214,6 +214,13 @@ export function createAdminUi({
 
   function recordFailure(ip) {
     const now = Date.now();
+    // 过期条目清理：30 分钟无新失败即清零——否则几天前的 4 次 + 今天 1 次
+    // 就把正常管理员锁在门外；也让 Map 不随历史 IP 无限膨胀
+    for (const [key, rec] of failures) {
+      if (rec.lockedUntil <= now && now - rec.lastAt > FAILURE_IDLE_MS) failures.delete(key);
+    }
+    // 兜底上限：海量伪造来源 IP 不该让 Map 无限增长（清理后仍超限则整体重置）
+    if (failures.size > 1000) failures.clear();
     const record = failures.get(ip);
     const count = (record?.count ?? 0) + 1;
     const lockedUntil = count >= FAILURES_TO_LOCK ? now + LOCK_DURATION_MS : 0;
@@ -552,6 +559,16 @@ export function createAdminUi({
         sendJson(res, 400, { error: "两步验证未启用" });
         return true;
       }
+      // 高危动作必须先查锁定：此前只 recordFailure 不 checkThrottle，
+      // 会话被劫持的攻击者可以无限制爆破 6 位动态码来关闭两步验证
+      const lockSec = checkThrottle(ip);
+      if (lockSec > 0) {
+        sendJson(res, 429, {
+          error: `尝试次数过多，请 ${lockSec} 秒后再试`,
+          retryAfterSec: lockSec,
+        });
+        return true;
+      }
       const body = await readJsonBody(req);
       const verdict = await verifyAdminCode(doc, body.code);
       if (!verdict.ok) {
@@ -574,6 +591,15 @@ export function createAdminUi({
       const doc = await registry.getAdminTotp();
       if (!doc) {
         sendJson(res, 400, { error: "两步验证未启用" });
+        return true;
+      }
+      // 同 /totp/disable：重生成恢复码也是高危动作，先查锁定再验码
+      const lockSec = checkThrottle(ip);
+      if (lockSec > 0) {
+        sendJson(res, 429, {
+          error: `尝试次数过多，请 ${lockSec} 秒后再试`,
+          retryAfterSec: lockSec,
+        });
         return true;
       }
       const body = await readJsonBody(req);

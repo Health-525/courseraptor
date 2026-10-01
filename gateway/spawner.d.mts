@@ -24,3 +24,15 @@ export function createSpawner(options: {
   reapIntervalMs?: number;
   nodeExec?: string;
 }): Spawner;
+
+export function buildInstanceEnv(
+  sourceEnv: Record<string, string | undefined>,
+  options: {
+    port: number;
+    dataDir: string;
+    credFile: string;
+    siteKey?: string;
+    fallbackKey?: string;
+    forceSite?: boolean;
+  },
+): Record<string, string>;

@@ -35,11 +35,32 @@ function verifyPassword(stored, password) {
   }
 }
 
-async function readJson(file, fallback) {
+/**
+ * 读取状态 JSON。
+ * - 文件不存在：按 fallback 起步（正常首启）
+ * - 文件存在但损坏：strict=true（账本类：users/invites/resets）必须抛错——
+ *   回退空表会被下一次写盘落成真空表，全部账号无备份丢失（数据清空放大器）；
+ *   strict=false（admin-totp 等）按 fallback 处理，损坏不把管理台锁死
+ */
+async function readJson(file, fallback, { strict = false } = {}) {
+  let text;
   try {
-    return JSON.parse(await readFile(file, "utf8"));
-  } catch {
-    return fallback;
+    text = await readFile(file, "utf8");
+  } catch (e) {
+    if (e?.code === "ENOENT") return fallback;
+    throw e;
+  }
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    if (!strict) {
+      console.error(`[registry] 状态文件损坏，按缺省处理：${path.basename(file)}`);
+      return fallback;
+    }
+    throw new Error(
+      `状态文件损坏（${path.basename(file)}）：${e?.message ?? e}。已拒绝读取以防空表覆盖落盘，` +
+        "请人工修复该文件（或从备份恢复）后重启网关",
+    );
   }
 }
 
@@ -63,11 +84,11 @@ export function createRegistry({ stateDir }) {
     await rename(temp, file);
   }
 
-  const readUsers = () => readJson(usersFile, { users: [] });
+  const readUsers = () => readJson(usersFile, { users: [] }, { strict: true });
   const writeUsers = (users) => writeAtomic(usersFile, JSON.stringify({ users }, null, 2));
-  const readInvites = () => readJson(invitesFile, { invites: [] });
+  const readInvites = () => readJson(invitesFile, { invites: [] }, { strict: true });
   const resetsFile = path.join(stateDir, "reset-requests.json");
-  const readResets = () => readJson(resetsFile, { requests: [], codes: [] });
+  const readResets = () => readJson(resetsFile, { requests: [], codes: [] }, { strict: true });
   const writeResets = (store) => writeAtomic(resetsFile, JSON.stringify(store, null, 2));
   const writeInvites = (invites) => writeAtomic(invitesFile, JSON.stringify({ invites }, null, 2));
 

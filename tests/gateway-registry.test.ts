@@ -102,3 +102,31 @@ test("当日用量：累加并按日期自动清零", async () => {
   assert.equal(await registry.turnsToday(user.id), 0, "旧日期计数应视为清零");
   assert.equal(await registry.addTurns(user.id, 1), 1);
 });
+
+// ── 状态文件损坏防护（数据清空放大器）────────────────────────────
+// 回归背景：readJson 此前对损坏 JSON 静默回退空表，下一位同学的写入会把
+// 空表落盘——全部账号/邀请码无备份地丢失。现在损坏必须显式拒绝。
+
+test("注册表：users.json 损坏时拒绝读取（防空表覆盖落盘），不再静默清空", async () => {
+  const { registry, stateDir } = makeRegistry();
+  await registry.createUser({ username: "student01", password: "password123" });
+
+  fs.writeFileSync(path.join(stateDir, "users.json"), "{corrupted!!");
+  await assert.rejects(() => registry.listUsers(), /损坏/);
+
+  // 修复后恢复
+  fs.writeFileSync(path.join(stateDir, "users.json"), JSON.stringify({ users: [] }));
+  assert.equal((await registry.listUsers()).length, 0);
+});
+
+test("注册表：invites.json 损坏同样拒绝读取", async () => {
+  const { registry, stateDir } = makeRegistry();
+  fs.writeFileSync(path.join(stateDir, "invites.json"), "not json at all");
+  await assert.rejects(() => registry.listInvites(), /损坏/);
+});
+
+test("注册表：文件不存在（首启）仍按空表起步，不受损坏防护影响", async () => {
+  const { registry } = makeRegistry();
+  assert.equal((await registry.listUsers()).length, 0);
+  assert.equal((await registry.listInvites()).length, 0);
+});

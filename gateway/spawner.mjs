@@ -23,6 +23,64 @@ const SPAWN_TIMEOUT_MS = 30_000;
 const MAX_RESTARTS = 1;
 const UPTIME_RESET_MS = 10 * 60_000;
 
+/**
+ * 子实例环境变量白名单：实例是跑在同学会话里的 AI Agent，任何工具代码都能
+ * 读进程 env——绝不能把 GATEWAY_SECRET / GATEWAY_ADMIN_PASSWORD /
+ * GATEWAY_UPDATE_TOKEN 这类网关凭据透传进去（拿了就能登录 /admin、踢任意
+ * 同学下线）。只带运行时与系统必需项，网关自身的配置一概不给。
+ */
+const ENV_ALLOWLIST = [
+  "PATH",
+  "PATHEXT",
+  "SYSTEMROOT",
+  "SystemRoot",
+  "SYSTEMDRIVE",
+  "SystemDrive",
+  "TEMP",
+  "TMP",
+  "TMPDIR",
+  "COMSPEC",
+  "ComSpec",
+  "HOME",
+  "USERPROFILE",
+  "APPDATA",
+  "LOCALAPPDATA",
+  "USERNAME",
+  "COMPUTERNAME",
+  "LANG",
+  "LC_ALL",
+  "TZ",
+  "NUMBER_OF_PROCESSORS",
+  "PROCESSOR_ARCHITECTURE",
+  "NODE_ENV",
+];
+
+/**
+ * 构造子实例环境变量（白名单 + 注入项）。独立导出以便单测断言
+ * 「网关凭据绝不进子实例」。
+ */
+export function buildInstanceEnv(
+  sourceEnv,
+  { port, dataDir, credFile, siteKey = "", fallbackKey = "", forceSite = false },
+) {
+  const env = {};
+  for (const key of ENV_ALLOWLIST) {
+    if (sourceEnv[key] !== undefined) env[key] = sourceEnv[key];
+  }
+  env.RAPTOR_WEB_PORT = String(port);
+  env.RAPTOR_DATA_DIR = dataDir;
+  env.RAPTOR_CREDENTIALS_FILE = credFile;
+  env.RAPTOR_NO_UPDATE_CHECK = "1";
+  env.RAPTOR_NO_TODO_REMINDERS = "1";
+  // 混合 Key 模式：站点 Key（站点设置优先于构造兜底值）；同学在网页设置里
+  // 保存自己的 Key 后，凭证文件里的 override 优先级更高（src/core/config.ts
+  // 的解析顺序），无需此处感知
+  const effectiveKey = siteKey || fallbackKey;
+  if (effectiveKey) env.DEEPSEEK_API_KEY = effectiveKey;
+  if (forceSite) env.RAPTOR_DISABLE_DS_OVERRIDE = "1";
+  return env;
+}
+
 export function createSpawner({
   projectRoot,
   usersDir,
@@ -46,6 +104,8 @@ export function createSpawner({
 
   /** @type {Map<string, Instance>} */
   const instances = new Map();
+  /** 拉起中的互斥：并发 acquire 同一用户共享同一次拉起（TOCTOU 会产生孤儿双实例） */
+  const pendingSpawn = new Map();
 
   function pickPort() {
     for (let i = 0; i < 50; i++) {
@@ -93,20 +153,14 @@ export function createSpawner({
     const credFile = path.join(userDataDir(userId), "credentials.enc");
     mkdirSync(dataDir, { recursive: true });
     const port = pickPort();
-    const env = {
-      ...process.env,
-      RAPTOR_WEB_PORT: String(port),
-      RAPTOR_DATA_DIR: dataDir,
-      RAPTOR_CREDENTIALS_FILE: credFile,
-      RAPTOR_NO_UPDATE_CHECK: "1",
-      RAPTOR_NO_TODO_REMINDERS: "1",
-    };
-    // 混合 Key 模式：默认注入站点统一 Key（站点设置优先于 env，由调用方取最新值
-    // 传入）；同学在网页设置里保存自己的 Key 后，凭证文件里的 override 优先级
-    // 更高（src/core/config.ts 的解析顺序），无需此处感知
-    const effectiveKey = siteKey || deepseekKey;
-    if (effectiveKey) env.DEEPSEEK_API_KEY = effectiveKey;
-    if (forceSite) env.RAPTOR_DISABLE_DS_OVERRIDE = "1";
+    const env = buildInstanceEnv(process.env, {
+      port,
+      dataDir,
+      credFile,
+      siteKey,
+      fallbackKey: deepseekKey,
+      forceSite,
+    });
 
     const child = spawn(nodeExec, ["--import", tsxUrl, "gateway/headless/entry.ts"], {
       cwd: projectRoot,
@@ -136,7 +190,9 @@ export function createSpawner({
     };
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
-      instance.rawStdout += chunk;
+      // rawStdout 只为就绪探测服务：ready 之后不再累积（活跃实例跑数小时
+      // 会积累可观内存），日志呈现走 recentLogs（封顶 30 条）
+      if (instance.port == null) instance.rawStdout += chunk;
       note(chunk);
     });
     child.stderr.setEncoding("utf8");
@@ -151,9 +207,12 @@ export function createSpawner({
       const effectiveRestarts =
         Date.now() - instance.startedAt > UPTIME_RESET_MS ? 0 : instance.restarts;
       if (effectiveRestarts < MAX_RESTARTS) {
-        void Promise.all([currentSiteKey(), forceSiteKey(userId)]).then(([key, force]) =>
-          spawnInstance(userId, effectiveRestarts + 1, key, force),
-        );
+        void Promise.all([currentSiteKey(), forceSiteKey(userId)])
+          .then(([key, force]) => spawnInstance(userId, effectiveRestarts + 1, key, force))
+          .catch((e) => {
+            // 自动重启失败（如端口段耗尽）：可见地记录，不留未处理 rejection
+            note(`自动重启失败：${e instanceof Error ? e.message : String(e)}`);
+          });
       }
     });
 
@@ -186,19 +245,37 @@ export function createSpawner({
   const spawner = {
     /** 拿到用户实例的端口；没起就拉起。满并发上限抛 QuotaError。 */
     async acquire(userId) {
-      let instance = instances.get(userId);
+      const instance = instances.get(userId);
       if (instance) {
         instance.lastRequestAt = Date.now();
-        return instance.port;
+        // 冷启动窗口（最长 30s）port 还是 null：必须等 ready 再返回——
+        // 否则 http.request({port:null}) 会打到 127.0.0.1:80，页面并行
+        // 加载的多个请求几乎必踩
+        return instance.port ?? (await instance.ready);
       }
-      if (instances.size >= maxConcurrent) {
+      // 同用户并发 acquire 共享同一次拉起：此前检查-拉起之间有异步间隙，
+      // 两个请求各拉一个，前一个被 instances.set 覆盖成孤儿进程（永不回收）
+      const pending = pendingSpawn.get(userId);
+      if (pending) return pending;
+      // 容量把「拉起中」也计入：不同用户并发通过检查会实际超出 maxConcurrent
+      if (instances.size + pendingSpawn.size >= maxConcurrent) {
         const err = new Error("当前在线的同学较多，请稍后再试");
         err.code = "ECONCURRENCY";
         throw err;
       }
-      instance = spawnInstance(userId, 0, await currentSiteKey(), await forceSiteKey(userId));
-      const port = await instance.ready;
-      return port;
+      const task = (async () => {
+        try {
+          const [siteKey, forceSite] = await Promise.all([currentSiteKey(), forceSiteKey(userId)]);
+          const it = spawnInstance(userId, 0, siteKey, forceSite);
+          const port = await it.ready;
+          it.lastRequestAt = Date.now();
+          return port;
+        } finally {
+          pendingSpawn.delete(userId);
+        }
+      })();
+      pendingSpawn.set(userId, task);
+      return task;
     },
 
     noteActivity(userId) {
