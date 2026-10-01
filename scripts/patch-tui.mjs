@@ -42,13 +42,14 @@ const applied = [];
 
 // ── 补丁 1：欢迎页 ────────────────────────────────────────────
 if (!source.includes("globalThis.__raptorWelcome")) {
-  // 空状态 return 的位置在 `_sections.length === 0` 分支里，
-  // 原版和旧版补丁只有 return 的内容不同，统一按这个锚点替换
-  // （锚点分组已含 "return "，这里只给表达式）
-  const anchor = /(_sections\)\.length === 0\) \{\n\s*return )[^;]+;/;
+  // 空状态只 return 一行 "Waiting for input..."。锚点不能用 `_sections).length`
+  // 这类私有字段写法：1.0.112 是 __privateGet(this, _sections)、1.0.117 起改为
+  // 原生 this.#sections，写法变过一轮导致补丁静默失效；按返回值字面量定位，
+  // 新旧 dist 都含这一行且全文件唯一。
+  const anchor = /return \["Waiting for input\.\.\."\];/;
   const next = patched.replace(
     anchor,
-    `$1(globalThis.__raptorWelcome ?? ${JSON.stringify(fallbackLines)});`,
+    `return (globalThis.__raptorWelcome ?? ${JSON.stringify(fallbackLines)});`,
   );
   if (next !== patched) {
     patched = next;
