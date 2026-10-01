@@ -1011,14 +1011,18 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     body { grid-template-columns: 1fr; }
     /* 窄屏推不动主区：大厅退回左侧滑入的整幅抽屉（小屏全出血、平板 420px），
        与会话抽屉同一侧——对齐豆包等手机端 App「面板从左侧出」的习惯，
-       也不在屏幕右侧留缝 */
+       也不在屏幕右侧留缝。
+       打开态用 transform:none 而不是 translateX(0)：iOS WebKit 的触摸滚动
+       在「带 transform 的祖先」子树里会整体失灵——抽屉停在 translateX(0)
+       时大厅/会话列表在 iPhone 上一根手指都滚不动；归零成 none 后滚动
+       容器脱离变换子树，滑入动画不受影响（none 按单位阵插值） */
     body.hall-open { grid-template-columns: 1fr; }
     .hall { position: fixed; top: 0; left: 0; bottom: var(--vkb, 0px); z-index: 45;
             width: min(420px, 100vw); transform: translateX(-103%);
             transition: transform .2s ease; border-left: 0;
             border-right: 1px solid var(--rule-2);
             box-shadow: 14px 0 36px rgba(38, 35, 29, .2); }
-    body.hall-open .hall { transform: translateX(0); }
+    body.hall-open .hall { transform: none; }
     body.hall-open .hall-backdrop { display: block; }
     /* 独立窗口/横屏时标题不顶进刘海 */
     .hall-head { padding-top: max(12px, env(safe-area-inset-top));
@@ -1029,7 +1033,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             padding-top: max(27px, env(safe-area-inset-top));
             padding-left: max(22px, env(safe-area-inset-left));
             box-shadow: 14px 0 36px rgba(38, 35, 29, .2); }
-    body.drawer-open aside { transform: translateX(0); }
+    body.drawer-open aside { transform: none; }
     body.drawer-open .drawer-backdrop { display: block; }
     .topbar { display: flex;
               /* 全面屏横屏时避开左右刘海；加到主屏桌面不引入任何视觉变化 */
