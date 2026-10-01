@@ -40,7 +40,10 @@ export function currentWeekOf(year: number, semester: number, now: Date = new Da
 }
 
 // ── NJTECH 节次时间表 ──────────────────────────────────────────
-// 南京工业大学标准作息时间（每节课45分钟，课间休息10分钟）
+// 南京工业大学标准作息时间（每节课45分钟，课间休息10分钟）。
+// 注意两处大间隔：上午 09:50-10:20 与 下午 15:40-16:10 都是 30 分钟
+// （2026-10 同学对照实际作息核对：下午第二节与第三节之间是 30 分钟，
+// 不是普通 10 分钟课间）。
 export const NJTECH_PERIOD_TIMES: Record<string, string> = {
   "1": "08:10-08:55",
   "2": "09:05-09:50",
@@ -48,15 +51,15 @@ export const NJTECH_PERIOD_TIMES: Record<string, string> = {
   "4": "11:15-12:00",
   "5": "14:00-14:45",
   "6": "14:55-15:40",
-  "7": "16:00-16:45",
-  "8": "16:55-17:40",
+  "7": "16:10-16:55",
+  "8": "17:05-17:50",
   "9": "19:00-19:45",
   "10": "19:55-20:40",
 };
 
 export const WEEKDAY_NAMES = ["", "周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
-/** 节次号 -> 上课时间段，如 [7,8] -> "16:00-17:40" */
+/** 节次号 -> 上课时间段，如 [7,8] -> "16:10-17:50" */
 export function periodTimeRange(periods: number[]): string | undefined {
   if (!periods.length) return undefined;
   const first = NJTECH_PERIOD_TIMES[String(periods[0])];
