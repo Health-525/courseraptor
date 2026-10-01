@@ -216,6 +216,9 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 /* 触屏：按钮双击不缩放、长按不弹选中（与对话页同一套手感规则） */
 button,.peek{touch-action:manipulation;-webkit-user-select:none;user-select:none}
 body{margin:0;min-height:100vh;min-height:100dvh;display:grid;place-items:center;
+/* safe center：小屏（SE）或键盘弹出时内容比视口高，普通 center 会把
+   顶部裁进不可滚出的负溢出区；不认 safe 的浏览器整行回落到上一条 */
+place-items:safe center;
 padding:34px 18px;background:var(--paper);color:var(--ink);
 font-family:var(--sans);font-size:16px;line-height:1.7;
 -webkit-font-smoothing:antialiased}
@@ -322,7 +325,7 @@ else { input.type = "password"; this.textContent = "显示"; }
       "登录",
       `${errorNotice(error)}<form method="post" action="/login">
 <h2>登 录<span class="en">SIGN IN</span></h2>
-<label>用户名 USERNAME</label><input name="username" autocomplete="username" required autofocus placeholder="学号或用户名">
+<label>用户名 USERNAME</label><input name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required autofocus placeholder="学号或用户名">
 <label>密码 PASSWORD</label>
 <div class="pw"><input name="password" type="password" autocomplete="current-password" required placeholder="登录密码">
 <button type="button" class="peek">显示</button></div>
@@ -338,14 +341,14 @@ else { input.type = "password"; this.textContent = "显示"; }
       `${notice ? `<div class="notice" style="background:var(--accent-soft)">${escapeHtml(notice)}</div>` : ""}${errorNotice(error)}
 <h2>申请重置<span class="en">REQUEST</span></h2>
 <form method="post" action="/forgot">
-<label>用户名 USERNAME</label><input name="username" autocomplete="username" required placeholder="你的登录用户名">
+<label>用户名 USERNAME</label><input name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required placeholder="你的登录用户名">
 <button type="submit" class="primary">提交申请</button>
 </form>
 <p class="lead" style="margin:10px 2px 0">提交后请到班级群联系管理员；管理员同意后会给你一个一次性重置码。</p>
 <h2>用重置码设新密码<span class="en">RESET</span></h2>
 <form method="post" action="/reset-password">
-<label>用户名 USERNAME</label><input name="username" autocomplete="username" required>
-<label>重置码 CODE</label><input name="code" required autocomplete="one-time-code" placeholder="管理员发给你的一串码">
+<label>用户名 USERNAME</label><input name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+<label>重置码 CODE</label><input name="code" required autocomplete="one-time-code" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="管理员发给你的一串码">
 <label>新密码 PASSWORD（至少 8 位）</label>
 <div class="pw"><input name="next" type="password" autocomplete="new-password" required placeholder="自己设一个，别告诉任何人">
 <button type="button" class="peek">显示</button></div>
@@ -363,8 +366,8 @@ else { input.type = "password"; this.textContent = "显示"; }
       "注册",
       `${errorNotice(error)}<form method="post" action="/register">
 <h2>注 册<span class="en">SIGN UP</span></h2>
-<label>邀请码 INVITE CODE</label><input name="invite" required autocomplete="off" autofocus placeholder="向管理员索取">
-<label>用户名 USERNAME（字母 / 数字 / _ / -，2-32 位）</label><input name="username" autocomplete="username" required placeholder="注册后用于登录">
+<label>邀请码 INVITE CODE</label><input name="invite" required autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" autofocus placeholder="向管理员索取">
+<label>用户名 USERNAME（字母 / 数字 / _ / -，2-32 位）</label><input name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required placeholder="注册后用于登录">
 <label>密码 PASSWORD（至少 8 位）</label>
 <div class="pw"><input name="password" type="password" autocomplete="new-password" required placeholder="至少 8 位">
 <button type="button" class="peek">显示</button></div>
