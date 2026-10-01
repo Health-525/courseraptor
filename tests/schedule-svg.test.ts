@@ -166,7 +166,7 @@ test("color：每门课稳定配色，品牌小字落款与顶条在场", () => 
   assertWellFormed(r.svg);
   // 课格用色盘底色（断言至少出现一个色盘值）
   assert.ok(
-    /#FCE7E3|#FCEBD9|#FAF1CC|#EDF5E0|#E4F3E4|#DFF1EE|#E3EDFA|#E5E9FA|#ECE7F8|#F9E5ED|#F1E8DD|#E7EBEF/.test(
+    /#FAE7E3|#FBEDDF|#FAF4D9|#F1F6E5|#EAF4E9|#E8F4F1|#E7F0F9|#ECEBF8|#F0EDF9|#F9ECF1|#F4EEE5|#F0F2F4/.test(
       r.svg,
     ),
     "彩色课格应使用色盘",
@@ -235,7 +235,7 @@ test("端点：无课表缓存时如实报错", async () => {
   assert.ok(body.error, "无缓存应返回 error 字段而不是空图");
 });
 
-test("端点：默认 PNG 彩色且 inline 可预览，download=1 才强制下载", async () => {
+test("端点：默认 PNG 红头档案且 inline 可预览，download=1 才强制下载", async () => {
   const url = (await startChatWeb())!;
   saveScheduleCache({
     year: 2026,

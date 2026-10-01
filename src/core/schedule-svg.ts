@@ -10,7 +10,7 @@
  *
  * 两套风格（style 参数）：
  * - classic 红头档案：暖纸底 + 墨字 + 单一朱砂 + 楷体课名，与 /schedule 网页同源
- * - color 彩色课格：每门课一个稳定柔和色块（WakeUp 式手机壁纸友好），
+ * - color 彩色课格：每门课一个稳定柔和色块（同亮度马卡龙底、文字一律墨色），
  *   品牌元素收敛成小节——顶部朱砂细条 + 底部「COURSERAPTOR · 生成于」小字
  *   落款，今天列与补课角标仍用朱砂，整体暖白底不脱离红头档案的血统
  *
@@ -28,24 +28,28 @@ const FONT_KAI = "KaiTi, STKaiti, Kaiti SC, Georgia, serif";
 const FONT_MONO = "ui-monospace, Cascadia Mono, Consolas, Liberation Mono, monospace";
 const FONT_SANS = "Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif";
 
-/** color 风格的课色盘：柔和底 + 同色系深字，12 个分离度大的色相轮转 */
+/**
+ * color 风格的课色盘：12 个同亮度（L≈92%）的马卡龙底色轮转。
+ * 关键实践：颜色只出现在卡片底，文字一律中性墨色——
+ * 彩色文字 + 彩色底是「花」的根源，统一亮度则怎么排都不打架。
+ */
 const COURSE_PALETTE = [
-  { bg: "#FCE7E3", fg: "#A83B2F" }, // 朱红（呼应品牌朱砂）
-  { bg: "#FCEBD9", fg: "#B0641D" }, // 杏橙
-  { bg: "#FAF1CC", fg: "#8C751B" }, // 芥黄
-  { bg: "#EDF5E0", fg: "#5A7D2F" }, // 黄绿
-  { bg: "#E4F3E4", fg: "#3E7B43" }, // 苔绿
-  { bg: "#DFF1EE", fg: "#2C7A6F" }, // 青
-  { bg: "#E3EDFA", fg: "#3C6EAD" }, // 天蓝
-  { bg: "#E5E9FA", fg: "#46539F" }, // 蓝紫
-  { bg: "#ECE7F8", fg: "#62519A" }, // 紫
-  { bg: "#F9E5ED", fg: "#A74D73" }, // 藕粉
-  { bg: "#F1E8DD", fg: "#7C5F41" }, // 岩棕
-  { bg: "#E7EBEF", fg: "#4E5A6B" }, // 灰蓝（无描边色块里底色要压得住暖白纸面）
+  "#FAE7E3", // 朱红（呼应品牌朱砂）
+  "#FBEDDF", // 杏橙
+  "#FAF4D9", // 芥黄
+  "#F1F6E5", // 黄绿
+  "#EAF4E9", // 苔绿
+  "#E8F4F1", // 青
+  "#E7F0F9", // 天蓝
+  "#ECEBF8", // 蓝紫
+  "#F0EDF9", // 紫
+  "#F9ECF1", // 藕粉
+  "#F4EEE5", // 岩棕
+  "#F0F2F4", // 灰蓝
 ] as const;
 
 /** djb2（与日历 UID 同款哈希）：课色随课名稳定，跨周/跨形态同课同色 */
-function courseColorOf(title: string): { bg: string; fg: string } {
+function courseColorOf(title: string): string {
   let h = 5381;
   for (let i = 0; i < title.length; i++) h = ((h << 5) + h + title.charCodeAt(i)) | 0;
   return COURSE_PALETTE[Math.abs(h) % COURSE_PALETTE.length];
@@ -149,7 +153,7 @@ const SKINS: Record<ScheduleStyle, Skin> = {
     accentSoft: "#F6E3DD",
     todayCol: "#F8E7DA",
     card: "#FFFFFF",
-    cardRadius: 8,
+    cardRadius: 9,
     cardShadow: false,
     titleFont: FONT_SANS,
     nameFont: FONT_SANS,
@@ -161,8 +165,8 @@ const SKINS: Record<ScheduleStyle, Skin> = {
     brandBar: true,
     gridLines: false,
     todayPill: true,
-    cardPad: 5,
-    margin: 20,
+    cardPad: 6,
+    margin: 24,
     titleH: 50,
     timeW: 76,
     dayW: 132,
@@ -373,9 +377,10 @@ function courseCard(opts: {
   const nameLines = fitLines(course.title, inner, skin.nameSize, nameMax);
 
   const color = style === "color" ? courseColorOf(course.title) : null;
-  const cardFill = color ? color.bg : skin.card;
-  const nameFill = color ? color.fg : skin.ink;
-  const metaFill = color ? color.fg : skin.ink3;
+  const cardFill = color ?? skin.card;
+  // 中性文字：颜色只在底，课名一律墨色，元信息比 classic 深一档灰
+  const nameFill = skin.ink;
+  const metaFill = color ? skin.ink2 : skin.ink3;
 
   const contentH = nameLines.length * skin.nameLh + (metas.length ? 4 + metaH : 0);
   let ty = y + (h - contentH) / 2 + skin.nameSize; // 首行基线
@@ -401,7 +406,7 @@ function courseCard(opts: {
   for (const m of metas) {
     for (const line of fitLines(m, inner, skin.metaSize, 1, skin.metaFactor)) {
       parts.push(
-        `<text x="${x + 8}" y="${(ty + 1).toFixed(1)}" font-family="${skin.metaFont}" font-size="${skin.metaSize}" fill="${metaFill}"${color ? ' fill-opacity="0.82"' : ""}>${esc(line)}</text>`,
+        `<text x="${x + 8}" y="${(ty + 1).toFixed(1)}" font-family="${skin.metaFont}" font-size="${skin.metaSize}" fill="${metaFill}">${esc(line)}</text>`,
       );
       ty += skin.metaLh;
     }
@@ -520,11 +525,11 @@ function buildScheduleSvg(opts: {
       `<line x1="${s.margin}" y1="${s.margin + 58}" x2="${width - s.margin}" y2="${s.margin + 58}" stroke="${s.gridBorder}" stroke-width="1"/>`,
     );
   } else {
-    // color 页头：粗体学期名 + 小字副题，日期戳靠右；品牌只在顶条与页脚小字
+    // color 页头：朱砂小竖条 + 学期名；右侧周次副题（时间戳只在页脚落款，不重复）
     p.push(
-      `<text x="${s.margin}" y="${s.margin + 24}" font-family="${s.titleFont}" font-size="16" font-weight="700" fill="${s.ink}">${esc(termLabel)}</text>`,
-      `<text x="${s.margin}" y="${s.margin + 42}" font-family="${FONT_MONO}" font-size="9.5" letter-spacing="1" fill="${s.ink3}">${esc(subtitle)}</text>`,
-      `<text x="${width - s.margin}" y="${s.margin + 42}" text-anchor="end" font-family="${FONT_MONO}" font-size="9.5" fill="${s.ink3}">${stampOf(now)}</text>`,
+      `<rect x="${s.margin}" y="${s.margin + 12}" width="4" height="18" rx="2" fill="${s.accent}"/>`,
+      `<text x="${s.margin + 12}" y="${s.margin + 27}" font-family="${s.titleFont}" font-size="16" font-weight="700" fill="${s.ink}">${esc(termLabel)}</text>`,
+      `<text x="${width - s.margin}" y="${s.margin + 27}" text-anchor="end" font-family="${s.titleFont}" font-size="11" font-weight="600" fill="${s.ink2}">${esc(subtitle)}</text>`,
     );
   }
 

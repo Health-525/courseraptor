@@ -246,8 +246,8 @@ export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } 
       <div class="ph-date" id="phDate"></div>
       <div class="ph-week" id="phWeek"></div>
     </div>
-    <a class="tbtn" id="svgWeekBtn" href="/api/schedule/image?mode=week" target="_blank" title="在新标签页预览当前周课表 PNG（手机长按、电脑右键即可存图；纯本地渲染）">本周图片</a>
-    <a class="tbtn" id="svgTermBtn" href="/api/schedule/image?mode=term" target="_blank" title="在新标签页预览整学期课表 PNG（手机长按、电脑右键即可存图）">整学期图片</a>
+    <a class="tbtn" id="svgWeekBtn" href="/api/schedule/image?mode=week" target="_blank" title="在新标签页预览当前周课表 PNG（红头档案风；手机长按、电脑右键即可存图；纯本地渲染）">本周图片</a>
+    <a class="tbtn" id="svgTermBtn" href="/api/schedule/image?mode=term" target="_blank" title="在新标签页预览整学期课表 PNG（红头档案风，课格标注周次）">整学期图片</a>
     <a class="tbtn" href="/today">今日日程</a>
     <a class="tbtn" href="/">返回对话</a>
   </div>

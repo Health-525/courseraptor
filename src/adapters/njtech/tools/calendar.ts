@@ -9,7 +9,12 @@ import { z } from "zod";
 import { loadLogoDataUri } from "../../../core/brand";
 import { buildTermICS } from "../../../core/calendar/export";
 import { config } from "../../../core/config";
-import { generatedDir, recordDeliverable, uniquePath } from "../../../core/document/save";
+import {
+  generatedDir,
+  recordDeliverable,
+  sanitizeFileBase,
+  uniquePath,
+} from "../../../core/document/save";
 import { publishCalendarToGitee } from "../../../core/gitee-publish";
 import { publishCalendarToGithub } from "../../../core/github-publish";
 import type { CourseData, ExamData } from "../../../core/model";
@@ -151,7 +156,7 @@ export const calendarTools = {
   /** 课表图片导出（PNG/SVG × 整学期汇总/单周） */
   export_schedule_image: tool({
     description:
-      "把课表导出为图片（默认 PNG 位图，手机相册/QQ 直接存直接看；可选 SVG 矢量）。默认彩色课格风（每门课一个柔和色块、带项目 logo 落款，竖版适合手机壁纸）；style=classic 可换红头档案风（暖纸底+朱砂+楷体）。两种形态：term=整学期汇总（默认，课格标注「2-16周(单)」这类周次，适合做壁纸或打印）、week=单周实际课表（自动处理放假与调休补课，可指定周次，默认本周）。用户说「导出课表图片」「生成课表壁纸」「把课表做成图」时调用。文件存 data/generated 并回绝对路径。",
+      "把课表导出为图片（默认 PNG 位图，手机相册/QQ 直接存直接看；可选 SVG 矢量）。默认 classic 红头档案风——暖纸底+墨字+单一朱砂+楷体课名+印章 logo，CourseRaptor 招牌视觉，与 /schedule 网页同款；style=color 可换彩色课格风（每门课一个柔和色块）。两种形态：term=整学期汇总（默认，课格标注「2-16周(单)」这类周次，适合做壁纸或打印）、week=单周实际课表（自动处理放假与调休补课，可指定周次，默认本周）。文件名由你按用户语境拟定（filename 参数），如「国庆周课表」「我的秋课表壁纸」。用户说「导出课表图片」「生成课表壁纸」「把课表做成图」时调用。文件存 data/generated 并回绝对路径。",
     inputSchema: z.object({
       mode: z
         .enum(["term", "week"])
@@ -162,10 +167,16 @@ export const calendarTools = {
         .default("png")
         .describe("png=位图，手机直接保存查看（默认）；svg=矢量图，放大不糊、可再编辑"),
       style: z
-        .enum(["color", "classic"])
-        .default("color")
+        .enum(["classic", "color"])
+        .default("classic")
         .describe(
-          "color=彩色课格（默认，手机壁纸友好）；classic=红头档案风（与 /schedule 网页同款）",
+          "classic=红头档案风（默认，CourseRaptor 招牌视觉，与 /schedule 网页同款）；color=彩色课格",
+        ),
+      filename: z
+        .string()
+        .optional()
+        .describe(
+          "图片文件名（不含扩展名，按 format 自动补 .png/.svg）。按用户说法和用途起个有意义的名字，如「国庆周课表」「期末冲刺课表壁纸」；不填则用 schedule-term/schedule-weekN 默认名",
         ),
       week: z
         .number()
@@ -179,7 +190,7 @@ export const calendarTools = {
         .optional()
         .describe("指定学期，格式如「2026-2027-1」；不填则自动探测最新学期"),
     }),
-    execute: async ({ mode, format, style, week, semester }) => {
+    execute: async ({ mode, format, style, filename, week, semester }) => {
       const g = await gatherCalendar(semester, "schedule");
       if (!g.ok) return { error: `课表图导出失败：${g.error}` };
 
@@ -227,7 +238,9 @@ export const calendarTools = {
       const payload: Buffer | string =
         format === "png" ? scheduleSvgToPng(svgResult.svg, svgResult.width * 2) : svgResult.svg;
       const ext = format === "png" ? ".png" : ".svg";
-      const filePath = uniquePath(dir, base, ext);
+      // 模型自拟的文件名优先（去扩展名 + 同文档一道净化闸），缺省回落默认名
+      const named = filename?.trim().replace(/\.(png|svg)$/i, "");
+      const filePath = uniquePath(dir, named ? sanitizeFileBase(named) : base, ext);
       await fsp.writeFile(filePath, payload);
       const file = {
         filename: path.basename(filePath),

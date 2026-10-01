@@ -984,12 +984,13 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     }
     if (url === "/api/schedule/image" || url.startsWith("/api/schedule/image?")) {
       // 课表图片直链（/schedule 页按钮）：只读本地缓存渲染，零登录零模型，
-      // 与对话工具 export_schedule_image 同一渲染器。默认 PNG 彩色课格。
+      // 与对话工具 export_schedule_image 同一渲染器。默认 PNG 红头档案风
+      // （CourseRaptor 招牌视觉），style=color 可换彩色课格。
       // 默认 inline——浏览器/手机直接看图（长按或右键另存），?download=1 才强制下载
       const params = new URL(url, "http://127.0.0.1").searchParams;
       const mode = params.get("mode") === "week" ? "week" : "term";
       const format = params.get("format") === "svg" ? "svg" : "png";
-      const style = params.get("style") === "classic" ? "classic" : "color";
+      const style = params.get("style") === "color" ? "color" : "classic";
       const weekParam = Number(params.get("week"));
       const cached = loadScheduleCache();
       if (!cached) {
