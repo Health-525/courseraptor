@@ -3,6 +3,10 @@ const inner = document.getElementById("inner");
 const hero = document.getElementById("hero");
 const input = document.getElementById("i");
 const btn = document.getElementById("b");
+/* 触屏设备不自动聚焦输入框：iOS 上一进页面/每轮回复完就 focus 会把键盘
+   顶起来，盖住问候语与流式内容；桌面保留即打即用的便利。
+   （用户主动点击引出的聚焦不受此限，如大厅空态的「去问问」） */
+const AUTO_FOCUS = !window.matchMedia("(hover: none)").matches;
 let busy = false;
 let controller = null;
 /* 最近一轮的用户消息：失败重试用 */
@@ -914,7 +918,7 @@ function startFresh() {
   hero.style.display = "";
   heroGreeting();
   renderSessList();
-  input.focus();
+  if (AUTO_FOCUS) input.focus();
 }
 
 /* 会话菜单挂 body 走 fixed，菜单按钮点不到 sessList 的委托：委托挂 document，
@@ -3688,7 +3692,7 @@ async function send(text) {
     else if (document.title.startsWith("● 回复中")) document.title = "CourseRaptor";
     refreshSessions();
     refreshHallBadge();
-    input.focus();
+    if (AUTO_FOCUS) input.focus();
   }
 }
 
@@ -3737,4 +3741,28 @@ form.addEventListener("submit", (e) => {
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) document.title = "CourseRaptor";
 });
-input.focus();
+
+/* ── iOS 键盘抬升：Safari 键盘弹出时布局视口不缩（100dvh 不变）、只有
+   visualViewport 变小，钉在视口底部的输入条会被键盘整个盖住。这里把
+   「布局视口高 − 视觉视口高」的差值写进 --vkb（px），页面与两个抽屉
+   用它整体抬到键盘上方（见 chat-page.ts 的 height/bottom 用法）。
+   Android 两套视口同步缩放、差值恒为 0，天然不生效；桌面没有键盘。
+   双指缩放（scale≠1）不算键盘，跳过以免误抬。 ── */
+const vv = window.visualViewport;
+if (vv) {
+  const syncKb = () => {
+    const kb =
+      Math.abs(vv.scale - 1) > 0.01
+        ? 0
+        : Math.max(0, Math.round(window.innerHeight - vv.height));
+    document.documentElement.style.setProperty("--vkb", kb + "px");
+    /* iOS 会顺势把页面往上顶；锁高布局里那只是一段空白，拉回顶部 */
+    if (kb > 0 && window.scrollY !== 0) window.scrollTo(0, 0);
+    /* 高度变化后按需贴底：正在看最新消息时不让键盘把消息顶出视野 */
+    requestAnimationFrame(() => {
+      if (pinned) scroll(false);
+    });
+  };
+  vv.addEventListener("resize", syncKb);
+}
+if (AUTO_FOCUS) input.focus();

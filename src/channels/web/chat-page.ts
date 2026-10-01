@@ -67,12 +67,15 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   html, body { height: 100%; }
   /* 旋转屏幕时 iOS 不许对正文做字号膨胀（放大后布局必炸） */
   html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-  /* 锁定整页：只有消息区能滚，输入/发送条永远钉在视口底部；
-     dvh 让移动端键盘弹出时底栏跟着抬进可见区而不是被顶出屏幕。
+  /* 锁定整页：只有消息区能滚，输入/发送条永远钉在视口底部。
+     iOS Safari 的键盘弹出时布局视口不缩（100dvh 不变），输入条会被键盘
+     盖住——chat-app.js 监听 visualViewport 把「布局视口 − 视觉视口」的
+     差值写进 --vkb（Android 两者同步缩、差值恒 0，不生效），这里用 var
+     扣减让整页抬到键盘上方；旧浏览器不认 calc+dvh 会回落到上面的 100vh。
      第三列 0px 是功能大厅的坑位：打开时撑到 min(420px, 40vw)，
      聊天主区被真实地往左推——不是浮层盖上来。 */
   body { margin: 0; display: grid; grid-template-columns: 284px 1fr 0;
-         height: 100vh; height: 100dvh; overflow: hidden;
+         height: 100vh; height: calc(100dvh - var(--vkb, 0px)); overflow: hidden;
          background: var(--paper); color: var(--ink);
          font-family: var(--sans); font-size: 16px; line-height: 1.7;
          -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
@@ -326,7 +329,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .frow .fname { flex: 1; min-width: 0; overflow: hidden;
                  text-overflow: ellipsis; white-space: nowrap;
                  word-break: break-all; }
-  .frow a.tbtn { flex: none; text-decoration: none; padding: 3px 14px;
+  .frow a.tbtn { flex: none; display: inline-flex; align-items: center;
+                 text-decoration: none; padding: 3px 14px;
                  font-size: 12px; }
 
   /* 结构化结果卡：查询结果（课表/成绩/考试/通知…）以红头档案卡片呈现，
@@ -1009,21 +1013,31 @@ export function chatPage(options: { demo?: boolean } = {}): string {
        与会话抽屉同一侧——对齐豆包等手机端 App「面板从左侧出」的习惯，
        也不在屏幕右侧留缝 */
     body.hall-open { grid-template-columns: 1fr; }
-    .hall { position: fixed; top: 0; left: 0; bottom: 0; z-index: 45;
+    .hall { position: fixed; top: 0; left: 0; bottom: var(--vkb, 0px); z-index: 45;
             width: min(420px, 100vw); transform: translateX(-103%);
             transition: transform .2s ease; border-left: 0;
             border-right: 1px solid var(--rule-2);
             box-shadow: 14px 0 36px rgba(38, 35, 29, .2); }
     body.hall-open .hall { transform: translateX(0); }
     body.hall-open .hall-backdrop { display: block; }
-    aside { display: flex; position: fixed; inset: 0 auto 0 0; z-index: 40; width: min(320px, 88vw);
+    /* 独立窗口/横屏时标题不顶进刘海 */
+    .hall-head { padding-top: max(12px, env(safe-area-inset-top));
+                 padding-left: max(20px, env(safe-area-inset-left)); }
+    /* 抽屉同样随 --vkb 抬起：在抽屉里改会话名/填设置时输入框不被键盘盖住 */
+    aside { display: flex; position: fixed; inset: 0 auto var(--vkb, 0px) 0; z-index: 40; width: min(320px, 88vw);
             transform: translateX(-102%); transition: transform .2s ease;
+            padding-top: max(27px, env(safe-area-inset-top));
+            padding-left: max(22px, env(safe-area-inset-left));
             box-shadow: 14px 0 36px rgba(38, 35, 29, .2); }
     body.drawer-open aside { transform: translateX(0); }
     body.drawer-open .drawer-backdrop { display: block; }
-    .topbar { display: flex; }
+    .topbar { display: flex;
+              /* 全面屏横屏时避开左右刘海；加到主屏桌面不引入任何视觉变化 */
+              padding-top: max(10px, env(safe-area-inset-top));
+              padding-left: max(16px, env(safe-area-inset-left));
+              padding-right: max(16px, env(safe-area-inset-right)); }
     #log { padding: 28px 20px 24px; }
-    form { padding: 11px 16px max(10px, env(safe-area-inset-bottom)); }
+    form { padding: 11px max(16px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
     /* 附件与发送同高（44px）：高低不齐在手机上一眼就露怯 */
     .attach-btn { min-height: 44px; }
     /* 窄屏快捷问题回单排横滚：wrap 三四行会挤压输入区；
@@ -1036,7 +1050,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .fhint { display: none; }
   }
   @media (max-width: 560px) {
-    .topbar { min-height: 56px; padding: 8px 12px; gap: 7px; }
+    .topbar { min-height: 56px; padding: 8px 12px; gap: 7px;
+              padding-top: max(8px, env(safe-area-inset-top));
+              padding-left: max(12px, env(safe-area-inset-left));
+              padding-right: max(12px, env(safe-area-inset-right)); }
     .topbar .tb-title { font-size: 17px; }
     .topbar .tbtn { min-height: 32px; padding: 4px 9px; font-size: 12px; }
     .topbar .iconbtn { width: 44px; min-width: 44px; min-height: 44px; }
@@ -1049,7 +1066,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .hero .hint { display: inline-block; margin-top: 5px; font-size: 12px; }
     .turn { margin-bottom: 32px; }
     .turn.bot .msg, .turn.user .msg { font-size: 16px; }
-    form { padding: 9px 12px max(10px, env(safe-area-inset-bottom)); }
+    form { padding: 9px max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
     .quickbar { gap: 8px; }
     .qlabel { font-size: 12px; }
     .chip { min-height: 32px; padding: 4px 10px; font-size: 12px; }
@@ -1097,6 +1114,12 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     /* 触屏主操作提到 44px 触控目标（HIG 下限）：发送与附件都是高频按钮 */
     #b, .attach-btn { min-height: 44px; }
     .fld input, .fld select, .qq-add input, .hall-search input { font-size: 16px; }
+    /* 会话重命名输入框：13px 会触发 iOS 聚焦整页放大，触屏提到 16px */
+    .sess .sedit { font-size: 16px; }
+    /* 工具卡/思考卡折叠行是手机上最常点的小字行：40px 才够拇指 */
+    .tool summary, .think summary { min-height: 40px; }
+    /* 消息操作行（复制/重试）与附件下载行同理 */
+    .acts .tbtn, .frow a.tbtn { min-height: 38px; }
   }
 </style>
 </head>
@@ -1143,7 +1166,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
       <div class="cwrap">
         <button class="attach-btn" id="attachBtn" type="button" title="上传 PDF、Word、Excel 等文件" aria-label="上传附件" ${demo ? "disabled" : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg><span class="attach-text">附件</span></button>
         <input id="fileInput" type="file" hidden multiple accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.pptx">
-        <textarea id="i" rows="1" aria-label="向 CourseRaptor 提问" placeholder="课表、成绩、考试、通知，直接问…"></textarea>
+        <textarea id="i" rows="1" aria-label="向 CourseRaptor 提问" enterkeyhint="send" placeholder="课表、成绩、考试、通知，直接问…"></textarea>
         <button id="b">发送<span class="kbd">⏎</span></button>
       </div>
       <div class="fhint">⏎ 发送 · ⇧⏎ 换行 · ${demo ? "虚构示例，会话仅保留在内存" : "会话自动存档"}</div>
