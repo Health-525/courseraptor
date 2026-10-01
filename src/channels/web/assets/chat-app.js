@@ -149,8 +149,42 @@ qchips.addEventListener("click", (e) => {
 
 /* ── 智能滚动：用户上翻（离底 > 60px）就不再自动拽底 ── */
 let pinned = true;
+/* 回到最新：上翻离底时浮现的圆钮（样式见 chat-page.ts 的 .jump）。
+   位置跟随输入条实际高度（textarea 长高、提示词行收起都重算），
+   iOS 键盘占位由 CSS 里的 --vkb 一并叠加，不打架 */
+const jumpLatest = document.createElement("button");
+jumpLatest.type = "button";
+jumpLatest.className = "jump";
+jumpLatest.hidden = true;
+jumpLatest.setAttribute("aria-label", "回到最新消息");
+jumpLatest.innerHTML =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>';
+document.body.appendChild(jumpLatest);
+const composerForm = document.getElementById("f");
+function syncJumpBottom() {
+  document.documentElement.style.setProperty(
+    "--jump-bottom",
+    composerForm.offsetHeight + 14 + "px",
+  );
+}
+if (typeof ResizeObserver !== "undefined") {
+  new ResizeObserver(syncJumpBottom).observe(composerForm);
+}
+window.addEventListener("resize", syncJumpBottom);
+syncJumpBottom();
+let jumpRaf = 0;
+function syncJumpVisible() {
+  jumpRaf = 0;
+  jumpLatest.hidden = pinned;
+}
 logScroll.addEventListener("scroll", () => {
   pinned = logScroll.scrollHeight - logScroll.scrollTop - logScroll.clientHeight < 60;
+  if (!jumpRaf) jumpRaf = requestAnimationFrame(syncJumpVisible);
+});
+jumpLatest.addEventListener("click", () => {
+  pinned = true;
+  jumpLatest.hidden = true;
+  logScroll.scrollTop = logScroll.scrollHeight;
 });
 
 const HAS_MARKED = typeof marked !== "undefined";
@@ -2057,6 +2091,8 @@ function hallSearchBox(panel) {
   const box = el("hall-search");
   const input = document.createElement("input");
   input.type = "search";
+  /* 手机软键盘回车键标成「搜索」，与行为一致（不动桌面） */
+  input.setAttribute("enterkeyhint", "search");
   input.placeholder = "搜索" + (HALL_TITLES[panel] || "本面板") + "…";
   input.setAttribute("aria-label", "在" + (HALL_TITLES[panel] || "本面板") + "中搜索");
   input.value = hallSearch.panel === panel ? hallSearch.q : "";
