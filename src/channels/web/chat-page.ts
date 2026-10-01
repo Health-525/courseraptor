@@ -1090,6 +1090,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .hero .hint { display: inline-block; margin-top: 5px; font-size: 12px; }
     .turn { margin-bottom: 32px; }
     .turn.bot .msg, .turn.user .msg { font-size: 16px; }
+    /* 数据表不挤碎：课表/成绩这类表保持单元格自然宽度、由容器横向滚动
+       （.md table 本就是 display:block + overflow-x:auto），别把地点、
+       课程名压成一竖列一字一行 */
+    .md th, .md td { white-space: nowrap; }
     form { padding: 9px max(12px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
     .quickbar { gap: 8px; }
     .qlabel { font-size: 12px; }
@@ -1209,7 +1213,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
       <div class="cwrap">
         <button class="attach-btn" id="attachBtn" type="button" title="上传 PDF、Word、Excel 等文件" aria-label="上传附件" ${demo ? "disabled" : ""}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg><span class="attach-text">附件</span></button>
         <input id="fileInput" type="file" hidden multiple accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md,.pptx">
-        <textarea id="i" rows="1" aria-label="向 CourseRaptor 提问" enterkeyhint="send" placeholder="课表、成绩、考试、通知，直接问…"></textarea>
+        <textarea id="i" rows="1" aria-label="向 CourseRaptor 提问" enterkeyhint="send" placeholder="这周我有哪些课？"></textarea>
         <button id="b">发送<span class="kbd">⏎</span></button>
       </div>
       <div class="fhint">⏎ 发送 · ⇧⏎ 换行 · ${demo ? "虚构示例，会话仅保留在内存" : "会话自动存档"}</div>
