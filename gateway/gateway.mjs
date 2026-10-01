@@ -38,6 +38,17 @@ const port = Number(env.GATEWAY_PORT) || 8080;
 const host = env.GATEWAY_HOST || "0.0.0.0";
 
 const registry = createRegistry({ stateDir });
+
+// 启动自检：状态文件损坏（users.json 等）时立即退出并指明修复路径，
+// 而不是等到第一个请求才 500——registry 对损坏文件的策略是「拒绝读取
+// 以防空表覆盖落盘」，这里让该策略在启动时就可见
+try {
+  await registry.listUsers();
+  await registry.listInvites();
+} catch (e) {
+  console.error(`启动失败：网关状态文件自检未通过——${e?.message ?? e}`);
+  process.exit(1);
+}
 const spawner = createSpawner({
   projectRoot: ROOT,
   usersDir,
@@ -90,7 +101,13 @@ function shutdown(signal) {
   closing = true;
   console.log(`[gateway] 收到 ${signal}，回收全部实例后退出`);
   stopReaper();
-  void spawner.stopAll().then(() => server.close(() => process.exit(0)));
+  void spawner
+    .stopAll()
+    .then(() => server.close(() => process.exit(0)))
+    .catch((e) => {
+      console.error(`[gateway] 关闭时回收实例出错：${e?.message ?? e}`);
+      process.exit(1);
+    });
   setTimeout(() => process.exit(0), 5000).unref();
 }
 process.on("SIGTERM", () => shutdown("SIGTERM"));

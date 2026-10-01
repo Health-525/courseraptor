@@ -54,3 +54,31 @@ test("spawner：拉起真实 headless 实例并隔离数据目录", async (t) =>
   spawner.kick("u_smoke1");
   assert.equal(spawner.runningCount(), 1);
 });
+
+test("spawner：同用户并发 acquire 共享同一次拉起（无 null 端口、无孤儿双实例）", async (t) => {
+  // 回归背景：冷启动窗口（最长 30s）里 acquire 曾直接返回 null 端口，
+  // 代理会打到 127.0.0.1:80；且检查-拉起之间的异步间隙会产生双实例孤儿
+  const usersDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-race-"));
+  const spawner = createSpawner({
+    projectRoot: PROJECT_ROOT,
+    usersDir,
+    maxConcurrent: 2,
+    reapIntervalMs: 3_600_000,
+  });
+  t.after(() => void spawner.stopAll());
+
+  const [p1, p2, p3] = await Promise.all([
+    spawner.acquire("u_race"),
+    spawner.acquire("u_race"),
+    spawner.acquire("u_race"),
+  ]);
+  assert.ok(
+    Number.isInteger(p1) && p1 > 0 && p1 === p2 && p2 === p3,
+    `并发 acquire 必须等到同一实例的真实端口：${p1}/${p2}/${p3}`,
+  );
+  assert.equal(spawner.runningCount(), 1, "并发不得拉出第二个实例");
+
+  // 冷启动期间的请求也应能拿到端口（等 ready 而不是 null）
+  const again = await spawner.acquire("u_race");
+  assert.equal(again, p1, "已就绪实例直接复用端口");
+});
