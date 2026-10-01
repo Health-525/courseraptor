@@ -10,6 +10,7 @@
  */
 
 import { type SpecialDay, specialOnDate } from "../../core/calendar/holidays";
+import { isoOf, planForDate, weekdayOf } from "../../core/calendar/week-plan";
 import { loadExamCache } from "../../core/exam-cache";
 import type { CourseData } from "../../core/model";
 import { school } from "../../core/school";
@@ -181,29 +182,10 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-function isoOf(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-/** JS 周日=0 -> 教学周 weekday（周一=1 … 周日=7） */
-function weekdayOf(d: Date): number {
-  return ((d.getDay() + 6) % 7) + 1;
-}
-
 function datePlus(base: Date, days: number): Date {
   return new Date(base.getFullYear(), base.getMonth(), base.getDate() + days);
 }
 
-/** 某天在本学期的教学周号；开学前/无法归周返回 null */
-function weekOfDate(iso: string, week1Monday: string): number | null {
-  const diff = Math.floor(
-    (new Date(`${iso}T00:00:00`).getTime() - new Date(`${week1Monday}T00:00:00`).getTime()) /
-      DAY_MS,
-  );
-  return diff < 0 ? null : Math.floor(diff / 7) + 1;
-}
-
-/** 节次 -> 当天分钟数；作息表里没有该节次返回 null */
 function periodStartMin(period: number): number | null {
   const t = terms.periodTime(period);
   if (!t) return null;
@@ -216,33 +198,6 @@ function periodEndMin(period: number): number | null {
   if (!t) return null;
   const [h, m] = t.split("-")[1].split(":").map(Number);
   return h * 60 + m;
-}
-
-interface DayPlan {
-  holiday?: string;
-  makeup?: boolean;
-  /** 该日按调休换算后要上的课 */
-  courses: CourseData[];
-}
-
-/** 某天实际要上的课：放假日清空，调休日按被补周几的课表（都叠上周次过滤） */
-function planForDate(courses: CourseData[], iso: string, week1Monday: string): DayPlan {
-  const special = specialOnDate(iso);
-  if (special?.type === "holiday") return { holiday: special.name ?? "放假", courses: [] };
-  const weekday =
-    special?.type === "makeup" && special.follows
-      ? special.follows
-      : weekdayOf(new Date(`${iso}T00:00:00`));
-  const week = weekOfDate(iso, week1Monday);
-  if (week == null) return { courses: [] };
-  const effective = courses.filter(
-    (c) => c.weekday === weekday && terms.expandWeeks(c.weeks).includes(week),
-  );
-  effective.sort((a, b) => (a.periods[0] ?? 99) - (b.periods[0] ?? 99));
-  return {
-    ...(special?.type === "makeup" ? { makeup: true } : {}),
-    courses: effective,
-  };
 }
 
 function toBriefCourse(c: CourseData, nowMin: number): BriefCourse {

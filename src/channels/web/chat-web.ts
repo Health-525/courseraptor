@@ -74,6 +74,8 @@ import {
   type PomodoroView,
   toView,
 } from "../../core/pomodoro";
+import { loadScheduleCache } from "../../core/schedule-cache";
+import { renderTermScheduleSVG, renderWeekScheduleSVG } from "../../core/schedule-svg";
 import { school } from "../../core/school";
 import { maybeAutoTitle } from "../../core/session-titles";
 import {
@@ -970,6 +972,56 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       // 只读本地缓存（课表/考试/假期/学期日期），不登录教务、不调模型
       const week = Number(new URL(url, "http://127.0.0.1").searchParams.get("week"));
       json(res, buildTodayBrief(undefined, Number.isInteger(week) ? week : undefined));
+      return;
+    }
+    if (url === "/api/schedule/svg" || url.startsWith("/api/schedule/svg?")) {
+      // 课表 SVG 直链下载（/schedule 页按钮）：只读本地缓存渲染，零登录零模型，
+      // 与对话工具 export_schedule_svg 同一渲染器。直链形式与待办 .ics 同款
+      const params = new URL(url, "http://127.0.0.1").searchParams;
+      const mode = params.get("mode") === "week" ? "week" : "term";
+      const weekParam = Number(params.get("week"));
+      const cached = loadScheduleCache();
+      if (!cached) {
+        json(res, { error: "还没有课表缓存：在对话页查询一次课表后再导出" });
+        return;
+      }
+      const schedule = cached.schedule;
+      const semPart = `${schedule.year}-${schedule.semester === 3 ? 1 : 2}`;
+      let svg: string;
+      let filename: string;
+      if (mode === "week") {
+        const terms = school().terms;
+        const current = terms.weekOf(schedule.year, schedule.semester);
+        const maxWeek = Math.max(
+          1,
+          ...schedule.courses.flatMap((course) => terms.expandWeeks(course.weeks)),
+        );
+        const week =
+          Number.isInteger(weekParam) && weekParam >= 1 && weekParam <= maxWeek
+            ? weekParam
+            : current?.week;
+        if (week == null) {
+          json(res, { error: `当前不在教学周内，请指定周次（week=1-${maxWeek}）` });
+          return;
+        }
+        const week1Monday = terms.week1MondayOf(schedule.year, schedule.semester).week1Monday;
+        svg = renderWeekScheduleSVG({
+          courses: schedule.courses,
+          week,
+          week1Monday,
+          termLabel: schedule.label,
+        }).svg;
+        filename = `schedule-week${week}-${semPart}.svg`;
+      } else {
+        svg = renderTermScheduleSVG({ courses: schedule.courses, termLabel: schedule.label }).svg;
+        filename = `schedule-term-${semPart}.svg`;
+      }
+      res.writeHead(200, {
+        "content-type": "image/svg+xml; charset=utf-8",
+        "content-disposition": `attachment; filename="${filename}"`,
+        "cache-control": "no-store",
+      });
+      res.end(svg);
       return;
     }
     if (url === "/api/sessions") {

@@ -246,6 +246,8 @@ export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } 
       <div class="ph-date" id="phDate"></div>
       <div class="ph-week" id="phWeek"></div>
     </div>
+    <a class="tbtn" id="svgWeekBtn" href="/api/schedule/svg?mode=week" title="下载当前查看的这一周课表（SVG 矢量图，纯本地渲染）">导出本周 SVG</a>
+    <a class="tbtn" id="svgTermBtn" href="/api/schedule/svg?mode=term" title="下载整学期汇总课表（SVG 矢量图，课格标注周次）">整学期 SVG</a>
     <a class="tbtn" href="/today">今日日程</a>
     <a class="tbtn" href="/">返回对话</a>
   </div>
@@ -464,6 +466,19 @@ function render(b) {
   }
   renderWeek(b);
   renderSrc(b);
+  /* SVG 导出按钮：演示模式没有真实缓存、假期没有当前周，都先藏起来 */
+  const svgWeekBtn = $("svgWeekBtn");
+  const svgTermBtn = $("svgTermBtn");
+  if (DEMO_DATA) {
+    svgWeekBtn.style.display = "none";
+    svgTermBtn.style.display = "none";
+  } else if (displayedWeek == null) {
+    svgWeekBtn.style.display = "none";
+  } else {
+    svgWeekBtn.style.display = "";
+    svgWeekBtn.href = "/api/schedule/svg?mode=week&week=" + displayedWeek;
+    svgWeekBtn.textContent = selectedWeek ? "导出第 " + displayedWeek + " 周 SVG" : "导出本周 SVG";
+  }
   document.title = "课表 · " + (b.term.weekLabel || "CourseRaptor");
   if (!DEMO_DATA) {
     // 所选周写进 URL：刷新 / 分享不丢；请求的周次无效时服务端会回落到当前周，跟着对齐
