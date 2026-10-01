@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 import type { ModelMessage } from "ai";
 import { attachmentStats, clearAttachments } from "../../core/attachment-store";
 import { type AttachmentResult, openLocalFile } from "../../core/attachments";
+import { loadLogoDataUri } from "../../core/brand";
 import {
   appendRound,
   contextMessages,
@@ -75,6 +76,7 @@ import {
   toView,
 } from "../../core/pomodoro";
 import { loadScheduleCache } from "../../core/schedule-cache";
+import { scheduleSvgToPng } from "../../core/schedule-png";
 import { renderTermScheduleSVG, renderWeekScheduleSVG } from "../../core/schedule-svg";
 import { school } from "../../core/school";
 import { maybeAutoTitle } from "../../core/session-titles";
@@ -974,11 +976,14 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       json(res, buildTodayBrief(undefined, Number.isInteger(week) ? week : undefined));
       return;
     }
-    if (url === "/api/schedule/svg" || url.startsWith("/api/schedule/svg?")) {
-      // 课表 SVG 直链下载（/schedule 页按钮）：只读本地缓存渲染，零登录零模型，
-      // 与对话工具 export_schedule_svg 同一渲染器。直链形式与待办 .ics 同款
+    if (url === "/api/schedule/image" || url.startsWith("/api/schedule/image?")) {
+      // 课表图片直链下载（/schedule 页按钮）：只读本地缓存渲染，零登录零模型，
+      // 与对话工具 export_schedule_image 同一渲染器。默认 PNG 彩色课格（手机
+      // 直接存图），format=svg/style=classic 可换矢量或红头档案风。直链与待办 .ics 同款
       const params = new URL(url, "http://127.0.0.1").searchParams;
       const mode = params.get("mode") === "week" ? "week" : "term";
+      const format = params.get("format") === "svg" ? "svg" : "png";
+      const style = params.get("style") === "classic" ? "classic" : "color";
       const weekParam = Number(params.get("week"));
       const cached = loadScheduleCache();
       if (!cached) {
@@ -987,7 +992,9 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       }
       const schedule = cached.schedule;
       const semPart = `${schedule.year}-${schedule.semester === 3 ? 1 : 2}`;
+      const logo = loadLogoDataUri() ?? undefined;
       let svg: string;
+      let svgWidth: number;
       let filename: string;
       if (mode === "week") {
         const terms = school().terms;
@@ -1005,23 +1012,45 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
           return;
         }
         const week1Monday = terms.week1MondayOf(schedule.year, schedule.semester).week1Monday;
-        svg = renderWeekScheduleSVG({
+        const r = renderWeekScheduleSVG({
           courses: schedule.courses,
           week,
           week1Monday,
           termLabel: schedule.label,
-        }).svg;
-        filename = `schedule-week${week}-${semPart}.svg`;
+          style,
+          ...(logo ? { logoDataUri: logo } : {}),
+        });
+        svg = r.svg;
+        svgWidth = r.width;
+        filename = `schedule-week${week}-${semPart}`;
       } else {
-        svg = renderTermScheduleSVG({ courses: schedule.courses, termLabel: schedule.label }).svg;
-        filename = `schedule-term-${semPart}.svg`;
+        const r = renderTermScheduleSVG({
+          courses: schedule.courses,
+          termLabel: schedule.label,
+          style,
+          ...(logo ? { logoDataUri: logo } : {}),
+        });
+        svg = r.svg;
+        svgWidth = r.width;
+        filename = `schedule-term-${semPart}`;
       }
-      res.writeHead(200, {
-        "content-type": "image/svg+xml; charset=utf-8",
-        "content-disposition": `attachment; filename="${filename}"`,
-        "cache-control": "no-store",
-      });
-      res.end(svg);
+      if (format === "png") {
+        // 2 倍宽出图：手机放大看笔画不发虚
+        const png = scheduleSvgToPng(svg, svgWidth * 2);
+        res.writeHead(200, {
+          "content-type": "image/png",
+          "content-disposition": `attachment; filename="${filename}.png"`,
+          "cache-control": "no-store",
+        });
+        res.end(png);
+      } else {
+        res.writeHead(200, {
+          "content-type": "image/svg+xml; charset=utf-8",
+          "content-disposition": `attachment; filename="${filename}.svg"`,
+          "cache-control": "no-store",
+        });
+        res.end(svg);
+      }
       return;
     }
     if (url === "/api/sessions") {

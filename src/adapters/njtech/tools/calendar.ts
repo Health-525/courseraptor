@@ -1,19 +1,24 @@
 /**
- * 日历与课表图工具：export_calendar（本机 .ics）/ publish_calendar（GitHub/Gitee 发布，手机订阅）/ export_schedule_svg（课表 SVG 图）
+ * 日历与课表图工具：export_calendar（本机 .ics）/ publish_calendar（GitHub/Gitee 发布，手机订阅）/ export_schedule_image（课表 PNG/SVG 图）
  */
 
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { tool } from "ai";
 import { z } from "zod";
-
+import { loadLogoDataUri } from "../../../core/brand";
 import { buildTermICS } from "../../../core/calendar/export";
 import { config } from "../../../core/config";
 import { generatedDir, recordDeliverable, uniquePath } from "../../../core/document/save";
 import { publishCalendarToGitee } from "../../../core/gitee-publish";
 import { publishCalendarToGithub } from "../../../core/github-publish";
 import type { CourseData, ExamData } from "../../../core/model";
-import { renderTermScheduleSVG, renderWeekScheduleSVG } from "../../../core/schedule-svg";
+import { scheduleSvgToPng } from "../../../core/schedule-png";
+import {
+  renderTermScheduleSVG,
+  renderWeekScheduleSVG,
+  type ScheduleStyle,
+} from "../../../core/schedule-svg";
 import { school } from "../../../core/school";
 import {
   fetchExamsSmart,
@@ -143,15 +148,25 @@ export const calendarTools = {
     },
   }),
 
-  /** 课表 SVG 导出（整学期汇总 / 单周） */
-  export_schedule_svg: tool({
+  /** 课表图片导出（PNG/SVG × 整学期汇总/单周） */
+  export_schedule_image: tool({
     description:
-      "把课表导出为 SVG 矢量图（红头档案风格周网格：节次×星期、课名/地点/教师、周次标注）。两种形态：term=整学期汇总（默认，经典课表样式，课格标注「2-16周(单)」这类周次，适合做壁纸或打印）、week=单周实际课表（自动处理放假与调休补课，可指定周次，默认本周）。用户说「导出课表图片」「生成课表 SVG」「把课表做成图/壁纸」时调用。文件存 data/generated 并回绝对路径；SVG 放大不糊，浏览器/微信可直接打开。",
+      "把课表导出为图片（默认 PNG 位图，手机相册/QQ 直接存直接看；可选 SVG 矢量）。默认彩色课格风（每门课一个柔和色块、带项目 logo 落款，竖版适合手机壁纸）；style=classic 可换红头档案风（暖纸底+朱砂+楷体）。两种形态：term=整学期汇总（默认，课格标注「2-16周(单)」这类周次，适合做壁纸或打印）、week=单周实际课表（自动处理放假与调休补课，可指定周次，默认本周）。用户说「导出课表图片」「生成课表壁纸」「把课表做成图」时调用。文件存 data/generated 并回绝对路径。",
     inputSchema: z.object({
       mode: z
         .enum(["term", "week"])
         .default("term")
         .describe("term=整学期汇总课表（默认）；week=某一教学周的实际课表（含放假调休）"),
+      format: z
+        .enum(["png", "svg"])
+        .default("png")
+        .describe("png=位图，手机直接保存查看（默认）；svg=矢量图，放大不糊、可再编辑"),
+      style: z
+        .enum(["color", "classic"])
+        .default("color")
+        .describe(
+          "color=彩色课格（默认，手机壁纸友好）；classic=红头档案风（与 /schedule 网页同款）",
+        ),
       week: z
         .number()
         .int()
@@ -164,11 +179,12 @@ export const calendarTools = {
         .optional()
         .describe("指定学期，格式如「2026-2027-1」；不填则自动探测最新学期"),
     }),
-    execute: async ({ mode, week, semester }) => {
+    execute: async ({ mode, format, style, week, semester }) => {
       const g = await gatherCalendar(semester, "schedule");
       if (!g.ok) return { error: `课表图导出失败：${g.error}` };
 
       const semPart = `${g.term.year}-${g.term.semester === 3 ? 1 : 2}`;
+      const logo = loadLogoDataUri() ?? undefined;
       let svgResult: ReturnType<typeof renderTermScheduleSVG>;
       let base: string;
       let resolvedWeek: number | undefined;
@@ -192,21 +208,31 @@ export const calendarTools = {
           week: resolvedWeek,
           week1Monday,
           termLabel: g.term.label,
+          style: style as ScheduleStyle,
+          ...(logo ? { logoDataUri: logo } : {}),
         });
         base = `schedule-week${resolvedWeek}-${semPart}`;
       } else {
-        svgResult = renderTermScheduleSVG({ courses: g.courses, termLabel: g.term.label });
+        svgResult = renderTermScheduleSVG({
+          courses: g.courses,
+          termLabel: g.term.label,
+          style: style as ScheduleStyle,
+          ...(logo ? { logoDataUri: logo } : {}),
+        });
         base = `schedule-term-${semPart}`;
       }
 
       const dir = generatedDir();
       await fsp.mkdir(dir, { recursive: true });
-      const filePath = uniquePath(dir, base, ".svg");
-      await fsp.writeFile(filePath, svgResult.svg, "utf8");
+      const payload: Buffer | string =
+        format === "png" ? scheduleSvgToPng(svgResult.svg, svgResult.width * 2) : svgResult.svg;
+      const ext = format === "png" ? ".png" : ".svg";
+      const filePath = uniquePath(dir, base, ext);
+      await fsp.writeFile(filePath, payload);
       const file = {
         filename: path.basename(filePath),
         filePath,
-        bytes: Buffer.byteLength(svgResult.svg, "utf8"),
+        bytes: typeof payload === "string" ? Buffer.byteLength(payload, "utf8") : payload.length,
       };
       recordDeliverable(file);
 
@@ -215,6 +241,8 @@ export const calendarTools = {
         file,
         term: g.term.label,
         mode,
+        style,
+        format,
         ...(resolvedWeek != null ? { week: resolvedWeek } : {}),
         counts: {
           课格: counts.cells,
@@ -223,7 +251,9 @@ export const calendarTools = {
           ...(counts.unscheduled ? { 未排节次: counts.unscheduled } : {}),
         },
         usage:
-          "SVG 是矢量图，任意放大不糊：浏览器或微信直接打开即可看；做壁纸/打印直接用，需要 PNG 时用浏览器打开截图即可。",
+          format === "png"
+            ? "PNG 是位图，手机/QQ 直接保存查看即可（2 倍分辨率出图，放大不糊）。"
+            : "SVG 是矢量图，任意放大不糊：浏览器/微信直接打开，需要 PNG 时可用浏览器打开后截图。",
         note: !g.courses.length ? "本学期课表为空，图里只有空网格" : undefined,
       };
     },

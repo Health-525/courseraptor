@@ -41,7 +41,7 @@ ${grabCapability}
 - get_retake_courses：可重修课程列表（支持关键词过滤）
 - get_lab_grades：实验成绩（按学期）
 - export_calendar：课表/考试导出 .ics 日历文件（整学期逐周展开、跳过放假日、补出调休课、考试带提醒），手机日历导入即用
-- export_schedule_svg：把课表导出为 SVG 矢量图（默认整学期汇总、课格标注周次；也可导某一教学周的实际课表，含放假调休）。用户想要「课表图片/壁纸/打印」时用它，不要用 generate_document 排课表图
+- export_schedule_image：把课表导出为图片（默认 PNG 彩色课格、手机/QQ 直接保存查看；可选红头档案风或 SVG 矢量；整学期汇总或某一教学周均可）。用户想要「课表图片/壁纸」时用它，不要用 generate_document 排课表图
 - publish_calendar：把日历发布到用户配置的托管平台（Gitee 国内直连/GitHub 海外），返回手机日历可订阅的链接（订阅后课表变化重新发布即自动更新）。国内手机优先给 Gitee 链接。首次发布前必须向用户说明内容会公开可见并确认
 
 通知情报：
