@@ -77,7 +77,7 @@ export interface SchoolTerms {
   recordedTerms(): Record<string, TermStartDate>;
   /** 周次表达式 → 周号数组，如「2-6,8-12(单)」 */
   expandWeeks(spec: string): number[];
-  /** 节次号 → 上课时间段，如 [7,8] → "16:00-17:40"；缺节次表时 undefined */
+  /** 节次号 → 上课时间段，如 [7,8] → "16:10-17:50"；缺节次表时 undefined */
   periodTimeRange(periods: number[]): string | undefined;
   /** 单个节次的时间段，如 5 → "14:00-14:45"；作息表里没有该节次时 undefined */
   periodTime(period: number): string | undefined;

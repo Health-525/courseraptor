@@ -100,9 +100,9 @@ test("单双周：双周不含「(单)」课，下一节课跨天到明天", () 
     b.schedule.courses.map((c) => c.title),
     ["高等数学"],
   );
-  assert.equal(b.next?.course.title, "程序设计"); // 周三 16:00-17:40
+  assert.equal(b.next?.course.title, "程序设计"); // 周三 16:10-17:50
   assert.equal(b.next?.dateLabel, "明天");
-  assert.equal(b.next?.startsInMin, 1440 + 16 * 60 - 10 * 60);
+  assert.equal(b.next?.startsInMin, 1440 + 16 * 60 + 10 - 10 * 60); // 第 7 节 16:10 开课
 });
 
 test("调休补课日：按被换周几的课表上课", () => {

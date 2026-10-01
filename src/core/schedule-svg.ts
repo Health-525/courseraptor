@@ -153,7 +153,7 @@ const SKINS: Record<ScheduleStyle, Skin> = {
     brandBar: true,
     margin: 20,
     titleH: 50,
-    timeW: 60,
+    timeW: 76,
     dayW: 132,
     headH: 38,
     rowH: 78,
