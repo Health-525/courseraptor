@@ -21,6 +21,7 @@ export function todosPage(options: { demo?: boolean; demoData?: TodayBrief } = {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#F6F4ED">
 <link rel="icon" type="image/png" href="/logo.png">
 <title>待办 · CourseRaptor</title>
 <style>
@@ -190,6 +191,10 @@ export function todosPage(options: { demo?: boolean; demoData?: TodayBrief } = {
   /* 触屏没有悬停：行内小字按钮放大到能点的尺寸 */
   @media (hover: none) {
     .todo-del { min-height: 36px; padding: 6px 12px; }
+    /* 折叠开关头（「已完成 N」）与侧栏次要按钮提到能点的尺寸；
+       知识页同语言的 .k-toggle 已是 36px，这里对齐 */
+    .todo-group.toggle { min-height: 36px; padding: 8px 0; }
+    .rail-meta .tbtn { min-height: 38px; }
   }
   @media print {
     body { background: #fff; }

@@ -22,6 +22,7 @@ export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } 
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#F6F4ED">
 <link rel="icon" type="image/png" href="/logo.png">
 <title>课表 · CourseRaptor</title>
 <style>
@@ -212,6 +213,9 @@ export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } 
   /* 触屏：周次直达下拉提到 16px 防 iOS 聚焦缩放 */
   @media (hover: none) {
     .week-sel { font-size: 16px; }
+    /* 周次翻页是本页最高频操作，触屏提到 38px */
+    .week-nav .tbtn { min-height: 38px; }
+    .rail-meta .tbtn { min-height: 38px; }
   }
 
   /* ── 打印：隐去导航与操作，只留周课表（左栏周次标题保留作上下文） ── */

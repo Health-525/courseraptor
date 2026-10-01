@@ -28,6 +28,7 @@ export function knowledgePage(
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#F6F4ED">
 <link rel="icon" type="image/png" href="/logo.png">
 <title>知识库 · CourseRaptor</title>
 <style>
@@ -189,6 +190,7 @@ export function knowledgePage(
     .cat-btn { min-height: 40px; }
     .k-del { min-height: 36px; padding: 6px 12px; }
     .k-toggle { min-height: 36px; padding: 8px 0; }
+    .k-more { min-height: 38px; }
   }
   @media print {
     body { background: #fff; }
