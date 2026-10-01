@@ -26,6 +26,10 @@ update-data/
 .playwright-mcp/
 outputs/
 hall-main.png
+# 管理台/同学端 UI 评审截图（根目录快照，含用户列表等界面，不入库）
+/desk-*.png
+/mob-*.png
+/shot-*.png
 # QMuse CLI 导入后生成的应用绑定文件（本机专属，不入库）
 .qmuse/
 # 本地语义评审临时产物，不入库
