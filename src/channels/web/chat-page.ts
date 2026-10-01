@@ -1140,6 +1140,11 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .fld input, .fld select, .qq-add input, .hall-search input { font-size: 16px; }
     /* 会话重命名输入框：13px 会触发 iOS 聚焦整页放大，触屏提到 16px */
     .sess .sedit { font-size: 16px; }
+    /* 触屏抽屉不做滑移动画，瞬时开合：click 的派发目标是「按下与抬起时
+       元素的公共祖先」，滑动的 200ms 里条目仍在位移，落在动画内的第一下
+       点按会判到别的元素上（条目收不到 click）——「侧边栏里的东西要点
+       两下」的根源。瞬时出现后点按永远落在稳定布局上；桌面保留动画 */
+    aside, .hall { transition: none; }
     /* 工具卡/思考卡折叠行是手机上最常点的小字行：40px 才够拇指 */
     .tool summary, .think summary { min-height: 40px; }
     /* 消息操作行（复制/重试）与附件下载行同理 */
