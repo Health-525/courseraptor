@@ -3200,53 +3200,162 @@ document
   .getElementById("testDeepseek")
   .addEventListener("click", () => runDiagnostic("deepseek", "testDeepseek", "diagDeepseek"));
 
+/* ── 自绘下拉：原生 <select> 点开的选项列表浏览器不让改样式，换成与
+   会话 ⋯ 菜单同一语言的纸片浮层。按钮 aria-expanded 标记开合；键盘
+   ↑↓ 在选项间移动，Esc / 点外面 / 滚动收起 ── */
+let ddOpenBtn = null;
+function closeDd(refocus) {
+  const pop = document.getElementById("ddPop");
+  if (pop) pop.remove();
+  if (ddOpenBtn) {
+    ddOpenBtn.setAttribute("aria-expanded", "false");
+    if (refocus) ddOpenBtn.focus();
+    ddOpenBtn = null;
+  }
+}
+function toggleDd(btn, items, onPick) {
+  if (ddOpenBtn === btn) {
+    closeDd(true);
+    return;
+  }
+  closeDd();
+  const pop = document.createElement("div");
+  pop.id = "ddPop";
+  pop.className = "dd-pop";
+  pop.setAttribute("role", "listbox");
+  items.forEach((it) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "dd-item" + (it.on ? " on" : "");
+    row.setAttribute("role", "option");
+    row.setAttribute("aria-selected", it.on ? "true" : "false");
+    const main = document.createElement("span");
+    main.className = "dd-main";
+    main.textContent = it.label;
+    row.appendChild(main);
+    if (it.note) {
+      const note = document.createElement("span");
+      note.className = "dd-note";
+      note.textContent = it.note;
+      row.appendChild(note);
+    }
+    row.addEventListener("click", () => {
+      onPick(it.id);
+      closeDd(true);
+    });
+    pop.appendChild(row);
+  });
+  document.body.appendChild(pop);
+  const r = btn.getBoundingClientRect();
+  pop.style.minWidth = r.width + "px";
+  pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - r.width - 8)) + "px";
+  /* 下方空间不够就翻到上方；两边都紧张时贴空间大的一侧 */
+  const spaceBelow = window.innerHeight - r.bottom;
+  if (spaceBelow < 160 && r.top > spaceBelow) {
+    pop.style.bottom = window.innerHeight - r.top + 4 + "px";
+  } else {
+    pop.style.top = r.bottom + 4 + "px";
+  }
+  pop.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    const rows = [...pop.querySelectorAll(".dd-item")];
+    const i = rows.indexOf(document.activeElement);
+    rows[(i + (e.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length].focus();
+  });
+  btn.setAttribute("aria-expanded", "true");
+  ddOpenBtn = btn;
+  /* 焦点先落在选中项（没有则第一项）：键盘 ↑↓ 连续移动 */
+  const firstChoice = pop.querySelector(".dd-item.on") || pop.querySelector(".dd-item");
+  if (firstChoice) firstChoice.focus();
+}
+/* 闭合状态下按 ↑↓ 也展开（承接原生下拉的键盘习惯） */
+function bindDdBtn(btn) {
+  btn.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    if (ddOpenBtn !== btn) btn.click();
+  });
+}
+/* 点浮层与按钮以外的地方、设置面板滚动、Esc 都收起 */
+document.addEventListener(
+  "click",
+  (e) => {
+    if (!ddOpenBtn) return;
+    if (e.target.closest && (e.target.closest("#ddPop") || e.target.closest(".dd-btn"))) return;
+    closeDd();
+  },
+  true,
+);
+document.addEventListener(
+  "scroll",
+  (e) => {
+    if (!ddOpenBtn) return;
+    /* 浮层自己滚动（长清单）不收起 */
+    if (e.target && e.target.closest && e.target.closest("#ddPop")) return;
+    closeDd();
+  },
+  true,
+);
+document.addEventListener(
+  "keydown",
+  (e) => {
+    if (e.key === "Escape" && ddOpenBtn) {
+      e.stopPropagation();
+      closeDd(true);
+    }
+  },
+  true,
+);
+
 /* ── 型号下拉框：候选由后端给（该 Key 实际可用的型号），拉不到时是内置兜底清单。
    sModel 仍是值的唯一载体（hidden input），保存逻辑读 sModel.value 不变：
    下拉显示当前在用型号＝「不修改」，选成别的型号保存时才提交切换 ── */
 let modelCurrent = "";
+let modelOptions = [];
+let modelEmptyMsg = "";
+function modelLabelOf(id) {
+  const m = modelOptions.find((x) => x.id === id);
+  return m ? m.label || m.id : "";
+}
 function pickModel(id) {
   sModel.value = id || "";
-  const sel = document.getElementById("modelSelect");
-  if (sel) sel.value = sModel.value || modelCurrent;
+  const btn = document.getElementById("modelSelect");
+  if (btn) btn.textContent = modelLabelOf(sModel.value || modelCurrent) || modelEmptyMsg || "—";
 }
 function fillModels(options, current, message) {
   const list = Array.isArray(options) ? options : [];
   modelCurrent = current || "";
-  const keep = sModel.value;
-  const sel = document.getElementById("modelSelect");
-  if (sel) {
-    sel.innerHTML = "";
-    if (!list.length) {
-      /* 拉不到清单：占位选项给后端的说明文案，禁用防误选 */
-      const opt = document.createElement("option");
-      opt.value = "";
-      opt.textContent = message || "型号清单读取中…";
-      sel.appendChild(opt);
-      sel.disabled = true;
-    } else {
-      for (const m of list) {
-        if (!m || typeof m.id !== "string") continue;
-        const opt = document.createElement("option");
-        opt.value = m.id;
-        opt.textContent = m.label || m.id;
-        sel.appendChild(opt);
-      }
-      sel.disabled = false;
-    }
-  }
-  pickModel(keep && list.some((m) => m && m.id === keep) ? keep : "");
-  const picked = list.filter((m) => m && m.id === current)[0];
+  modelOptions = list.filter((m) => m && typeof m.id === "string");
+  modelEmptyMsg = modelOptions.length ? "" : (message || "型号清单读取中…");
+  pickModel(sModel.value && modelOptions.some((m) => m.id === sModel.value) ? sModel.value : "");
+  const picked = modelOptions.filter((m) => m.id === current)[0];
   let note = "当前：" + ((picked && picked.label) || current || "未设置");
   if (picked && picked.note) note += " · " + picked.note;
-  if (message && list.length) note += " · " + message;
+  if (message && modelOptions.length) note += " · " + message;
   curModel.textContent = note;
 }
-const modelSelectEl = document.getElementById("modelSelect");
-if (modelSelectEl)
-  modelSelectEl.addEventListener("change", () => {
-    /* 选回当前在用型号＝不修改；选成别的＝保存时切换（演示页纯预览，保存本就禁用） */
-    sModel.value = modelSelectEl.value === modelCurrent ? "" : modelSelectEl.value;
+const modelSelectBtn = document.getElementById("modelSelect");
+if (modelSelectBtn) {
+  bindDdBtn(modelSelectBtn);
+  modelSelectBtn.addEventListener("click", () => {
+    if (!modelOptions.length) return;
+    const active = sModel.value || modelCurrent;
+    toggleDd(
+      modelSelectBtn,
+      modelOptions.map((m) => ({
+        id: m.id,
+        label: m.label || m.id,
+        note: m.note,
+        on: m.id === active,
+      })),
+      (id) => {
+        /* 选回当前在用型号＝不修改；选成别的＝保存时切换（演示页纯预览） */
+        pickModel(id === modelCurrent ? "" : id);
+      },
+    );
   });
+}
 
 /* ── 设置栏目切换：点左列目录，右列换内容。「保存设置」只属于
    凭证类栏目（学校 / 教务 / 模型 / QQ）；本地数据即改即存，不亮保存 ── */
@@ -3297,29 +3406,50 @@ function renderSetDots(d) {
 
 /* ── 学校栏目：下拉框选学校 + 随选择出现的教务账号 / 导入课表 ── */
 const schoolSelect = document.getElementById("schoolSelect");
-/* 下拉框选项与选中值：options 来自 /api/settings；选中「其他学校」后下方只出导入入口 */
+let schoolData = null; /* renderSchoolCards 最近一次的数据，选中后重绘按钮文案用 */
+function schoolOptionLabel(o) {
+  return o.id === "custom" ? "其他学校（手动导入课表）" : o.name;
+}
 function renderSchoolCards(d) {
   if (!schoolSelect) return;
-  const school = d.school || {};
+  if (d) schoolData = d;
+  const school = (schoolData && schoolData.school) || {};
   const options = Array.isArray(school.options) ? school.options : [];
   const pickedId = schoolPicked || school.current;
-  schoolSelect.innerHTML = "";
-  options.forEach((o) => {
-    const opt = document.createElement("option");
-    opt.value = o.id;
-    opt.textContent = o.id === "custom" ? "其他学校（手动导入课表）" : o.name;
-    schoolSelect.appendChild(opt);
-  });
-  if (options.some((o) => o.id === pickedId)) schoolSelect.value = pickedId;
+  const picked = options.filter((o) => o.id === pickedId)[0];
+  schoolSelect.textContent = picked
+    ? schoolOptionLabel(picked)
+    : options.length
+      ? "请选择学校"
+      : "读取中…";
 }
-if (schoolSelect)
-  schoolSelect.addEventListener("change", () => {
-    if (!schoolSelect.value) return;
-    /* 演示页同样放行：纯客户端预览，「保存设置」在演示里本就禁用，不落数据 */
-    schoolPicked = schoolSelect.value;
-    /* 选适配学校 → 下方出教务账号表单；选「其他学校」→ 只出导入课表入口 */
-    syncSchoolUi(true);
+if (schoolSelect) {
+  bindDdBtn(schoolSelect);
+  schoolSelect.addEventListener("click", () => {
+    const school = (schoolData && schoolData.school) || {};
+    const options = Array.isArray(school.options) ? school.options : [];
+    if (!options.length) return;
+    const active = schoolPicked || school.current;
+    toggleDd(
+      schoolSelect,
+      options.map((o) => ({
+        id: o.id,
+        label: schoolOptionLabel(o),
+        note: o.manual
+          ? "粘贴 / 上传课表，AI 解析后保存"
+          : "教务系统已适配：课表 / 成绩 / 考试 / 通知",
+        on: o.id === active,
+      })),
+      (id) => {
+        /* 演示页同样放行：纯客户端预览，「保存设置」在演示里本就禁用，不落数据 */
+        schoolPicked = id;
+        renderSchoolCards();
+        /* 选适配学校 → 下方出教务账号表单；选「其他学校」→ 只出导入课表入口 */
+        syncSchoolUi(true);
+      },
+    );
   });
+}
 /* 学校相关 UI 的可见性/文案随「选中态」走：保存前预览，保存后即为现状 */
 function syncSchoolUi(preview) {
   const picked = schoolPicked || (schoolState && schoolState.current) || "njtech";
