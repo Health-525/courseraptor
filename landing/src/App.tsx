@@ -97,9 +97,9 @@ function App() {
         <section className="section wrap screen" id="features" aria-labelledby="features-title">
           <div className="section-head"><div><p className="eyebrow">01 / LESS SEARCHING, MORE LIVING</p><h2 id="features-title">你说一句话，<br />小恐龙来办。</h2></div><p>不是又一个功能菜单，而是一位懂教务、会规划步骤、<br />记得住你的事的 Agent。</p></div>
           <div className="feature-grid">
-            <article className="feature feature-wide"><span className="feature-number">01 — 对话即办事</span><h3>复合请求，<br />一次链式办完。</h3><p>自动理解意图、拆解步骤、调度 31 个内置工具——登录教务、查考试、导日历、设提醒一气呵成，不用自己拆成一次次查询与点击。</p><div className="prompt-pill">“下周三有考试吗？加到手机日历，考前提醒我。”</div><span className="feature-symbol" aria-hidden="true">↗</span></article>
+            <article className="feature feature-wide"><span className="feature-number">01 — 对话即办事</span><h3>复合请求，<br />一次链式办完。</h3><p>自动理解意图、拆解步骤、调度 32 个内置工具——登录教务、查考试、导日历、设提醒一气呵成，不用自己拆成一次次查询与点击。</p><div className="prompt-pill">“下周三有考试吗？加到手机日历，考前提醒我。”</div><span className="feature-symbol" aria-hidden="true">↗</span></article>
             <article className="feature"><span className="feature-number">02 — 思考与记忆</span><h3>过程看得见，<br />越用越懂你。</h3><p>思考过程与工具调用全程可见，可追问、可纠正；两层记忆跨重启续聊、自主沉淀事实，待办到期主动找人提醒。</p><div className="prompt-pill">“上次聊的那个截止日期是哪天？”</div></article>
-            <article className="feature"><span className="feature-number">03 — 三端随叫随到</span><h3>终端、网页、QQ，<br />同一份记忆。</h3><p>TUI、本地网页与 QQ 官方机器人共享同一 Agent 内核、31 个工具与记忆，在哪儿都能一句话办事。</p><div className="prompt-pill">“在哪儿都能找到我。”</div></article>
+            <article className="feature"><span className="feature-number">03 — 三端随叫随到</span><h3>终端、网页、QQ，<br />同一份记忆。</h3><p>TUI、本地网页与 QQ 官方机器人共享同一 Agent 内核、32 个工具与记忆，在哪儿都能一句话办事。</p><div className="prompt-pill">“在哪儿都能找到我。”</div></article>
             <article className="feature"><span className="feature-number">04 — 通知替你读</span><h3>长通知，<br />先读与你有关的。</h3><p>按年级自动标注相关度，附件 Excel 结构化筛选，长文分页续读；关键日期藏在附件里也会被拎出来提醒你。</p><div className="prompt-pill">“这条通知需要我做什么？”</div></article>
             <article className="feature"><span className="feature-number">05 — 数据不出本机</span><h3>凭证加密，<br />隐私优先。</h3><p>教务账号与 API Key 以 AES-256-GCM 加密保存在本机，开源可审计；无需服务器，也不用向任何第三方交出密码。</p><div className="prompt-pill">“Local-first · 开源可审计”</div></article>
           </div>
