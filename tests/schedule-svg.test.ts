@@ -6,7 +6,7 @@
  * 2. 同一时段不同周次的课（冲突）并排分栏，计数值如实；
  * 3. 无节次课程落脚注不入格；周末没课的尾列自动收掉；
  * 4. week 单周：放假日清空并画竖排放假块、调休按被补周几换课表、
- *    单双周过滤、今天列带「·今」标记；
+ *    单双周过滤、导出图不标「今天」（静态存档无当天高亮）；
  * 5. 网页直链 /api/schedule/svg：无缓存如实报错，有缓存按
  *    attachment 下发 image/svg+xml（term 与指定周两种形态）。
  */
@@ -132,7 +132,7 @@ test("week：放假日清空画竖排块，调休日按被补周几上课", () =
   assert.ok(r.svg.includes("测试节 放假"), "放假日画竖排块");
   assert.ok(r.svg.includes("补课"), "调休日角标");
   assert.ok(r.svg.includes("最优化方法"), "周六补的是周三的课");
-  assert.ok(r.svg.includes("·今"), "周二 09-01 是今天");
+  assert.ok(!r.svg.includes("·今"), "导出图是静态存档，不标「今天」");
   // 第 1 周不该出现的：大学英语(9-16 周)、单周体育(3-13 单)
   assert.ok(!r.svg.includes("大学英语"));
   assert.ok(!r.svg.includes("体育"));
