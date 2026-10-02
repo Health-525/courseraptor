@@ -6,22 +6,21 @@
 
 ### Less time navigating academic portals. More time for student life.
 
-**An open-source academic AI assistant for Nanjing Tech University (NJTECH) students only.**
+**An open-source conversational academic agent — currently fully adapted for Nanjing Tech University (NJTECH), usable at other schools via manual timetable import.**
 
 [简体中文](README.md) · **English**
 
 [![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
 [![ISC License](https://img.shields.io/badge/License-ISC-8f2b21)](LICENSE)
 [![Node 24+](https://img.shields.io/badge/Node.js-24%2B-8f2b21?logo=nodedotjs&logoColor=white)](https://nodejs.org/en/download)
-[![Featured](https://img.shields.io/badge/Featured-China_Indie_Dev_List-8f2b21)](https://github.com/1c7/chinese-independent-developer/blob/master/.github/pages/README-Programmer-Edition.md)
 
-[Try the demo](#try-it-without-credentials) · [Discuss](https://github.com/Health-525/courseraptor/discussions) · [Contribute](CONTRIBUTING.md)
+[Try the demo](#try-it-without-credentials) · [Quick start](#use-your-own-academic-account) · [Discuss](https://github.com/Health-525/courseraptor/discussions) · [Contribute](CONTRIBUTING.md)
 
 </div>
 
-CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Use the browser or terminal, with an optional QQ bot connection.
+CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Ask in the terminal, the browser, or QQ — three entrances sharing one agent kernel and one memory store. Everything runs on your own machine: credentials are AES-256-GCM encrypted on disk, there is no telemetry, and it talks to your own DeepSeek API key.
 
-> ⚠️ **The current academic-system integration supports Nanjing Tech University only.** This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project.
+> ⚠️ **The online academic-system integration supports Nanjing Tech University only.** This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project. The [Chinese README](README.md) is the authoritative, fully detailed version.
 
 ## What it does
 
@@ -31,11 +30,14 @@ CourseRaptor brings timetables, grades, exams, academic announcements, and calen
 | How am I doing academically? | GPA, earned credits, failed courses, and grades requiring confirmation |
 | Which general elective categories have I covered? | Passed-course category summaries to help check your own curriculum requirements |
 | When are my exams? | Exam subjects, dates, times, rooms, and seat information |
-| What does this announcement require me to do? | Announcement lists, full text, and supported attachments |
+| What does this announcement require me to do? | Announcement lists with per-grade relevance, full text, and cached attachments (spreadsheet filtering, paginated document reading) |
 | Can I use my phone calendar? | Local `.ics` export; optional publication to a public GitHub/Gitee subscription source |
-| Can I turn this material into a document? | Local document/table reading and Word, Excel, PowerPoint, and PDF generation |
+| Can I turn this material into a document? | Local document/table reading and Word, Excel, PowerPoint, and PDF generation with cross-format conversion |
+| My school is not NJTECH | Manual timetable mode: paste timetable text or upload Excel/CSV/PDF/Word/TXT, and the AI parses it into a structured timetable |
 
-Both screenshots use fictional demo data.
+The agent ships **36 tools** (32 loaded by default — the four course-grabbing tools are real write operations, disabled unless `RAPTOR_ENABLE_GRAB=1`, and always require in-chat confirmation). See [capabilities](docs/capabilities.md) for the full table. A headless CLI ([`skills/njtech-jwgl/`](skills/njtech-jwgl/SKILL.md)) exposes the same academic queries for scripting without touching the LLM.
+
+Both screenshots below use fictional demo data.
 
 **Terminal TUI** — type `raptor` to chat; the first screen shows today's classes, todos, upcoming exams, and latest notices:
 
@@ -65,7 +67,7 @@ To showcase real AI analysis with the same fictional data, run `npm run demo:liv
 
 ## Use your own academic account
 
-Run `npm start`, or double-click `start.bat` on Windows. Follow the prompts to configure your own university credentials and DeepSeek API key. You can also skip the campus account with an empty Enter and fill it in later via the web Settings panel. Provider API usage may incur charges.
+Windows users can grab a self-contained installer (bundled Node runtime, ~110 MB) from [Releases](https://github.com/Health-525/courseraptor/releases/latest) — no development environment needed. From source, run `npm start` (or double-click `start.bat` on Windows). Follow the prompts to configure your university credentials and DeepSeek API key. You can also skip the campus account with an empty Enter and fill it in later via the web Settings panel. Provider API usage may incur charges.
 
 The browser UI usually runs at `http://localhost:3210`; follow the actual startup address if that port is busy. Keep the terminal running. To change your API key securely, enter `/key` without arguments in the terminal.
 
@@ -75,6 +77,7 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 - **LLM**: DeepSeek (default `deepseek-flash` / V4.1-Flash)
 - **Academic protocol**: Custom NJTECH 正方新版 adapter (RSA + CSRF login; course selection reverse-engineered from official frontend)
 - **Web UI**: Single-page Node server (`src/channels/web/`) with push-panel layout, session history, and real-time tool result sync
+- **Ports and adapters**: `src/core/school.ts` defines the `SchoolAdapter` port; core never imports adapters, so adding a school means adding one self-contained directory under `src/adapters/`
 - **Data storage**: Local JSON files only (`data/`, `session.json`, `memory.json`, `credentials.enc`); no database, no cloud sync
 
 ## Project structure (key directories)
@@ -82,21 +85,16 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 ```
 ├── bin/raptor.cjs        # Global CLI entry (npm link)
 ├── docs/                 # Assets & extended docs
-└── src/
-    ├── index.ts          # Terminal entry (spawns QQ bridge if configured)
-    ├── agent.ts          # System prompt + tool registration
-    ├── config.ts         # .env loading (works from any CWD)
-    ├── jwgl/             # NJTECH academic protocol layer
-    │   ├── auth.ts       # RSA + CSRF login
-    │   ├── academics.ts  # Timetable & exams (semester detection, week calc)
-    │   ├── grades.ts     # Grades + GPA + gen-ed categories
-    │   ├── news.ts       # Announcements & attachments
-    │   └── xk.ts         # Course selection protocol
-    ├── web/              # Web UI: chat, hall, /today, /schedule, /todos, /knowledge
-    ├── tools/            # 30 agent tools (schemas + implementations)
-    ├── memory/           # Dual-layer memory (session + long-term facts)
-    ├── qq/               # QQ Official Bot bridge
-    └── ...               # todo, knowledge, pomodoro, weather, attachments, sandbox
+├── skills/njtech-jwgl/   # Headless academic-query skill (no LLM, no tokens)
+├── src/
+│   ├── core/             # School-agnostic kernel: agent, memory, calendar,
+│   │                     # documents, attachments, knowledge + generic tools
+│   ├── adapters/
+│   │   ├── njtech/       # NJTECH implementation: login, schedule, grades,
+│   │   │                 # exams, course selection, notices + school tools
+│   │   └── custom/       # Other schools (manual timetable mode)
+│   └── channels/web/     # Web UI: chat, hall, /today, /todos, /knowledge
+└── local/                # Entrypoints: cli (TUI), qq (bot bridge), demo
 ```
 
 ## Boundaries that matter
@@ -114,13 +112,13 @@ Share the repository URL or an inspected clean installation package, never your 
 
 | University | Capabilities | Adapter maintainer |
 |---|---|---|
-| [Nanjing Tech University](src/adapters/njtech/) (NJTECH) | All 10 capabilities | [@Health-525](https://github.com/Health-525) |
+| [Nanjing Tech University](src/adapters/njtech/) (NJTECH) | All online capabilities | [@Health-525](https://github.com/Health-525) |
 
-Your school not listed? [Request an adapter](https://github.com/Health-525/courseraptor/issues/new?template=request-school.yml) with a few details, or [write one yourself](docs/adapter-guide.md) — adapters are self-contained, Zhengfang-based systems have a full reference implementation to copy from, and merged PRs carry your name as that school's maintainer.
+Other schools work through the manual timetable mode (paste or upload a timetable and let the AI parse it). Your school not listed? [Request an adapter](https://github.com/Health-525/courseraptor/issues/new?template=request-school.yml) with a few details, or [write one yourself](docs/adapter-guide.md) — adapters are self-contained, Zhengfang-based systems have a full reference implementation to copy from, and merged PRs carry your name as that school's maintainer.
 
 ## Build with us
 
-TypeScript, Vercel AI SDK, DeepSeek, and a Node HTTP browser interface. School adapters live in `src/adapters/njtech/` behind the `SchoolAdapter` port (`src/core/school.ts`), generic tool schemas in `src/core/tools/`, and the production/demo shared view in `src/channels/web/chat-page.ts`.
+TypeScript, Vercel AI SDK, DeepSeek, and a Node HTTP browser interface. School adapters live in `src/adapters/` behind the `SchoolAdapter` port (`src/core/school.ts`), generic tools in `src/core/tools/`, and the production/demo shared view in `src/channels/web/`.
 
 ```bash
 npm run typecheck

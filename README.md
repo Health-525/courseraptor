@@ -4,7 +4,7 @@
 
 # 🦖 CourseRaptor
 
-**大学教务对话式 Agent**  
+**大学教务对话式 Agent**
 课表 · 成绩 · 考试 · 学籍 · 教务通知 · 待办 · 知识库 · 记忆，一句话搞定。
 
 [![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
@@ -16,45 +16,109 @@
 
 **[简体中文](README.md) · [English](README.en.md)**
 
-**[🚀 快速开始](#-快速开始) · [🖥️ 界面预览](#️-界面预览) · [✨ 核心能力](#-核心能力) · [🔒 隐私承诺](#-隐私承诺) · [🧩 项目架构](#-项目架构) · [🏗️ 技术栈](#-技术栈) · [📚 文档与社区](#-文档与社区) · [❓ 常见问题](#-常见问题)**
+**[✨ 核心特性](#-核心特性) · [🖥️ 界面预览](#️-界面预览) · [🚀 快速开始](#-快速开始) · [🏫 学校支持](#-学校支持) · [🔒 隐私与安全](#-隐私与安全) · [🧩 项目架构](#-项目架构) · [📚 文档](#-文档) · [❓ 常见问题](#-常见问题)**
 
 </div>
 
 ---
 
+把散落在教务系统各处的信息收进一句对话：问「这周课表」「我的 GPA」「最近的考试」「通识学分还缺哪几类」，agent 自动登录教务、抓取、结构化后回答。**终端敲 `raptor`、浏览器开 `localhost:3210`、QQ 里 @机器人**——三个入口共用同一个 Agent 内核与同一份记忆。
+
+一切都在你自己的电脑上运行：凭证 AES-256-GCM 加密落盘、无遥测上报、教务数据不经第三方；接的是你自己的 DeepSeek Key，按量计费、用量透明。目前对南京工业大学做了全量适配，**其他学校开箱可用「手动课表」模式**；对开发者，这也是一套「Vercel AI SDK + 端口适配器架构」的本地 Agent 完整工程样例。
+
+---
+
+## ✨ 核心特性
+
+Agent 共装备 **36 个工具**（默认装载 32 个：4 个抢课工具属真实写操作，默认关闭，需 `RAPTOR_ENABLE_GRAB=1` 显式开启，且对话中须本人二次确认）。完整参数表、耗时、环境变量与教务模块覆盖见 [📖 能力文档](docs/capabilities.md)。
+
+- **教务全量查询** —— 课表、成绩与 GPA（重修取最高、通识六类统计）、考试、学籍、已选/重修/实验成绩，一句话直查；学期交界自动探测候选学期，不靠日历猜
+- **选课分析（只读）** —— 搜课搜班看余量；多门课自动查各教学班明细，与已选课程做时间冲突检测，覆盖单双周与部分周重叠
+- **通知情报** —— 教务处通知按你的年级标相关度，正文全文直读；附件下载一次即缓存，表格按问题筛选、文档分页续读或关键词定位
+- **日历导出与订阅** —— 整学期 `.ics`（假期自动跳过、调休按周几补课、考试带提醒）导入手机日历；或发布到 Gitee / GitHub 拿订阅链接，课表更新自动刷新
+- **文件与文档** —— 读本地 Word / PDF / Excel / TXT，千行大表按条件取行而非整本塞给模型；沙箱 JS 计算；生成 Word / Excel / PPT / PDF 及跨格式互转，中文原生
+- **记忆 · 知识 · 待办** —— 两层记忆（会话跨重启延续 + 长期事实自主维护）；知识点对话自动沉淀、按课表真实课程归类；待办三端同步，到期桌面通知 + QQ 推送双提醒
+- **手动课表（其他学校）** —— 粘贴课表文字（教务网页表格、Excel、其他课表 App 导出都行）或上传 Excel / CSV / PDF / Word / TXT，AI 解析成结构化课表，拿不准会追问，预览里逐行确认
+- **三端入口** —— 终端 TUI（首屏即今日课表、待办、考试、通知速览）、本地网页「功能大厅」（九大面板、会话管理、文件上传）、QQ 官方机器人（白名单制、零封号）
+- **更多** —— 番茄钟、天气与穿衣建议、模型设置面板、自动更新；另有无头 CLI 可脚本化直查教务，不经模型、不耗 token
+
+---
+
 ## 🖥️ 界面预览
 
-> 截图均为虚构示例数据(演示模式),不代表真实教务信息。
+> 截图均为虚构示例数据（演示模式），不代表真实教务信息。
 
-**终端卡片 TUI** —— 敲 `raptor` 直接开聊,启动首屏即见今日课表、一周待办、临近考试与最新通知:
+**终端卡片 TUI** —— 敲 `raptor` 直接开聊，启动首屏即见今日课表、一周待办、临近考试与最新通知：
 
-<p align="center"><img src="docs/screenshots/tui.png" width="800" alt="终端 TUI 首屏:今日课表、待办、考试与通知速览(虚构示例数据)"></p>
+<p align="center"><img src="docs/screenshots/tui.png" width="800" alt="终端 TUI 首屏：今日课表、待办、考试与通知速览（虚构示例数据）"></p>
 
-**网页对话** —— 浏览器打开 `http://localhost:3210` 即聊,思考过程与工具调用全程可见:
+**网页对话** —— 浏览器打开 `http://localhost:3210` 即聊，思考过程与工具调用全程可见：
 
-<p align="center"><img src="docs/screenshots/gui.png" width="800" alt="网页对话:思考卡片、工具调用与课表回复(虚构示例数据)"></p>
+<p align="center"><img src="docs/screenshots/gui.png" width="800" alt="网页对话：思考卡片、工具调用与课表回复（虚构示例数据）"></p>
 
-**动态演示** —— 从欢迎页、快捷提问到一句话发起查询的完整流程(虚构示例数据):
+**动态演示** —— 从欢迎页、快捷提问到一句话发起查询的完整流程（虚构示例数据）：
 
-<p align="center"><img src="docs/screenshots/gui-demo.gif" width="800" alt="网页端动态演示:快捷提问与一句话查询全流程(虚构示例数据)"></p>
+<p align="center"><img src="docs/screenshots/gui-demo.gif" width="800" alt="网页端动态演示：快捷提问与一句话查询全流程（虚构示例数据）"></p>
 
 ---
 
 ## 🚀 快速开始
 
-同一个 agent，两种入口：终端里敲 `raptor` 直接对话，或浏览器打开 `http://localhost:3210` 用网页版。思考过程、工具调用、每轮问答都会归档进会话历史。不想开对话、只想脚本化查数据？见下方「方式三」无头命令行。
+三种用法按需选：**安装包**（推荐给同学，零开发环境）、**源码运行**（开发者）、**无头命令行**（自动化与二次封装）。无论哪种，思考过程、工具调用与每轮问答都会归档进会话历史。
 
-### 🎮 零门槛先体验：离线演示（可选）
+### 先零门槛体验（可选）
 
-还没配教务账号和 API Key？克隆源码后（按下方「方式二」完成 `git clone` 与 `npm install`），一行命令即可体验正式网页界面：
+还没配教务账号和 API Key？按下方方式二完成 `git clone` 与 `npm install` 后，一行命令进入离线演示：
 
 ```bash
 npm run demo
 ```
 
-- **虚构示例数据 + 剧本式回答**：不读取本机凭证、不连教务系统、不调用模型、对话不落盘
-- 打开终端打印的地址（通常 `http://127.0.0.1:3211`），即可体验与正式版一致的界面和交互
-- 想看真实 AI 对同样的虚构数据做分析：在 `.env` 配好 `DEEPSEEK_API_KEY` 后改跑 `npm run demo:live`（回复来自真实模型、工具仍返回虚构数据，API 用量可能产生费用；没配 Key 会自动退回离线剧本）
+- **虚构示例数据 + 剧本式回答**：不读本机凭证、不连教务、不调模型、对话不落盘
+- 打开终端打印的地址（通常 `http://127.0.0.1:3211`），体验与正式版一致的界面和交互
+- 想看真实 AI 对同样的虚构数据做分析：`.env` 配好 `DEEPSEEK_API_KEY` 后改跑 `npm run demo:live`（回复来自真实模型、工具仍返回虚构数据，API 用量可能产生费用；没配 Key 自动退回离线剧本）
+
+### 方式一：下载安装包（推荐给同学，无需任何开发环境）
+
+到 [Releases](https://github.com/Health-525/courseraptor/releases/latest) 下载任一安装包（约 110 MB，**已内置 Node 运行时**，不用装 Node.js、也不用联网装依赖）。别下页面最底部 GitHub 自动生成的 Source code 包。
+
+- **`portable-win-x64.exe`（最省事，推荐）**：双击即用。exe 放哪、程序就装到哪——首次双击在旁边释放 `CourseRaptor` 文件夹（约 110 MB）后直接进入对话；之后秒开，删文件夹即卸载。**升级 = 新版 exe 放进原文件夹再双击**，账号、记忆、数据全部保留
+- **`portable-win-x64.zip`（绿色版）**：解压后双击文件夹里的 `start.bat`，适合 U 盘携带或机房电脑
+
+首次启动引导录入教务账号和 DeepSeek API Key，加密存本机、之后免填；教务账号可回车跳过，之后在网页「功能大厅 → 设置 → 教务账号」补填。
+
+> 双击没反应或被拦截：安装包未做代码签名（exe 是自释放启动器、zip 里的 `runtime\node.exe` 是 Node 官方运行时），SmartScreen 弹窗选「更多信息 → 仍要运行」，或把安装/解压目录加入杀软信任区。
+
+### 方式二：git 克隆（开发者）
+
+```bash
+git clone https://github.com/Health-525/courseraptor.git
+cd courseraptor
+npm install        # 需 Node.js ≥ 24
+
+# DeepSeek Key：cp .env.example .env 后编辑填入
+# 教务账号：留空即可，首次启动引导录入并加密保存本机；可跳过后在网页设置里补填
+
+npm link           # 注册全局命令（一次即可，任意目录可用）
+raptor             # 启动；项目内也可 npm run dev
+```
+
+常用脚本：`npm run doctor`（环境自检）· `npm test`（node:test，带覆盖率门槛）· `npm run typecheck && npm run lint`（类型 + Biome 检查）。
+
+### 方式三：无头命令行（自动化 / 二次封装，不消耗 token）
+
+仓库内置技能 [`skills/njtech-jwgl/`](skills/njtech-jwgl/SKILL.md) 把南京工业大学教务查询（课表 / 成绩 / 考试 / 通知 / 学籍 / 选课）封装成无头 CLI——**不经过 LLM 对话、不消耗 DeepSeek token**。需按方式二克隆源码并配好教务账号（无需 DeepSeek Key）。
+
+```bash
+npm run njtech -- schedule            # 课表
+npm run njtech -- grades              # 成绩
+npm run njtech -- news 公告通知 5      # 通知列表
+npm run njtech -- search-courses 高等数学
+```
+
+12 个子命令：`schedule` · `grades` · `exams` · `lab-grades` · `news` · `student-info` · `enrolled-courses` · `retake-courses` · `selection-status` · `search-courses` · `search-classes` · `watch`。协议细节与安全红线见 [SKILL.md](skills/njtech-jwgl/SKILL.md) 与其 `references/`。
+
+> 抢课 / 退课属真实写操作，**不进无头 CLI**，仅交互式 `raptor` 可用且需本人二次确认。
 
 <details>
 <summary><b>💻 系统要求</b>（点开查看）</summary>
@@ -69,108 +133,35 @@ npm run demo
 
 </details>
 
-### 方式一：下载安装包（推荐给同学，无需任何开发环境）
-
-到 [Releases](https://github.com/Health-525/courseraptor/releases/latest) 下载任一安装包（约 110 MB，**已内置 Node 运行时，不用装 Node.js、也不用联网装依赖**）。别下页面最底部 GitHub 自动生成的 Source code 包。
-
-- **`portable-win-x64.exe`（最省事，推荐）**：双击即用。**exe 放哪、程序就装到哪**——首次双击会在 exe 旁边释放出 `CourseRaptor` 文件夹（约 110MB），然后直接进入对话；之后每次双击都是秒开，删除文件夹即卸载。**升级 = 把新版 exe 放进原来的文件夹再双击**，账号、记忆、数据全部保留。
-- **`portable-win-x64.zip`（绿色版）**：右键 →「全部解压缩」，双击文件夹里的 **`start.bat`**。适合 U 盘携带或机房电脑。
-
-首次启动会引导录入教务账号和 DeepSeek API Key，加密存在本机，之后免填；教务账号也可直接回车跳过，之后在网页「功能大厅 → 设置 → 教务账号」里补填。
-
-> 双击没反应或被拦截：安装包未做代码签名（exe 是自释放启动器、zip 里的 `runtime\node.exe` 是 Node 官方运行时），SmartScreen 弹窗选「更多信息 → 仍要运行」，或把安装/解压目录加入杀软信任区。
-
-### 方式二：git 克隆（开发者）
-
-```bash
-# 1. 克隆 & 安装
-git clone https://github.com/Health-525/courseraptor.git
-cd courseraptor && npm install
-
-# 2. 配置凭证
-#    DeepSeek Key：cp .env.example .env 后编辑填入
-#    教务账号：留空即可，首次启动 raptor 引导录入并加密保存本机；引导时回车可跳过，跳过后在网页「功能大厅 → 设置 → 教务账号」里补填
-
-# 3. 注册全局命令（一次即可，任意目录可用）
-npm link
-
-# 4. 启动
-raptor                 # 全局命令
-npm run dev            # 或项目内开发模式
-```
-
-### 方式三：无头命令行（适合二次封装 / 自动化，不消耗 token）
-
-不想开对话也能查：仓库内置技能 [`skills/njtech-jwgl/`](skills/njtech-jwgl/SKILL.md)，把南京工业大学教务查询（课表 / 成绩 / 考试 / 通知 / 学籍 / 选课）封装成可脚本化、可被 agent 直接调用的无头 CLI——**不经过 LLM 对话、不消耗 DeepSeek token**。需按方式二克隆源码，并配置好教务账号（无需 DeepSeek Key）。
-
-```bash
-# 无头查询（在项目根目录执行）
-npx tsx skills/njtech-jwgl/scripts/query.ts schedule
-npx tsx skills/njtech-jwgl/scripts/query.ts grades
-npx tsx skills/njtech-jwgl/scripts/query.ts news 公告通知 5
-
-# 或用 npm 快捷命令（参数跟在 -- 之后）
-npm run njtech -- schedule
-npm run njtech -- search-courses 高等数学
-```
-
-可用命令：`schedule` · `grades` · `exams` · `lab-grades` · `news` · `student-info` · `enrolled-courses` · `retake-courses` · `selection-status` · `search-courses` · `search-classes` · `watch`。完整说明、协议细节与安全红线见 [`skills/njtech-jwgl/SKILL.md`](skills/njtech-jwgl/SKILL.md) 与其 `references/`。
-
-> 抢课 / 退课属真实写操作，**不在此脚本内**，仅走交互式 `raptor` 且需本人二次确认。
-
 ---
 
-## 🎯 适用人群
-
-- **南京工业大学在校学生**：想用对话方式查课表、看成绩、订考试日历、记待办、沉淀知识点
-- **想体验本地化 AI Agent 的开发者**：Vercel AI SDK + DeepSeek + 自研教务协议的完整工程样例
-- **关注隐私的用户**：**全本地运行，数据不出设备**，凭证 AES-256-GCM 加密落盘，无任何遥测上报
-
----
-
-## 🏫 已适配学校
+## 🏫 学校支持
 
 | 学校 | 能力面 | 适配维护者 |
 |------|--------|-----------|
-| [南京工业大学](src/adapters/njtech/)（NJTECH） | 全部 10 项能力（课表/成绩/考试/学籍/通知/选课…） | [@Health-525](https://github.com/Health-525) |
+| [南京工业大学](src/adapters/njtech/)（NJTECH） | 全部在线能力（课表/成绩/考试/学籍/通知/选课…） | [@Health-525](https://github.com/Health-525) |
 
-设置第一栏先选学校：已适配学校填教务账号即可自动抓取；**其他学校走「手动课表」模式**——把课表粘贴成文字（教务网页复制的表格、Excel 内容、其他课表 App 的导出文本都行）或上传 Excel / CSV / PDF / Word / TXT 文件，AI 解析成结构化课表，拿不准的会追问，预览里逐行改完确认，课表 / 今日日程 / 周次推算照常可用。
+设置第一栏先选学校：已适配学校填教务账号即可自动抓取；**其他学校走「手动课表」模式**——粘贴或上传课表，AI 解析成结构化课表，课表 / 今日日程 / 周次推算照常可用。
 
-你的学校不在列表？三条路：先用**手动课表**顶着，**[请求适配](https://github.com/Health-525/courseraptor/issues/new?template=request-school.yml)**（把学校信息留给社区），或者**[自己动手写一个](docs/adapter-guide.md)**——适配层完全自包含，正方系学校的登录与查询逻辑有现成参考实现，PR 合并后你就是这所学校的署名维护者。
+你的学校不在列表？三条路：先用**手动课表**顶着，**[请求适配](https://github.com/Health-525/courseraptor/issues/new?template=request-school.yml)**（把学校信息留给社区），或**[自己动手写一个](docs/adapter-guide.md)**——适配层完全自包含，正方系学校的登录与查询逻辑有现成参考实现，PR 合并后你就是这所学校的署名维护者。
 
 ---
 
-## 🔒 隐私承诺
+## 🔒 隐私与安全
 
 | 承诺 | 实现方式 |
 |------|----------|
-| 数据不出设备 | 所有教务查询、文件解析、文档生成、记忆存储均在本机完成 |
-| 凭证加密存储 | 教务密码、API Key、QQ 机器人密钥均经 AES-256-GCM 加密写入 `credentials.enc` |
+| 数据不出设备 | 教务查询、文件解析、文档生成、记忆与知识库存储均在本机完成 |
+| 凭证加密存储 | 教务密码、API Key、QQ 机器人密钥均经 AES-256-GCM 加密写入 `credentials.enc`（密钥绑定本机指纹，拷走的文件在别的电脑解不开） |
 | 无遥测/上报 | 代码中无任何统计埋点、错误上报、使用情况收集逻辑 |
 | 可审计 | 完全开源，`src/` 下所有网络请求、文件读写、加密逻辑均可直接阅读 |
 
----
+安全细节：
 
-## ✨ 核心能力
-
-Agent 默认可调用 **31 个工具**，覆盖十大能力线。完整参数表、耗时、环境变量、教务模块覆盖清单见 [📖 完整能力文档](docs/capabilities.md)。
-
-| 📚 教务查询 | 📰 通知情报 | 📁 文件与数据 | ✍️ 文档写作 | 🕐 时间·日历·天气 |
-|-------------|-------------|---------------|-------------|-------------------|
-| 课表/成绩/考试/学籍/已选/重修/实验成绩/选课状态/搜课/搜教学班/**选课冲突对比** | 通知列表(按年级标相关度) / 正文全文 / 附件下载缓存+表格筛选+文档分页读 | 本地文件读取 / Excel 筛选查询 / 沙箱 JS 计算 / 附件缓存管理 | Word/Excel/PPT/PDF 生成 / 跨格式转换 | 日期教学周 / 放假调休落盘 / .ics 导出与订阅 / 天气穿衣建议 |
-
-| 🧠 两层记忆 | 📝 待办提醒 | 📚 知识库 | 🍅 番茄钟 | 💬 QQ 接入 |
-|-------------|-------------|-----------|-----------|------------|
-| 短期会话跨重启延续 / 长期事实自主维护(合并/过期/归档) | 随口记、到期自动提醒(桌面+QQ)、三端同步 | 对话自动沉淀、按课程归类、多入口检索 | 对话开计时、网页实时倒计时 | 官方机器人零封号、白名单制、对话双向归档 |
-
----
-
-## 📡 已知状态与边界
-
-- 学期交界期课表/考试查询为**候选学期探测**，不依赖日历日期推断；开学日期按校历维护（未知学期按 9 月/3 月第一个周一估算并标注）。
-- 课表查询自动叠加**放假/调休覆盖**：假期日整周标注「放假」、调休补课日按被换周几的课表补出行；具体安排由 agent 读教务处通知后经 `set_holidays` 落盘到 `data/term-holidays.json`。
-- 教务线路偶发抖动：所有登录内置 5 次线性退避重试（2/4/6/8s，统一走 core/http 的 withRetry），单学期成绩查询带重试。
-- **教务模块覆盖**：已接入 31 个工具；学校侧停用 6 个模块（空闲教室、班级课表等）；申请/流程类 30+ 项暂未接入。详见 [完整文档](docs/capabilities.md#-教务系统模块覆盖清单55-个菜单模块)。
+- 网页服务仅监听 `127.0.0.1`：Host / Origin 校验、写请求须携带 CSRF token、仅认 `application/json`
+- 学籍敏感字段（证件号/银行卡/考生号）返回时自动打码；沙箱 JS 无网络无磁盘、超时截断
+- `.env`、`session.json`、`memory.json`、`data/chat-sessions.json` 等含个人数据的文件已被 `.gitignore` 排除，**切勿提交或分享**
+- 「本地运行」不等于完全离线：提示词与相关查询结果会发给你配置的模型服务商；附件云解析仅用于公开网站，教务数据一律本地直连、不经第三方
 
 ---
 
@@ -184,17 +175,11 @@ Agent 默认可调用 **31 个工具**，覆盖十大能力线。完整参数表
   </picture>
 </p>
 
-**本地优先（Local-first）**：交互入口、Agent 内核、两层记忆与知识库全部跑在本机，数据不出电脑；教务系统、天气等外部服务仅在查询时按需访问。各层用到的技术与模块对照见 [🏗️ 技术栈](#️-技术栈)。
+**本地优先（Local-first）**：交互入口、Agent 内核、两层记忆与知识库全部跑在本机，数据不出电脑；教务系统、天气等外部服务仅在查询时按需访问。
 
----
+**技术栈**：[Vercel AI SDK v7](https://ai-sdk.dev)（`ToolLoopAgent` + `runAgentTUI`）· DeepSeek（默认 `deepseek-flash`，即 V4.1-Flash）· TypeScript + Node 内置 HTTP（网页端零框架）· Biome + node:test
 
-## 🏗️ 技术栈
-
-- **Agent**：[Vercel AI SDK v7](https://ai-sdk.dev)（`ToolLoopAgent` + `runAgentTUI`）
-- **LLM**：DeepSeek（默认 `deepseek-flash`，即 V4.1-Flash）
-- **教务协议**：NJTECH 正方新版适配层（RSA + CSRF 登录；选课接口逆向自官方前端）
-
-**项目结构概览**（完整树见 [完整文档](docs/capabilities.md#-项目结构完整树)）：
+**项目结构**（完整树见 [能力文档](docs/capabilities.md#-项目结构完整树)）：
 
 ```
 ├── bin/raptor.cjs      # 全局命令入口
@@ -203,18 +188,21 @@ Agent 默认可调用 **31 个工具**，覆盖十大能力线。完整参数表
 ├── src/                # 公用核心（与运行形态无关）
 │   ├── core/           # 学校无关内核：agent/记忆/日历/文档/附件/知识库等 + 通用工具
 │   ├── adapters/       # 学校适配层：core/school.ts 定义的 SchoolAdapter 端口
-│   │   └── njtech/     # 南京工业大学实现（登录/课表/成绩/考试/选课/通知 + 教务工具）
+│   │   ├── njtech/     # 南京工业大学实现（登录/课表/成绩/考试/选课/通知 + 教务工具）
+│   │   └── custom/     # 其他学校（手动课表模式）
 │   └── channels/       # 输出渠道：web（网页版）
 └── local/              # 本地版入口：cli（终端 TUI）、qq（机器人）、demo（离线演示）
 ```
 
+核心与适配层以 `SchoolAdapter` 端口解耦：`src/core/` 永不反向依赖任何学校实现，新增一所学校 = 新增一个自包含的 `src/adapters/<school>/` 目录。
+
 ---
 
-## 📚 文档与社区
+## 📚 文档
 
 | 想做什么 | 去哪里 |
 |------|------|
-| 看全部 31 个工具的参数、耗时、环境变量、教务模块覆盖 | [完整能力文档](docs/capabilities.md) |
+| 查工具参数、耗时、环境变量、教务模块覆盖 | [能力文档](docs/capabilities.md) |
 | 我是同学，想看图文上手指南 | [同学使用指南](docs/student-guide.md) |
 | 查环境变量、凭证、QQ 机器人等配置项 | [配置参考](docs/configuration.md) |
 | 给自己的学校写适配层 | [适配指南](docs/adapter-guide.md) |
@@ -233,38 +221,10 @@ Agent 默认可调用 **31 个工具**，覆盖十大能力线。完整参数表
 
 ---
 
-## 🔐 安全提示
-
-- `.env` 含教务密码与 API Key，**切勿提交或分享**（建议个人设备使用；更高安全性可留空密码、运行时交互输入）。
-- 网页服务仅监听 127.0.0.1，多层防线：Host/Origin 校验、写请求须携带 CSRF token、仅认 application/json。
-- 本地敏感文件**请勿分享**：`session.json`（完整对话含学号/成绩）、`memory.json`、`qq-allowlist.json`、`data/chat-sessions.json`（网页+QQ 双渠道对话）。
-- 学籍敏感字段（证件号/银行卡/考生号）返回时自动打码。
-- 附件云解析仅用于公开网站；教务数据一律本地直连，不经第三方。
-
----
-
-## 🗑️ 卸载与清理
-
-```bash
-# 1. 取消全局命令
-npm unlink
-
-# 2. 删除项目目录
-rm -rf courseraptor
-
-# 3. 清理本地数据（可选，含凭证/记忆/会话/待办/知识库/日历/附件缓存）
-rm -rf data/
-rm -f credentials.enc session.json memory.json qq-allowlist.json
-```
-
-> ⚠️ 执行第 3 步前请确认已备份重要数据。
-
----
-
 ## ❓ 常见问题
 
 **双击安装包没反应，或被系统 / 杀软拦截？**
-安装包未做代码签名（exe 是自释放启动器、zip 里的 `runtime\node.exe` 是 Node 官方运行时），SmartScreen 弹窗选「更多信息 → 仍要运行」，或把安装 / 解压目录加入杀软信任区（见上文「方式一」的说明）。
+安装包未做代码签名（exe 是自释放启动器、zip 里的 `runtime\node.exe` 是 Node 官方运行时），SmartScreen 弹窗选「更多信息 → 仍要运行」，或把安装 / 解压目录加入杀软信任区。
 
 **没有 DeepSeek API Key，能先用吗？**
 可以先跑上面的离线演示，零凭证体验界面。正式对话需要自己的 Key（在 DeepSeek 开放平台注册获取，按量计费）；教务账号可以跳过，之后在网页「功能大厅 → 设置 → 教务账号」补填。
@@ -273,10 +233,13 @@ rm -f credentials.enc session.json memory.json qq-allowlist.json
 以终端启动时打印的实际地址为准（默认 `http://127.0.0.1:3210`，被占用会自动换端口）；页面表现异常先 `Ctrl+F5` 强刷缓存。
 
 **课表 / 考试查出来是空的，或学期不对？**
-学期交界期为候选学期探测，不依赖日历日期推断，可在对话里切换学期重查；开学日期按校历维护，未知学期按 9 月 / 3 月第一个周一估算并标注（见上文「已知状态与边界」）。
+学期交界期为候选学期探测，不依赖日历日期推断，可在对话里切换学期重查；开学日期按校历维护，未知学期按 9 月 / 3 月第一个周一估算并标注。放假 / 调休会在 agent 读到教务处通知后自动叠加进课表与日历。
 
 **我的数据都存在哪，怎么彻底删除？**
-全部在本机：`data/`、`credentials.enc`、`session.json`、`memory.json` 等，删除步骤见下文「🗑️ 卸载与清理」。
+全部在本机：`data/`、`credentials.enc`、`session.json`、`memory.json` 等。安装包版删除 `CourseRaptor` 文件夹即净卸载；源码版先 `npm unlink` 再删项目目录，本地数据清理步骤见[能力文档](docs/capabilities.md)「卸载与清理」一节。
+
+**怎么把 agent 挂到 QQ 上？**
+走腾讯官方机器人路线（零封号）：网页「功能大厅 → 设置」填 AppID / AppSecret / 激活暗号即可上线，QQ 里发暗号完成授权；细节见[能力文档](docs/capabilities.md)「QQ 接入」一节。
 
 更多问题欢迎到 [GitHub Discussions](https://github.com/Health-525/courseraptor/discussions) 提问。
 
