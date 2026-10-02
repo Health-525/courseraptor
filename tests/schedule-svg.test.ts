@@ -98,7 +98,9 @@ test("term：同时段不同周次并排分栏，计数如实", () => {
   const r = renderTermScheduleSVG({ courses: fixtureCourses(), termLabel: TERM_LABEL });
   assert.equal(r.counts.cells, 3);
   assert.equal(r.counts.splitSlots, 1, "周三 1-2 节两门课算一个并排时段");
-  assert.ok(r.svg.includes("大学英语"));
+  // 窄卡里课名会折行，断言用去标签的纯文本（折行不破坏连续性）
+  const plain = r.svg.replace(/<[^>]+>/g, "");
+  assert.ok(plain.includes("大学英语"));
 });
 
 test("term：无节次课落脚注，空周末尾列收掉", () => {
