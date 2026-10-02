@@ -5,16 +5,31 @@
 
 import path from "node:path";
 import { z } from "zod";
-import { loadCredentialsStore } from "./credentials";
+import { type CredentialsStore, loadCredentialsStore } from "./credentials";
 import { resolveStoredModel } from "./models";
-
 // 项目根目录解析独立成 paths.ts，避免与 credentials.ts 循环依赖
 import { PROJECT_ROOT as ROOT } from "./paths";
+import {
+  getProviderDef,
+  normalizeCustomBaseUrl,
+  providerBaseUrl,
+  resolveProviderId,
+} from "./providers";
 export const PROJECT_ROOT = ROOT;
 
 export type DeepSeekApiKeySource = "env" | "encrypted" | "unset";
 
 export interface RaptorConfig {
+  /** 当前模型供应商 id（内置厂商之一；缺省 deepseek，历史行为零改动） */
+  providerId: string;
+  /** 当前供应商显示名（给 UI 的摘要） */
+  providerLabel: string;
+  /** 当前供应商的 OpenAI 兼容端点（custom = 解析后的自填地址） */
+  providerBaseUrl: string;
+  /** custom 供应商的自填端点（其余供应商为空串） */
+  customBaseUrl: string;
+  /** 多用户网关注入 RAPTOR_HOSTED=1；本地版恒 false（探测显隐红线） */
+  hosted: boolean;
   deepseekApiKey: string;
   /** 仅供状态展示，UI 不得读取 deepseekApiKey 明文。 */
   deepseekApiKeySource: DeepSeekApiKeySource;
@@ -109,14 +124,15 @@ export interface ResolvedDeepSeekApiKey {
 }
 
 /**
- * 交互式 /key 明确确认的覆盖值优先于 .env：否则成功提示后重启又回到旧值，
- * 用户无法可靠地更换密钥。未标记覆盖的历史加密值仍保持 .env 优先。
+ * 交互式保存（/key、设置弹窗）明确确认的覆盖值优先于 .env：否则成功提示后
+ * 重启又回到旧值，用户无法可靠地更换密钥。未标记覆盖的历史加密值仍保持
+ * .env 优先。适用于任意供应商（历史名保留，语义未变）。
  *
  * 多用户网关部署时注入 RAPTOR_DISABLE_DS_OVERRIDE=1：该同学选了「站点
  * 免费额度」模式——加密保存的自己 Key 保留不删，但本轮会话改用站点 Key
  * （.env 层）。本地版从不设置此变量，行为不变。
  */
-export function resolveDeepSeekApiKey(input: {
+export function resolveProviderApiKey(input: {
   environmentKey?: string;
   storedKey?: string;
   storedOverride?: boolean;
@@ -128,6 +144,26 @@ export function resolveDeepSeekApiKey(input: {
   if (input.environmentKey) return { key: input.environmentKey, source: "env" };
   if (input.storedKey) return { key: input.storedKey, source: "encrypted" };
   return { key: "", source: "unset" };
+}
+
+/** @deprecated 历史名：逻辑已泛化到全部供应商，新代码用 resolveProviderApiKey */
+export const resolveDeepSeekApiKey = resolveProviderApiKey;
+
+/**
+ * 各供应商 Key 的有效视图：新格式 providerKeys（存在即明确保存过）合并
+ * 旧格式 deepseekApiKey(+Override) 的迁移映射——存量凭证不用重存就生效。
+ */
+export function effectiveProviderKeys(stored: CredentialsStore | null): {
+  keys: Record<string, string>;
+  overrides: Record<string, boolean>;
+} {
+  const keys: Record<string, string> = { ...(stored?.providerKeys ?? {}) };
+  const overrides: Record<string, boolean> = { ...(stored?.providerKeyOverrides ?? {}) };
+  if (stored?.deepseekApiKey && keys.deepseek === undefined) {
+    keys.deepseek = stored.deepseekApiKey;
+    overrides.deepseek = stored.deepseekApiKeyOverride === true;
+  }
+  return { keys, overrides };
 }
 
 /** 脱敏展示：永远不完整回显；过短或不规范值只表明已配置。 */
@@ -181,13 +217,26 @@ function parseRateLimit(): { rps: number; burst: number } {
 
 function loadConfig(): RaptorConfig {
   const stored = loadCredentialsStore();
-  const resolvedKey = resolveDeepSeekApiKey({
-    environmentKey: env("DEEPSEEK_API_KEY"),
-    storedKey: stored?.deepseekApiKey,
-    storedOverride: stored?.deepseekApiKeyOverride,
+  // 供应商解析：网关注入（RAPTOR_PROVIDER_ID）优先于本地保存的选择，
+  // 都没有就是 deepseek——本地版什么都不配时历史行为零改动。
+  const providerId = resolveProviderId(env("RAPTOR_PROVIDER_ID") ?? stored?.providerId);
+  const def = getProviderDef(providerId);
+
+  const { keys: providerKeys, overrides: providerOverrides } = effectiveProviderKeys(stored);
+  const resolvedKey = resolveProviderApiKey({
+    environmentKey:
+      env("RAPTOR_PROVIDER_KEY") ??
+      (providerId === "deepseek" ? env("DEEPSEEK_API_KEY") : undefined),
+    storedKey: providerKeys[providerId],
+    storedOverride: providerOverrides[providerId] === true,
     disableOverride: env("RAPTOR_DISABLE_DS_OVERRIDE") === "1",
   });
-  if (resolvedKey.key) process.env.DEEPSEEK_API_KEY = resolvedKey.key;
+  // 回写进程环境：llm.ts 的 fetch 包装每请求读 RAPTOR_PROVIDER_KEY（热生效），
+  // DeepSeek 官方包读 DEEPSEEK_API_KEY（历史路径）。
+  if (resolvedKey.key) {
+    process.env.RAPTOR_PROVIDER_KEY = resolvedKey.key;
+    if (providerId === "deepseek") process.env.DEEPSEEK_API_KEY = resolvedKey.key;
+  }
 
   const resolvedQQ = resolveQQBotCredentials({
     environmentAppId: env("QQBOT_APP_ID"),
@@ -198,14 +247,31 @@ function loadConfig(): RaptorConfig {
     storedPasscode: stored?.qqBotPasscode,
   });
 
+  // custom 端点是「custom 供应商的持久配置」：与当前选的供应商无关地保留
+  // （切到别家再切回来地址还在）；.env 可选覆盖（RAPTOR_CUSTOM_BASE_URL），
+  // 坏值按未配置处理，绝不让畸形 URL 进请求层。
+  const customRaw = env("RAPTOR_CUSTOM_BASE_URL") ?? stored?.customBaseUrl;
+  const customBaseUrl = normalizeCustomBaseUrl(customRaw).url;
+
   const config: RaptorConfig = {
+    providerId,
+    providerLabel: def.label,
+    providerBaseUrl:
+      providerId === "deepseek" && env("DEEPSEEK_BASE_URL")
+        ? (env("DEEPSEEK_BASE_URL") as string)
+        : providerBaseUrl(providerId, customBaseUrl),
+    customBaseUrl,
+    hosted: env("RAPTOR_HOSTED") === "1",
     deepseekApiKey: resolvedKey.key,
     deepseekApiKeySource: resolvedKey.source,
     deepseekBaseUrl: env("DEEPSEEK_BASE_URL"),
     model: resolveStoredModel({
-      environmentModel: env("RAPTOR_MODEL"),
-      storedModel: stored?.model,
-      storedOverride: stored?.modelOverride,
+      environmentModel: providerId === "deepseek" ? env("RAPTOR_MODEL") : undefined,
+      // 每供应商的型号记忆优先；全局 model 字段是旧格式回退
+      storedModel: stored?.providerModels?.[providerId] ?? stored?.model,
+      storedOverride: stored?.providerModels?.[providerId]
+        ? true
+        : (stored?.modelOverride ?? false),
     }),
     jwglUsername: env("JWGL_USERNAME") ?? "",
     jwglPassword: env("JWGL_PASSWORD") ?? "",

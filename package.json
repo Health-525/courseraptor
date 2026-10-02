@@ -53,6 +53,7 @@
   "type": "module",
   "dependencies": {
     "@ai-sdk/deepseek": "^3.0.54",
+    "@ai-sdk/openai-compatible": "^3.0.62",
     "@ai-sdk/tui": "^1.0.117",
     "@resvg/resvg-js": "^2.6.2",
     "@tencent-connect/qqbot-nodejs": "^1.0.4",

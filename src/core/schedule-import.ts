@@ -258,15 +258,11 @@ export async function parseScheduleImport(
 export async function installDefaultScheduleParser(): Promise<void> {
   if (defaultInstalled) return;
   const { generateText } = await import("ai");
-  const { createDeepSeek } = await import("@ai-sdk/deepseek");
-  const { config } = await import("./config");
-  const deepseek = createDeepSeek(
-    config.deepseekBaseUrl ? { baseURL: config.deepseekBaseUrl } : {},
-  );
+  const { buildLanguageModel } = await import("./llm");
   defaultInstalled = true;
   setScheduleParser(async (prompt) => {
     const result = await generateText({
-      model: deepseek(config.model),
+      model: buildLanguageModel(),
       prompt,
       maxOutputTokens: 6000,
       abortSignal: AbortSignal.timeout(90_000),

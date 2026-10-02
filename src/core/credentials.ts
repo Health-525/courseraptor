@@ -38,10 +38,26 @@ export interface CredentialsStore {
   deepseekApiKey?: string;
   /** 经 /key 明确确认的本机覆盖值；启动时优先于 .env。 */
   deepseekApiKeyOverride?: boolean;
-  /** 设置弹窗里选定的 DeepSeek 型号 */
+  /**
+   * 设置里选定的模型供应商 id（内置厂商之一）。本地版保存于此；托管版
+   * 由网关 users.json 管理并经 RAPTOR_PROVIDER_ID 注入，不落在这里。
+   */
+  providerId?: string;
+  /**
+   * 各供应商的 API Key（每家一把，切换供应商不丢已存的 Key）。存在即
+   * 「用户明确保存过」，启动时优先于环境注入的站点 Key。
+   */
+  providerKeys?: Record<string, string>;
+  /** 历史兼容：仅 providerKeys.deepseek 早期版本的 override 标记 */
+  providerKeyOverrides?: Record<string, boolean>;
+  /** custom：自定义 OpenAI 兼容端点地址（仅本地版可用，托管版拒绝保存） */
+  customBaseUrl?: string;
+  /** 设置弹窗里选定的型号（随供应商切换各自记忆，见 providerModels） */
   model?: string;
   /** 用户在界面上明确选过型号；启动时优先于 .env 的 RAPTOR_MODEL。 */
   modelOverride?: boolean;
+  /** 各供应商分别记住的型号选择（切换供应商后回到上次用的那家型号） */
+  providerModels?: Record<string, string>;
   /** QQ 官方机器人（q.qq.com）：设置面板保存，AppID 与 Secret 成对 */
   qqBotAppId?: string;
   qqBotAppSecret?: string;

@@ -202,6 +202,26 @@ export function createRegistry({ stateDir }) {
       });
     },
 
+    /**
+     * 模型供应商选择（多厂商）：合法形状的内置厂商 id。custom 一律拒绝——
+     * 托管实例的自定义端点会成为探测内网的口子（SSRF），语义清单见
+     * src/core/providers.ts；实例侧对未知 id 回落 deepseek，这里只挡脏数据。
+     */
+    async setProviderId(id, providerId) {
+      return serialized(async () => {
+        const users = (await readUsers()).users;
+        const user = users.find((u) => u.id === id);
+        if (!user) throw new Error("用户不存在");
+        const value = typeof providerId === "string" ? providerId.trim() : "";
+        if (value === "custom") throw new Error("托管环境不支持自定义端点");
+        if (value && !/^[a-z][a-z0-9-]{0,20}$/.test(value)) {
+          throw new Error("供应商标识不合法");
+        }
+        user.providerId = value || "deepseek";
+        await writeUsers(users);
+      });
+    },
+
     async turnsToday(id) {
       const user = await this.findUserById(id);
       if (!user) return 0;

@@ -10,7 +10,6 @@ import { tool } from "ai";
 import { z } from "zod";
 import { isSessionExpiredError } from "../../../core/errors";
 import {
-  NJTECH_PERIOD_TIMES,
   parseSksjSegments,
   periodTimeRange,
   type SkwjSegment,

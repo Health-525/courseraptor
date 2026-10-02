@@ -42,7 +42,7 @@ import {
   resetAll,
   updateSession,
 } from "../../core/chat-sessions";
-import { config } from "../../core/config";
+import { config, effectiveProviderKeys } from "../../core/config";
 import { loadCredentialsStore, saveCredentialsStore } from "../../core/credentials";
 import { generatedDir } from "../../core/document/save";
 import { loadGradesCache } from "../../core/grades-cache";
@@ -65,7 +65,7 @@ import { relevanceOf } from "../../core/notices";
 import {
   getDeepSeekKeyStatus,
   getQQBotStatus,
-  setDeepSeekApiKey,
+  setProviderApiKey,
   setQQBotCredentials,
 } from "../../core/onboarding";
 import { isInsideDir } from "../../core/paths";
@@ -76,6 +76,14 @@ import {
   type PomodoroView,
   toView,
 } from "../../core/pomodoro";
+import {
+  CUSTOM_PROVIDER_ID,
+  getProviderDef,
+  normalizeCustomBaseUrl,
+  providerBaseUrl,
+  providerOptionList,
+  resolveProviderId,
+} from "../../core/providers";
 import { loadScheduleCache, saveScheduleCache } from "../../core/schedule-cache";
 import {
   hasScheduleParser,
@@ -686,9 +694,18 @@ function settingsPayload() {
     },
     deepseek: { ...ds, sourceLabel: SOURCE_LABEL[ds.source] ?? ds.source },
     qq: { ...qq, sourceLabel: SOURCE_LABEL[qq.source] ?? qq.source },
+    /** 供应商选择（AI 模型栏第一行）：当前 + 候选 + custom 端点 */
+    provider: {
+      current: config.providerId,
+      label: config.providerLabel,
+      options: providerOptionList(),
+      customBaseUrl: config.customBaseUrl,
+      /** 托管版禁自定义端点（防实例探测内网），前端据此隐藏 custom 选项 */
+      hosted: config.hosted,
+    },
     model: config.model,
     /** 下拉候选：只读同步缓存/兜底清单，联网刷新走 GET /api/models，别卡住弹窗 */
-    models: cachedModelOptions(),
+    models: cachedModelOptions(config.providerId),
     /** 输入框上方「提示词」模板的当前生效清单（未自定义时为默认） */
     quickQuestions: effectiveQuickQuestions(creds?.webQuickQuestions),
     /** 学校选择（设置第一栏）：当前学校 + 可选清单 + 手动课表状态 */
@@ -712,6 +729,11 @@ function settingsPayload() {
   };
 }
 
+/** 预览其他供应商清单的 Key：只从加密存储取该供应商已存值（没存过就走兜底清单） */
+function providerKeyPreview(providerId: string): string {
+  return effectiveProviderKeys(loadCredentialsStore()).keys[providerId] ?? "";
+}
+
 async function runDiagnostic(target: unknown): Promise<SettingResult> {
   if (target === "jwgl") {
     if (!config.jwglUsername || !config.jwglPassword) {
@@ -732,7 +754,7 @@ async function runDiagnostic(target: unknown): Promise<SettingResult> {
     if (!config.deepseekApiKey) {
       return { field: "deepseek", ok: false, message: "请先保存 API Key" };
     }
-    const base = (config.deepseekBaseUrl || "https://api.deepseek.com/v1").replace(/\/+$/, "");
+    const base = config.providerBaseUrl.replace(/\/+$/, "");
     try {
       const response = await fetch(`${base}/models`, {
         headers: { Authorization: `Bearer ${config.deepseekApiKey}` },
@@ -748,7 +770,11 @@ async function runDiagnostic(target: unknown): Promise<SettingResult> {
               : `模型连接失败：服务返回 HTTP ${response.status}`,
         };
       }
-      return { field: "deepseek", ok: true, message: `模型服务连接正常 · ${config.model}` };
+      return {
+        field: "deepseek",
+        ok: true,
+        message: `模型服务连接正常 · ${config.providerLabel} ${config.model}`,
+      };
     } catch (error) {
       return {
         field: "deepseek",
@@ -818,9 +844,11 @@ function applySettings(body: Record<string, unknown>): {
   status: ReturnType<typeof settingsPayload>;
   modelChanged: boolean;
   schoolChanged: boolean;
+  providerChanged: boolean;
 } {
   const results: SettingResult[] = [];
   let schoolChanged = false;
+  let providerChanged = false;
   // 学校切换（设置第一栏）：保存偏好 + 运行期换适配器；工具集跟 agent 重建换新
   const schoolId = typeof body.schoolId === "string" ? body.schoolId.trim() : "";
   if (schoolId) {
@@ -866,9 +894,78 @@ function applySettings(body: Record<string, unknown>): {
       results.push({ field: "jwgl", ok: true, message: "教务账号已加密保存，下次查询即生效" });
     }
   }
+  // ── 供应商 / 自定义端点 / API Key（AI 模型栏）──
+  // 托管版：供应商由网关 users.json 管理（前端走网关 /api/provider），实例
+  // 不收这两个字段；custom 端点在托管版一律拒绝（防实例探测内网）。
+  const rawProvider = typeof body.providerId === "string" ? body.providerId.trim() : "";
+  const rawCustomUrl = typeof body.customBaseUrl === "string" ? body.customBaseUrl : "";
+  const touchesProvider = !!rawProvider || body.customBaseUrl !== undefined;
+  if (touchesProvider && config.hosted) {
+    results.push({
+      field: "provider",
+      ok: false,
+      message: "当前环境由站点托管：供应商切换走站点接口，自定义端点不可用",
+    });
+  } else if (touchesProvider) {
+    const nextId = rawProvider ? resolveProviderId(rawProvider) : config.providerId;
+    const urlCheck = body.customBaseUrl !== undefined ? normalizeCustomBaseUrl(rawCustomUrl) : null;
+    if (urlCheck && !urlCheck.ok) {
+      results.push({ field: "provider", ok: false, message: urlCheck.message });
+    } else if (nextId !== config.providerId) {
+      // 切换供应商：custom 必须有地址（本次提交或既有存值）；旧供应商的型号
+      // 记入 providerModels，新供应商恢复上次记忆或兜底第一项。
+      const hasCustomUrl = urlCheck?.url || config.customBaseUrl;
+      if (nextId === CUSTOM_PROVIDER_ID && !hasCustomUrl) {
+        results.push({
+          field: "provider",
+          ok: false,
+          message: "选择自定义供应商时请一并填写服务地址（https://…）",
+        });
+      } else {
+        const def = getProviderDef(nextId);
+        const stored = loadCredentialsStore();
+        const providerModels = {
+          ...(stored?.providerModels ?? {}),
+          [config.providerId]: config.model,
+        };
+        const nextModel = providerModels[nextId] ?? def.fallbackModels[0]?.id ?? config.model;
+        // custom 地址是「custom 供应商的持久配置」：切到别的供应商不清空，
+        // 切回来还在；本次带新地址则更新
+        const nextCustomUrl = urlCheck?.url || config.customBaseUrl;
+        config.providerId = def.id;
+        config.providerLabel = def.label;
+        config.customBaseUrl = nextCustomUrl;
+        config.providerBaseUrl = providerBaseUrl(def.id, nextCustomUrl);
+        config.model = nextModel;
+        saveCredentialsStore({
+          providerId: def.id,
+          customBaseUrl: nextCustomUrl,
+          providerModels,
+          model: nextModel,
+          modelOverride: true,
+        });
+        invalidateModelCache();
+        providerChanged = true;
+        results.push({
+          field: "provider",
+          ok: true,
+          message: `供应商已切换为「${def.label}」：型号与 Key 请按新供应商确认`,
+        });
+      }
+    } else if (body.customBaseUrl !== undefined && urlCheck?.ok) {
+      // 只更新 custom 地址（供应商未变）：清单跟地址走，一并作废
+      config.customBaseUrl = urlCheck.url;
+      config.providerBaseUrl = providerBaseUrl(config.providerId, urlCheck.url);
+      saveCredentialsStore({ customBaseUrl: urlCheck.url });
+      invalidateModelCache();
+      providerChanged = true;
+      results.push({ field: "provider", ok: true, message: "自定义服务地址已保存" });
+    }
+  }
   const key = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
   if (key) {
-    const r = setDeepSeekApiKey(key);
+    // Key 存到「本次提交后的供应商」（供应商切换在上一段已生效）
+    const r = setProviderApiKey(config.providerId, key);
     results.push({ field: "apiKey", ok: r.ok, message: r.message.replace(/^[✅❌]\s*/, "") });
     // 可用型号跟 Key 走：换 Key 后旧清单作废，下次打开弹窗重新拉
     if (r.ok) invalidateModelCache();
@@ -901,18 +998,37 @@ function applySettings(body: Record<string, unknown>): {
   let modelChanged = false;
   const requestedModel = typeof body.model === "string" ? body.model.trim() : "";
   if (requestedModel) {
-    const allowed = allowedModelIds(
-      cachedModelOptions().map((m) => m.id),
-      [config.model],
-    );
-    const r = validateModelChoice({ requested: requestedModel, allowed, current: config.model });
+    // custom 供应商型号靠手输：清单拉不到时不卡白名单（形状校验仍在）；
+    // 内置厂商维持白名单，防手滑存进无效 id。
+    const allowed =
+      config.providerId === CUSTOM_PROVIDER_ID
+        ? allowedModelIds(
+            cachedModelOptions(config.providerId).map((m) => m.id),
+            [config.model],
+            [requestedModel],
+          )
+        : allowedModelIds(
+            cachedModelOptions(config.providerId).map((m) => m.id),
+            [config.model],
+          );
+    const r = validateModelChoice({
+      requested: requestedModel,
+      allowed,
+      current: config.model,
+      providerId: config.providerId,
+    });
     if (r.ok && r.model === config.model) {
       results.push({ field: "model", ok: true, message: "所选模型已是当前值，无需切换" });
     } else {
       results.push({ field: "model", ok: r.ok, message: r.message });
       if (r.ok) {
         config.model = r.model;
-        saveCredentialsStore({ model: r.model, modelOverride: true });
+        // 型号随供应商分别记忆：切回旧供应商时还能找回上次的型号
+        const providerModels = {
+          ...(loadCredentialsStore()?.providerModels ?? {}),
+          [config.providerId]: r.model,
+        };
+        saveCredentialsStore({ model: r.model, modelOverride: true, providerModels });
         modelChanged = true;
       }
     }
@@ -926,6 +1042,7 @@ function applySettings(body: Record<string, unknown>): {
     status: settingsPayload(),
     modelChanged,
     schoolChanged,
+    providerChanged,
   };
 }
 
@@ -1148,10 +1265,47 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return;
     }
     if (url === "/api/models" || url.startsWith("/api/models?")) {
-      // 弹窗打开后异步刷新：清单以该 Key 实际可用的型号为准
-      const force = new URL(url, "http://127.0.0.1").searchParams.get("refresh") === "1";
+      // 弹窗打开后异步刷新：清单以该 Key 实际可用的型号为准。
+      // ?provider= 支持切换前的预览（前端选中即拉）；custom= 传自填端点。
+      const query = new URL(url, "http://127.0.0.1").searchParams;
+      const force = query.get("refresh") === "1";
+      const previewProvider = query.get("provider");
+      const previewCustom = query.get("custom") ?? undefined;
+      if (previewProvider) {
+        // 预览别吃缓存也别写缓存：listModelOptions 缓存按 provider 分桶，
+        // 这里用一次性入参直查（结果不落 cache，避免污染已保存供应商的缓存）
+        const providerId = resolveProviderId(previewProvider);
+        const def = getProviderDef(providerId);
+        const base = providerBaseUrl(
+          providerId,
+          previewCustom ?? (providerId === config.providerId ? config.customBaseUrl : ""),
+        );
+        const list = await listModelOptions({
+          providerId,
+          baseUrl: base,
+          customBaseUrl: base,
+          apiKey:
+            providerId === config.providerId
+              ? config.deepseekApiKey
+              : providerKeyPreview(providerId),
+          force,
+          noCache: true,
+        });
+        json(res, {
+          ok: list.source === "live",
+          current: providerId === config.providerId ? config.model : "",
+          source: list.source,
+          provider: providerId,
+          label: def.label,
+          options: list.options,
+          message: list.message ?? "",
+        });
+        return;
+      }
       const list = await listModelOptions({
-        baseUrl: config.deepseekBaseUrl,
+        providerId: config.providerId,
+        baseUrl: config.providerBaseUrl,
+        customBaseUrl: config.customBaseUrl,
         apiKey: config.deepseekApiKey,
         force,
       });
@@ -1159,6 +1313,8 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         ok: list.source === "live",
         current: config.model,
         source: list.source,
+        provider: config.providerId,
+        label: config.providerLabel,
         options: list.options,
         message: list.message ?? "",
       });
@@ -1267,14 +1423,15 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         return;
       }
       const r = applySettings(body ?? {});
-      if (r.modelChanged || r.schoolChanged) {
-        // 串行重建：并发保存时不能让两个 agent 互相覆盖（换型号与切学校同一条路）
+      if (r.modelChanged || r.schoolChanged || r.providerChanged) {
+        // 串行重建：并发保存时不能让两个 agent 互相覆盖（换型号/换供应商与切学校同一条路）
         refreshChain = refreshChain
           .then(refreshChatAgent)
           .catch(() => "；即时切换失败，旧模型继续可用，重启后生效");
         const note = await refreshChain;
         const line =
           r.results.find((item) => item.field === "model") ??
+          r.results.find((item) => item.field === "provider") ??
           r.results.find((item) => item.field === "school");
         if (line) line.message += note;
       }

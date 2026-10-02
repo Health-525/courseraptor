@@ -98,14 +98,10 @@ export async function maybeAutoTitle(
  */
 export async function installDefaultTitleMaker(): Promise<void> {
   const { generateText } = await import("ai");
-  const { createDeepSeek } = await import("@ai-sdk/deepseek");
-  const { config } = await import("./config");
-  const deepseek = createDeepSeek(
-    config.deepseekBaseUrl ? { baseURL: config.deepseekBaseUrl } : {},
-  );
+  const { buildLanguageModel } = await import("./llm");
   setTitleMaker(async (input) => {
     const result = await generateText({
-      model: deepseek(config.model),
+      model: buildLanguageModel(),
       prompt: buildTitlePrompt(input.messages),
       maxOutputTokens: 30,
       abortSignal: AbortSignal.timeout(15_000),
