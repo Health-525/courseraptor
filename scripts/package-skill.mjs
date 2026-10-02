@@ -6,7 +6,9 @@
  * - export-schedule  课表图片导出（读本地缓存渲染 PNG/SVG）
  *
  * 产物（默认在 dist/ 下）：
- * - dist/skill/<名>/    可直接整目录拷进 ~/.workbuddy/skills/ 的技能
+ * - dist/skill/<名>/    可整目录拷进各 agent 工具技能目录的技能
+ *   （Claude Code ~/.claude/skills/、ZCode ~/.zcode/skills/、
+ *    WorkBuddy ~/.workbuddy/skills/、通用 ~/.agents/skills/ 等）
  * - dist/<名>-skill-vX.Y.Z.zip   供下载分发（解压即上述目录）
  *
  * 做法：esbuild 把 skills/<名>/scripts/*.ts 连同它引用的 src/ 依赖闭包打成
@@ -356,7 +358,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     for (const skill of targets) {
       const r = await buildSkillPackage({ skill });
       console.log(`✅ ${skill} 独立技能包 v${r.version}`);
-      console.log(`   技能目录：${r.skillDir}（拷进 ~/.workbuddy/skills/ 即用）`);
+      console.log(
+        `   技能目录：${r.skillDir}（拷进所用工具的技能目录即用，如 ~/.claude/skills/、~/.zcode/skills/、~/.workbuddy/skills/）`,
+      );
       console.log(`   下载包：  ${r.zipPath}`);
       console.log(`   文件数：  ${r.files.length}，bundle ${(r.bundleBytes / 1024).toFixed(0)} KB`);
       console.log("   自检：");
