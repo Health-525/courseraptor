@@ -48,6 +48,11 @@ export interface SchoolInfo {
   city: string;
   /** 学校所在时区（IANA 名）：教学周与「北京时间」口径 */
   timezone: string;
+  /**
+   * 手动课表模式（「其他学校」伪适配器）：教务在线能力（成绩/考试/通知/
+   * 选课）一概没有，课表来自用户导入的本地缓存。设置页据此切换门禁文案。
+   */
+  manual?: boolean;
 }
 
 /** 当前教学周快照；估算出来的必须带 source，调用方如实透传 */
@@ -147,6 +152,27 @@ export interface SchoolAdapter {
 }
 
 let registered: SchoolAdapter | null = null;
+
+/** 可选学校清单：装配点（src/adapters/index.ts）把全部实现登记进来，供设置页枚举与运行期切换 */
+const options = new Map<string, SchoolAdapter>();
+
+/** 登记一个可选学校（不去切换当前学校；幂等，装配点调用） */
+export function registerSchoolOption(adapter: SchoolAdapter): void {
+  options.set(adapter.info.id, adapter);
+}
+
+/** 全部已登记学校（登记序）；设置页的学校选择列表数据源 */
+export function listSchoolOptions(): SchoolAdapter[] {
+  return [...options.values()];
+}
+
+/** 按 id 运行期切换学校；未知 id 返回 false（当前学校保持不变） */
+export function selectSchool(id: string): boolean {
+  const adapter = options.get(id);
+  if (!adapter) return false;
+  registered = adapter;
+  return true;
+}
 
 /** 注册学校适配器（幂等；装配点在 src/adapters/index.ts） */
 export function registerSchool(adapter: SchoolAdapter): void {

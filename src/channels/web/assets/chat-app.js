@@ -1136,9 +1136,11 @@ const HALL_CARDS = [
   /* 提示词模板与设置并列（2026-09-23）：原设置里的「常用问题」栏目拆出来
      成独立面板——它是内容管理，不是凭证配置，混在设置里连保存语义都变了味 */
   { id: "prompts", t: "提示词模板", d: "输入框上方「提示词」的自定义清单", group: "系统" },
+  /* 导入课表：不进宫格（入口在 设置 → 学校 与课表空态），深链 #hall=import 可达 */
+  { id: "import", t: "导入课表", d: "粘贴或上传课表，AI 解析后手动确认", group: "系统", hidden: true },
   /* 我的账号：托管版专有（改本站登录密码），quota 探测成功后现身 */
   { id: "account", t: "我的账号", d: "修改本站登录密码", group: "系统", hidden: true },
-  { id: "settings", t: "设置", d: "教务账号、AI 模型、QQ 与本地数据", group: "系统" },
+  { id: "settings", t: "设置", d: "学校、教务账号、AI 模型、QQ 与本地数据", group: "系统" },
 ];
 const HALL_GROUPS = ["学习安排", "效率工具", "系统"];
 const HALL_TITLES = Object.fromEntries(HALL_CARDS.map((c) => [c.id, c.t]));
@@ -1149,6 +1151,17 @@ const hallBack = document.getElementById("hallBack");
 let hallPanel = ""; // 当前面板 id；空 = 宫格主页
 let hallBrief = null; // /api/today 一次取数，日程/课表/考试/待办/知识五个面板共享
 let hallAutoMuted = false; // 本轮对话里用户手动关过抽屉：这轮不再自动弹
+/* ── 学校模式（设置 → 学校）：从 /api/settings 的 school 块同步，
+   各面板与设置页据此区分「已适配学校 / 其他学校（手动课表）」 */
+let schoolState = null; // { current, manual, scheduleCached, custom:{name,city}, options:[] }
+function schoolManual() {
+  return !!(schoolState && schoolState.manual);
+}
+function applySchoolState(next) {
+  if (!next || typeof next !== "object") return;
+  schoolState = next;
+  syncSchoolUi();
+}
 
 function briefOf() {
   if (hallBrief) return Promise.resolve(hallBrief);
@@ -1417,6 +1430,18 @@ function buildToday(b) {
 function buildSchedule(b) {
   const wrap = el("");
   if (!b.schedule.available) {
+    if (schoolManual()) {
+      wrap.appendChild(
+        hallEmpty(
+          "🗓️",
+          "还没有导入课表",
+          "其他学校模式：粘贴文字或上传文件，AI 解析后确认即可用。",
+          "去导入课表",
+          () => openHall("import"),
+        ),
+      );
+      return wrap;
+    }
     wrap.appendChild(hallEmpty("🗓️", "还没有课表", "在对话框里说「课表」，查询后这里就会显示。"));
     return wrap;
   }
@@ -1442,6 +1467,18 @@ function buildSchedule(b) {
 function buildExams(b) {
   const wrap = el("");
   const list = (b.exams && b.exams.upcoming) || [];
+  if (schoolManual() && !list.length) {
+    wrap.appendChild(
+      hallEmpty(
+        "📝",
+        "考试安排需要学校适配",
+        "当前是手动课表模式：考试安排要从教务系统抓取，暂不支持。",
+        "去设置学校",
+        () => openHall("settings"),
+      ),
+    );
+    return wrap;
+  }
   if (!list.length) {
     wrap.appendChild(
       hallEmpty("📝", "近 14 天没有考试", "有新安排时，这里会标出时间、地点与座位。"),
@@ -1922,6 +1959,18 @@ function hallPomoTick() {
 /* 成绩面板：纯缓存（get_grades 查通一次即落盘），零登录零模型 */
 function gradesRender(g, wrap) {
   if (g.savedAt == null) {
+    if (schoolManual()) {
+      wrap.appendChild(
+        hallEmpty(
+          "📊",
+          "成绩查询需要学校适配",
+          "当前是手动课表模式：成绩要从教务系统抓取，暂不支持。",
+          "去设置学校",
+          () => openHall("settings"),
+        ),
+      );
+      return wrap;
+    }
     wrap.appendChild(
       hallEmpty("📊", "还没有成绩缓存", "在对话框里说「我的成绩」，查询后这里就会显示。"),
     );
@@ -2001,6 +2050,18 @@ function buildNews() {
     .then((d) => {
       const items = d.items || [];
       wrap.dataset.total = String(items.length);
+      if (d.unsupported) {
+        wrap.appendChild(
+          hallEmpty(
+            "📣",
+            "教务通知需要学校适配",
+            "当前是手动课表模式：通知要从你所在学校的教务处官网抓取，暂不支持。",
+            "去设置学校",
+            () => openHall("settings"),
+          ),
+        );
+        return wrap;
+      }
       if (d.error) wrap.appendChild(hallNote("抓取失败：" + d.error));
       if (!items.length) {
         if (!d.error)
@@ -2225,7 +2286,8 @@ function hallBadges(dyn) {
     })
     .catch(() => {});
   /* 设置卡徽标：缺关键凭证才亮（与自动推出设置的口径一致：教务 > 模型；QQ 选配不打扰）。
-     缺配置是要行动的事，与逾期同档用朱砂实底跳出 */
+     缺配置是要行动的事，与逾期同档用朱砂实底跳出。手动课表模式的「要行动」
+     换成未导课表（教务账号在那边不适用） */
   fetch("/api/settings")
     .then((r) => r.json())
     .then((d) => {
@@ -2233,11 +2295,15 @@ function hallBadges(dyn) {
       const card = dyn.querySelector('[data-panel="settings"]');
       if (!card || card.querySelector(".hall-badge")) return;
       const miss =
-        !d.jwgl || !d.jwgl.configured
-          ? "教务未配"
-          : !d.deepseek || !d.deepseek.configured
-            ? "模型未配"
-            : "";
+        d.school && d.school.manual
+          ? d.school.scheduleCached
+            ? ""
+            : "未导课表"
+          : !d.jwgl || !d.jwgl.configured
+            ? "教务未配"
+            : !d.deepseek || !d.deepseek.configured
+              ? "模型未配"
+              : "";
       if (!miss) return;
       const badge = el2("hall-badge", miss);
       badge.classList.add("warn");
@@ -2252,6 +2318,7 @@ function renderHall(force) {
   const staticSettings = document.getElementById("hallSettings");
   const staticPrompts = document.getElementById("hallPrompts");
   const staticAccount = document.getElementById("hallAccount");
+  const staticImport = document.getElementById("hallImport");
   /* 滚动管理：刷新保持位置（clamp 防内容变短），切面板/回主页复位顶部 */
   const keepScroll = !!force;
   const lastTop = hallBody.scrollTop;
@@ -2269,6 +2336,7 @@ function renderHall(force) {
   staticSettings.hidden = hallPanel !== "settings";
   staticPrompts.hidden = hallPanel !== "prompts";
   staticAccount.hidden = hallPanel !== "account";
+  staticImport.hidden = hallPanel !== "import";
   if (hallPanel === "settings") {
     hallTitle.textContent = "设置";
     showSettings();
@@ -2284,6 +2352,12 @@ function renderHall(force) {
   if (hallPanel === "prompts") {
     hallTitle.textContent = "提示词模板";
     showPrompts();
+    settle();
+    return;
+  }
+  if (hallPanel === "import") {
+    hallTitle.textContent = "导入课表";
+    showImport();
     settle();
     return;
   }
@@ -2994,6 +3068,9 @@ let settingsCloseTimer = 0;
 function settingsDirty() {
   if (document.body.dataset.demo === "true") return false;
   return !!(
+    (schoolPicked && schoolState && schoolPicked !== schoolState.current) ||
+    (schoolManual() && sSchoolName.value.trim() !== ((schoolState.custom || {}).name || "")) ||
+    (schoolManual() && sSchoolCity.value.trim() !== ((schoolState.custom || {}).city || "")) ||
     sUser.value.trim() ||
     sPass.value ||
     sKey.value.trim() ||
@@ -3161,11 +3238,12 @@ document.getElementById("modelCards").addEventListener("keydown", (e) => {
 });
 
 /* ── 设置栏目切换：点左列目录，右列换内容。「保存设置」只属于
-   凭证类栏目（教务 / 模型 / QQ）；本地数据即改即存，不亮保存 ── */
+   凭证类栏目（学校 / 教务 / 模型 / QQ）；本地数据即改即存，不亮保存 ── */
 const setTabs = [...document.querySelectorAll(".set-tab")];
-let setLastTab = "account"; // 记住上次停留的栏目，进设置直达上次位置
+let setLastTab = "school"; // 记住上次停留的栏目，进设置直达上次位置
+let schoolPicked = ""; // 学校卡片本次选中的 id（保存时提交；空 = 未动）
 function setTab(name) {
-  if (!setTabs.some((t) => t.dataset.pane === name)) name = "account";
+  if (!setTabs.some((t) => t.dataset.pane === name && !t.hidden)) name = "school";
   setLastTab = name;
   for (const tab of setTabs) {
     const on = tab.dataset.pane === name;
@@ -3176,7 +3254,9 @@ function setTab(name) {
   for (const pane of document.querySelectorAll(".set-pane")) {
     pane.classList.toggle("on", pane.dataset.pane === name);
   }
-  document.getElementById("saveSettings").hidden = !["account", "model", "qq"].includes(name);
+  document.getElementById("saveSettings").hidden = !["school", "account", "model", "qq"].includes(
+    name,
+  );
 }
 for (const tab of setTabs) tab.addEventListener("click", () => setTab(tab.dataset.pane));
 /* 方向键在栏目间移动焦点：大厅里目录是横排（左右）+ 窄屏也是横排，竖排同样支持上下 */
@@ -3198,9 +3278,90 @@ function renderSetDots(d) {
     dot.className = "sdot " + (ok ? "ok" : optional ? "" : "warn");
     dot.title = ok ? "已配置" : optional ? "" : "未配置，需要填写";
   };
+  /* 学校一选就是已配置（默认南京工业大学，不存在「未选」态） */
+  mark("school", true, false);
   mark("account", !!(d.jwgl && d.jwgl.configured), false);
   mark("model", !!(d.deepseek && d.deepseek.configured), false);
   mark("qq", !!(d.qq && d.qq.configured), true);
+}
+
+/* ── 学校栏目：卡片选择 + 自定义学校信息 + 导入课表入口 ── */
+const sSchoolName = document.getElementById("sSchoolName");
+const sSchoolCity = document.getElementById("sSchoolCity");
+function schoolCardName(o) {
+  if (o.id !== "custom") return o.name;
+  const custom = (schoolState && schoolState.custom) || {};
+  return custom.name ? "其他学校 · " + custom.name : "其他学校（手动导入课表）";
+}
+function renderSchoolCards(d) {
+  const box = document.getElementById("schoolCards");
+  if (!box) return;
+  const school = d.school || {};
+  const options = Array.isArray(school.options) ? school.options : [];
+  const pickedId = schoolPicked || school.current;
+  box.innerHTML = "";
+  options.forEach((o) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "model-card" + (o.id === pickedId ? " picked" : "");
+    card.setAttribute("role", "radio");
+    card.setAttribute("aria-checked", o.id === pickedId ? "true" : "false");
+    const name = document.createElement("span");
+    name.className = "mc-name";
+    name.textContent = schoolCardName(o);
+    card.appendChild(name);
+    const badge = document.createElement("span");
+    badge.className = "mc-badge";
+    badge.textContent = o.id === school.current ? "当前" : o.id === pickedId ? "已选" : "";
+    if (badge.textContent) card.appendChild(badge);
+    const id = document.createElement("span");
+    id.className = "mc-id";
+    id.textContent = o.manual
+      ? "粘贴/上传课表 → AI 解析；课表本地保存"
+      : "教务系统已适配：课表 / 成绩 / 考试 / 通知自动抓取";
+    card.appendChild(id);
+    const note = document.createElement("span");
+    note.className = "mc-note";
+    note.textContent = o.manual
+      ? "成绩、考试与教务通知需要学校适配，此模式暂不可用"
+      : "需要教务账号（下一栏）登录后查询";
+    card.appendChild(note);
+    card.addEventListener("click", () => {
+      if (HALL_DEMO) return;
+      schoolPicked = o.id;
+      renderSchoolCards(d);
+      /* 切到「其他学校」直接展开自定义信息与导入入口；切回适配学校则收起 */
+      syncSchoolUi(true);
+    });
+    box.appendChild(card);
+  });
+}
+/* 学校相关 UI 的可见性/文案随「选中态」走：保存前预览，保存后即为现状 */
+function syncSchoolUi(preview) {
+  const picked = schoolPicked || (schoolState && schoolState.current) || "njtech";
+  const manual =
+    preview && schoolPicked
+      ? !!((schoolState && schoolState.options) || []).find((o) => o.id === picked && o.manual)
+      : schoolManual();
+  const customBox = document.getElementById("schoolCustomBox");
+  const importRow = document.getElementById("schoolImportRow");
+  const cur = document.getElementById("curSchool");
+  if (customBox) customBox.hidden = !manual;
+  if (importRow) importRow.hidden = !manual;
+  /* 手动课表模式没有教务系统：教务账号栏整个收起，避免填了也用不上 */
+  const accountTab = document.querySelector('#setTabs .set-tab[data-pane="account"]');
+  if (accountTab) accountTab.hidden = manual;
+  if (accountTab && manual && setLastTab === "account") setTab("school");
+  if (cur) {
+    const cached = schoolState && schoolState.scheduleCached;
+    if (!manual) {
+      cur.textContent = "已适配学校：填写下一栏教务账号后即可查课表 / 成绩 / 通知";
+    } else {
+      cur.textContent = cached
+        ? "已有导入的课表；换学期或课表有变时重新导入即可"
+        : "还没有导入课表：点下方按钮粘贴或上传，AI 解析后确认";
+    }
+  }
 }
 
 function qqStatusText(q) {
@@ -3241,14 +3402,22 @@ function showSettings() {
   sQQAppId.value = "";
   sQQSecret.value = "";
   sQQPass.value = "";
+  schoolPicked = "";
+  sSchoolName.value = "";
+  sSchoolCity.value = "";
   document.getElementById("diagJwgl").textContent = "";
   document.getElementById("diagDeepseek").textContent = "";
+  document.getElementById("diagSchool").textContent = "";
   refreshData();
   fetch("/api/settings")
     .then((r) => r.json())
     .then((d) => {
       setStatus = d;
       renderSetDots(d);
+      applySchoolState(d.school);
+      renderSchoolCards(d);
+      sSchoolName.placeholder = d.school.custom.name || "如：某某大学（仅用于显示）";
+      sSchoolCity.placeholder = d.school.custom.city || "问天气时的默认城市";
       sUser.value = "";
       sUser.placeholder = d.jwgl.username || "请输入教务系统学号";
       sPass.placeholder = d.jwgl.configured ? "已保存；留空不修改" : "请输入教务系统密码";
@@ -3361,6 +3530,21 @@ document.getElementById("saveSettings").addEventListener("click", () => {
   const u = sUser.value.trim(),
     pw = sPass.value,
     k = sKey.value.trim();
+  /* 学校切换：只在选了别的卡片时提交（点回当前学校不算修改） */
+  if (schoolPicked && schoolState && schoolPicked !== schoolState.current) {
+    body.schoolId = schoolPicked;
+  }
+  /* 自定义学校信息：选了「其他学校」才随保存提交（清空即恢复默认显示） */
+  const pickedManual = (() => {
+    const id = schoolPicked || (schoolState && schoolState.current) || "";
+    const opt = ((schoolState && schoolState.options) || []).find((o) => o.id === id);
+    return !!(opt && opt.manual);
+  })();
+  if (pickedManual && setStatus && setStatus.school) {
+    const stored = setStatus.school.custom || {};
+    if (sSchoolName.value.trim() !== (stored.name || "")) body.customSchoolName = sSchoolName.value.trim();
+    if (sSchoolCity.value.trim() !== (stored.city || "")) body.customCity = sSchoolCity.value.trim();
+  }
   if (pw) {
     /* 只改密码时自动带上现有学号，免得来回填 */
     body.jwglPassword = pw;
@@ -3418,6 +3602,16 @@ document.getElementById("saveSettings").addEventListener("click", () => {
         sPass.value = "";
         sKey.value = "";
         renderSetDots(d.status);
+        /* 学校切换/自定义信息落库后：同步模式标记并重绘卡片（含教务账号栏显隐） */
+        if (d.status.school) {
+          applySchoolState(d.status.school);
+          renderSchoolCards(d.status);
+          sSchoolName.placeholder = d.status.school.custom.name || "如：某某大学（仅用于显示）";
+          sSchoolCity.placeholder = d.status.school.custom.city || "问天气时的默认城市";
+        }
+        schoolPicked = "";
+        sSchoolName.value = "";
+        sSchoolCity.value = "";
         sUser.placeholder = d.status.jwgl.username || "请输入教务系统学号";
         sPass.placeholder = d.status.jwgl.configured ? "已保存；留空不修改" : "请输入教务系统密码";
         document.getElementById("curJwgl").textContent = d.status.jwgl.configured
@@ -3454,15 +3648,463 @@ document.getElementById("saveSettings").addEventListener("click", () => {
     });
 });
 
+/* ── 导入课表面板（#hallImport）：粘贴/上传 → AI 解析 → 追问 → 可编辑预览 → 确认。
+     服务端不存会话状态：追问答案由前端持有、重新解析时带上重放；
+     预览行点开就地编辑（课名/星期/节次/周次/地点/教师），删除两步确认；
+     确认导入两步确认后覆盖本地课表缓存（手动课表模式的数据源） ── */
+const impText = document.getElementById("impText");
+const impStateEl = document.getElementById("impState");
+const impParseBtn = document.getElementById("impParse");
+const impCommitBtn = document.getElementById("impCommit");
+const imp = {
+  uploadId: "",
+  fileName: "",
+  answers: {}, // question -> answer：追问循环的状态，重新解析时带上
+  courses: [],
+  rejected: [],
+  conflicts: [],
+  questions: [],
+  parsed: false,
+  termHint: "",
+  termStartHint: "",
+  busy: false,
+  done: "",
+};
+const IMP_WEEKDAYS = ["", "周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+function impSay(text) {
+  impStateEl.textContent = text || "";
+}
+/* 候选学期与服务端 candidateTerms 同一套日历规则（仅用于下拉预选） */
+function impTermCandidates() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth() + 1;
+  if (m >= 9) return [{ year: y, semester: 3 }, { year: y - 1, semester: 12 }];
+  if (m >= 7)
+    return [
+      { year: y, semester: 3 },
+      { year: y - 1, semester: 12 },
+      { year: y - 1, semester: 3 },
+    ];
+  return [
+    { year: y - 1, semester: 12 },
+    { year: y - 1, semester: 3 },
+  ];
+}
+function impTermLabel(t) {
+  return t.year + "-" + (t.year + 1) + "学年第" + (t.semester === 3 ? "一" : "二") + "学期";
+}
+/* 节次文本 → 数组："3-4" / "3,4" / "3 4" 都认；编辑框里随手改 */
+function impParsePeriods(s) {
+  const out = [];
+  String(s || "")
+    .split(/[,，;；\s]+/)
+    .filter(Boolean)
+    .forEach((seg) => {
+      const m = seg.match(/(\d+)\s*[-~—－]\s*(\d+)/);
+      if (m) {
+        for (let p = Number(m[1]); p <= Number(m[2]); p++) out.push(p);
+      } else {
+        const n = Number.parseInt(seg, 10);
+        if (n > 0) out.push(n);
+      }
+    });
+  return [...new Set(out)].sort((a, b) => a - b);
+}
+function impCourseMeta(c) {
+  return [
+    IMP_WEEKDAYS[c.weekday] || "周" + c.weekday,
+    (c.periods || []).join(",") + "节",
+    c.weeks ? c.weeks + "周" : "",
+    c.location ? "@" + c.location : "",
+    c.teacher,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+function impSyncCommit() {
+  impCommitBtn.disabled = !imp.parsed || !imp.courses.length || !!imp.done;
+}
+function showImport() {
+  impRender();
+}
+/* 全量重绘追问区 / 预览区 / 学期行；textarea 与上传 chip 是常驻 DOM 不动 */
+function impRender() {
+  const qBox = document.getElementById("impQuestions");
+  const pBox = document.getElementById("impPreview");
+  const tBox = document.getElementById("impTerm");
+  qBox.innerHTML = "";
+  pBox.innerHTML = "";
+  tBox.innerHTML = "";
+  if (imp.done) {
+    const done = el("imp-done");
+    done.appendChild(el2("id-t", "✓ " + imp.done));
+    done.appendChild(
+      el2(
+        "id-s",
+        "课表已写入本地缓存：对话里问「这周有什么课」、功能大厅与 /schedule 页都会用它。",
+      ),
+    );
+    const go = document.createElement("button");
+    go.type = "button";
+    go.className = "tbtn";
+    go.textContent = "查看课表";
+    go.addEventListener("click", () => openHall("schedule"));
+    done.appendChild(go);
+    pBox.appendChild(done);
+    impSyncCommit();
+    return;
+  }
+  if (!imp.parsed) {
+    impSyncCommit();
+    return;
+  }
+  /* 追问卡：未回答过的问题逐条给输入框（答案可留空 = 先按解析结果走） */
+  imp.questions.forEach((q) => {
+    const card = el("imp-q");
+    card.dataset.question = q.question;
+    card.appendChild(el2("iq-t", "AI 想确认：" + q.question));
+    if (q.options) card.appendChild(el2("iq-o", "可选：" + q.options));
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = "写下你的回答，然后点「解析课表」带上答案重新解析";
+    input.value = imp.answers[q.question] || "";
+    card.appendChild(input);
+    qBox.appendChild(card);
+  });
+  if (imp.questions.length) {
+    const note = el2("imp-warn", "答完上面的框再点一次「解析课表」；不确定的可以留空直接看预览。");
+    qBox.appendChild(note);
+  }
+  /* 解析质量问题如实亮出来：被拒行 + 时间冲突 */
+  const warns = [];
+  imp.rejected.forEach((r) => warns.push("第 " + r.row + " 行未解析：" + r.reason));
+  imp.conflicts.forEach((c) => warns.push("⚠ " + c));
+  if (warns.length) pBox.appendChild(el2("imp-warn", warns.join("\n")));
+  imp.courses.forEach((c, i) => pBox.appendChild(impRowNode(c, i)));
+  if (!imp.courses.length && !warns.length)
+    pBox.appendChild(el2("imp-warn", "没有解析出任何课程：换一段更完整的文字再试。"));
+  /* 学期与开学日期：模型从内容里看出的线索做预选，最终以这里的选择为准 */
+  const row = el("imp-term-row");
+  const termFld = el("fld");
+  termFld.appendChild(el2("", "学期"));
+  const sel = document.createElement("select");
+  const auto = document.createElement("option");
+  auto.value = "";
+  auto.textContent = "自动（按当前日期）";
+  sel.appendChild(auto);
+  const candidates = impTermCandidates();
+  candidates.forEach((t) => {
+    const o = document.createElement("option");
+    o.value = t.year + ":" + t.semester;
+    o.textContent = impTermLabel(t);
+    sel.appendChild(o);
+  });
+  if (imp.termHint) {
+    const o = document.createElement("option");
+    o.value = "";
+    o.textContent = "内容提到：" + imp.termHint;
+    o.disabled = true;
+    sel.insertBefore(o, sel.children[1] ?? null);
+  }
+  termFld.appendChild(sel);
+  row.appendChild(termFld);
+  const startFld = el("fld");
+  startFld.appendChild(el2("", "开学日期（第 1 周的周一）"));
+  const dateInput = document.createElement("input");
+  dateInput.type = "date";
+  dateInput.value = /^\d{4}-\d{2}-\d{2}$/.test(imp.termStartHint || "") ? imp.termStartHint : "";
+  startFld.appendChild(dateInput);
+  row.appendChild(startFld);
+  tBox.appendChild(row);
+  const note = el2(
+    "hall-note",
+    "开学日期用于推算「今天是第几周」，不填则按 9 月 / 2 月的周一估算；之后在设置里重新导入可校准。",
+  );
+  tBox.appendChild(note);
+  impSyncCommit();
+}
+/* 单条课程行：折叠态一行摘要，点开 6 个字段就地编辑；删除两步确认 */
+function impRowNode(c, i) {
+  const row = el("imp-row");
+  const top = el("imp-row-top");
+  top.tabIndex = 0;
+  top.setAttribute("role", "button");
+  top.setAttribute("aria-expanded", "false");
+  const main = document.createElement("span");
+  main.className = "ir-main";
+  main.textContent = c.title || "（未命名课程）";
+  const meta = document.createElement("span");
+  meta.className = "ir-meta";
+  meta.textContent = impCourseMeta(c);
+  top.appendChild(main);
+  top.appendChild(meta);
+  top.appendChild(
+    hallDelBtn("删除", () => {
+      imp.courses.splice(i, 1);
+      impRender();
+    }),
+  );
+  row.appendChild(top);
+  const edit = el("imp-edit");
+  edit.hidden = true;
+  const fields = [
+    { key: "title", label: "课程名", type: "text", value: () => c.title || "" },
+    {
+      key: "weekday",
+      label: "星期",
+      type: "select",
+      options: IMP_WEEKDAYS.slice(1).map((n, k) => [String(k + 1), n]),
+      value: () => String(c.weekday || 1),
+    },
+    { key: "periods", label: "节次（如 3-4）", type: "text", value: () => (c.periods || []).join(",") },
+    { key: "weeks", label: "周次（如 1-16）", type: "text", value: () => c.weeks || "" },
+    { key: "location", label: "地点", type: "text", value: () => c.location || "" },
+    { key: "teacher", label: "教师", type: "text", value: () => c.teacher || "" },
+  ];
+  const syncTop = () => {
+    main.textContent = c.title || "（未命名课程）";
+    meta.textContent = impCourseMeta(c);
+  };
+  fields.forEach((f) => {
+    const fld = el("fld");
+    fld.appendChild(el2("", f.label));
+    let input;
+    if (f.type === "select") {
+      input = document.createElement("select");
+      f.options.forEach(([v, n]) => {
+        const o = document.createElement("option");
+        o.value = v;
+        o.textContent = n;
+        input.appendChild(o);
+      });
+    } else {
+      input = document.createElement("input");
+      input.type = "text";
+    }
+    input.value = f.value();
+    input.addEventListener("input", () => {
+      if (f.key === "weekday") c.weekday = Number(input.value) || 1;
+      else if (f.key === "periods") c.periods = impParsePeriods(input.value);
+      else c[f.key] = input.value.trim();
+      syncTop();
+    });
+    fld.appendChild(input);
+    edit.appendChild(fld);
+  });
+  row.appendChild(edit);
+  const toggle = () => {
+    edit.hidden = !edit.hidden;
+    top.setAttribute("aria-expanded", edit.hidden ? "false" : "true");
+    if (!edit.hidden) {
+      const first = edit.querySelector("input, select");
+      if (first) first.focus();
+    }
+  };
+  top.addEventListener("click", (e) => {
+    if (e.target.closest("button")) return;
+    toggle();
+  });
+  top.addEventListener("keydown", (e) => {
+    if ((e.key === "Enter" || e.key === " ") && !e.target.closest("button")) {
+      e.preventDefault();
+      toggle();
+    }
+  });
+  return row;
+}
+/* 解析（也承担「带着答案重新解析」） */
+impParseBtn.addEventListener("click", () => {
+  if (imp.busy) return;
+  const text = impText.value.trim();
+  if (!text && !imp.uploadId) {
+    impSay("先粘贴课表文字，或选择一个课表文件");
+    return;
+  }
+  const answers = [];
+  document.querySelectorAll("#impQuestions .imp-q").forEach((card) => {
+    const q = card.dataset.question || "";
+    const a = (card.querySelector("input") || {}).value || "";
+    if (q && a.trim()) answers.push({ question: q, answer: a.trim() });
+  });
+  imp.busy = true;
+  impParseBtn.disabled = true;
+  impParseBtn.textContent = "解析中…";
+  impSay("AI 正在解析课表（几秒到半分钟）…");
+  fetch("/api/schedule/import", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      text,
+      ...(imp.uploadId ? { uploadId: imp.uploadId } : {}),
+      ...(imp.fileName ? { fileName: imp.fileName } : {}),
+      answers,
+    }),
+  })
+    .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+    .then(({ ok, d }) => {
+      if (!ok || d.error) {
+        impSay(d.error || "解析失败，请稍后重试");
+        return;
+      }
+      answers.forEach((a) => {
+        imp.answers[a.question] = a.answer;
+      });
+      imp.courses = d.courses || [];
+      imp.rejected = d.rejected || [];
+      imp.conflicts = d.conflicts || [];
+      imp.questions = (d.questions || []).filter((q) => !imp.answers[q.question]);
+      imp.termHint = d.termHint || "";
+      imp.termStartHint = d.termStartHint || "";
+      imp.parsed = true;
+      imp.done = "";
+      impSay(
+        imp.questions.length
+          ? "解析出 " +
+            imp.courses.length +
+            " 条课程；AI 还有 " +
+            imp.questions.length +
+            " 个问题要确认（见下方）"
+          : "解析出 " + imp.courses.length + " 条课程；核对预览后点「确认导入」",
+      );
+      impRender();
+    })
+    .catch(() => impSay("网络错误，解析失败"))
+    .finally(() => {
+      imp.busy = false;
+      impParseBtn.disabled = HALL_DEMO;
+      impParseBtn.textContent = "解析课表";
+    });
+});
+/* 上传：与聊天附件同一条 /api/uploads 通道（Excel/CSV/PDF/Word/TXT 服务端预解析） */
+document.getElementById("impFileBtn").addEventListener("click", () => {
+  document.getElementById("impFile").click();
+});
+document.getElementById("impFile").addEventListener("change", (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  impSay("正在上传 " + file.name + "…");
+  const reader = new FileReader();
+  reader.onerror = () => impSay("读取文件失败");
+  reader.onload = () => {
+    const b64 = String(reader.result || "").split(",")[1] || "";
+    fetch("/api/uploads", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: file.name, type: file.type || "", data: b64 }),
+    })
+      .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+      .then(({ ok, d }) => {
+        if (!ok || !d.upload) {
+          impSay(d.error || "上传失败");
+          return;
+        }
+        imp.uploadId = d.upload.id;
+        imp.fileName = file.name;
+        document.getElementById("impFileName").textContent =
+          file.name + "（" + Math.max(1, Math.round(file.size / 1024)) + " KB，已上传）";
+        impSay("文件已就绪，点「解析课表」让 AI 读取");
+      })
+      .catch(() => impSay("网络错误，上传失败"));
+  };
+  reader.readAsDataURL(file);
+});
+/* 确认导入：两步确认（覆盖现有课表缓存），成功后清 brief 缓存让各面板立刻用新数据 */
+impCommitBtn.addEventListener("click", () => {
+  if (impCommitBtn.disabled || imp.busy) return;
+  if (impCommitBtn.dataset.armed !== "1") {
+    impCommitBtn.dataset.armed = "1";
+    impCommitBtn.dataset.label = impCommitBtn.textContent;
+    impCommitBtn.textContent = "确认覆盖导入？";
+    impCommitBtn.classList.add("armed");
+    window.clearTimeout(Number(impCommitBtn.dataset.timer));
+    impCommitBtn.dataset.timer = String(
+      window.setTimeout(() => {
+        impCommitBtn.dataset.armed = "";
+        impCommitBtn.textContent = impCommitBtn.dataset.label || "确认导入";
+        impCommitBtn.classList.remove("armed");
+      }, 3000),
+    );
+    return;
+  }
+  window.clearTimeout(Number(impCommitBtn.dataset.timer));
+  impCommitBtn.dataset.armed = "";
+  impCommitBtn.classList.remove("armed");
+  const termSel = document.querySelector("#impTerm select");
+  const dateInput = document.querySelector('#impTerm input[type="date"]');
+  const courses = imp.courses.map((c) => ({
+    title: c.title,
+    weekday: c.weekday,
+    periods: c.periods,
+    weeks: c.weeks,
+    location: c.location || "",
+    teacher: c.teacher || "",
+  }));
+  const body = { courses };
+  if (termSel && termSel.value) {
+    const [y, s] = termSel.value.split(":");
+    body.year = Number(y);
+    body.semester = Number(s);
+  }
+  if (dateInput && dateInput.value) body.termStart = dateInput.value;
+  imp.busy = true;
+  impCommitBtn.disabled = true;
+  impCommitBtn.textContent = "导入中…";
+  fetch("/api/schedule/import/commit", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  })
+    .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+    .then(({ ok, d }) => {
+      if (!ok || d.error) {
+        impSay(d.error || "导入失败");
+        impSyncCommit();
+        impCommitBtn.textContent = impCommitBtn.dataset.label || "确认导入";
+        return;
+      }
+      imp.done = "已导入 " + d.count + " 门课（" + d.term + "）";
+      hallBrief = null;
+      if (schoolState) {
+        schoolState.scheduleCached = true;
+        syncSchoolUi();
+      }
+      impSay("");
+      impRender();
+      impCommitBtn.textContent = impCommitBtn.dataset.label || "确认导入";
+    })
+    .catch(() => {
+      impSay("网络错误，导入失败");
+      impSyncCommit();
+      impCommitBtn.textContent = impCommitBtn.dataset.label || "确认导入";
+    })
+    .finally(() => {
+      imp.busy = false;
+    });
+});
+/* 返回：回设置的学校栏（入口在那儿）；直接深链进来的关掉抽屉也一样能走 */
+document.getElementById("impBack").addEventListener("click", () => {
+  openHall("settings");
+  setTab("school");
+});
+/* 设置 → 学校 → 导入 / 重新导入课表 */
+const openImportBtn = document.getElementById("openImport");
+if (openImportBtn)
+  openImportBtn.addEventListener("click", () => {
+    openHall("import");
+  });
+
 /* ── 启动：拉会话列表，但默认进入新的空会话 ── */
 refreshSessions().then(() => {
   startFresh();
 });
 /* 快捷问题以服务端保存的自定义清单为准（设置里自选过的话）；
-   拉不到就保持默认，不挡页面启动 */
+   拉不到就保持默认，不挡页面启动。顺手同步学校模式（各面板门禁用） */
 fetch("/api/settings")
   .then((r) => r.json())
   .then((d) => {
+    if (d.school) applySchoolState(d.school);
     if (Array.isArray(d.quickQuestions) && d.quickQuestions.length) {
       quickQuestions = d.quickQuestions.slice();
       renderQchips();

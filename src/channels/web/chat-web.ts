@@ -52,6 +52,7 @@ import {
   knowledgeStats,
   listKnowledge,
 } from "../../core/knowledge";
+import { recordManualTermStart } from "../../core/manual-terms";
 import { loadUserGrade } from "../../core/memory/longterm";
 import {
   allowedModelIds,
@@ -75,10 +76,17 @@ import {
   type PomodoroView,
   toView,
 } from "../../core/pomodoro";
-import { loadScheduleCache } from "../../core/schedule-cache";
+import { loadScheduleCache, saveScheduleCache } from "../../core/schedule-cache";
+import {
+  hasScheduleParser,
+  type ImportQA,
+  installDefaultScheduleParser,
+  parseScheduleImport,
+  sanitizeCourses,
+} from "../../core/schedule-import";
 import { scheduleSvgToPng } from "../../core/schedule-png";
 import { renderTermScheduleSVG, renderWeekScheduleSVG } from "../../core/schedule-svg";
-import { school } from "../../core/school";
+import { listSchoolOptions, school, selectSchool } from "../../core/school";
 import { maybeAutoTitle } from "../../core/session-titles";
 import {
   addReminder,
@@ -669,6 +677,7 @@ const SOURCE_LABEL: Record<string, string> = {
 function settingsPayload() {
   const ds = getDeepSeekKeyStatus();
   const qq = getQQBotStatus();
+  const creds = loadCredentialsStore();
   return {
     jwgl: {
       configured: !!(config.jwglUsername && config.jwglPassword),
@@ -681,7 +690,25 @@ function settingsPayload() {
     /** 下拉候选：只读同步缓存/兜底清单，联网刷新走 GET /api/models，别卡住弹窗 */
     models: cachedModelOptions(),
     /** 输入框上方「提示词」模板的当前生效清单（未自定义时为默认） */
-    quickQuestions: effectiveQuickQuestions(loadCredentialsStore()?.webQuickQuestions),
+    quickQuestions: effectiveQuickQuestions(creds?.webQuickQuestions),
+    /** 学校选择（设置第一栏）：当前学校 + 可选清单 + 手动课表状态 */
+    school: {
+      current: school().info.id,
+      /** 手动课表模式下教务账号栏隐藏、各面板给「未适配」空态 */
+      manual: school().info.manual === true,
+      /** 已有导入课表缓存（「去导入课表」与「重新导入」的文案分叉） */
+      scheduleCached: !!loadScheduleCache(),
+      custom: {
+        name: creds?.customSchoolName ?? "",
+        city: creds?.customCity ?? "",
+      },
+      options: listSchoolOptions().map((a) => ({
+        id: a.info.id,
+        name: a.info.name,
+        shortName: a.info.shortName,
+        manual: a.info.manual === true,
+      })),
+    },
   };
 }
 
@@ -790,8 +817,42 @@ function applySettings(body: Record<string, unknown>): {
   results: SettingResult[];
   status: ReturnType<typeof settingsPayload>;
   modelChanged: boolean;
+  schoolChanged: boolean;
 } {
   const results: SettingResult[] = [];
+  let schoolChanged = false;
+  // 学校切换（设置第一栏）：保存偏好 + 运行期换适配器；工具集跟 agent 重建换新
+  const schoolId = typeof body.schoolId === "string" ? body.schoolId.trim() : "";
+  if (schoolId) {
+    if (schoolId === school().info.id) {
+      results.push({ field: "school", ok: true, message: "所选学校已是当前学校，无需切换" });
+    } else if (selectSchool(schoolId)) {
+      saveCredentialsStore({ schoolId });
+      schoolChanged = true;
+      const name = listSchoolOptions().find((a) => a.info.id === schoolId)?.info.name ?? schoolId;
+      results.push({
+        field: "school",
+        ok: true,
+        message: `学校已切换为「${name}」：对话与各面板下一条起生效（终端界面重启后生效）`,
+      });
+    } else {
+      results.push({
+        field: "school",
+        ok: false,
+        message: `未知学校「${schoolId}」，请重新选择`,
+      });
+    }
+  }
+  // 自定义学校的显示名/城市（跟着学校切换一起保存也行，单独保存也行）
+  if (body.customSchoolName !== undefined || body.customCity !== undefined) {
+    const name = typeof body.customSchoolName === "string" ? body.customSchoolName.trim() : "";
+    const city = typeof body.customCity === "string" ? body.customCity.trim() : "";
+    saveCredentialsStore({
+      customSchoolName: name.slice(0, 40),
+      customCity: city.slice(0, 20),
+    });
+    results.push({ field: "school", ok: true, message: "自定义学校信息已保存" });
+  }
   const user = typeof body.jwglUsername === "string" ? body.jwglUsername.trim() : "";
   const pass = typeof body.jwglPassword === "string" ? body.jwglPassword : "";
   if (user || pass) {
@@ -864,6 +925,7 @@ function applySettings(body: Record<string, unknown>): {
     results,
     status: settingsPayload(),
     modelChanged,
+    schoolChanged,
   };
 }
 
@@ -962,6 +1024,11 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return;
     }
     if (url === "/api/news") {
+      // 自定义学校没有教务处官网可抓：如实给「未适配」态，前端换引导文案
+      if (!school().notices) {
+        json(res, { items: [], unsupported: true });
+        return;
+      }
       // 教务处官网公开页，无需登录；TTL 缓存在适配器 fetchNewsMemo，失败如实降级
       try {
         const snapshot = await scoredNewsSnapshot();
@@ -1188,13 +1255,15 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         return;
       }
       const r = applySettings(body ?? {});
-      if (r.modelChanged) {
-        // 串行重建：并发保存时不能让两个 agent 互相覆盖
+      if (r.modelChanged || r.schoolChanged) {
+        // 串行重建：并发保存时不能让两个 agent 互相覆盖（换型号与切学校同一条路）
         refreshChain = refreshChain
           .then(refreshChatAgent)
           .catch(() => "；即时切换失败，旧模型继续可用，重启后生效");
         const note = await refreshChain;
-        const line = r.results.find((item) => item.field === "model");
+        const line =
+          r.results.find((item) => item.field === "model") ??
+          r.results.find((item) => item.field === "school");
         if (line) line.message += note;
       }
       // QQ 凭证保存成功且已凑齐：顺手把桥拉起来（未在跑时），不用等重启
@@ -1241,6 +1310,116 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
           },
           400,
         );
+      }
+      return;
+    }
+    if (url === "/api/schedule/import") {
+      // 手动课表导入第一步：文本或上传文件 → AI 结构化 + 追问。
+      // 服务端不存会话状态，追问循环由前端带着 answers 重放。
+      try {
+        const body = await jsonBody(req, 2 * 1024 * 1024);
+        let content = typeof body.text === "string" ? body.text : "";
+        let fileName = typeof body.fileName === "string" ? body.fileName : "";
+        if (!content.trim() && typeof body.uploadId === "string" && body.uploadId) {
+          const [upload] = getUploads([body.uploadId]);
+          if (!upload) {
+            json(res, { error: "上传文件不存在或已过期，请重新选择文件" }, 400);
+            return;
+          }
+          // 与聊天附件同一条预解析流水线：xlsx/csv 出表格行、docx/pdf/txt 出全文
+          const result = await openLocalFile(upload.storedPath);
+          content = importTextOf(result);
+          fileName = upload.name;
+          if (!content.trim()) {
+            json(
+              res,
+              {
+                error: `「${upload.name}」是图片或其他暂不支持解析的格式：请改贴文字，或导出 Excel/PDF/Word/TXT 后再传`,
+              },
+              400,
+            );
+            return;
+          }
+        }
+        if (!content.trim()) {
+          json(res, { error: "请先粘贴课表文本，或选择一个课表文件" }, 400);
+          return;
+        }
+        if (!hasScheduleParser()) {
+          // 默认解析器直连模型 API：没配 Key 时给出可操作的指引（托管版 Key 已注入）
+          if (!config.deepseekApiKey) {
+            json(
+              res,
+              { error: "AI 解析需要先配置模型：到 设置 → AI 模型 保存 API Key 后再试" },
+              400,
+            );
+            return;
+          }
+          await installDefaultScheduleParser();
+        }
+        const answers: ImportQA[] = Array.isArray(body.answers)
+          ? body.answers
+              .filter(
+                (a): a is { question: string; answer: string } =>
+                  typeof a === "object" &&
+                  a !== null &&
+                  typeof (a as { question?: unknown }).question === "string" &&
+                  typeof (a as { answer?: unknown }).answer === "string",
+              )
+              .slice(0, 6)
+          : [];
+        const parsed = await parseScheduleImport(content, answers);
+        json(res, {
+          ok: true,
+          fileName,
+          courses: parsed.courses,
+          rejected: parsed.rejected,
+          conflicts: parsed.conflicts,
+          questions: parsed.questions,
+          ...(parsed.termHint ? { termHint: parsed.termHint } : {}),
+          ...(parsed.termStartHint ? { termStartHint: parsed.termStartHint } : {}),
+        });
+      } catch (error) {
+        json(res, { error: error instanceof Error ? error.message : "解析失败，请稍后重试" }, 500);
+      }
+      return;
+    }
+    if (url === "/api/schedule/import/commit") {
+      // 第二步：确认后的课程清单落盘（覆盖旧缓存；服务端再校验一遍）
+      try {
+        const body = await jsonBody(req, 1024 * 1024);
+        const rows = Array.isArray(body.courses) ? body.courses : [];
+        const { courses, rejected } = sanitizeCourses(rows);
+        if (!courses.length) {
+          json(
+            res,
+            {
+              error: "没有可导入的课程" + (rejected.length ? `（${rejected.length} 行无效）` : ""),
+            },
+            400,
+          );
+          return;
+        }
+        const candidates = school().terms.candidates();
+        const year = Number.isInteger(body.year) ? Number(body.year) : candidates[0].year;
+        const semester = Number.isInteger(body.semester)
+          ? Number(body.semester)
+          : candidates[0].semester;
+        const label = school().terms.label(year, semester);
+        // 开学日期（选填）：必须是周一，写进 custom 学期真值，周次从此有据
+        const termStart = typeof body.termStart === "string" ? body.termStart.trim() : "";
+        if (termStart) {
+          const d = new Date(`${termStart}T00:00:00`);
+          if (Number.isNaN(d.getTime()) || d.getDay() !== 1) {
+            json(res, { error: "开学日期无效：应为「第 1 教学周的周一」日期（YYYY-MM-DD）" }, 400);
+            return;
+          }
+          recordManualTermStart(year, semester, termStart);
+        }
+        saveScheduleCache({ year, semester, label, courses });
+        json(res, { ok: true, term: label, year, semester, count: courses.length, rejected });
+      } catch (error) {
+        json(res, { error: error instanceof Error ? error.message : "导入失败" }, 400);
       }
       return;
     }
@@ -1445,6 +1624,15 @@ function attachmentDigest(result: AttachmentResult, name: string, storedPath: st
   if (result.mode === "file")
     return `${head}\n该格式暂不支持自动解析，已存副本（${result.size} 字节）。`;
   return `${head}\n（内容已由云解析兜底，见 markdown）`;
+}
+
+/** 课表导入用的附件 → 纯文本：表格给数据行（表头+预览行），长文给全文；不支持解析的格式给空 */
+function importTextOf(result: AttachmentResult): string {
+  if (result.mode === "text") return result.text;
+  if (result.mode === "table") return result.sheets.map((s) => s.preview.join("\n")).join("\n\n");
+  if (result.mode === "search") return result.matches.join("\n");
+  if (result.mode === "firecrawl") return result.markdown;
+  return "";
 }
 
 /** 发消息前把本轮上传预解析成小型文本块，直接注入模型上下文 */

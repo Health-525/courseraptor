@@ -49,6 +49,14 @@ export interface CredentialsStore {
   qqBotPasscode?: string;
   /** 网页「提示词」模板（用户在提示词模板面板自选；空/缺失即回默认清单） */
   webQuickQuestions?: string[];
+  /** 设置里选定的学校适配器 id（"njtech" / "custom"）；未存过按 RAPTOR_SCHOOL / 默认 njtech */
+  schoolId?: string;
+  /** custom：用户自填的学校显示名（空则用「其他学校」） */
+  customSchoolName?: string;
+  /** custom：所在城市（天气默认城市；空则问用户） */
+  customCity?: string;
+  /** custom：学期 → 开学周一（YYYY-MM-DD），导入课表时记录，周次按它推算 */
+  customTermStarts?: Record<string, string>;
   savedAt: string;
 }
 

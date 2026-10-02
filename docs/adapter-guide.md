@@ -83,13 +83,13 @@ src/adapters/<你的学校id>/
 
 ### 第五步：注册
 
-在 [`src/adapters/index.ts`](../src/adapters/index.ts) 的 `IMPLEMENTATIONS` 表里加一行，然后：
+在 [`src/adapters/index.ts`](../src/adapters/index.ts) 里给你的适配器补一行 `registerSchoolOption(yourSchool)`（登记序即设置页的学校列表顺序），然后：
 
 ```bash
 RAPTOR_SCHOOL=<你的学校id> npm run dev
 ```
 
-如果 `RAPTOR_SCHOOL` 未设置时希望默认是你的学校，改 `installDefaultSchool()` 里的缺省值（仅 fork 自用时）。
+默认学校的取舍顺序是 `RAPTOR_SCHOOL` 环境变量 > 设置页保存的 `schoolId`（加密凭证）> `"njtech"`；运行期切换走 core 的 `selectSchool`，设置页「学校」栏即入口。内置的 `custom`（其他学校 / 手动课表）垫底，勿改动其语义。
 
 ### 第六步：自检与提交
 

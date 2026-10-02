@@ -134,7 +134,9 @@ npm run njtech -- search-courses 高等数学
 |------|--------|-----------|
 | [南京工业大学](src/adapters/njtech/)（NJTECH） | 全部 10 项能力（课表/成绩/考试/学籍/通知/选课…） | [@Health-525](https://github.com/Health-525) |
 
-你的学校不在列表？两条路：**[请求适配](https://github.com/Health-525/courseraptor/issues/new?template=request-school.yml)**（把学校信息留给社区），或者**[自己动手写一个](docs/adapter-guide.md)**——适配层完全自包含，正方系学校的登录与查询逻辑有现成参考实现，PR 合并后你就是这所学校的署名维护者。
+设置第一栏先选学校：已适配学校填教务账号即可自动抓取；**其他学校走「手动课表」模式**——把课表粘贴成文字（教务网页复制的表格、Excel 内容、其他课表 App 的导出文本都行）或上传 Excel / CSV / PDF / Word / TXT 文件，AI 解析成结构化课表，拿不准的会追问，预览里逐行改完确认，课表 / 今日日程 / 周次推算照常可用。
+
+你的学校不在列表？三条路：先用**手动课表**顶着，**[请求适配](https://github.com/Health-525/courseraptor/issues/new?template=request-school.yml)**（把学校信息留给社区），或者**[自己动手写一个](docs/adapter-guide.md)**——适配层完全自包含，正方系学校的登录与查询逻辑有现成参考实现，PR 合并后你就是这所学校的署名维护者。
 
 ---
 

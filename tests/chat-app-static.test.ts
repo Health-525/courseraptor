@@ -100,6 +100,7 @@ const BUILTINS = new Set([
   "sessionStorage",
   "setInterval",
   "setTimeout",
+  "Set",
   "String",
   "structuredClone",
   "Symbol",

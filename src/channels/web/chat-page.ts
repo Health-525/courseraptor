@@ -698,6 +698,49 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .qq-item.dragging, .chip.dragging { opacity: .45; border-color: var(--accent);
                                       border-style: dashed; }
 
+  /* ── 导入课表面板（#hallImport）：字段与设置同一语言；
+     追问卡是朱砂竖线纸片，预览行点开就地编辑 ── */
+  .fld textarea { width: 100%; border: 1px solid var(--rule-2); background: var(--card);
+                  color: var(--ink); font-family: var(--mono); font-size: 14px;
+                  padding: 9px 10px; border-radius: 2px; outline: none;
+                  resize: vertical; min-height: 110px; line-height: 1.7; }
+  .fld textarea:focus { border-color: var(--accent);
+                        box-shadow: 0 0 0 3px rgba(173, 57, 44, .09); }
+  .fld textarea::placeholder { color: var(--ink-3); opacity: .75; }
+  .imp-file { display: flex; align-items: center; gap: 10px; margin: 2px 0 12px; min-width: 0; }
+  .imp-fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+               white-space: nowrap; font-family: var(--mono); font-size: 12px;
+               color: var(--ink-2); }
+  .imp-q { border: 1px solid var(--rule-2); border-left: 3px solid var(--accent);
+           background: var(--card); padding: 9px 12px 10px; margin: 0 0 8px; border-radius: 3px; }
+  .imp-q .iq-t { font-size: 14px; font-weight: 600; line-height: 1.6; margin-bottom: 6px; }
+  .imp-q .iq-o { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
+                 margin: -2px 0 6px; }
+  .imp-q input { width: 100%; border: 1px solid var(--rule-2); background: var(--paper);
+                 color: var(--ink); font-size: 14px; padding: 7px 9px;
+                 border-radius: 2px; outline: none; }
+  .imp-q input:focus { border-color: var(--accent); }
+  .imp-row { border: 1px solid var(--rule); background: var(--card); padding: 8px 11px;
+             margin-bottom: 6px; border-radius: 4px; }
+  .imp-row-top { display: flex; align-items: baseline; gap: 8px; cursor: pointer; }
+  .imp-row-top .ir-main { flex: 1; min-width: 0; font-size: 14px; font-weight: 600;
+                          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .imp-row-top .ir-meta { flex: none; max-width: 60%; overflow: hidden;
+                          text-overflow: ellipsis; white-space: nowrap;
+                          font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+  .imp-row-top:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .imp-edit { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px;
+              margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--rule); }
+  .imp-edit .fld { margin: 0; }
+  .imp-warn { font-family: var(--mono); font-size: 12px; color: var(--accent-deep);
+              margin: 6px 0; white-space: pre-wrap; line-height: 1.7; }
+  .imp-term-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 10px; }
+  .imp-done { border: 1px solid var(--rule-2); border-top: 2px solid var(--accent);
+              background: var(--card); padding: 14px; margin: 4px 0 10px; }
+  .imp-done .id-t { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .imp-done .id-s { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+  .imp-done .tbtn { margin-top: 10px; }
+
   .data-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; align-items: stretch; }
   .data-cell { border: 1px solid var(--rule); background: var(--card); padding: 10px 8px;
                min-height: 72px; display: flex; flex-direction: column;
@@ -1141,7 +1184,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .topbar .iconbtn { width: 44px; min-width: 44px; min-height: 44px; }
     /* 触屏主操作提到 44px 触控目标（HIG 下限）：发送与附件都是高频按钮 */
     #b, .attach-btn { min-height: 44px; }
-    .fld input, .fld select, .qq-add input, .hall-search input { font-size: 16px; }
+    .fld input, .fld select, .fld textarea, .qq-add input, .hall-search input,
+    .imp-q input, .imp-edit input { font-size: 16px; }
     /* 会话重命名输入框：13px 会触发 iOS 聚焦整页放大，触屏提到 16px */
     .sess .sedit { font-size: 16px; }
     /* 触屏抽屉不做滑移动画，瞬时开合：click 的派发目标是「按下与抬起时
@@ -1233,13 +1277,24 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     <div id="hallSettings" hidden>
       <div class="set-frame">
         <nav class="set-tabs" id="setTabs" role="tablist" aria-label="设置栏目">
-          <button class="set-tab on" type="button" role="tab" id="setTabAccount" aria-controls="setPaneAccount" aria-selected="true" data-pane="account"><i class="sdot" aria-hidden="true"></i>教务账号</button>
+          <button class="set-tab on" type="button" role="tab" id="setTabSchool" aria-controls="setPaneSchool" aria-selected="true" data-pane="school"><i class="sdot" aria-hidden="true"></i>学校</button>
+          <button class="set-tab" type="button" role="tab" id="setTabAccount" aria-controls="setPaneAccount" aria-selected="false" data-pane="account"><i class="sdot" aria-hidden="true"></i>教务账号</button>
           <button class="set-tab" type="button" role="tab" id="setTabModel" aria-controls="setPaneModel" aria-selected="false" data-pane="model"><i class="sdot" aria-hidden="true"></i>AI 模型</button>
           <button class="set-tab" type="button" role="tab" id="setTabQQ" aria-controls="setPaneQQ" aria-selected="false" data-pane="qq"><i class="sdot" aria-hidden="true"></i>QQ 机器人</button>
           <button class="set-tab" type="button" role="tab" id="setTabData" aria-selected="false" data-pane="data">本地数据</button>
         </nav>
         <div class="set-main">
-          <section class="set-pane on" id="setPaneAccount" role="tabpanel" aria-labelledby="setTabAccount" data-pane="account">
+          <section class="set-pane on" id="setPaneSchool" role="tabpanel" aria-labelledby="setTabSchool" data-pane="school">
+            <p class="dlg-intro">先选学校：已适配的学校可以自动查课表、成绩、考试与教务通知；其他学校用手动导入课表，AI 帮你把文字或文件解析成课表。学校切换保存后生效。</p>
+            <div class="model-cards" id="schoolCards" role="radiogroup" aria-label="选择学校"></div>
+            <div id="schoolCustomBox" hidden>
+              <label class="fld"><span>学校名称（选填）</span><input id="sSchoolName" type="text" autocomplete="off" maxlength="40" placeholder="如：某某大学（仅用于显示）" ${demo ? "disabled" : ""}></label>
+              <label class="fld"><span>所在城市（选填）</span><input id="sSchoolCity" type="text" autocomplete="off" maxlength="20" placeholder="问天气时的默认城市" ${demo ? "disabled" : ""}></label>
+            </div>
+            <div class="cur" id="curSchool"></div>
+            <div class="diagrow" id="schoolImportRow" hidden><button class="tbtn" id="openImport" type="button" ${demo ? "disabled" : ""}>导入 / 重新导入课表</button><span class="diagstate" id="diagSchool"></span></div>
+          </section>
+          <section class="set-pane" id="setPaneAccount" role="tabpanel" aria-labelledby="setTabAccount" data-pane="account">
             <p class="dlg-intro">正式查询课表、成绩、考试与通知前，请先配置教务账号。已保存的信息不会在页面中完整显示，留空即保持不变；账号仅加密保存在当前电脑。</p>
             <label class="fld"><span>学号</span><input id="sUser" type="text" autocomplete="off" ${demo ? "disabled" : ""}></label>
             <label class="fld"><span>登录密码</span><span class="fld-row"><input id="sPass" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyePass" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
@@ -1309,6 +1364,23 @@ export function chatPage(options: { demo?: boolean } = {}): string {
       <div class="hall-settings-foot prompts-foot">
         <button class="tbtn" id="resetQuick" type="button" ${demo ? "disabled" : ""} title="清空自定义清单，恢复默认模板">恢复默认</button>
         <span class="setmsg good" id="promptsMsg" role="status" aria-live="polite"></span>
+      </div>
+    </div>
+    <div id="hallImport" hidden>
+      <p class="dlg-intro">把课表交给 AI 解析：粘贴文字（教务网页里复制的表格、Excel 单元格内容、其他课表 App 导出的文本、随手打的描述都行），或上传文件（Excel / CSV / PDF / Word / TXT）。拿不准的地方 AI 会问你，答完带着答案重新解析；预览里每行可以改，确认后写入本地课表。</p>
+      <label class="fld"><span>粘贴课表文本</span><textarea id="impText" rows="7" ${demo ? "disabled" : ""} placeholder="例如：&#10;周一 3-4节 高等数学 1-16周 教一101 张老师&#10;周三 5-6节 大学英语 1-16周 文楼202 李老师"></textarea></label>
+      <div class="imp-file">
+        <button class="tbtn" id="impFileBtn" type="button" ${demo ? "disabled" : ""}>或选择文件…</button>
+        <span class="imp-fname" id="impFileName"></span>
+        <input id="impFile" type="file" hidden accept=".pdf,.docx,.xlsx,.xls,.csv,.txt,.md">
+      </div>
+      <div class="diagrow"><button class="tbtn" id="impParse" type="button" ${demo ? "disabled" : ""}>解析课表</button><span class="diagstate" id="impState"></span></div>
+      <div id="impQuestions"></div>
+      <div id="impPreview"></div>
+      <div id="impTerm"></div>
+      <div class="hall-settings-foot">
+        <button class="tbtn" id="impBack" type="button">返回</button>
+        <button class="tbtn primary" id="impCommit" type="button" ${demo ? "disabled" : ""} disabled>确认导入</button>
       </div>
     </div>
   </div>

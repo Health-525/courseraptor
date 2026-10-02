@@ -384,9 +384,7 @@ function courseCard(opts: {
     1,
     Math.min(
       3,
-      Math.floor(
-        (h - CARD_PAD_Y * 2 - (metas.length ? metaH + NAME_META_GAP : 0)) / skin.nameLh,
-      ),
+      Math.floor((h - CARD_PAD_Y * 2 - (metas.length ? metaH + NAME_META_GAP : 0)) / skin.nameLh),
     ),
   );
   const nameLines = fitLines(course.title, inner, skin.nameSize, nameMax);
@@ -398,9 +396,7 @@ function courseCard(opts: {
   const contentH = nameLines.length * skin.nameLh + (metas.length ? NAME_META_GAP + metaH : 0);
   // 跨节次的高卡从顶部排（像真实的卡片内容），单节次矮卡整块居中
   const topAligned = h >= 110;
-  let ty = topAligned
-    ? y + CARD_PAD_Y + skin.nameSize
-    : y + (h - contentH) / 2 + skin.nameSize; // 首行基线
+  let ty = topAligned ? y + CARD_PAD_Y + skin.nameSize : y + (h - contentH) / 2 + skin.nameSize; // 首行基线
 
   const parts: string[] = ["<g>"];
   parts.push(

@@ -1,0 +1,185 @@
+/**
+ * 学校选择 + 手动课表导入的网页接口链路：
+ * /api/settings 的 school 块、运行期切换、/api/news 未适配态、
+ * /api/schedule/import（文本与上传文件两条路）与 commit 落盘。
+ */
+
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { test } from "node:test";
+
+process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-import-"));
+process.env.RAPTOR_CREDENTIALS_FILE = path.join(process.env.RAPTOR_DATA_DIR, "credentials.enc");
+delete process.env.RAPTOR_SCHOOL;
+
+await import("../src/adapters");
+const { startChatWeb } = await import("../src/channels/web/chat-web");
+const { setScheduleParser } = await import("../src/core/schedule-import");
+const { loadScheduleCache } = await import("../src/core/schedule-cache");
+const { loadCredentialsStore } = await import("../src/core/credentials");
+const { manualTermStarts } = await import("../src/core/manual-terms");
+
+/** 页面签发的 CSRF token（写请求必须带） */
+let pageToken: string | null = null;
+async function csrfToken(): Promise<string> {
+  pageToken ??=
+    (await (await fetch((await startChatWeb())!)).text()).match(
+      /<meta name="csrf-token" content="([0-9a-f]{64})">/,
+    )?.[1] ?? null;
+  assert.ok(pageToken, "页面必须注入 csrf-token meta");
+  return pageToken;
+}
+
+async function wfetch(url: string, init: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(init.headers ?? {});
+  headers.set("content-type", "application/json");
+  headers.set("x-csrf-token", await csrfToken());
+  return fetch(url, { ...init, headers });
+}
+
+/** 固定输出的解析器替身：一门课 + 一个追问 */
+const FAKE_MODEL_OUTPUT = JSON.stringify({
+  courses: [
+    {
+      title: "高等数学",
+      weekday: 1,
+      periods: [3, 4],
+      weeks: "1-16",
+      location: "教一101",
+      teacher: "张老师",
+    },
+  ],
+  questions: [{ question: "本学期一共上到第几周？", options: "16/18/20" }],
+  termHint: "2026-2027-1",
+});
+setScheduleParser(async () => FAKE_MODEL_OUTPUT);
+
+const base = async () => (await startChatWeb())!;
+
+test("GET /api/settings：school 块带清单与手动课表标记，默认 njtech", async () => {
+  const r = await (await fetch(`${await base()}/api/settings`)).json();
+  assert.equal(r.school.current, "njtech");
+  assert.equal(r.school.manual, false);
+  assert.deepEqual(
+    r.school.options.map((o: { id: string }) => o.id),
+    ["njtech", "custom"],
+  );
+  assert.equal(r.school.options[1].manual, true);
+});
+
+test("POST /api/settings 切换学校：运行期生效并落凭证", async () => {
+  const r = await wfetch(`${await base()}/api/settings`, {
+    method: "POST",
+    body: JSON.stringify({ schoolId: "custom", customSchoolName: "某某大学", customCity: "杭州" }),
+  });
+  assert.equal(r.status, 200);
+  const d = await r.json();
+  assert.equal(d.status.school.current, "custom");
+  assert.equal(d.status.school.manual, true);
+  assert.match(d.results.find((x: { field: string }) => x.field === "school").message, /已切换/);
+  const creds = loadCredentialsStore();
+  assert.equal(creds?.schoolId, "custom");
+  assert.equal(creds?.customSchoolName, "某某大学");
+  assert.equal(creds?.customCity, "杭州");
+  // 再切一遍同一学校：提示无需切换，不算失败
+  const again = await wfetch(`${await base()}/api/settings`, {
+    method: "POST",
+    body: JSON.stringify({ schoolId: "custom" }),
+  });
+  assert.equal(again.status, 200);
+});
+
+test("自定义学校：/api/news 给未适配态", async () => {
+  const r = await (await fetch(`${await base()}/api/news`)).json();
+  assert.deepEqual(r.items, []);
+  assert.equal(r.unsupported, true);
+});
+
+test("POST /api/schedule/import：文本解析 + 追问透传；空内容报错", async () => {
+  const r = await wfetch(`${await base()}/api/schedule/import`, {
+    method: "POST",
+    body: JSON.stringify({ text: "周一 3-4节 高等数学 1-16周 教一101 张老师" }),
+  });
+  assert.equal(r.status, 200);
+  const d = await r.json();
+  assert.equal(d.courses.length, 1);
+  assert.equal(d.courses[0].title, "高等数学");
+  assert.deepEqual(d.courses[0].periods, [3, 4]);
+  assert.equal(d.questions.length, 1);
+  assert.match(d.questions[0].question, /第几周/);
+
+  const empty = await wfetch(`${await base()}/api/schedule/import`, {
+    method: "POST",
+    body: JSON.stringify({ text: "   " }),
+  });
+  assert.equal(empty.status, 400);
+});
+
+test("POST /api/schedule/import：上传文件走同一条解析（uploadId）", async () => {
+  const up = await wfetch(`${await base()}/api/uploads`, {
+    method: "POST",
+    body: JSON.stringify({
+      name: "课表.txt",
+      type: "text/plain",
+      data: Buffer.from("周一 3-4节 高等数学 1-16周", "utf8").toString("base64"),
+    }),
+  });
+  const upload = await up.json();
+  assert.ok(upload.upload?.id);
+  const r = await wfetch(`${await base()}/api/schedule/import`, {
+    method: "POST",
+    body: JSON.stringify({ uploadId: upload.upload.id }),
+  });
+  assert.equal(r.status, 200);
+  const d = await r.json();
+  assert.equal(d.fileName, "课表.txt");
+  assert.equal(d.courses.length, 1);
+  // 不存在的上传：明确报错
+  const gone = await wfetch(`${await base()}/api/schedule/import`, {
+    method: "POST",
+    body: JSON.stringify({ uploadId: "no-such" }),
+  });
+  assert.equal(gone.status, 400);
+});
+
+test("POST /api/schedule/import/commit：落盘课表缓存与开学日期（校验周一）", async () => {
+  const courses = [
+    {
+      title: "高等数学",
+      weekday: 1,
+      periods: [3, 4],
+      weeks: "1-16",
+      location: "教一101",
+      teacher: "张老师",
+    },
+    { title: "大学英语", weekday: 3, periods: [5, 6], weeks: "1-16", location: "", teacher: "" },
+    { title: "坏行", weekday: 0, periods: [] },
+  ];
+  const ok = await wfetch(`${await base()}/api/schedule/import/commit`, {
+    method: "POST",
+    body: JSON.stringify({ courses, year: 2026, semester: 3, termStart: "2026-09-07" }),
+  });
+  assert.equal(ok.status, 200);
+  const d = await ok.json();
+  assert.equal(d.count, 2);
+  assert.equal(d.rejected.length, 1);
+  const cached = loadScheduleCache();
+  assert.equal(cached?.schedule.year, 2026);
+  assert.equal(cached?.schedule.label, "2026-2027学年第一学期");
+  assert.equal(cached?.schedule.courses.length, 2);
+  assert.equal(manualTermStarts()["2026-2027-1"], "2026-09-07");
+  // 非周一的开学日期拒收
+  const bad = await wfetch(`${await base()}/api/schedule/import/commit`, {
+    method: "POST",
+    body: JSON.stringify({ courses: courses.slice(0, 1), termStart: "2026-09-08" }),
+  });
+  assert.equal(bad.status, 400);
+  // 全空清单拒收
+  const none = await wfetch(`${await base()}/api/schedule/import/commit`, {
+    method: "POST",
+    body: JSON.stringify({ courses: [] }),
+  });
+  assert.equal(none.status, 400);
+});
