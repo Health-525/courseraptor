@@ -160,7 +160,14 @@ test("技能打包：export-schedule 独立包结构 + 自包含可运行", asyn
       schoolId: "njtech",
     }),
   );
-  const exported = run(["--cache", cacheFile, "--week", "1", "--out", path.join(outDir, "exports")]);
+  const exported = run([
+    "--cache",
+    cacheFile,
+    "--week",
+    "1",
+    "--out",
+    path.join(outDir, "exports"),
+  ]);
   assert.equal(exported.status, 0, `带缓存导出应成功：${exported.stderr}`);
   assert.match(exported.stdout, /已导出/);
   const produced = fs
