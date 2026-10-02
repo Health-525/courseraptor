@@ -316,9 +316,9 @@ test("live /api/chat：先发虚构数据声明，工具结果出卡，轮次写
     assert.match(session.messages[1].text, /^> 演示模式：[\s\S]*这是实时生成的回答$/);
     assert.equal(session.messages[1].cards?.[0].kind, "schedule", "卡片随消息保存供重绘");
 
-    // 设置面板如实标注 live 模式
+    // 设置面板展示真实型号 UI：current 是内置默认型号 id（live 与离线一致）
     const settings = (await (await fetch(`${base}/api/settings`)).json()) as { model: string };
-    assert.equal(settings.model, "DeepSeek 实时生成（虚构数据演示）");
+    assert.equal(settings.model, "deepseek-flash");
   });
 });
 
