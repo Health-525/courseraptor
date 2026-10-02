@@ -102,13 +102,7 @@ export function Overview() {
               loading={isLoading}
               icon={<Rocket className='size-4' />}
               label='今日对话轮数'
-              value={
-                o
-                  ? o.ownTurnsToday > 0
-                    ? `${o.turnsToday}`
-                    : String(o.turnsToday)
-                  : undefined
-              }
+              value={o ? String(o.turnsToday) : undefined}
               hint={o?.ownTurnsToday ? `另有自用 Key ${o.ownTurnsToday} 轮（不限额）` : '站点额度账'}
               extra={
                 o && o.ownTurnsToday > 0 ? (

@@ -437,7 +437,8 @@ export function createRegistry({ stateDir }) {
         if (!request) throw new Error("申请不存在或已处理");
         request.status = "approved";
         request.resolvedAt = new Date().toISOString();
-        const code = randomBytes(4).toString("hex");
+        // 6 字节 = 48 位熵：兑换端点有防爆破锁，但码本身也不留给枚举空间
+        const code = randomBytes(6).toString("hex");
         store.codes.push({
           code,
           userId: request.userId,
@@ -470,9 +471,10 @@ export function createRegistry({ stateDir }) {
         );
         if (index < 0) return null;
         const entry = store.codes[index];
+        const expired = new Date(entry.expiresAt) < new Date();
         store.codes.splice(index, 1);
         await writeResets(store);
-        if (new Date(entry.expiresAt) < new Date()) return null;
+        if (expired) return null;
         return entry.userId;
       });
     },

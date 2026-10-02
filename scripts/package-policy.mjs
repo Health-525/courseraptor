@@ -51,6 +51,11 @@ export function shouldPackagePath(relativePath) {
     );
   }
   if (!CODE_DIRS.has(parts[0])) return false;
+  // 网关运行数据绝不进学生包：users.json（同学密码哈希）、invites.json、
+  // admin-totp.json（两步验证密钥）、reset-requests.json（有效期内的重置码）
+  // 与 gateway/users/<id>/（托管同学的会话数据）。这些目录只在维护者本机
+  // 自测网关时出现（见 .gitignore），一不小心就会随打包被带走。
+  if (parts[0] === "gateway" && (parts[1] === "state" || parts[1] === "users")) return false;
   // 落地页（landing/）与技能包（skills/）不属于学生端安装包，白名单里自然排除。
   // 即使误放在代码目录，也不带出日志、密钥、编辑器备份或环境文件。
   return !parts.some((part) => part.startsWith(".") || /\.(?:log|enc|pem|key|bak)$/.test(part));

@@ -73,6 +73,23 @@ test("网关与更新后台照常分发，落地页与技能包不进学生端�
   }
 });
 
+test("网关运行数据绝不进学生包：账本、TOTP 密钥、重置码与托管同学数据", () => {
+  for (const file of [
+    "gateway/state",
+    "gateway/state/users.json",
+    "gateway/state/invites.json",
+    "gateway/state/admin-totp.json",
+    "gateway/state/reset-requests.json",
+    "gateway/state/site.json",
+    "gateway/state/admin-log.json",
+    "gateway/users",
+    "gateway/users/u_123/data/chat-sessions.json",
+    "gateway/users/u_123/credentials.enc",
+  ]) {
+    assert.equal(shouldPackagePath(file), false, file);
+  }
+});
+
 test("管理台前端只分发构建产物：admin/dist 进包，源码与依赖不进", () => {
   for (const file of [
     "admin/dist",

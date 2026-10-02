@@ -52,6 +52,7 @@ test("buildInstanceEnv：网关凭据与同学侧敏感变量绝不进入子实�
   assert.equal(env.RAPTOR_CREDENTIALS_FILE, "/c");
   assert.equal(env.RAPTOR_NO_UPDATE_CHECK, "1");
   assert.equal(env.RAPTOR_NO_TODO_REMINDERS, "1");
+  assert.equal(env.RAPTOR_LOCAL_FILE_ROOT, "/d", "实例只能读自己数据目录内的本机文件");
   assert.equal(env.RAPTOR_DISABLE_DS_OVERRIDE, undefined, "非钉站点模式不注入禁用旗标");
 });
 
