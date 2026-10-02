@@ -12,6 +12,7 @@ import { DEFAULT_QUESTIONS } from "../../src/channels/web/quick-questions";
 import { schedulePage } from "../../src/channels/web/schedule-page";
 import { todayPage } from "../../src/channels/web/today-page";
 import { todosPage } from "../../src/channels/web/todos-page";
+import { FALLBACK_MODEL_ID, FALLBACK_MODELS } from "../../src/core/models";
 import { type DemoStreamAgent, runDemoLiveTurn } from "./agent";
 import { type DemoCard, demoCardsForMessage } from "./cards";
 import { demoKnowledge, demoTodayBrief } from "./data";
@@ -261,8 +262,9 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
           jwgl: { configured: false, username: "", sourceLabel: "演示模式" },
           deepseek: { configured: false, masked: "", sourceLabel: "演示模式" },
           qq: { configured: false, passcodeSet: false, source: "unset", sourceLabel: "演示模式" },
-          model: liveAgent ? "DeepSeek 实时生成（虚构数据演示）" : "离线固定回答",
-          models: [],
+          /* 演示页展示真实型号 UI：current 用内置默认，型号说明行如实标注 */
+          model: FALLBACK_MODEL_ID,
+          models: FALLBACK_MODELS.map((m) => ({ ...m })),
           quickQuestions: DEFAULT_QUESTIONS,
           /* 学校块与正式版同形状（chat-web.ts statusPayload）：没有它演示页
              设置里「选择学校」是空的，看不出复选框选学校 → 下方出表单的联动 */
@@ -279,11 +281,11 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
         });
       } else if (req.method === "GET" && url.startsWith("/api/models")) {
         json(res, {
-          ok: false,
-          current: liveAgent ? "DeepSeek 实时生成（虚构数据演示）" : "离线固定回答",
+          ok: true,
+          current: FALLBACK_MODEL_ID,
           source: "fallback",
-          options: [],
-          message: liveAgent ? "演示模式固定使用启动时指定的模型" : "演示模式不联网，无可选型号",
+          options: FALLBACK_MODELS.map((m) => ({ ...m })),
+          message: liveAgent ? "演示模式：显示内置型号清单" : "演示模式不联网，显示内置型号清单",
         });
       } else if (req.method === "GET" && url === "/api/reminders") {
         json(res, { reminders: [] });
