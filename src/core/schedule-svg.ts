@@ -139,10 +139,10 @@ const SKINS: Record<ScheduleStyle, Skin> = {
     dayW: 152,
     headH: 44,
     rowH: 80,
-    nameSize: 14.5,
-    nameLh: 18,
+    nameSize: 15,
+    nameLh: 19,
     metaSize: 10.5,
-    metaLh: 12.5,
+    metaLh: 13,
   },
   color: {
     bg: "#FDFCF9",
@@ -174,10 +174,10 @@ const SKINS: Record<ScheduleStyle, Skin> = {
     dayW: 132,
     headH: 38,
     rowH: 78,
-    nameSize: 13.5,
-    nameLh: 17,
+    nameSize: 14,
+    nameLh: 18,
     metaSize: 10,
-    metaLh: 12,
+    metaLh: 12.5,
   },
 };
 
@@ -351,7 +351,16 @@ function layoutDayCourses(courses: CourseData[]): {
 
 // ── 课格卡片 ────────────────────────────────────────────────────────
 
-/** 课格文字块：课名 + 元信息，整块在卡片内垂直居中（样式随皮肤走） */
+/** 卡内统一内边距与行距：文字距卡边不贴不死，课名与元信息之间留呼吸 */
+const CARD_PAD_X = 9;
+const CARD_PAD_Y = 8;
+const NAME_META_GAP = 5;
+
+/**
+ * 课格卡片：稳定纸色卡底 + 规范排版——课名（可折行）在上、元信息在下，
+ * 高卡（跨节次）从顶部往下排、矮卡（单节次）整块垂直居中。
+ * 不画任何边条装饰：颜色即卡片，内容即版面。
+ */
 function courseCard(opts: {
   x: number;
   y: number;
@@ -364,7 +373,7 @@ function courseCard(opts: {
   style: ScheduleStyle;
 }): string {
   const { x, y, w, h, course, withWeeks, skin, style } = opts;
-  const inner = w - 8 - 3;
+  const inner = w - CARD_PAD_X * 2;
   // 元信息只留地点（与 /schedule 网页课格同口径）：导出图是给同学自己
   // 看的，教师名不参与找教室，窄格里的版面留给课名
   const meta1 = course.location?.trim() || "地点待定";
@@ -373,42 +382,43 @@ function courseCard(opts: {
   const metaH = metas.length * skin.metaLh;
   const nameMax = Math.max(
     1,
-    Math.min(3, Math.floor((h - 8 - (metas.length ? metaH + 4 : 0)) / skin.nameLh)),
+    Math.min(
+      3,
+      Math.floor(
+        (h - CARD_PAD_Y * 2 - (metas.length ? metaH + NAME_META_GAP : 0)) / skin.nameLh,
+      ),
+    ),
   );
   const nameLines = fitLines(course.title, inner, skin.nameSize, nameMax);
 
-  // 每门课一个稳定纸色卡底（两风格共用同一份课色盘，课格不再清一色）；
-  // classic 另有朱砂边条 + 投影保持档案卡质感
   const cardFill = courseColorOf(course.title);
-  // 中性文字：颜色只在底，课名一律墨色，元信息比 classic 深一档灰
   const nameFill = skin.ink;
   const metaFill = style === "color" ? skin.ink2 : skin.ink3;
 
-  const contentH = nameLines.length * skin.nameLh + (metas.length ? 4 + metaH : 0);
-  let ty = y + (h - contentH) / 2 + skin.nameSize; // 首行基线
+  const contentH = nameLines.length * skin.nameLh + (metas.length ? NAME_META_GAP + metaH : 0);
+  // 跨节次的高卡从顶部排（像真实的卡片内容），单节次矮卡整块居中
+  const topAligned = h >= 110;
+  let ty = topAligned
+    ? y + CARD_PAD_Y + skin.nameSize
+    : y + (h - contentH) / 2 + skin.nameSize; // 首行基线
 
   const parts: string[] = ["<g>"];
-  if (style === "classic") {
-    parts.push(
-      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="${cardFill}" filter="url(#cardShadow)"/>`,
-      `<rect x="${x}" y="${y}" width="3" height="${h}" rx="1.5" fill="${skin.accent}"/>`,
-    );
-  } else {
-    parts.push(
-      `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${skin.cardRadius}" fill="${cardFill}"/>`,
-    );
-  }
+  parts.push(
+    style === "classic"
+      ? `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="${cardFill}" filter="url(#cardShadow)"/>`
+      : `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${skin.cardRadius}" fill="${cardFill}"/>`,
+  );
   for (const line of nameLines) {
     parts.push(
-      `<text x="${x + 8}" y="${ty.toFixed(1)}" font-family="${skin.nameFont}" font-size="${skin.nameSize}" font-weight="${skin.nameWeight}" fill="${nameFill}">${esc(line)}</text>`,
+      `<text x="${x + CARD_PAD_X}" y="${ty.toFixed(1)}" font-family="${skin.nameFont}" font-size="${skin.nameSize}" font-weight="${skin.nameWeight}" fill="${nameFill}">${esc(line)}</text>`,
     );
     ty += skin.nameLh;
   }
-  ty += 4 - (skin.nameLh - skin.metaSize); // 元信息行距从课名行距切换过来
+  ty += NAME_META_GAP - (skin.nameLh - skin.metaSize); // 课名行距切换到元信息行距，中间留一道呼吸
   for (const m of metas) {
     for (const line of fitLines(m, inner, skin.metaSize, 1, skin.metaFactor)) {
       parts.push(
-        `<text x="${x + 8}" y="${(ty + 1).toFixed(1)}" font-family="${skin.metaFont}" font-size="${skin.metaSize}" fill="${metaFill}">${esc(line)}</text>`,
+        `<text x="${x + CARD_PAD_X}" y="${(ty + 1).toFixed(1)}" font-family="${skin.metaFont}" font-size="${skin.metaSize}" fill="${metaFill}">${esc(line)}</text>`,
       );
       ty += skin.metaLh;
     }
