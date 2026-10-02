@@ -1307,7 +1307,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
         </nav>
         <div class="set-main">
           <section class="set-pane on" id="setPaneSchool" role="tabpanel" aria-labelledby="setTabSchool" data-pane="school">
-            <p class="dlg-intro">先选学校：已适配的学校在下方填写教务账号，即可自动查课表、成绩、考试与教务通知；选「其他学校」则改为手动导入课表，AI 帮你把文字或文件解析成课表。学校切换保存后生效。</p>
+            <p class="dlg-intro">先选学校：适配学校填教务账号自动查询；其他学校导入课表即可。</p>
             <div class="school-opts" id="schoolCards" role="radiogroup" aria-label="选择学校"></div>
             <div id="schoolJwglBox" hidden>
               <div class="pane-sub">教务账号</div>
