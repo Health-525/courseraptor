@@ -67,12 +67,13 @@ export function UsersPage() {
   const users = data?.users ?? []
   const siteDefaultTurns = data?.site.defaultDailyTurns ?? 0
 
-  // 来源列：用 user.id 反查邀请码（usedBy 里还有 pending-* 占位，跳过）
+  // 来源列：用 username 反查邀请码（usedBy 存的是用户名，见 app.mjs 的
+  // markInviteUsed(form.invite, user.username)；pending-* 占位跳过）
   const inviteByUser = useMemo(() => {
     const map = new Map<string, { code: string; note: string }>()
     for (const inv of data?.invites ?? []) {
-      for (const uid of inv.usedBy ?? []) {
-        if (!uid.startsWith('pending-')) map.set(uid, { code: inv.code, note: inv.note })
+      for (const name of inv.usedBy ?? []) {
+        if (!name.startsWith('pending-')) map.set(name, { code: inv.code, note: inv.note })
       }
     }
     return map
@@ -169,7 +170,7 @@ export function UsersPage() {
                       <UserRow
                         key={u.id}
                         user={u}
-                        invite={inviteByUser.get(u.id)}
+                        invite={inviteByUser.get(u.username)}
                         siteDefaultTurns={siteDefaultTurns}
                         turnsToday={u.turns.date === today ? u.turns.count : 0}
                         ownTurnsToday={u.ownTurns.date === today ? u.ownTurns.count : 0}

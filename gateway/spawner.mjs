@@ -72,6 +72,9 @@ export function buildInstanceEnv(
   env.RAPTOR_CREDENTIALS_FILE = credFile;
   env.RAPTOR_NO_UPDATE_CHECK = "1";
   env.RAPTOR_NO_TODO_REMINDERS = "1";
+  // 文件读取边界：同学的 agent 只能读自己数据目录内的文件（openLocalFile
+  // 据此拦截），网关账本 / 站点 Key / 他人数据目录 / /proc 都不可达
+  env.RAPTOR_LOCAL_FILE_ROOT = dataDir;
   // 混合 Key 模式：站点 Key（站点设置优先于构造兜底值）；同学在网页设置里
   // 保存自己的 Key 后，凭证文件里的 override 优先级更高（src/core/config.ts
   // 的解析顺序），无需此处感知

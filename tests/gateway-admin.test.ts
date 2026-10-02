@@ -1006,6 +1006,53 @@ test("学生端额度接口与自带 Key 豁免", async (t) => {
   assert.equal(q3.ownKeyActive, false);
 });
 
+test("满载 503 的对话轮不烧额度：记账在拉起实例成功之后", async (t) => {
+  const backendPort = await startBackend(t);
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-busy-"));
+  t.after(() => fs.rmSync(stateDir, { recursive: true, force: true }));
+  const registry = createRegistry({ stateDir });
+  const busySpawner = {
+    ...fakeSpawner(backendPort),
+    async acquire() {
+      throw Object.assign(new Error("当前在线人数较多，请稍后再试"), { code: "ECONCURRENCY" });
+    },
+  };
+  const server = createGatewayServer({
+    registry,
+    spawner: busySpawner,
+    secret: "unit-test-secret-0123456789",
+    dailyTurns: 5,
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const base = `http://127.0.0.1:${address.port}`;
+
+  const [invite] = await registry.createInvites({ count: 1 });
+  const reg = await fetch(`${base}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      invite: invite.code,
+      username: "busyspender",
+      password: "password123",
+      password2: "password123",
+    }),
+    redirect: "manual",
+  });
+  const cookie = reg.headers.get("set-cookie") ?? "";
+  const user = await registry.findUserByName("busyspender");
+
+  const hit = await fetch(`${base}/api/chat`, { method: "POST", headers: { cookie }, body: "{}" });
+  assert.equal(hit.status, 503);
+  assert.equal(
+    await registry.turnsToday(user!.id),
+    0,
+    "被满载/拉起失败拒绝的轮次没有真正发给模型，不烧当日额度",
+  );
+});
+
 test("同学自助修改登录密码", async (t) => {
   const backendPort = await startBackend(t);
   const { base, registry } = await startGateway(t, {
@@ -1124,7 +1171,7 @@ test("忘记密码全链路：申请→管理员同意出码→同学自设新�
       body: JSON.stringify({ id: pending.id }),
     })
   ).json()) as { ok: boolean; code: string };
-  assert.ok(approve.ok && /^[0-9a-f]{8}$/.test(approve.code));
+  assert.ok(approve.ok && /^[0-9a-f]{12}$/.test(approve.code), "重置码 6 字节（48 位熵）");
 
   // 3) 错码 401；正确码改密成功并跳登录页；旧密码失效、新密码可登
   const wrong = await fetch(`${base}/reset-password`, {
@@ -1179,4 +1226,62 @@ test("忘记密码全链路：申请→管理员同意出码→同学自设新�
     redirect: "manual",
   });
   assert.equal(newLogin.status, 303);
+});
+
+test("重置码兑换防爆破：连错五次锁 15 分钟，锁定期间正确码也不可兑换", async (t) => {
+  const backendPort = await startBackend(t);
+  const { base, registry } = await startGateway(t, {
+    backendPort,
+    adminPassword: "admin-master-pw",
+  });
+  const [invite] = await registry.createInvites({ count: 1 });
+  await fetch(`${base}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      invite: invite.code,
+      username: "bruteforcer",
+      password: "password123",
+      password2: "password123",
+    }),
+    redirect: "manual",
+  });
+
+  // 出一枚真码（校验锁定期间连真码也进不去，防「先试后抢」）
+  await registry.createResetRequest(
+    (await registry.findUserByName("bruteforcer"))!.id,
+    "bruteforcer",
+  );
+  const admin = await adminLogin(base, "admin-master-pw");
+  const boot = (await (
+    await fetch(`${base}/admin/api/bootstrap`, { headers: { cookie: admin.cookie } })
+  ).json()) as { resets: { pending: Array<{ id: string; username: string }> } };
+  const pending = boot.resets.pending.find((r) => r.username === "bruteforcer");
+  const approve = (await (
+    await fetch(`${base}/admin/api/reset/approve`, {
+      method: "POST",
+      headers: { cookie: admin.cookie, "content-type": "application/json" },
+      body: JSON.stringify({ id: pending!.id }),
+    })
+  ).json()) as { code: string };
+
+  const post = (code: string) =>
+    fetch(`${base}/reset-password`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        username: "bruteforcer",
+        code,
+        next: "newpassword456",
+        next2: "newpassword456",
+      }),
+      redirect: "manual",
+    });
+
+  for (let i = 0; i < 5; i++) {
+    const res = await post("ffffffffffff");
+    assert.equal(res.status, 401, `第 ${i + 1} 次错码应 401`);
+  }
+  const locked = await post(approve.code);
+  assert.equal(locked.status, 429, "连错五次后锁定，正确码也不可兑换");
 });

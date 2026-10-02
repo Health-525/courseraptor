@@ -11,6 +11,7 @@
  * - 本地解析全部离线完成（mammoth + SheetJS + pdf-parse），数据不出本机。
  */
 
+import { realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -581,6 +582,25 @@ export async function fetchAttachment(
 }
 
 /**
+ * 托管（无终端）实例的文件读取边界：RAPTOR_LOCAL_FILE_ROOT 设置后，
+ * openLocalFile 只放行该目录内的文件（网关把每个实例自己的 data 目录
+ * 设为根，同学的 agent 便读不到网关账本、站点 Key、他人数据或 /proc 等
+ * 服务器敏感路径）。本地完整版从不设置此变量，任意路径行为不变。
+ * realpath 跟随符号链接，堵住 ../ 与软链逃逸。
+ */
+export function assertWithinLocalFileRoot(abs: string): void {
+  const root = process.env.RAPTOR_LOCAL_FILE_ROOT?.trim();
+  if (!root) return;
+  const rootReal = realpathSync(root);
+  const real = realpathSync(abs);
+  if (real !== rootReal && !real.startsWith(rootReal + path.sep)) {
+    throw new Error(
+      `当前环境只允许读取你的数据目录（${root}）内的文件，其余本机路径不可读：${abs}`,
+    );
+  }
+}
+
+/**
  * 读取本机文件（用户提供的路径）：与附件同一条解析/缓存流水线。
  * 只读不删；文件更新（体积变化）时自动重新入缓存。
  */
@@ -589,6 +609,7 @@ export async function openLocalFile(
   opts: AnalyzeOpts = {},
 ): Promise<AttachmentResult> {
   const abs = path.resolve(inputPath);
+  assertWithinLocalFileRoot(abs);
   let stat: Awaited<ReturnType<typeof fs.stat>>;
   try {
     stat = await fs.stat(abs);

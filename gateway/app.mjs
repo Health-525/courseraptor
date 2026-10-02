@@ -528,6 +528,15 @@ else { input.type = "password"; this.textContent = "显示"; }
         return;
       }
       if (req.method === "POST" && pathname === "/forgot") {
+        // 防刷：提交本身也进防爆破计数——否则可对全部用户名各造一条 pending，
+        // 把管理台审批列表刷成垃圾墙掩护真实申请（正常同学一次就够）
+        const lockSec = throttle.check(ip);
+        if (lockSec) {
+          sendHtml(res, 429, forgotPage(`提交次数过多，请 ${lockSec} 秒后再试`));
+          finish(429);
+          return;
+        }
+        throttle.fail(ip);
         const form = await readForm(req);
         const user = await registry.findUserByName(String(form.username ?? ""));
         if (user && !user.disabled) {
@@ -543,6 +552,13 @@ else { input.type = "password"; this.textContent = "显示"; }
         return;
       }
       if (req.method === "POST" && pathname === "/reset-password") {
+        // 重置码是可暴力尝试的凭据：兑换失败与登录失败同一套防爆破锁
+        const lockSec = throttle.check(ip);
+        if (lockSec) {
+          sendHtml(res, 429, forgotPage(`尝试次数过多，请 ${lockSec} 秒后再试`));
+          finish(429);
+          return;
+        }
         const form = await readForm(req);
         const username = String(form.username ?? "");
         const next = String(form.next ?? "");
@@ -552,9 +568,20 @@ else { input.type = "password"; this.textContent = "显示"; }
         }
         const userId = await registry.redeemResetCode(username, String(form.code ?? ""));
         if (!userId) {
-          sendHtml(res, 401, forgotPage("重置码无效或已过期；请向管理员确认"));
+          const lockSec = throttle.fail(ip);
+          sendHtml(
+            res,
+            401,
+            forgotPage(
+              lockSec
+                ? `重置码无效或已过期。连续失败过多，已锁定 ${lockSec} 秒`
+                : "重置码无效或已过期；请向管理员确认",
+            ),
+          );
+          finish(401);
           return;
         }
+        throttle.reset(ip);
         try {
           await registry.setPassword(userId, next);
         } catch (error) {
@@ -771,7 +798,10 @@ else { input.type = "password"; this.textContent = "显示"; }
       }
 
       // 统一 Key 的费用护栏：每日对话轮数（按人限额优先，未设用站点默认）；
-      // 已保存自己 DeepSeek Key 的同学不占站点免费额度，仅计数用于展示
+      // 已保存自己 DeepSeek Key 的同学不占站点免费额度，仅计数用于展示。
+      // 记账放在 acquire 成功之后：满载 503 / 拉起失败被拒的轮次没有真正
+      // 发给模型，不该烧同学的当日额度
+      let chatTurnLedger = null;
       if (req.method === "POST" && pathname === "/api/chat") {
         const hasOwnKey = usersDir ? await ownDeepseekKeyActive(usersDir, user.id) : false;
         const ownKeyActive = hasOwnKey && user.dsMode !== "site";
@@ -786,7 +816,7 @@ else { input.type = "password"; this.textContent = "显示"; }
             return;
           }
         }
-        await registry.addTurns(user.id, 1, ownKeyActive ? "own" : "site");
+        chatTurnLedger = ownKeyActive ? "own" : "site";
       }
 
       spawner.noteActivity(user.id);
@@ -805,6 +835,7 @@ else { input.type = "password"; this.textContent = "显示"; }
         }
         throw error;
       }
+      if (chatTurnLedger) await registry.addTurns(user.id, 1, chatTurnLedger);
       proxyTo(req, res, user.id, port);
       res.on("close", () => finish(res.statusCode ?? 0));
     } catch (error) {
