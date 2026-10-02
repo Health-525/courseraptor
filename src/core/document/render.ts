@@ -107,17 +107,23 @@ function pushDocxBlock(children: any[], b: DocBlock, lib: any): void {
       );
       break;
     case "list":
-      for (const it of b.items) {
+      // ordered：docx 原生编号样式不直观，统一用可见的「1. 」文本前缀
+      //（schema 对模型承诺 ordered=true 用 1.2.3 前缀）
+      b.items.forEach((it, i) => {
         children.push(
           new Paragraph({
             ...(b.ordered ? {} : { bullet: { level: 0 } }),
             spacing: { after: 60 },
             children: [
-              new TextRun({ text: (b.ordered ? "• " : "") + it, size: 22, font: CJK_FONT }),
+              new TextRun({
+                text: b.ordered ? `${i + 1}. ${it}` : it,
+                size: 22,
+                font: CJK_FONT,
+              }),
             ],
           }),
         );
-      }
+      });
       break;
     case "table":
       children.push(
@@ -301,7 +307,8 @@ function slidesFromBlocks(spec: DocumentSpec): SlideSpec[] {
       cur = { title: b.text, bullets: [] };
     } else if (cur) {
       if (b.type === "paragraph") cur.bullets.push(b.text);
-      else if (b.type === "list") cur.bullets.push(...b.items);
+      else if (b.type === "list")
+        cur.bullets.push(...b.items.map((it, i) => (b.ordered ? `${i + 1}. ${it}` : it)));
       else if (b.type === "table") cur.table = b.table;
     }
   }
@@ -362,11 +369,13 @@ export async function renderPdf(spec: DocumentSpec): Promise<Buffer> {
       doc.fontSize(12).text(b.text, { align: "justify" });
       doc.moveDown(0.5);
     } else if (b.type === "list") {
-      for (const it of b.items) {
+      b.items.forEach((it, i) => {
         if (doc.y > bottom - 20) doc.addPage();
         setFont();
-        doc.fontSize(12).text(`• ${it}`, left + 12, undefined, { indent: 0 });
-      }
+        doc
+          .fontSize(12)
+          .text(b.ordered ? `${i + 1}. ${it}` : `• ${it}`, left + 12, undefined, { indent: 0 });
+      });
       doc.moveDown(0.4);
     } else if (b.type === "table") {
       ensureRoom(doc, bottom, 40);

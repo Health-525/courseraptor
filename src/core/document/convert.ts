@@ -115,6 +115,13 @@ async function extractText(buf: Buffer, filename: string): Promise<string | null
       const r = await mammoth.extractRawText({ buffer: buf });
       return r.value;
     }
+    if (ext === "pptx") {
+      // 此前 pptx 一路落进 buf.toString("utf8")——「PPT 转 Word」会产出
+      // 二进制乱码文档且流程显示成功；复用附件流水线的 pptx 抽取
+      const { extractPptxText } = await import("../attachments");
+      const text = await extractPptxText(buf);
+      return text.trim() ? text : null;
+    }
     return buf.toString("utf8");
   } catch {
     return null;

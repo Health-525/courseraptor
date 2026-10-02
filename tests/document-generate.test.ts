@@ -89,6 +89,51 @@ test("pptx 生成：zip 魔数 + 非空", async () => {
   assert.ok(buf.length > 1000, "pptx 应有实际体积");
 });
 
+test("ordered 列表：docx/pdf 都用 1.2.3 前缀（schema 对模型的承诺）", async () => {
+  const list = { type: "list" as const, items: ["第一步", "第二步", "第三步"], ordered: true };
+
+  const docx = await renderDocx({
+    format: "docx",
+    title: "有序列表",
+    blocks: [list],
+  });
+  const mammoth = require("mammoth");
+  const r = await mammoth.extractRawText({ buffer: docx });
+  assert.match(r.value, /1\. 第一步/);
+  assert.match(r.value, /2\. 第二步/);
+  assert.match(r.value, /3\. 第三步/);
+  assert.ok(!r.value.includes("•"), "有序列表不得再出项目符号前缀");
+
+  const pdf = await renderPdf({ format: "pdf", title: "有序列表", blocks: [list] });
+  if (resolveCjkFont()) {
+    const { PDFParse } = require("pdf-parse");
+    const parser = new PDFParse({ data: new Uint8Array(pdf) });
+    const t = await parser.getText();
+    await parser.destroy().catch(() => {});
+    const text = typeof t === "string" ? t : (t as any).text;
+    assert.match(text, /1\. 第一步/);
+  }
+});
+
+test("convertDocument：pptx 源抽取正文转 docx（此前是二进制乱码还显示成功）", async () => {
+  // 用自家渲染器造一个 pptx，再走转换链——dogfood 往返
+  const pptx = await renderPptx({
+    format: "pptx",
+    title: "复习提纲",
+    slides: [{ title: "要点", bullets: ["高数极限", "线代秩"] }],
+  });
+  const srcPath = path.join(tmpData, "src-deck.pptx");
+  fs.writeFileSync(srcPath, pptx);
+
+  const r = await convertDocument({ target: "docx", sourcePath: srcPath });
+  assert.ok(r.ok, "pptx 转 docx 应成功");
+  if (r.ok) {
+    const mammoth = require("mammoth");
+    const extracted = await mammoth.extractRawText({ buffer: fs.readFileSync(r.file.filePath) });
+    assert.match(extracted.value, /复习提纲|高数极限/, "转出的 Word 应含 pptx 正文而非乱码");
+  }
+});
+
 test("pdf 生成：中文字形真的嵌入（回读可抽取）", async () => {
   const buf = await renderPdf({
     format: "pdf",
