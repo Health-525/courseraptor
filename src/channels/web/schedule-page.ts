@@ -466,10 +466,11 @@ function render(b) {
   }
   renderWeek(b);
   renderSrc(b);
-  /* 图片导出按钮：演示模式没有真实缓存、假期没有当前周，都先藏起来 */
+  /* 图片导出按钮：演示模式没有真实缓存、没有缓存时点开是裸 JSON 错误页、
+     假期没有当前周——都先藏起来 */
   const svgWeekBtn = $("svgWeekBtn");
   const svgTermBtn = $("svgTermBtn");
-  if (DEMO_DATA) {
+  if (DEMO_DATA || !b.schedule.available) {
     svgWeekBtn.style.display = "none";
     svgTermBtn.style.display = "none";
   } else if (displayedWeek == null) {

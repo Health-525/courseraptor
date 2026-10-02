@@ -86,6 +86,17 @@ test("GET / 返回对话页面（含 marked 引用与快捷提问）", async () 
   // Markdown 渲染脚本与快捷提问气泡必须就位
   assert.match(html, /\/vendor\/marked\.min\.js/);
   assert.match(html, /这周课表/);
+  // 页面内嵌进程级 CSRF token，绝不能被浏览器缓存：否则重启后旧 token
+  // 让全部写请求 403
+  assert.equal(res.headers.get("cache-control"), "no-store");
+});
+
+test("GET 四张独立页同样禁缓存（都内嵌 CSRF token）", async () => {
+  const url = (await startChatWeb())!;
+  for (const p of ["/today", "/schedule", "/todos", "/knowledge"]) {
+    const res = await fetch(`${url}${p}`);
+    assert.equal(res.headers.get("cache-control"), "no-store", p);
+  }
 });
 
 test("GET /vendor/marked.min.js 返回 marked 脚本本体", async () => {
