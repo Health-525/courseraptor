@@ -946,6 +946,7 @@ test("学生端额度接口与自带 Key 豁免", async (t) => {
     hasOwnKey: false,
     ownKeyActive: false,
     providerId: "deepseek",
+    siteProviders: [],
     dsMode: "own",
     source: "site",
   });
@@ -1415,4 +1416,180 @@ test("多厂商自带 Key 分账：hasOwnKey 按当前供应商判定", async (t
   const pass = await fetch(`${base}/api/chat`, { method: "POST", headers: { cookie }, body: "{}" });
   assert.equal(pass.status, 200);
   assert.equal(await registry.ownTurnsToday(user!.id), 1, "智谱自有 Key 记自己的账");
+});
+
+/* ── 站点多厂商 Key（第二批）：管理台读写 / quota siteProviders / 供应商切换校验 ── */
+
+/** 项目根（读 ui.mjs 源码做清单同步钉用） */
+const ROOT = path.resolve(import.meta.dirname, "..");
+
+/** 管理台会话：登录拿 cookie（站点接口在 /admin/api 下；无 TOTP 时纯密码） */
+async function adminSession(t: { after: (fn: () => void) => void }, base: string) {
+  const res = await fetch(`${base}/admin/api/login`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ password: "admin-pass-1234" }),
+  });
+  t.after(() => void fetch(`${base}/admin/api/logout`, { method: "POST" }).catch(() => {}));
+  const cookie = (res.headers.get("set-cookie") ?? "").split(";")[0];
+  return cookie;
+}
+
+test("站点多厂商 Key：管理台按厂商读写、旧字段迁移、quota 下发 siteProviders", async (t) => {
+  const backendPort = await startBackend(t);
+  const usersDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-site-"));
+  t.after(() => fs.rmSync(usersDir, { recursive: true, force: true }));
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-site-st-"));
+  const registry = createRegistry({ stateDir });
+  const server = createGatewayServer({
+    registry,
+    spawner: fakeSpawner(backendPort),
+    secret: "unit-test-secret-0123456789",
+    dailyTurns: 3,
+    usersDir,
+    adminPassword: "admin-pass-1234",
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const base = `http://127.0.0.1:${address.port}`;
+  const admin = await adminSession(t, base);
+  const [invite] = await registry.createInvites({ count: 1 });
+  const reg = await fetch(`${base}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      invite: invite.code,
+      username: "siteuser",
+      password: "password123",
+      password2: "password123",
+    }),
+    redirect: "manual",
+  });
+  const userCookie = reg.headers.get("set-cookie") ?? "";
+
+  const adminCall = (body: unknown) =>
+    fetch(`${base}/admin/api/site`, {
+      method: "POST",
+      headers: { cookie: admin, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  // GET 初始：providers 清单形状完整、都没设 Key
+  const s0 = (await (
+    await fetch(`${base}/admin/api/site`, { headers: { cookie: admin } })
+  ).json()) as {
+    providers: { id: string; label: string; keySet: boolean; keyMasked: string }[];
+  };
+  assert.ok(s0.providers.length >= 10, "内置厂商都在清单里");
+  assert.ok(s0.providers.every((p) => p.keySet === false && p.keyMasked === ""));
+
+  // 按厂商保存：智谱宽松校验放行，deepseek 严格 sk-
+  const glmKey = "opaque-glm-site-key-0123456789";
+  assert.equal((await adminCall({ provider: "glm", key: glmKey })).status, 200);
+  const badDeepseek = await adminCall({ provider: "deepseek", key: "short" });
+  assert.equal(badDeepseek.status, 400, "deepseek 站点 Key 维持 sk- 严格校验");
+  const okDeepseek = await adminCall({
+    provider: "deepseek",
+    key: "sk-sitedeepseek1234567890abcd",
+  });
+  assert.equal(okDeepseek.status, 200);
+  const custom = await adminCall({ provider: "custom", key: "whatever-key-012345" });
+  assert.equal(custom.status, 400, "custom 没有站点 Key 的概念");
+
+  // registry 双视图：providerKeys 齐全；deepseek 双写旧字段（兼容旧客户端）
+  const keys = await registry.getSiteProviderKeys();
+  assert.equal(keys.glm, glmKey);
+  assert.equal(keys.deepseek, "sk-sitedeepseek1234567890abcd");
+  assert.equal((await registry.getSiteSettings()).deepseekKey, keys.deepseek, "旧字段同步");
+
+  // quota 下发 siteProviders：配了 Key 的厂商都在
+  const q = (await (
+    await fetch(`${base}/api/quota`, { headers: { cookie: userCookie } })
+  ).json()) as {
+    siteProviders: string[];
+  };
+  assert.ok(q.siteProviders.includes("glm") && q.siteProviders.includes("deepseek"));
+  assert.ok(!q.siteProviders.includes("qwen"), "没配 Key 的厂商不在站点清单");
+
+  // 清除智谱 Key：quota 清单同步收缩
+  assert.equal((await adminCall({ provider: "glm", key: "" })).status, 200);
+  const q2 = (await (
+    await fetch(`${base}/api/quota`, { headers: { cookie: userCookie } })
+  ).json()) as {
+    siteProviders: string[];
+  };
+  assert.ok(!q2.siteProviders.includes("glm"), "清除后即从站点清单消失");
+});
+
+test("钉站点模式的供应商切换：没配站点 Key 的厂商被拒，配了即放行", async (t) => {
+  const backendPort = await startBackend(t);
+  const usersDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-pin-"));
+  t.after(() => fs.rmSync(usersDir, { recursive: true, force: true }));
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-pin-st-"));
+  const registry = createRegistry({ stateDir });
+  const server = createGatewayServer({
+    registry,
+    spawner: fakeSpawner(backendPort),
+    secret: "unit-test-secret-0123456789",
+    dailyTurns: 3,
+    usersDir,
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const base = `http://127.0.0.1:${address.port}`;
+
+  const [invite] = await registry.createInvites({ count: 1 });
+  const reg = await fetch(`${base}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      invite: invite.code,
+      username: "pinuser",
+      password: "password123",
+      password2: "password123",
+    }),
+    redirect: "manual",
+  });
+  const cookie = reg.headers.get("set-cookie") ?? "";
+  const user = await registry.findUserByName("pinuser");
+  await registry.setDsMode(user!.id, "site");
+
+  const call = (providerId: string) =>
+    fetch(`${base}/api/provider`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ providerId }),
+    });
+
+  // 站点没配智谱 Key：钉站点的同学切智谱被拒，且不落库
+  const denied = await call("glm");
+  assert.equal(denied.status, 400);
+  assert.match(((await denied.json()) as { error: string }).error, /站点免费额度暂未提供/);
+  assert.notEqual((await registry.findUserByName("pinuser"))?.providerId, "glm");
+
+  // 配上站点 Key 后放行；deepseek 永远允许（env 兜底语义）
+  await registry.setSiteProviderKey("glm", "opaque-glm-site-key-0123456789");
+  assert.equal((await call("glm")).status, 200);
+  assert.equal((await registry.findUserByName("pinuser"))?.providerId, "glm");
+  assert.equal((await call("deepseek")).status, 200, "deepseek 是兜底供应商，恒可切");
+});
+
+test("网关侧厂商清单与 src/core/providers.ts 保持一致（防漂移钉）", async () => {
+  const ui = await fs.promises.readFile(path.join(ROOT, "gateway/admin/ui.mjs"), "utf8");
+  const m = ui.match(/const SITE_PROVIDERS = \[([\s\S]*?)\];/);
+  assert.ok(m, "SITE_PROVIDERS 常量应存在于 ui.mjs");
+  const gatewayIds = [...m[1].matchAll(/id: "([a-z0-9-]+)"/g)].map((x) => x[1]);
+  const { BUILTIN_PROVIDERS } = await import("../src/core/providers");
+  const coreIds = BUILTIN_PROVIDERS.filter((p: { id: string }) => p.id !== "custom").map(
+    (p: { id: string }) => p.id,
+  );
+  assert.deepEqual(
+    gatewayIds,
+    coreIds,
+    "加/改厂商时两处清单要同步：gateway/admin/ui.mjs 的 SITE_PROVIDERS 与 src/core/providers.ts",
+  );
 });

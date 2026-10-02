@@ -61,7 +61,16 @@ const ENV_ALLOWLIST = [
  */
 export function buildInstanceEnv(
   sourceEnv,
-  { port, dataDir, credFile, siteKey = "", fallbackKey = "", forceSite = false, providerId = "" },
+  {
+    port,
+    dataDir,
+    credFile,
+    siteKey = "",
+    fallbackKey = "",
+    forceSite = false,
+    providerId = "",
+    providerSiteKey = "",
+  },
 ) {
   const env = {};
   for (const key of ENV_ALLOWLIST) {
@@ -79,12 +88,15 @@ export function buildInstanceEnv(
   // RAPTOR_HOSTED 让实例侧禁收 providerId/customBaseUrl（走网关，防 SSRF）
   if (providerId) env.RAPTOR_PROVIDER_ID = providerId;
   env.RAPTOR_HOSTED = "1";
-  // 混合 Key 模式：站点 Key（站点设置优先于构造兜底值）；同学在网页设置里
-  // 保存自己的 Key 后，凭证文件里的 override 优先级更高（src/core/config.ts
-  // 的解析顺序），无需此处感知。过渡期站点 Key 仅 DeepSeek：其他供应商的
-  // 站点额度待 site.json 支持多厂商后由 RAPTOR_PROVIDER_KEY 注入。
-  const effectiveKey = siteKey || fallbackKey;
-  if (effectiveKey) env.DEEPSEEK_API_KEY = effectiveKey;
+  // 混合 Key 模式：站点按厂商配 Key（site.json providerKeys）。当前供应商
+  // 的站点 Key 注入 RAPTOR_PROVIDER_KEY（实例内三层解析的 env 层）；同学
+  // 保存自己的 Key 后凭证 override 优先级更高（src/core/config.ts），无需
+  // 此处感知。DEEPSEEK_API_KEY 是 deepseek 的历史注入通道（官方 SDK 读它），
+  // 仅 deepseek 会话注入，其他厂商的站点 Key 不经它泄露。
+  const isDeepseek = !providerId || providerId === "deepseek";
+  if (providerSiteKey) env.RAPTOR_PROVIDER_KEY = providerSiteKey;
+  const deepseekEffective = providerSiteKey || siteKey || fallbackKey;
+  if (isDeepseek && deepseekEffective) env.DEEPSEEK_API_KEY = deepseekEffective;
   if (forceSite) env.RAPTOR_DISABLE_DS_OVERRIDE = "1";
   return env;
 }
@@ -99,6 +111,8 @@ export function createSpawner({
   getForceSiteKey = null,
   /** 每次拉起时问一次：该同学当前选的模型供应商（users.json，/api/provider 切换） */
   getProviderId = null,
+  /** 每次拉起时问一次：指定供应商的站点 Key（site.json providerKeys，含 env 兜底） */
+  getProviderSiteKey = null,
   maxConcurrent = 4,
   idleMinutes = 30,
   reapIntervalMs = 60_000,
@@ -158,6 +172,20 @@ export function createSpawner({
     }
   }
 
+  /** 指定供应商的站点 Key：site.json（经回调，含 env 兜底逻辑）；旧部署只配 deepseek */
+  async function providerSiteKeyFor(providerId) {
+    if (getProviderSiteKey) {
+      try {
+        return (await getProviderSiteKey(providerId)) || "";
+      } catch {
+        return "";
+      }
+    }
+    if (providerId !== "deepseek") return "";
+    const key = await currentSiteKey();
+    return key || deepseekKey;
+  }
+
   /** 站点 Key 当前值：站点设置（可运行时改）优先，回退构造参数 */
   async function currentSiteKey() {
     if (!getDeepseekKey) return "";
@@ -168,7 +196,14 @@ export function createSpawner({
     }
   }
 
-  function spawnInstance(userId, restartCount, siteKey = "", forceSite = false, providerId = "") {
+  function spawnInstance(
+    userId,
+    restartCount,
+    siteKey = "",
+    forceSite = false,
+    providerId = "",
+    providerSiteKey = "",
+  ) {
     const dataDir = path.join(userDataDir(userId), "data");
     const credFile = path.join(userDataDir(userId), "credentials.enc");
     mkdirSync(dataDir, { recursive: true });
@@ -181,6 +216,7 @@ export function createSpawner({
       fallbackKey: deepseekKey,
       forceSite,
       providerId,
+      providerSiteKey,
     });
 
     const child = spawn(nodeExec, ["--import", tsxUrl, "gateway/headless/entry.ts"], {
@@ -228,9 +264,13 @@ export function createSpawner({
       const effectiveRestarts =
         Date.now() - instance.startedAt > UPTIME_RESET_MS ? 0 : instance.restarts;
       if (effectiveRestarts < MAX_RESTARTS) {
-        void Promise.all([currentSiteKey(), forceSiteKey(userId), currentProviderId(userId)])
-          .then(([key, force, providerId]) =>
-            spawnInstance(userId, effectiveRestarts + 1, key, force, providerId),
+        void Promise.all([
+          currentSiteKey(),
+          forceSiteKey(userId),
+          currentProviderId(userId).then((id) => Promise.all([id, providerSiteKeyFor(id)])),
+        ])
+          .then(([key, force, [providerId, providerSiteKey]]) =>
+            spawnInstance(userId, effectiveRestarts + 1, key, force, providerId, providerSiteKey),
           )
           .catch((e) => {
             // 自动重启失败（如端口段耗尽）：可见地记录，不留未处理 rejection
@@ -288,12 +328,12 @@ export function createSpawner({
       }
       const task = (async () => {
         try {
-          const [siteKey, forceSite, providerId] = await Promise.all([
+          const [siteKey, forceSite, [providerId, providerSiteKey]] = await Promise.all([
             currentSiteKey(),
             forceSiteKey(userId),
-            currentProviderId(userId),
+            currentProviderId(userId).then((id) => Promise.all([id, providerSiteKeyFor(id)])),
           ]);
-          const it = spawnInstance(userId, 0, siteKey, forceSite, providerId);
+          const it = spawnInstance(userId, 0, siteKey, forceSite, providerId, providerSiteKey);
           const port = await it.ready;
           it.lastRequestAt = Date.now();
           return port;

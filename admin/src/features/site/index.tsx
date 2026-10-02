@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { AdminHeader } from '@/components/admin-header'
 import { Main } from '@/components/layout/main'
 import { useBootstrap, useInvalidateBootstrap } from '@/lib/admin-data'
-import { siteSaveKey } from '@/lib/api'
+import { siteSaveProviderKey } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -18,15 +18,16 @@ import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 
-/** 站点设置：统一 DeepSeek Key（三层优先级的中间层）+ 限额分账 */
+/** 站点设置：各厂商站点 Key（多厂商）+ 限额分账 */
 export function SitePage() {
   const { data, isLoading } = useBootstrap()
   const invalidate = useInvalidateBootstrap()
+  const [provider, setProvider] = useState('deepseek')
   const [key, setKey] = useState('')
   const [confirming, setConfirming] = useState(false)
 
   const save = useMutation({
-    mutationFn: () => siteSaveKey(key.trim()),
+    mutationFn: () => siteSaveProviderKey(provider, key.trim()),
     onSuccess: () => {
       toast.success('站点 Key 已保存（新拉起的实例立即使用）')
       setKey('')
@@ -38,26 +39,50 @@ export function SitePage() {
   const site = data?.site
   const o = data?.overview
 
+  const providers = useMemo(() => {
+    const list = site?.providers ?? []
+    return list.length
+      ? list
+      : [
+          {
+            id: 'deepseek',
+            label: 'DeepSeek',
+            keySet: Boolean(site?.deepseekKeySet),
+            keyMasked: site?.deepseekKeyMasked ?? '',
+            envFallback: Boolean(site?.envDeepseekKeySet) && !site?.deepseekKeySet,
+          },
+        ]
+  }, [site])
+
+  const selected = providers.find((p) => p.id === provider) ?? providers[0]
+  const selectedIsDeepseek = selected?.id === 'deepseek'
+
   const stateLine = isLoading ? (
     <Skeleton className='h-5 w-64' />
-  ) : site?.deepseekKeySet ? (
+  ) : site?.deepseekKeySet || site?.envDeepseekKeySet ? (
     <p className='text-sm'>
-      面板已设置 <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-xs'>{site.deepseekKeyMasked}</code>
-    </p>
-  ) : site?.envDeepseekKeySet ? (
-    <p className='text-sm'>
-      面板未设置，回退服务器 env 的 <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-xs'>GATEWAY_DEEPSEEK_KEY</code>
+      DeepSeek 站点额度可用
+      {site?.deepseekKeySet ? (
+        <>
+          （面板 <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-xs'>{site.deepseekKeyMasked}</code>）
+        </>
+      ) : (
+        <>（面板未设，回退服务器 env 的 GATEWAY_DEEPSEEK_KEY）</>
+      )}
     </p>
   ) : (
     <p className='text-sm text-red-600 dark:text-red-400'>
-      未设置（面板与服务器 env 都没有 Key，同学对话将不可用）
+      尚无任何站点 Key：同学须自带自己的 Key 才能对话
     </p>
   )
 
   const pinnedCount = data?.users.filter((u) => u.dsMode === 'site').length ?? 0
   const ownActiveCount =
     data?.users.filter(
-      (u) => u.dsMode !== 'site' && u.ownTurns.date === new Date().toISOString().slice(0, 10) && u.ownTurns.count > 0,
+      (u) =>
+        u.dsMode !== 'site' &&
+        u.ownTurns.date === new Date().toISOString().slice(0, 10) &&
+        u.ownTurns.count > 0,
     ).length ?? 0
 
   return (
@@ -66,30 +91,78 @@ export function SitePage() {
       <Main>
         <Card>
           <CardHeader>
-            <CardTitle>站点统一 DeepSeek Key</CardTitle>
-            <CardDescription>同学端「设置 → AI 模型」的统一 Key</CardDescription>
+            <CardTitle>站点统一 Key（按供应商）</CardTitle>
+            <CardDescription>
+              同学端「站点免费额度」只能选这里配了 Key 的供应商；没配的厂商同学须自带
+              Key。保存后新拉起的实例立即使用。
+            </CardDescription>
           </CardHeader>
-          <CardContent className='space-y-3'>
+          <CardContent className='space-y-4'>
             {stateLine}
+            {isLoading ? (
+              <Skeleton className='h-32 w-full' />
+            ) : (
+              <div className='divide-y rounded-md border'>
+                {providers.map((p) => (
+                  <div key={p.id} className='flex items-center justify-between gap-3 px-3 py-2'>
+                    <div className='flex min-w-0 items-center gap-2'>
+                      <span className='truncate text-sm font-medium'>{p.label}</span>
+                      {p.id === provider && <Badge variant='secondary'>编辑中</Badge>}
+                    </div>
+                    <div className='flex shrink-0 items-center gap-2'>
+                      {p.keySet ? (
+                        <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-xs'>
+                          {p.keyMasked}
+                        </code>
+                      ) : p.envFallback ? (
+                        <span className='text-muted-foreground text-xs'>回退 env</span>
+                      ) : (
+                        <span className='text-muted-foreground text-xs'>未设置</span>
+                      )}
+                      <Button
+                        variant={p.id === provider ? 'default' : 'outline'}
+                        size='sm'
+                        onClick={() => {
+                          setProvider(p.id)
+                          setKey('')
+                        }}
+                      >
+                        {p.keySet ? '更换' : '设置'}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className='flex gap-2'>
               <Input
                 value={key}
                 onChange={(e) => setKey(e.target.value)}
-                placeholder='粘贴新的 sk- 开头 Key（留空保存 = 清除面板 Key）'
+                placeholder={
+                  selected
+                    ? `粘贴 ${selected.label} 的新 Key（留空保存 = 清除面板 Key）`
+                    : '先选择供应商'
+                }
                 autoComplete='off'
                 className='font-mono'
               />
               <Button
                 className='shrink-0'
-                disabled={save.isPending || (key.trim() !== '' && !(key.trim().startsWith('sk-') && key.trim().length >= 20))}
+                disabled={
+                  save.isPending ||
+                  !selected ||
+                  (key.trim() !== '' &&
+                    (selectedIsDeepseek
+                      ? !(key.trim().startsWith('sk-') && key.trim().length >= 20)
+                      : key.trim().length < 16))
+                }
                 onClick={() => (key.trim() ? setConfirming(true) : save.mutate())}
               >
                 保存
               </Button>
             </div>
             <p className='text-muted-foreground text-xs'>
-              保存后新拉起的实例立即使用新 Key；在线实例下次拉起时切换。同学保存自己的 Key
-              后优先用自己的，不消耗站点额度。
+              在线实例下次拉起时切换；同学保存自己的 Key 后优先用自己的，不消耗站点额度。
             </p>
           </CardContent>
         </Card>
@@ -139,7 +212,7 @@ export function SitePage() {
           open={confirming}
           onOpenChange={setConfirming}
           title='保存站点 Key'
-          desc='确定保存这枚 DeepSeek Key 吗？新拉起的实例将立即使用它。'
+          desc={`确定保存这枚 ${selected?.label ?? ''} Key 吗？新拉起的实例将立即使用它。`}
           cancelBtnText='取消'
           confirmText='保存'
           isLoading={save.isPending}

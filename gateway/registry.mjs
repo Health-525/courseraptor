@@ -246,7 +246,7 @@ export function createRegistry({ stateDir }) {
 
     // ── 站点设置（管理台可改的运行时配置，site.json）──────────
 
-    /** 目前只有 deepseekKey；读取失败按空处理 */
+    /** 旧接口（DeepSeek 专用）：读取失败按空处理 */
     async getSiteSettings() {
       const data = await readJson(path.join(stateDir, "site.json"), null);
       return { deepseekKey: typeof data?.deepseekKey === "string" ? data.deepseekKey : "" };
@@ -257,6 +257,50 @@ export function createRegistry({ stateDir }) {
         const current = await this.getSiteSettings();
         const next = { ...current };
         if (typeof patch.deepseekKey === "string") next.deepseekKey = patch.deepseekKey;
+        await writeAtomic(path.join(stateDir, "site.json"), JSON.stringify(next, null, 2));
+      });
+    },
+
+    /**
+     * 站点各厂商 Key（多厂商）：新格式 providerKeys 优先，旧字段 deepseekKey
+     * 迁移映射进 deepseek 键——存量部署不用重配。只返回非空字符串值。
+     */
+    async getSiteProviderKeys() {
+      const data = await readJson(path.join(stateDir, "site.json"), null);
+      const raw =
+        data && typeof data.providerKeys === "object" && data.providerKeys !== null
+          ? data.providerKeys
+          : {};
+      const keys = {};
+      for (const [id, value] of Object.entries(raw)) {
+        if (typeof value === "string" && value) keys[id] = value;
+      }
+      const legacy = await this.getSiteSettings();
+      if (legacy.deepseekKey && !keys.deepseek) keys.deepseek = legacy.deepseekKey;
+      return keys;
+    },
+
+    /** 按厂商保存/清除站点 Key（custom 无意义，直接拒绝）；deepseek 双写旧字段保持兼容 */
+    async setSiteProviderKey(providerId, key) {
+      return serialized(async () => {
+        const value = typeof key === "string" ? key.trim() : "";
+        if (providerId === "custom") throw new Error("自定义端点没有站点 Key 的概念");
+        if (!/^[a-z][a-z0-9-]{0,20}$/.test(providerId)) {
+          throw new Error("供应商标识不合法");
+        }
+        if (value && (value.length < 16 || value.length > 200 || /\s/.test(value))) {
+          throw new Error("Key 长度或字符不合常理，请检查是否复制完整");
+        }
+        const data = (await readJson(path.join(stateDir, "site.json"), null)) ?? {};
+        const providerKeys = {
+          ...(typeof data.providerKeys === "object" && data.providerKeys !== null
+            ? data.providerKeys
+            : {}),
+        };
+        if (value) providerKeys[providerId] = value;
+        else delete providerKeys[providerId];
+        const next = { ...data, providerKeys };
+        if (providerId === "deepseek") next.deepseekKey = value;
         await writeAtomic(path.join(stateDir, "site.json"), JSON.stringify(next, null, 2));
       });
     },
