@@ -2672,6 +2672,20 @@ document.getElementById("newSessionM").addEventListener("click", doNewSession);
    开关按「同学的选择」渲染：没存 Key 时点「自己的 Key」是引导填 Key 的
    中间态，绝不能被额度接口按「实际生效」推导的值弹回站点 */
 let dsUiMode = "";
+/* 托管版标记：/api/quota（网关专属接口）探测成功才置 true。AI 模型栏目里
+   凡是「本地 / 托管」语义不同的文案都看它——本地版探测永远失败，一行不动 */
+var dsHosted = false;
+/* curKey 状态行：本地版如实说「本机加密」；托管版同一份加密存储对同学而言
+   在服务器上，换「已加密保存」，不拿本地语境的话术给 web 同学看 */
+function renderCurKey(d) {
+  var el = document.getElementById("curKey");
+  if (!el || !d || !d.deepseek) return;
+  var label = d.deepseek.sourceLabel;
+  if (dsHosted && label === "本机加密") label = "已加密保存";
+  el.textContent = d.deepseek.configured
+    ? "已保存：" + (d.deepseek.masked || "API Key") + " · " + label + " · " + d.model
+    : "尚未配置 API Key · 当前模型 " + d.model;
+}
 function setDsMode(m) {
   var site = document.getElementById("dsSite");
   var own = document.getElementById("dsOwn");
@@ -2732,7 +2746,20 @@ function refreshQuota() {
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (q) {
       var el = document.getElementById("curQuota");
-      if (!el || !q) return;
+      /* 形状守卫：非网关环境对 /api/quota 兜底出 200 页面/杂 JSON 时绝不能
+         把站点卡片亮出来——本地版与演示页必须一行站点内容都不出现 */
+      if (!el || !q || typeof q.used !== "number" || typeof q.limit !== "number") return;
+      if (!dsHosted) {
+        dsHosted = true;
+        /* 简介换成托管语境：本地版说「保存在当前电脑」，托管版 Key 在服务器上 */
+        var intro = document.getElementById("dsIntro");
+        if (intro) {
+          intro.textContent =
+            "模型服务使用 DeepSeek API。下方选择 Key 来源：站点免费额度开箱即用；自己的 Key 由服务器加密保存，留空即保持不变。";
+        }
+        /* curKey 已按本地语境渲染过（loadSettings 先于探测完成），补一次托管版渲染 */
+        renderCurKey(setStatus);
+      }
       el.hidden = false;
       /* 开关跟「同学的选择」走：本页点过的选择优先；没有点过时按服务端
          选择推导——钉在站点的显示站点，跟随模式且已存 Key 的显示自有，
@@ -3424,14 +3451,7 @@ function showSettings() {
       document.getElementById("curJwgl").textContent = d.jwgl.configured
         ? "已保存：学号 " + d.jwgl.username + " · " + d.jwgl.sourceLabel
         : "尚未配置教务账号";
-      document.getElementById("curKey").textContent = d.deepseek.configured
-        ? "已保存：" +
-          (d.deepseek.masked || "API Key") +
-          " · " +
-          d.deepseek.sourceLabel +
-          " · " +
-          d.model
-        : "尚未配置 API Key · 当前模型 " + d.model;
+      renderCurKey(d);
       refreshQuota();
       sKey.placeholder = "sk-…；留空不修改";
       qqApplyStatus(d.qq);
@@ -3617,14 +3637,7 @@ document.getElementById("saveSettings").addEventListener("click", () => {
         document.getElementById("curJwgl").textContent = d.status.jwgl.configured
           ? "已保存：学号 " + d.status.jwgl.username + " · " + d.status.jwgl.sourceLabel
           : "尚未配置教务账号";
-        document.getElementById("curKey").textContent = d.status.deepseek.configured
-          ? "已保存：" +
-            (d.status.deepseek.masked || "API Key") +
-            " · " +
-            d.status.deepseek.sourceLabel +
-            " · " +
-            d.status.model
-          : "尚未配置 API Key · 当前模型 " + d.status.model;
+        renderCurKey(d.status);
         refreshQuota();
         sQQAppId.value = "";
         sQQSecret.value = "";

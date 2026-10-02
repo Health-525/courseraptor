@@ -1302,7 +1302,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             <div class="diagrow"><button class="tbtn" id="testJwgl" type="button" ${demo ? "disabled" : ""}>检测教务连接</button><span class="diagstate" id="diagJwgl"></span></div>
           </section>
           <section class="set-pane" id="setPaneModel" role="tabpanel" aria-labelledby="setTabModel" data-pane="model">
-            <p class="dlg-intro">模型服务使用 DeepSeek API。API Key 与所选型号仅加密保存在当前电脑，留空即保持不变。</p>
+            <p class="dlg-intro" id="dsIntro">模型服务使用 DeepSeek API。API Key 与所选型号仅加密保存在当前电脑，留空即保持不变。</p>
             <div class="ds-mode" id="dsMode" hidden>
               <button type="button" class="ds-opt" id="dsSite" aria-pressed="false">
                 <b>站点免费额度</b>
