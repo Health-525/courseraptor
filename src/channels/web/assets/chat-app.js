@@ -3200,46 +3200,38 @@ document
   .getElementById("testDeepseek")
   .addEventListener("click", () => runDiagnostic("deepseek", "testDeepseek", "diagDeepseek"));
 
-/* ── 型号卡片：候选由后端给（该 Key 实际可用的型号），拉不到时是内置兜底清单。
-   sModel 仍是值的唯一载体（hidden input），保存逻辑读 sModel.value 不变 ── */
+/* ── 型号下拉框：候选由后端给（该 Key 实际可用的型号），拉不到时是内置兜底清单。
+   sModel 仍是值的唯一载体（hidden input），保存逻辑读 sModel.value 不变：
+   下拉显示当前在用型号＝「不修改」，选成别的型号保存时才提交切换 ── */
+let modelCurrent = "";
 function pickModel(id) {
   sModel.value = id || "";
-  for (const card of document.querySelectorAll("#modelCards .model-card")) {
-    const on = card.dataset.modelId === id;
-    card.classList.toggle("picked", on);
-    card.setAttribute("aria-checked", on ? "true" : "false");
-  }
+  const sel = document.getElementById("modelSelect");
+  if (sel) sel.value = sModel.value || modelCurrent;
 }
 function fillModels(options, current, message) {
   const list = Array.isArray(options) ? options : [];
+  modelCurrent = current || "";
   const keep = sModel.value;
-  const host = document.getElementById("modelCards");
-  host.textContent = "";
-  if (!list.length) {
-    host.appendChild(el2("model-empty", message || "型号清单读取中…"));
-  } else {
-    for (const m of list) {
-      if (!m || typeof m.id !== "string") continue;
-      const card = el("model-card");
-      card.dataset.modelId = m.id;
-      card.setAttribute("role", "radio");
-      card.tabIndex = 0;
-      card.appendChild(el2("mc-name", m.label || m.id));
-      if (m.id === current) card.appendChild(el2("mc-badge", "当前"));
-      card.appendChild(el2("mc-id", m.id));
-      if (m.note) card.appendChild(el2("mc-note", m.note));
-      card.addEventListener("click", () => {
-        if (document.body.dataset.demo === "true") return;
-        /* 再点一次已选卡片＝取消更换，回到「不修改」 */
-        pickModel(card.dataset.modelId === sModel.value ? "" : card.dataset.modelId);
-      });
-      card.addEventListener("keydown", (e) => {
-        if (e.key === " " || e.key === "Enter") {
-          e.preventDefault();
-          card.click();
-        }
-      });
-      host.appendChild(card);
+  const sel = document.getElementById("modelSelect");
+  if (sel) {
+    sel.innerHTML = "";
+    if (!list.length) {
+      /* 拉不到清单：占位选项给后端的说明文案，禁用防误选 */
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = message || "型号清单读取中…";
+      sel.appendChild(opt);
+      sel.disabled = true;
+    } else {
+      for (const m of list) {
+        if (!m || typeof m.id !== "string") continue;
+        const opt = document.createElement("option");
+        opt.value = m.id;
+        opt.textContent = m.label || m.id;
+        sel.appendChild(opt);
+      }
+      sel.disabled = false;
     }
   }
   pickModel(keep && list.some((m) => m && m.id === keep) ? keep : "");
@@ -3249,18 +3241,12 @@ function fillModels(options, current, message) {
   if (message && list.length) note += " · " + message;
   curModel.textContent = note;
 }
-/* 方向键在卡片间移动焦点（承接原生下拉的键盘习惯）；空格/回车才做选择 */
-document.getElementById("modelCards").addEventListener("keydown", (e) => {
-  if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) return;
-  const cards = [...document.querySelectorAll("#modelCards .model-card")];
-  if (cards.length < 2) return;
-  const step = e.key === "ArrowUp" || e.key === "ArrowLeft" ? -1 : 1;
-  const next = cards[(cards.indexOf(document.activeElement) + step + cards.length) % cards.length];
-  if (next) {
-    e.preventDefault();
-    next.focus();
-  }
-});
+const modelSelectEl = document.getElementById("modelSelect");
+if (modelSelectEl)
+  modelSelectEl.addEventListener("change", () => {
+    /* 选回当前在用型号＝不修改；选成别的＝保存时切换（演示页纯预览，保存本就禁用） */
+    sModel.value = modelSelectEl.value === modelCurrent ? "" : modelSelectEl.value;
+  });
 
 /* ── 设置栏目切换：点左列目录，右列换内容。「保存设置」只属于
    凭证类栏目（学校 / 教务 / 模型 / QQ）；本地数据即改即存，不亮保存 ── */

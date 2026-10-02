@@ -647,29 +647,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .diagrow .tbtn { min-height: 32px; padding: 4px 10px; font-size: 12px; }
   .diagstate { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
 
-  /* 型号卡片：取代原生下拉。选中态用朱砂竖线——与会话列表 .on 同一语言；
-     “当前”徽标标的是服务端在用型号，“选中”标的是这次要保存的型号 */
-  .model-cards { display: grid; gap: 8px; margin: 2px 0 10px; }
-  .model-card { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px;
-                padding: 9px 12px 8px; cursor: pointer;
-                border: 1px solid var(--rule); border-left: 3px solid var(--rule-2);
-                background: var(--card); border-radius: 3px;
-                transition: border-color .15s ease, box-shadow .15s ease; }
-  .model-card:hover { border-color: var(--rule-2); }
-  .model-card.picked { border-left-color: var(--accent); box-shadow: var(--shadow-sm); }
-  .model-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .mc-name { font-size: 14px; font-weight: 600; color: var(--ink); align-self: baseline; }
-  .mc-badge { justify-self: end; align-self: baseline;
-              font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
-              color: var(--accent-deep); background: var(--accent-soft);
-              padding: 2px 7px; border-radius: 2px; }
-  .mc-id { grid-column: 1 / -1; font-family: var(--mono); font-size: 12px;
-           color: var(--ink-3); letter-spacing: .03em; }
-  .mc-note { grid-column: 1 / -1; font-size: 12px; color: var(--ink-2); line-height: 1.65; }
-  .model-empty { border: 1px dashed var(--rule-2); border-radius: 3px;
-                 background: var(--card); color: var(--ink-3);
-                 font-size: 13px; text-align: center; padding: 16px 10px; }
-
   /* 提示词模板面板：添加行 + 可删 chip 清单，语言与主界面 .chip 一致 */
   .qq-add { display: flex; gap: 8px; margin: 2px 0 12px; }
   .qq-add input { flex: 1; min-width: 0; border: 1px solid var(--rule-2);
@@ -1020,7 +997,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-skel i:nth-child(2) { animation-delay: .15s; }
   .hall-skel i:nth-child(3) { animation-delay: .3s; }
   @keyframes hallPulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
-  /* 空态 / 错误态：虚线框纸片居中，与 .rem-empty / .model-empty 同一语言 */
+  /* 空态 / 错误态：虚线框纸片居中，与 .rem-empty 同一语言 */
   .hall-empty { border: 1px dashed var(--rule-2); border-radius: 3px;
                 background: var(--card); color: var(--ink-2);
                 text-align: center; padding: 20px 14px; margin-bottom: 6px; }
@@ -1212,7 +1189,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     /* 按压反馈：这些行/卡此前只有桌面 hover 态，触屏按下没有丝毫回应；
        给一记纸面压深（accent 族给朱砂浅底），松手即散——不用 JS */
     .hall-card:active, .sess li:active, .ds-opt:active, .set-tab:active,
-    .model-card:active, .hall-item:active { background: var(--shade); }
+    .hall-item:active { background: var(--shade); }
     .chip:active { background: var(--accent-soft); border-color: var(--accent);
                    color: var(--accent-deep); }
     .tool summary:active, .think summary:active { background: var(--paper-deep); }
@@ -1322,7 +1299,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             <label class="fld" id="sKeyRow"><span>API Key</span><span class="fld-row"><input id="sKey" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyeKey" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
             <div class="cur" id="curKey"></div>
             <div class="cur" id="curQuota" hidden></div>
-            <div class="model-cards" id="modelCards" role="radiogroup" aria-label="选择 AI 模型"></div>
+            <label class="fld"><span>模型</span><select id="modelSelect"></select></label>
             <input type="hidden" id="sModel" value="">
             <div class="cur" id="curModel"></div>
             <div class="diagrow"><button class="tbtn" id="testDeepseek" type="button" ${demo ? "disabled" : ""}>检测模型连接</button><span class="diagstate" id="diagDeepseek"></span></div>
