@@ -19,6 +19,9 @@ export function createSpawner(options: {
   projectRoot: string;
   usersDir: string;
   deepseekKey?: string;
+  getDeepseekKey?: (() => Promise<string>) | null;
+  getForceSiteKey?: ((userId: string) => Promise<boolean>) | null;
+  getProviderId?: ((userId: string) => Promise<string>) | null;
   maxConcurrent?: number;
   idleMinutes?: number;
   reapIntervalMs?: number;
@@ -34,5 +37,6 @@ export function buildInstanceEnv(
     siteKey?: string;
     fallbackKey?: string;
     forceSite?: boolean;
+    providerId?: string;
   },
 ): Record<string, string>;

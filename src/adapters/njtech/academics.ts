@@ -24,7 +24,6 @@ import type {
   ExamResult,
   ScheduleResult,
   SkwjSegment,
-  TermRef,
   WeekGroup,
 } from "../../core/model";
 import { BASE } from "./auth";

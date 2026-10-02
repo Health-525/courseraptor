@@ -1203,3 +1203,107 @@ test("畸形会话 URL（GET/PATCH/DELETE）一律 404，服务保持存活", as
   const page = await fetch(base);
   assert.equal(page.status, 200, "经历畸形请求后服务仍存活");
 });
+
+/* ── 多供应商：设置面板的供应商切换 / custom 端点 / 托管拦截 / 清单预览 ── */
+
+test("GET /api/settings 带 provider 块：全部内置厂商候选、custom 地址与 hosted 标志", async () => {
+  const url = (await startChatWeb())!;
+  const s = (await (await fetch(`${url}/api/settings`)).json()) as {
+    provider: {
+      current: string;
+      label: string;
+      options: { id: string }[];
+      customBaseUrl: string;
+      hosted: boolean;
+    };
+  };
+  assert.equal(s.provider.current, "deepseek", "默认供应商 deepseek（本地版行为零改动）");
+  assert.equal(s.provider.hosted, false, "本地版不是托管环境");
+  assert.equal(s.provider.customBaseUrl, "");
+  const ids = s.provider.options.map((o) => o.id);
+  for (const expected of ["deepseek", "qwen", "glm", "kimi", "custom"]) {
+    assert.ok(ids.includes(expected), `候选应含 ${expected}`);
+  }
+});
+
+test("POST /api/settings 切换供应商：型号随供应商记忆、custom 需带地址、custom 手输型号放行", async () => {
+  const url = (await startChatWeb())!;
+  const call = (body: unknown) =>
+    wfetch(`${url}/api/settings`, { method: "POST", body: JSON.stringify(body) });
+  const read = async () =>
+    (await (await fetch(`${url}/api/settings`)).json()) as Record<string, unknown> & {
+      provider: { current: string; customBaseUrl: string };
+      model: string;
+    };
+
+  // 切到智谱：型号自动落到 glm 兜底第一项，deepseek 的旧型号被记住
+  const before = await read();
+  const toGlm = await call({ providerId: "glm" });
+  assert.equal(toGlm.status, 200);
+  const afterGlm = await read();
+  assert.equal(afterGlm.provider.current, "glm");
+  assert.match(afterGlm.model, /^glm-/, "切供应商后型号落到该厂商兜底清单");
+
+  // 切回 deepseek：上次在用的型号要恢复回来
+  const back = await call({ providerId: "deepseek" });
+  assert.equal(back.status, 200);
+  const afterBack = await read();
+  assert.equal(afterBack.provider.current, "deepseek");
+  assert.equal(afterBack.model, before.model, "供应商型号记忆：切回旧供应商恢复上次型号");
+
+  // 切 custom 不带地址被拒；带地址成功，型号 ID 手输放行（拉不到清单不卡白名单）
+  const noUrl = await call({ providerId: "custom" });
+  assert.equal(noUrl.status, 400);
+  const withUrl = await call({
+    providerId: "custom",
+    customBaseUrl: "https://llm.example.com/v1/",
+    model: "my-private-model",
+  });
+  assert.equal(withUrl.status, 200);
+  const afterCustom = await read();
+  assert.equal(afterCustom.provider.current, "custom");
+  assert.equal(afterCustom.provider.customBaseUrl, "https://llm.example.com/v1", "尾斜杠应被去掉");
+  assert.equal(afterCustom.model, "my-private-model");
+
+  // 收尾：切回 deepseek（不污染同文件里其他测试的全局 config）
+  await call({ providerId: "deepseek" });
+});
+
+test("托管环境（RAPTOR_HOSTED=1）：供应商与 custom 地址提交一律被拒", async () => {
+  const url = (await startChatWeb())!;
+  const { config } = await import("../src/core/config");
+  const call = (body: unknown) =>
+    wfetch(`${url}/api/settings`, { method: "POST", body: JSON.stringify(body) });
+
+  const wasHosted = config.hosted;
+  config.hosted = true;
+  try {
+    const r1 = await call({ providerId: "glm" });
+    assert.equal(r1.status, 400);
+    const d1 = (await r1.json()).results[0] as { field: string; ok: boolean };
+    assert.equal(d1.field, "provider");
+    assert.equal(d1.ok, false, "托管版供应商切换必须走网关 /api/provider");
+
+    const r2 = await call({ customBaseUrl: "https://intranet.local/v1" });
+    assert.equal(r2.status, 400, "托管版 custom 端点是 SSRF 口子，必须拒绝");
+  } finally {
+    config.hosted = wasHosted;
+  }
+});
+
+test("GET /api/models?provider= 支持切换前预览（不落缓存、不要求已保存）", async () => {
+  const url = (await startChatWeb())!;
+  const preview = (await (await fetch(`${url}/api/models?provider=qwen`)).json()) as {
+    provider: string;
+    label: string;
+    source: string;
+    options: { id: string }[];
+  };
+  assert.equal(preview.provider, "qwen");
+  assert.equal(preview.label, "通义千问（阿里百炼）");
+  assert.equal(preview.source, "fallback", "没有该厂商 Key 时退回兜底清单");
+  assert.ok(preview.options.some((o) => o.id === "qwen-plus"));
+  // 预览不落缓存：deepseek 的同步候选不受影响
+  const s = (await (await fetch(`${url}/api/settings`)).json()) as { models: { id: string }[] };
+  assert.equal(s.models[0]?.id, "deepseek-flash", "预览不污染已保存供应商的缓存桶");
+});

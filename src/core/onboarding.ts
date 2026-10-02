@@ -10,8 +10,9 @@
 import readline from "node:readline/promises";
 
 import { config, type DeepSeekApiKeySource, maskDeepSeekApiKey } from "./config";
-import { saveCredentialsStore, saveStoredCredentials } from "./credentials";
+import { loadCredentialsStore, saveCredentialsStore, saveStoredCredentials } from "./credentials";
 import { isCredentialError } from "./errors";
+import { getProviderDef, validateProviderApiKey } from "./providers";
 import { school } from "./school";
 import { createMutedTerminalOutput } from "./secret-input";
 
@@ -222,7 +223,9 @@ export async function runDeepSeekKeySetup(
       }
     }
 
-    io.write("请粘贴或输入新的 DeepSeek API Key（输入内容不会显示）。");
+    io.write(
+      `请粘贴或输入新的 ${getProviderDef(config.providerId).label} API Key（输入内容不会显示）。`,
+    );
     const key = await io.readSecret("API Key");
     if (!key.trim()) {
       io.write("已取消，未修改 API Key。");
@@ -238,24 +241,35 @@ export async function runDeepSeekKeySetup(
 }
 
 /**
- * 配置 DeepSeek API Key（校验 -> 热生效 -> 加密持久化）
- * 热生效原理：provider 构建时不绑定 key，每次请求实时读
- * process.env.DEEPSEEK_API_KEY（AI SDK loadApiKey 惰性求值）
+ * 配置当前供应商的 API Key（校验 -> 热生效 -> 加密持久化）
+ * 热生效原理：回写 process.env（RAPTOR_PROVIDER_KEY；deepseek 另镜像
+ * DEEPSEEK_API_KEY 供官方包），llm.ts 每次请求实时读取。
+ * 每供应商一把 Key：切换供应商不丢已存的其他厂商 Key。
  */
-export function setDeepSeekApiKey(key: string): { ok: boolean; message: string } {
+export function setProviderApiKey(
+  providerId: string,
+  key: string,
+): { ok: boolean; message: string } {
+  const def = getProviderDef(providerId);
+  const check = validateProviderApiKey(def.id, key);
   const trimmed = key.trim();
-  if (!/^sk-[A-Za-z0-9]{16,}$/.test(trimmed)) {
-    return {
-      ok: false,
-      message: "❌ 格式不对：请输入 sk- 开头的完整 API Key。",
-    };
-  }
-  process.env.DEEPSEEK_API_KEY = trimmed; // 热生效
+  if (!check.ok) return { ok: false, message: `❌ ${check.message}` };
+
+  const stored = loadCredentialsStore();
+  const providerKeys = { ...(stored?.providerKeys ?? {}), [def.id]: trimmed };
+  const providerKeyOverrides = { ...(stored?.providerKeyOverrides ?? {}), [def.id]: true };
+  process.env.RAPTOR_PROVIDER_KEY = trimmed; // 热生效（llm.ts fetch 每请求读取）
+  if (def.id === "deepseek") process.env.DEEPSEEK_API_KEY = trimmed; // 官方包路径
   config.deepseekApiKey = trimmed;
   config.deepseekApiKeySource = "encrypted";
   // 明确覆盖标记让重启后优先使用加密新值，但绝不改写 .env 的明文旧值。
-  saveCredentialsStore({ deepseekApiKey: trimmed, deepseekApiKeyOverride: true });
+  saveCredentialsStore({ providerKeys, providerKeyOverrides });
   return { ok: true, message: "✅ API Key 已加密保存并立即生效，重启后仍使用新 Key。" };
+}
+
+/** 历史入口（TUI /key 与既有测试）：作用于当前供应商 */
+export function setDeepSeekApiKey(key: string): { ok: boolean; message: string } {
+  return setProviderApiKey(config.providerId, key);
 }
 
 // ── QQ 官方机器人凭证（设置面板保存；.env 优先级规则与教务账号一致）──

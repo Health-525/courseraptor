@@ -855,7 +855,12 @@ test("按人限额与站点 Key 管理", async (t) => {
 });
 
 /** 用与 src/core/credentials.ts 相同的派生方式造一个加密凭证文件 */
-async function craftCredentials(usersDir: string, userId: string, override: boolean) {
+async function craftCredentials(
+  usersDir: string,
+  userId: string,
+  override: boolean,
+  providerKeys?: Record<string, string>,
+) {
   const { scryptSync, createCipheriv, randomBytes } = await import("node:crypto");
   const os = await import("node:os");
   const pathMod = await import("node:path");
@@ -869,6 +874,7 @@ async function craftCredentials(usersDir: string, userId: string, override: bool
       JSON.stringify({
         deepseekApiKey: override ? "sk-own-key-1234567890" : "",
         deepseekApiKeyOverride: override,
+        ...(providerKeys ? { providerKeys } : {}),
       }),
     ),
     cipher.final(),
@@ -939,6 +945,7 @@ test("学生端额度接口与自带 Key 豁免", async (t) => {
     ownUsed: 0,
     hasOwnKey: false,
     ownKeyActive: false,
+    providerId: "deepseek",
     dsMode: "own",
     source: "site",
   });
@@ -1284,4 +1291,128 @@ test("重置码兑换防爆破：连错五次锁 15 分钟，锁定期间正确�
   }
   const locked = await post(approve.code);
   assert.equal(locked.status, 429, "连错五次后锁定，正确码也不可兑换");
+});
+
+test("模型供应商切换接口：合法 id 落库并踢实例，custom 与脏值被拒", async (t) => {
+  const backendPort = await startBackend(t);
+  const usersDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-prov-"));
+  t.after(() => fs.rmSync(usersDir, { recursive: true, force: true }));
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-prov-st-"));
+  const registry = createRegistry({ stateDir });
+  const spawner = fakeSpawner(backendPort);
+  const server = createGatewayServer({
+    registry,
+    spawner,
+    secret: "unit-test-secret-0123456789",
+    dailyTurns: 3,
+    usersDir,
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const base = `http://127.0.0.1:${address.port}`;
+
+  const [invite] = await registry.createInvites({ count: 1 });
+  const reg = await fetch(`${base}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      invite: invite.code,
+      username: "provuser",
+      password: "password123",
+      password2: "password123",
+    }),
+    redirect: "manual",
+  });
+  const cookie = reg.headers.get("set-cookie") ?? "";
+  const user = await registry.findUserByName("provuser");
+  spawner.acquire(user!.id);
+
+  const call = (body: unknown) =>
+    fetch(`${base}/api/provider`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  // 合法切换：落 users.json、踢实例、quota 下发新值
+  const ok = await call({ providerId: "glm" });
+  assert.equal(ok.status, 200);
+  assert.equal((await registry.findUserByName("provuser"))?.providerId, "glm");
+  assert.equal(spawner.isRunning(user!.id), false, "切换后实例被踢，下次请求以新供应商拉起");
+  const q = (await (await fetch(`${base}/api/quota`, { headers: { cookie } })).json()) as {
+    providerId: string;
+  };
+  assert.equal(q.providerId, "glm");
+
+  // custom 是 SSRF 口子，脏值同拒
+  assert.equal((await call({ providerId: "custom" })).status, 400);
+  assert.equal((await call({ providerId: "../etc/passwd" })).status, 400);
+  assert.equal((await call({})).status, 200, "空值回落 deepseek（归一化）");
+  assert.equal((await registry.findUserByName("provuser"))?.providerId, "deepseek");
+});
+
+test("多厂商自带 Key 分账：hasOwnKey 按当前供应商判定", async (t) => {
+  const backendPort = await startBackend(t);
+  const usersDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-prov2-"));
+  t.after(() => fs.rmSync(usersDir, { recursive: true, force: true }));
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-prov2-st-"));
+  const registry = createRegistry({ stateDir });
+  const server = createGatewayServer({
+    registry,
+    spawner: fakeSpawner(backendPort),
+    secret: "unit-test-secret-0123456789",
+    dailyTurns: 3,
+    usersDir,
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  t.after(() => server.close());
+  const address = server.address();
+  assert.ok(address && typeof address !== "string");
+  const base = `http://127.0.0.1:${address.port}`;
+
+  const [invite] = await registry.createInvites({ count: 1 });
+  const reg = await fetch(`${base}/register`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      invite: invite.code,
+      username: "provuser2",
+      password: "password123",
+      password2: "password123",
+    }),
+    redirect: "manual",
+  });
+  const cookie = reg.headers.get("set-cookie") ?? "";
+  const user = await registry.findUserByName("provuser2");
+  await registry.addTurns(user!.id, 3);
+
+  // 只有旧格式 deepseek Key，但同学已切到智谱：智谱没有自有 Key，不豁免
+  await craftCredentials(usersDir, user!.id, true);
+  await registry.setProviderId(user!.id, "glm");
+  const q1 = (await (await fetch(`${base}/api/quota`, { headers: { cookie } })).json()) as {
+    providerId: string;
+    hasOwnKey: boolean;
+  };
+  assert.equal(q1.providerId, "glm");
+  assert.equal(q1.hasOwnKey, false, "deepseek 的 Key 不该给智谱会话豁免");
+  const blocked = await fetch(`${base}/api/chat`, {
+    method: "POST",
+    headers: { cookie },
+    body: "{}",
+  });
+  assert.equal(blocked.status, 429, "站点额度照常拦截");
+
+  // 补上智谱的 Key（providerKeys 多厂商格式）：豁免成立、记自有账
+  await craftCredentials(usersDir, user!.id, true, { glm: "opaque-glm-key-0123456789" });
+  const q2 = (await (await fetch(`${base}/api/quota`, { headers: { cookie } })).json()) as {
+    hasOwnKey: boolean;
+    ownKeyActive: boolean;
+  };
+  assert.equal(q2.hasOwnKey, true);
+  assert.equal(q2.ownKeyActive, true);
+  const pass = await fetch(`${base}/api/chat`, { method: "POST", headers: { cookie }, body: "{}" });
+  assert.equal(pass.status, 200);
+  assert.equal(await registry.ownTurnsToday(user!.id), 1, "智谱自有 Key 记自己的账");
 });

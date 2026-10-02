@@ -7,6 +7,8 @@ export interface RegistryUser {
   ownTurns: { date: string; count: number };
   dailyTurns: number;
   dsMode: string;
+  /** 当前选的模型供应商 id（内置厂商；缺省 deepseek）。空串按 deepseek 处理 */
+  providerId?: string;
 }
 
 /** 管理台两步验证落盘形态（admin-totp.json，不存在即未启用） */
@@ -34,6 +36,8 @@ export interface Registry {
   setDailyTurns(id: string, turns: number): Promise<void>;
   ownTurnsToday(id: string): Promise<number>;
   setDsMode(id: string, mode: string): Promise<void>;
+  /** 模型供应商选择（合法形状的内置厂商 id；custom 一律拒绝） */
+  setProviderId(id: string, providerId: string): Promise<void>;
   getSiteSettings(): Promise<{ deepseekKey: string }>;
   setSiteSettings(patch: { deepseekKey?: string }): Promise<void>;
   getAdminTotp(): Promise<AdminTotpDoc | null>;

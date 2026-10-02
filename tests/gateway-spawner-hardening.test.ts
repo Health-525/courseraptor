@@ -67,3 +67,17 @@ test("buildInstanceEnv：站点 Key 缺省回退构造兜底；钉站点模式�
   const bare = buildInstanceEnv({}, { port: 2, dataDir: "d", credFile: "c" });
   assert.equal(bare.DEEPSEEK_API_KEY, undefined, "两侧都无 Key 时不设（同学必须自带）");
 });
+
+test("buildInstanceEnv：注入同学选择的供应商与托管标志", () => {
+  const env = buildInstanceEnv({}, { port: 1, dataDir: "d", credFile: "c", providerId: "glm" });
+  assert.equal(env.RAPTOR_PROVIDER_ID, "glm", "同学的供应商选择注入实例（users.json 的值）");
+  assert.equal(
+    env.RAPTOR_HOSTED,
+    "1",
+    "托管标志：实例据此禁收 providerId/customBaseUrl（防 SSRF）",
+  );
+
+  const bare = buildInstanceEnv({}, { port: 2, dataDir: "d", credFile: "c" });
+  assert.equal(bare.RAPTOR_PROVIDER_ID, undefined, "未选择不注入（实例回落 deepseek）");
+  assert.equal(bare.RAPTOR_HOSTED, "1");
+});

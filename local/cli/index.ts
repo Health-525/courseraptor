@@ -15,7 +15,7 @@
 import "../../src/adapters";
 import { createRaptorAgent } from "../../src/core/agent";
 import { config } from "../../src/core/config";
-import { saveCredentialsStore } from "../../src/core/credentials";
+import { loadCredentialsStore, saveCredentialsStore } from "../../src/core/credentials";
 import { flushCapturedSession } from "../../src/core/memory/shortterm";
 import { ensureModelAvailable } from "../../src/core/models";
 import { ensureCredentials, runDeepSeekKeySetup } from "../../src/core/onboarding";
@@ -71,12 +71,17 @@ if (updateInfo) {
 if (config.deepseekApiKey) {
   const drift = await ensureModelAvailable({
     current: config.model,
-    baseUrl: config.deepseekBaseUrl,
+    providerId: config.providerId,
+    baseUrl: config.providerBaseUrl,
     apiKey: config.deepseekApiKey,
   });
   if (drift.migrated) {
     config.model = drift.model;
-    saveCredentialsStore({ model: drift.model, modelOverride: true });
+    const providerModels = {
+      ...(loadCredentialsStore()?.providerModels ?? {}),
+      [config.providerId]: drift.model,
+    };
+    saveCredentialsStore({ model: drift.model, modelOverride: true, providerModels });
     console.log(`🔄 ${drift.message}\n`);
   }
 }

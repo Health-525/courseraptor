@@ -43,12 +43,14 @@ async function decryptStore(file) {
 }
 
 /**
- * 该同学是否保存了自己的 DeepSeek Key（override 生效）。
+ * 该同学是否保存了「当前供应商」自己的 Key（多厂商：读 providerKeys 里该
+ * 供应商的值；老格式 deepseekApiKey+Override 迁移兼容，与
+ * src/core/config.ts effectiveProviderKeys 同语义）。
  * 带 mtime 缓存：每次对话都查，别反复 scrypt。
  */
 const cache = new Map();
 
-export async function ownDeepseekKeyActive(usersDir, userId) {
+export async function ownDeepseekKeyActive(usersDir, userId, providerId = "deepseek") {
   const file = path.join(usersDir, userId, "credentials.enc");
   let mtime = 0;
   try {
@@ -60,7 +62,11 @@ export async function ownDeepseekKeyActive(usersDir, userId) {
   const hit = cache.get(userId);
   if (hit && hit.mtime === mtime) return hit.active;
   const store = await decryptStore(file);
-  const active = Boolean(store?.deepseekApiKeyOverride && store?.deepseekApiKey);
+  const keys = store?.providerKeys ?? {};
+  const active = Boolean(
+    keys[providerId] ||
+      (providerId === "deepseek" && store?.deepseekApiKeyOverride && store?.deepseekApiKey),
+  );
   cache.set(userId, { mtime, active });
   return active;
 }

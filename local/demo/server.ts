@@ -12,7 +12,8 @@ import { DEFAULT_QUESTIONS } from "../../src/channels/web/quick-questions";
 import { schedulePage } from "../../src/channels/web/schedule-page";
 import { todayPage } from "../../src/channels/web/today-page";
 import { todosPage } from "../../src/channels/web/todos-page";
-import { FALLBACK_MODEL_ID, FALLBACK_MODELS } from "../../src/core/models";
+import { FALLBACK_MODEL_ID, FALLBACK_MODELS, fallbackModelsFor } from "../../src/core/models";
+import { getProviderDef, providerOptionList, resolveProviderId } from "../../src/core/providers";
 import { type DemoStreamAgent, runDemoLiveTurn } from "./agent";
 import { type DemoCard, demoCardsForMessage } from "./cards";
 import { demoKnowledge, demoTodayBrief } from "./data";
@@ -262,6 +263,14 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
           jwgl: { configured: false, username: "", sourceLabel: "演示模式" },
           deepseek: { configured: false, masked: "", sourceLabel: "演示模式" },
           qq: { configured: false, passcodeSet: false, source: "unset", sourceLabel: "演示模式" },
+          /* 供应商块与正式版同形状：全部内置厂商可选（纯预览，保存被 403） */
+          provider: {
+            current: "deepseek",
+            label: getProviderDef("deepseek").label,
+            options: providerOptionList(),
+            customBaseUrl: "",
+            hosted: false,
+          },
           /* 演示页展示真实型号 UI：current 用内置默认，型号说明行如实标注 */
           model: FALLBACK_MODEL_ID,
           models: FALLBACK_MODELS.map((m) => ({ ...m })),
@@ -280,12 +289,26 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
           },
         });
       } else if (req.method === "GET" && url.startsWith("/api/models")) {
+        /* ?provider= 预览任意厂商的兜底清单（演示不联网，与正式版形状一致） */
+        const query = new URL(url, "http://127.0.0.1").searchParams;
+        const previewId = resolveProviderId(query.get("provider") || undefined);
+        const options =
+          previewId === "deepseek"
+            ? FALLBACK_MODELS.map((m) => ({ ...m }))
+            : fallbackModelsFor(previewId);
         json(res, {
           ok: true,
-          current: FALLBACK_MODEL_ID,
+          current: previewId === "deepseek" ? FALLBACK_MODEL_ID : "",
           source: "fallback",
-          options: FALLBACK_MODELS.map((m) => ({ ...m })),
-          message: liveAgent ? "演示模式：显示内置型号清单" : "演示模式不联网，显示内置型号清单",
+          provider: previewId,
+          label: getProviderDef(previewId).label,
+          options,
+          message:
+            previewId === "custom"
+              ? "演示模式：自定义端点请在正式版填写"
+              : liveAgent
+                ? "演示模式：显示内置型号清单"
+                : "演示模式不联网，显示内置型号清单",
         });
       } else if (req.method === "GET" && url === "/api/reminders") {
         json(res, { reminders: [] });

@@ -2683,8 +2683,15 @@ function renderCurKey(d) {
   var label = d.deepseek.sourceLabel;
   if (dsHosted && label === "本机加密") label = "已加密保存";
   el.textContent = d.deepseek.configured
-    ? "已保存：" + (d.deepseek.masked || "API Key") + " · " + label + " · " + d.model
-    : "尚未配置 API Key · 当前模型 " + d.model;
+    ? "已保存：" +
+      (d.deepseek.masked || "API Key") +
+      " · " +
+      label +
+      " · " +
+      providerLabelOf(providerCurrent) +
+      " " +
+      d.model
+    : "尚未配置 API Key · 当前 " + providerLabelOf(providerCurrent) + " " + d.model;
 }
 function setDsMode(m) {
   var site = document.getElementById("dsSite");
@@ -2755,11 +2762,15 @@ function refreshQuota() {
         var intro = document.getElementById("dsIntro");
         if (intro) {
           intro.textContent =
-            "模型服务使用 DeepSeek API。下方选择 Key 来源：站点免费额度开箱即用；自己的 Key 由服务器加密保存，留空即保持不变。";
+            "模型服务支持多家供应商。下方选择 Key 来源：站点免费额度开箱即用；自己的 Key 由服务器加密保存，留空即保持不变。";
         }
         /* curKey 已按本地语境渲染过（loadSettings 先于探测完成），补一次托管版渲染 */
         renderCurKey(setStatus);
       }
+      /* 站点配了 Key 的厂商清单（供应商下拉在站点额度模式下据此过滤；
+         过渡期网关未下发时按仅 DeepSeek）与 Key 来源选择同步给供应商块 */
+      if (Array.isArray(q.siteProviders)) siteProviders = q.siteProviders;
+      quotaUiMode = dsUiMode || (q.dsMode === "site" ? "site" : q.hasOwnKey ? "own" : "site");
       el.hidden = false;
       /* 开关跟「同学的选择」走：本页点过的选择优先；没有点过时按服务端
          选择推导——钉在站点的显示站点，跟随模式且已存 Key 的显示自有，
@@ -2779,7 +2790,11 @@ function refreshQuota() {
         if (!hallPanel) renderHall();
       }
       el.textContent = q.ownKeyActive
-        ? "✓ 正在使用自己的 DeepSeek Key（今日 " + (q.ownUsed || 0) + " 轮，不占站点额度）" +
+        ? "✓ 正在使用自己的 " +
+          providerLabelOf(providerCurrent) +
+          " Key（今日 " +
+          (q.ownUsed || 0) +
+          " 轮，不占站点额度）" +
           (q.remaining !== undefined ? "；站点免费额度保留：剩余 " + q.remaining + " 次" : "")
         : q.hasOwnKey
           ? "站点免费对话：今日已用 " + q.used + "/" + q.limit + "，剩余 " + q.remaining + " 次（已保存自己的 Key，上方可随时切换）"
@@ -3094,8 +3109,14 @@ let settingsCloseArmed = false;
 let settingsCloseTimer = 0;
 function settingsDirty() {
   if (document.body.dataset.demo === "true") return false;
+  const customUrlEl = document.getElementById("customBaseUrl");
+  const customModelEl = document.getElementById("customModelId");
+  const savedUrl = setStatus && setStatus.provider ? setStatus.provider.customBaseUrl || "" : "";
   return !!(
     (schoolPicked && schoolState && schoolPicked !== schoolState.current) ||
+    providerCurrent !== providerSaved ||
+    (providerCurrent === "custom" && customUrlEl && customUrlEl.value.trim() && customUrlEl.value.trim() !== savedUrl) ||
+    (providerCurrent === "custom" && customModelEl && customModelEl.value.trim()) ||
     sUser.value.trim() ||
     sPass.value ||
     sKey.value.trim() ||
@@ -3308,6 +3329,125 @@ document.addEventListener(
   true,
 );
 
+/* ── 供应商下拉：内置国内厂商 + 自定义 OpenAI 兼容端点（OpenAI 兼容接入）。
+   与型号/学校下拉同一套自绘浮层。本地版随「保存设置」提交（保存前只改
+   预览）；托管版（dsHosted 探测成功）供应商由网关管理，走 /api/provider
+   即切即重启实例。站点免费额度模式下只能选站点配了 Key 的厂商
+   （siteProviders，quota 下发；探测不到按仅 DeepSeek 过渡）── */
+let providerCurrent = "deepseek";
+let providerSaved = "deepseek";
+let providerOptions = [];
+let providerHosted = false;
+let siteProviders = ["deepseek"]; // quota 探测成功后更新；PR 过渡期默认仅 DeepSeek
+let quotaUiMode = ""; // quota 探测得到的 Key 来源选择（与 dsUiMode 同推导）
+function providerLabelOf(id) {
+  const p = providerOptions.find((x) => x.id === id);
+  return p && p.label ? p.label : id;
+}
+function providerKeyHintOf(id) {
+  const p = providerOptions.find((x) => x.id === id);
+  return p && p.keyHint ? p.keyHint : "API Key";
+}
+function applyProviderUi() {
+  const btn = document.getElementById("providerSelect");
+  if (btn) btn.textContent = providerLabelOf(providerCurrent);
+  const isCustom = providerCurrent === "custom";
+  const urlRow = document.getElementById("customBaseUrlRow");
+  if (urlRow) urlRow.hidden = !isCustom;
+  const modelRow = document.getElementById("customModelRow");
+  if (modelRow) modelRow.hidden = !isCustom;
+  const kk = document.getElementById("sKey");
+  if (kk) kk.placeholder = providerKeyHintOf(providerCurrent) + "；留空不修改";
+  const note = document.getElementById("dsOwnNote");
+  if (note)
+    note.textContent =
+      "自己的 " + providerLabelOf(providerCurrent) + " Key，不占免费额度、不限轮数";
+}
+function fillProviders(d) {
+  const p = d && d.provider;
+  if (!p) return;
+  providerOptions = Array.isArray(p.options)
+    ? p.options.filter((x) => x && typeof x.id === "string")
+    : [];
+  providerHosted = !!p.hosted;
+  providerSaved = p.current || "deepseek";
+  providerCurrent = p.current || "deepseek";
+  const url = document.getElementById("customBaseUrl");
+  if (url) url.value = p.customBaseUrl || "";
+  const mid = document.getElementById("customModelId");
+  if (mid) mid.value = providerCurrent === "custom" ? d.model || "" : "";
+  applyProviderUi();
+}
+/* 供应商预切换的型号清单预览（未保存选择不落缓存，服务端 noCache） */
+function previewProviderModels(id) {
+  if (id === "custom") {
+    const urlEl = document.getElementById("customBaseUrl");
+    const cu = urlEl ? urlEl.value.trim() : "";
+    if (!cu) {
+      fillModels([], "", "自定义供应商：填好服务地址并保存后拉取型号清单，或在下方直接输入型号 ID");
+      return;
+    }
+  }
+  const cu = id === "custom" ? encodeURIComponent(document.getElementById("customBaseUrl").value.trim()) : "";
+  fetch("/api/models?provider=" + encodeURIComponent(id) + (cu ? "&custom=" + cu : "") + "&refresh=1")
+    .then((r) => r.json())
+    .then((m) => {
+      if (!m) return;
+      fillModels(m.options || [], m.current || "", m.source === "live" ? "" : m.message);
+    })
+    .catch(() => {});
+}
+function pickProvider(id) {
+  if (id === providerCurrent) return;
+  if (dsHosted) {
+    /* 托管版：网关收下选择并踢掉实例，页面对话走新供应商；稍候重载取新状态 */
+    fetch("/api/provider", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ providerId: id }),
+    })
+      .then((r) => r.ok)
+      .then((okFlag) => {
+        if (!okFlag) {
+          dsSay("供应商切换失败，请稍后再试。");
+          return;
+        }
+        dsSay("已切换供应商，正在重启服务，稍候…", true);
+        window.setTimeout(() => window.location.reload(), 1500);
+      })
+      .catch(() => dsSay("网络错误，供应商切换失败。"));
+    return;
+  }
+  providerCurrent = id;
+  applyProviderUi();
+  const mid = document.getElementById("customModelId");
+  if (mid) mid.value = "";
+  pickModel("");
+  previewProviderModels(id);
+}
+const providerSelectBtn = document.getElementById("providerSelect");
+if (providerSelectBtn) {
+  bindDdBtn(providerSelectBtn);
+  providerSelectBtn.addEventListener("click", () => {
+    /* 托管版不给自定义端点（防内网探测）；站点额度模式下只列站点配了 Key 的厂商 */
+    let list = providerOptions.filter((p) => !providerHosted || p.id !== "custom");
+    if (dsHosted && quotaUiMode === "site") {
+      list = list.filter((p) => siteProviders.indexOf(p.id) >= 0);
+    }
+    if (!list.length) return;
+    toggleDd(
+      providerSelectBtn,
+      list.map((p) => ({
+        id: p.id,
+        label: p.label,
+        note: providerHosted && p.id === "custom" ? "托管环境不可用" : p.note,
+        on: p.id === providerCurrent,
+      })),
+      pickProvider,
+    );
+  });
+}
+
 /* ── 型号下拉框：候选由后端给（该 Key 实际可用的型号），拉不到时是内置兜底清单。
    sModel 仍是值的唯一载体（hidden input），保存逻辑读 sModel.value 不变：
    下拉显示当前在用型号＝「不修改」，选成别的型号保存时才提交切换 ── */
@@ -3505,6 +3645,8 @@ function showSettings() {
   sPass.value = "";
   sKey.value = "";
   pickModel("");
+  const customModelEl = document.getElementById("customModelId");
+  if (customModelEl) customModelEl.value = "";
   sQQAppId.value = "";
   sQQSecret.value = "";
   sQQPass.value = "";
@@ -3526,9 +3668,10 @@ function showSettings() {
       document.getElementById("curJwgl").textContent = d.jwgl.configured
         ? "已保存：学号 " + d.jwgl.username + " · " + d.jwgl.sourceLabel
         : "尚未配置教务账号";
+      fillProviders(d);
       renderCurKey(d);
       refreshQuota();
-      sKey.placeholder = "sk-…；留空不修改";
+      applyProviderUi();
       qqApplyStatus(d.qq);
       fillModels(d.models, d.model, "");
     })
@@ -3639,6 +3782,16 @@ document.getElementById("saveSettings").addEventListener("click", () => {
     return;
   }
   if (k) body.apiKey = k;
+  /* 供应商与自定义端点：本地版随保存提交（托管版走 /api/provider，不进这里） */
+  if (!dsHosted && providerCurrent !== providerSaved) body.providerId = providerCurrent;
+  if (providerCurrent === "custom") {
+    const cuEl = document.getElementById("customBaseUrl");
+    const cu = cuEl ? cuEl.value.trim() : "";
+    if (cu) body.customBaseUrl = cu;
+    const cmEl = document.getElementById("customModelId");
+    const cm = cmEl ? cmEl.value.trim() : "";
+    if (cm) body.model = cm; /* 手输型号优先于下拉选择 */
+  }
   const qa = sQQAppId.value.trim(),
     qs = sQQSecret.value,
     qp = sQQPass.value.trim();
@@ -3703,6 +3856,7 @@ document.getElementById("saveSettings").addEventListener("click", () => {
         sQQSecret.value = "";
         sQQPass.value = "";
         qqApplyStatus(d.status.qq);
+        fillProviders(d.status);
         pickModel("");
         fillModels(d.status.models, d.status.model, "");
         /* 凭证已落库：dirty 归零，「关闭」不必再二次确认；按钮短暂亮一下完成感 */

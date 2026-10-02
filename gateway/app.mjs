@@ -746,10 +746,33 @@ else { input.type = "password"; this.textContent = "显示"; }
         return;
       }
 
+      // 模型供应商切换（多厂商）：选择存网关（users.json），踢实例让新供应商
+      // 立刻生效（站点 Key 注入与 Key 判定都按它走）。custom 一律拒绝。
+      if (req.method === "POST" && pathname === "/api/provider") {
+        const body = await readJsonBody(req);
+        try {
+          await registry.setProviderId(user.id, String(body.providerId ?? ""));
+        } catch (error) {
+          sendJson(res, 400, {
+            error: error instanceof Error ? error.message : "供应商切换失败",
+          });
+          finish(400);
+          return;
+        }
+        spawner.kick(user.id);
+        console.log(`[gw] ${user.username} 模型供应商 → ${String(body.providerId)}`);
+        sendJson(res, 200, { ok: true });
+        finish(200);
+        return;
+      }
+
       // 同学端额度查询：设置弹窗「账号与模型」里展示剩余免费对话次数
       if (req.method === "GET" && pathname === "/api/quota") {
         const limit = user.dailyTurns > 0 ? user.dailyTurns : dailyTurns;
-        const hasOwnKey = usersDir ? await ownDeepseekKeyActive(usersDir, user.id) : false;
+        const providerId = user.providerId || "deepseek";
+        const hasOwnKey = usersDir
+          ? await ownDeepseekKeyActive(usersDir, user.id, providerId)
+          : false;
         // 实际生效：有自己的 Key 且未被钉在站点模式
         const ownKeyActive = hasOwnKey && user.dsMode !== "site";
         const used = await registry.turnsToday(user.id);
@@ -762,6 +785,8 @@ else { input.type = "password"; this.textContent = "显示"; }
           ownUsed,
           hasOwnKey,
           ownKeyActive,
+          /* 当前供应商（前端 Key 提示与站点模式的供应商过滤都用它） */
+          providerId,
           /* 同学选的来源（dsMode=site 钉在站点；空串=跟随，没存 Key 时实际仍
              走站点额度）。前端开关按「选择」渲染而不是按 ownKeyActive「实际
              生效」渲染——否则没存 Key 的同学点「自己的 Key」会被立刻刷回
@@ -798,19 +823,21 @@ else { input.type = "password"; this.textContent = "显示"; }
       }
 
       // 统一 Key 的费用护栏：每日对话轮数（按人限额优先，未设用站点默认）；
-      // 已保存自己 DeepSeek Key 的同学不占站点免费额度，仅计数用于展示。
+      // 已保存自己 Key（当前供应商）的同学不占站点免费额度，仅计数用于展示。
       // 记账放在 acquire 成功之后：满载 503 / 拉起失败被拒的轮次没有真正
       // 发给模型，不该烧同学的当日额度
       let chatTurnLedger = null;
       if (req.method === "POST" && pathname === "/api/chat") {
-        const hasOwnKey = usersDir ? await ownDeepseekKeyActive(usersDir, user.id) : false;
+        const hasOwnKey = usersDir
+          ? await ownDeepseekKeyActive(usersDir, user.id, user.providerId || "deepseek")
+          : false;
         const ownKeyActive = hasOwnKey && user.dsMode !== "site";
         if (!ownKeyActive) {
           const limit = user.dailyTurns > 0 ? user.dailyTurns : dailyTurns;
           const used = await registry.turnsToday(user.id);
           if (used >= limit) {
             sendJson(res, 429, {
-              error: `今日 ${limit} 轮免费对话已用完，明天再来；或到「设置 → 账号与模型」填自己的 DeepSeek Key（不占站点额度）`,
+              error: `今日 ${limit} 轮免费对话已用完，明天再来；或到「设置 → AI 模型」填自己的 API Key（不占站点额度）`,
             });
             finish(429);
             return;

@@ -57,6 +57,8 @@ const spawner = createSpawner({
   getDeepseekKey: () => registry.getSiteSettings().then((s) => s.deepseekKey),
   // 同学钉在「站点免费额度」模式时，实例禁用其保存的自己 Key（Key 保留不删）
   getForceSiteKey: (userId) => registry.findUserById(userId).then((u) => u?.dsMode === "site"),
+  // 同学当前选的模型供应商（users.json，/api/provider 切换后踢实例生效）
+  getProviderId: (userId) => registry.findUserById(userId).then((u) => u?.providerId || "deepseek"),
   maxConcurrent: Number(env.GATEWAY_MAX_CONCURRENT) || 4,
   idleMinutes: Number(env.GATEWAY_IDLE_MINUTES) || 30,
 });

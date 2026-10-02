@@ -6,31 +6,26 @@
  * - 长期：memory.json 事实条目（save_memory 工具维护），启动时全量注入
  */
 
-import { createDeepSeek } from "@ai-sdk/deepseek";
 import { ToolLoopAgent, wrapLanguageModel } from "ai";
 
 import { config } from "./config";
+import { buildLanguageModel } from "./llm";
 import { formatMemoryForPrompt } from "./memory/longterm";
 import { captureSessionPrompt, loadLastSessionTranscript } from "./memory/shortterm";
 import { basePrompt, QQ_CHANNEL_PROMPT } from "./prompt";
 import { school } from "./school";
 import { coreTools } from "./tools";
 
-const deepseek = createDeepSeek({
-  // 不传 apiKey：AI SDK 会每次请求实时读 DEEPSEEK_API_KEY 环境变量，
-  // /key 斜杠命令更新 env 即热生效，无需重建 provider
-
-  ...(config.deepseekBaseUrl ? { baseURL: config.deepseekBaseUrl } : {}),
-});
-
 /**
  * 包装模型：每次调用捕获完整对话（短期记忆的数据源）。
- * 每次组装 agent 时重新取 config.model——设置弹窗换型号后重建的 agent 才会用新模型；
- * Key 不需要这里处理（AI SDK 每次请求实时读 DEEPSEEK_API_KEY）。
+ * 每次组装 agent 时重新构建模型（当前供应商 + 型号）——设置弹窗换供应商或
+ * 型号后重建的 agent 才会用新模型；Key 不需要这里处理（DeepSeek 官方包每
+ * 请求实时读 DEEPSEEK_API_KEY，其余供应商经 llm.ts 的 fetch 读
+ * RAPTOR_PROVIDER_KEY，保存 Key 即热生效）。
  */
 function buildWrappedModel() {
   return wrapLanguageModel({
-    model: deepseek(config.model),
+    model: buildLanguageModel(),
     middleware: {
       wrapGenerate: async ({ doGenerate, params }) => {
         captureSessionPrompt(params.prompt);

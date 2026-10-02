@@ -1316,8 +1316,9 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             </div>
           </section>
           <section class="set-pane" id="setPaneModel" role="tabpanel" aria-labelledby="setTabModel" data-pane="model">
-            <p class="dlg-intro" id="dsIntro">模型服务使用 DeepSeek API。API Key 与所选型号仅加密保存在当前电脑，留空即保持不变。</p>
-            <label class="fld"><span>供应商</span><select disabled aria-label="模型供应商（当前仅支持 DeepSeek）"><option>DeepSeek</option></select></label>
+            <p class="dlg-intro" id="dsIntro">模型服务支持多家供应商（DeepSeek、通义千问、智谱 GLM、Kimi 等），也可填自定义 OpenAI 兼容端点。API Key 与所选型号仅加密保存在当前电脑，留空即保持不变。</p>
+            <label class="fld"><span>供应商</span><button type="button" class="dd-btn" id="providerSelect" aria-haspopup="listbox" aria-expanded="false"></button></label>
+            <label class="fld" id="customBaseUrlRow" hidden><span>服务地址</span><input id="customBaseUrl" type="url" autocomplete="off" spellcheck="false" placeholder="https://…（OpenAI 兼容端点，到 /v1 这一级）" ${demo ? "disabled" : ""}></label>
             <div class="ds-mode" id="dsMode" hidden>
               <button type="button" class="ds-opt" id="dsSite" aria-pressed="false">
                 <b>站点免费额度</b>
@@ -1325,13 +1326,14 @@ export function chatPage(options: { demo?: boolean } = {}): string {
               </button>
               <button type="button" class="ds-opt" id="dsOwn" aria-pressed="false">
                 <b>我自己的 API Key</b>
-                <span>自己的 DeepSeek Key，不占免费额度、不限轮数</span>
+                <span id="dsOwnNote">自己的 Key，不占免费额度、不限轮数</span>
               </button>
             </div>
             <label class="fld" id="sKeyRow"><span>API Key</span><span class="fld-row"><input id="sKey" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyeKey" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
             <div class="cur" id="curKey"></div>
             <div class="cur" id="curQuota" hidden></div>
             <label class="fld"><span>模型</span><button type="button" class="dd-btn" id="modelSelect" aria-haspopup="listbox" aria-expanded="false"></button></label>
+            <label class="fld" id="customModelRow" hidden><span>型号 ID</span><input id="customModelId" type="text" autocomplete="off" spellcheck="false" placeholder="该端点的模型 ID（清单拉不到时手填）" ${demo ? "disabled" : ""}></label>
             <input type="hidden" id="sModel" value="">
             <div class="cur" id="curModel"></div>
             <div class="diagrow"><button class="tbtn" id="testDeepseek" type="button" ${demo ? "disabled" : ""}>检测模型连接</button><span class="diagstate" id="diagDeepseek"></span></div>

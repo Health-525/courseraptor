@@ -61,7 +61,7 @@ const ENV_ALLOWLIST = [
  */
 export function buildInstanceEnv(
   sourceEnv,
-  { port, dataDir, credFile, siteKey = "", fallbackKey = "", forceSite = false },
+  { port, dataDir, credFile, siteKey = "", fallbackKey = "", forceSite = false, providerId = "" },
 ) {
   const env = {};
   for (const key of ENV_ALLOWLIST) {
@@ -75,9 +75,14 @@ export function buildInstanceEnv(
   // 文件读取边界：同学的 agent 只能读自己数据目录内的文件（openLocalFile
   // 据此拦截），网关账本 / 站点 Key / 他人数据目录 / /proc 都不可达
   env.RAPTOR_LOCAL_FILE_ROOT = dataDir;
+  // 多厂商：同学的供应商选择（users.json，/api/provider 切换）注入实例；
+  // RAPTOR_HOSTED 让实例侧禁收 providerId/customBaseUrl（走网关，防 SSRF）
+  if (providerId) env.RAPTOR_PROVIDER_ID = providerId;
+  env.RAPTOR_HOSTED = "1";
   // 混合 Key 模式：站点 Key（站点设置优先于构造兜底值）；同学在网页设置里
   // 保存自己的 Key 后，凭证文件里的 override 优先级更高（src/core/config.ts
-  // 的解析顺序），无需此处感知
+  // 的解析顺序），无需此处感知。过渡期站点 Key 仅 DeepSeek：其他供应商的
+  // 站点额度待 site.json 支持多厂商后由 RAPTOR_PROVIDER_KEY 注入。
   const effectiveKey = siteKey || fallbackKey;
   if (effectiveKey) env.DEEPSEEK_API_KEY = effectiveKey;
   if (forceSite) env.RAPTOR_DISABLE_DS_OVERRIDE = "1";
@@ -92,6 +97,8 @@ export function createSpawner({
   getDeepseekKey = null,
   /** 每次拉起时问一次：该同学是否钉在站点免费额度模式（注入禁用自己Key的旗标） */
   getForceSiteKey = null,
+  /** 每次拉起时问一次：该同学当前选的模型供应商（users.json，/api/provider 切换） */
+  getProviderId = null,
   maxConcurrent = 4,
   idleMinutes = 30,
   reapIntervalMs = 60_000,
@@ -141,6 +148,16 @@ export function createSpawner({
     }
   }
 
+  /** 该同学当前选的供应商（取不到按 deepseek，绝不让查询失败拦住拉起） */
+  async function currentProviderId(userId) {
+    if (!getProviderId) return "deepseek";
+    try {
+      return (await getProviderId(userId)) || "deepseek";
+    } catch {
+      return "deepseek";
+    }
+  }
+
   /** 站点 Key 当前值：站点设置（可运行时改）优先，回退构造参数 */
   async function currentSiteKey() {
     if (!getDeepseekKey) return "";
@@ -151,7 +168,7 @@ export function createSpawner({
     }
   }
 
-  function spawnInstance(userId, restartCount, siteKey = "", forceSite = false) {
+  function spawnInstance(userId, restartCount, siteKey = "", forceSite = false, providerId = "") {
     const dataDir = path.join(userDataDir(userId), "data");
     const credFile = path.join(userDataDir(userId), "credentials.enc");
     mkdirSync(dataDir, { recursive: true });
@@ -163,6 +180,7 @@ export function createSpawner({
       siteKey,
       fallbackKey: deepseekKey,
       forceSite,
+      providerId,
     });
 
     const child = spawn(nodeExec, ["--import", tsxUrl, "gateway/headless/entry.ts"], {
@@ -210,8 +228,10 @@ export function createSpawner({
       const effectiveRestarts =
         Date.now() - instance.startedAt > UPTIME_RESET_MS ? 0 : instance.restarts;
       if (effectiveRestarts < MAX_RESTARTS) {
-        void Promise.all([currentSiteKey(), forceSiteKey(userId)])
-          .then(([key, force]) => spawnInstance(userId, effectiveRestarts + 1, key, force))
+        void Promise.all([currentSiteKey(), forceSiteKey(userId), currentProviderId(userId)])
+          .then(([key, force, providerId]) =>
+            spawnInstance(userId, effectiveRestarts + 1, key, force, providerId),
+          )
           .catch((e) => {
             // 自动重启失败（如端口段耗尽）：可见地记录，不留未处理 rejection
             note(`自动重启失败：${e instanceof Error ? e.message : String(e)}`);
@@ -268,8 +288,12 @@ export function createSpawner({
       }
       const task = (async () => {
         try {
-          const [siteKey, forceSite] = await Promise.all([currentSiteKey(), forceSiteKey(userId)]);
-          const it = spawnInstance(userId, 0, siteKey, forceSite);
+          const [siteKey, forceSite, providerId] = await Promise.all([
+            currentSiteKey(),
+            forceSiteKey(userId),
+            currentProviderId(userId),
+          ]);
+          const it = spawnInstance(userId, 0, siteKey, forceSite, providerId);
           const port = await it.ready;
           it.lastRequestAt = Date.now();
           return port;

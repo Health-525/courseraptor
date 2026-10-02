@@ -17,6 +17,7 @@ const {
   cachedModelOptions,
   describeModel,
   ensureModelAvailable,
+  fallbackModelsFor,
   invalidateModelCache,
   listModelOptions,
   parseModelIds,
@@ -24,6 +25,7 @@ const {
   resolveStoredModel,
   validateModelChoice,
 } = await import("../src/core/models");
+const { getProviderDef } = await import("../src/core/providers");
 
 /** 假 Response：listModelOptions 只用到 ok / status / json() */
 function fakeFetch(payload: unknown, options: { ok?: boolean; status?: number } = {}) {
@@ -286,4 +288,118 @@ test("ensureModelAvailable：live 清单才判定退役，联网失败保持现�
     fetchImpl: fakeFetch({ data: [{ id: "deepseek-flash" }] }).impl,
   });
   assert.equal(noKey.migrated, false, "没有 Key 拉不到 live 清单，同样不动配置");
+});
+
+/* ── 多供应商：按厂商的兜底清单 / 缓存分桶 / 拉取地址 / 退役迁移边界 ── */
+
+test("fallbackModelsFor：各供应商有自己的兜底清单，custom 为空", async () => {
+  const { fallbackModelsFor } = await import("../src/core/models");
+  assert.deepEqual(
+    fallbackModelsFor("glm").map((m) => m.id),
+    getProviderDef("glm").fallbackModels.map((m) => m.id),
+  );
+  assert.deepEqual(fallbackModelsFor("custom"), [], "custom 型号由用户填或实时拉取");
+  assert.deepEqual(
+    fallbackModelsFor("deepseek").map((m) => m.id),
+    ["deepseek-flash", "deepseek-v4-pro"],
+    "deepseek 兜底与历史导出 FALLBACK_MODELS 同源",
+  );
+});
+
+test("listModelOptions 按 provider 打对应端点；缓存按供应商分桶互不污染", async () => {
+  invalidateModelCache();
+  const glm = fakeFetch({ data: [{ id: "glm-5" }, { id: "glm-5.2" }] });
+  const r1 = await listModelOptions({
+    providerId: "glm",
+    apiKey: "opaque-test-key-123456",
+    fetchImpl: glm.impl,
+  });
+  assert.equal(r1.source, "live");
+  assert.equal(glm.calls[0], "https://open.bigmodel.cn/api/paas/v4/models", "glm 走智谱端点");
+  assert.deepEqual(
+    r1.options.map((m) => m.id),
+    ["glm-5", "glm-5.2"],
+  );
+
+  // deepseek 的同步兜底不受 glm 拉取影响（分桶）；glm 的桶里是 live 结果
+  assert.deepEqual(
+    cachedModelOptions("deepseek").map((m) => m.id),
+    ["deepseek-flash", "deepseek-v4-pro"],
+  );
+  assert.deepEqual(
+    cachedModelOptions("glm").map((m) => m.id),
+    ["glm-5", "glm-5.2"],
+  );
+
+  // 没拉过的供应商同步读兜底
+  assert.ok(cachedModelOptions("qwen").length > 0);
+
+  invalidateModelCache();
+  assert.deepEqual(
+    cachedModelOptions("glm").map((m) => m.id),
+    getProviderDef("glm").fallbackModels.map((m) => m.id),
+    "invalidateModelCache 清全部桶",
+  );
+});
+
+test("listModelOptions：custom 未给地址时给手输指引，硅基流动斜杠 id 放行", async () => {
+  const noUrl = await listModelOptions({ providerId: "custom", apiKey: "k" });
+  assert.equal(noUrl.source, "fallback");
+  assert.deepEqual(noUrl.options, []);
+  assert.match(noUrl.message ?? "", /自定义端点/);
+
+  const sf = fakeFetch({ data: [{ id: "Qwen/Qwen3-8B" }, { id: "deepseek-ai/DeepSeek-V3.2" }] });
+  const r = await listModelOptions({
+    providerId: "siliconflow",
+    apiKey: "sk-sf-test-0123456789",
+    customBaseUrl: "https://wrong.example.com", // 内置厂商忽略自填地址
+    fetchImpl: sf.impl,
+  });
+  assert.equal(r.source, "live");
+  assert.equal(sf.calls[0], "https://api.siliconflow.cn/v1/models");
+  assert.deepEqual(
+    r.options.map((m) => m.id),
+    ["Qwen/Qwen3-8B", "deepseek-ai/DeepSeek-V3.2"],
+    "聚合平台的 厂商/型号 斜杠 id 必须能进清单",
+  );
+});
+
+test("noCache：预览拉取不落缓存", async () => {
+  invalidateModelCache();
+  const pass1 = fakeFetch({ data: [{ id: "kimi-k3" }] });
+  await listModelOptions({
+    providerId: "kimi",
+    apiKey: "sk-kimi-test-0123456789",
+    fetchImpl: pass1.impl,
+    noCache: true,
+  });
+  assert.deepEqual(
+    cachedModelOptions("kimi").map((m) => m.id),
+    getProviderDef("kimi").fallbackModels.map((m) => m.id),
+    "noCache 拉取成功也不写桶",
+  );
+});
+
+test("ensureModelAvailable：仅 deepseek 做自动迁移，其他供应商保持原样", async () => {
+  invalidateModelCache();
+  const gone = fakeFetch({ data: [{ id: "glm-5.2" }] });
+  const r = await ensureModelAvailable({
+    current: "glm-5",
+    providerId: "glm",
+    apiKey: "opaque-test-key-123456",
+    fetchImpl: gone.impl,
+  });
+  assert.equal(r.model, "glm-5", "非 deepseek 供应商即便清单里没有也不自动迁移");
+  assert.equal(r.migrated, false);
+});
+
+test("validateModelChoice 的 providerId 参数让 describeModel 命中各厂清单", () => {
+  const r = validateModelChoice({
+    requested: "glm-5",
+    allowed: ["glm-5"],
+    current: "glm-5.2",
+    providerId: "glm",
+  });
+  assert.equal(r.ok, true);
+  assert.match(r.message, /GLM-5|glm-5/);
 });
