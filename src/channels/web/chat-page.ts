@@ -623,6 +623,18 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                border-radius: 2px; outline: none; }
   .fld input:focus, .fld select:focus { border-color: var(--accent);
                box-shadow: 0 0 0 3px rgba(173, 57, 44, .09); }
+  /* 下拉框：去原生外观，细墨线圆头箭头（与全站 2px 描边图标同一语言）；
+     禁用态（如「供应商」锁定行）读作「印好的固定栏」——墨色浅一档、箭头
+     隐去、纸底不动：是锁定，不是坏掉 */
+  .fld select { appearance: none; -webkit-appearance: none;
+               padding-right: 34px; cursor: pointer;
+               background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236E6656' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+               background-repeat: no-repeat;
+               background-position: right 11px center;
+               background-size: 12px; }
+  .fld select:hover:not(:disabled) { border-color: var(--ink-3); }
+  .fld select:disabled { color: var(--ink-2); background-color: var(--card);
+                         background-image: none; cursor: default; }
   .fld input::placeholder { color: var(--ink-3); opacity: .75; }
   /* 密码类字段：右侧「显示/隐藏」切换，长 Key 手填时能核对 */
   .fld-row { position: relative; display: block; }
