@@ -565,8 +565,11 @@ export function chatPage(options: { demo?: boolean } = {}): string {
           border: 1px solid var(--rule-2); background: var(--card);
           color: var(--ink-2); box-shadow: var(--shadow-sm); cursor: pointer;
           transition: border-color .15s ease, color .15s ease, transform .15s ease; }
-  /* 上面的 display:inline-flex 会盖过 hidden 属性的 UA 样式，必须显式让位 */
-  .jump[hidden] { display: none; }
+  /* 任何带 author display 的类（.jump 的 inline-flex、.ds-mode 的 grid、
+     .diagrow 的 flex……）都会盖过 hidden 属性的 UA 样式，隐藏态仍在渲染
+     （.ds-mode 曾因此把「站点免费额度」漏给本地版）。一条全局规则让位，
+     不再逐类打补丁 */
+  [hidden] { display: none !important; }
   .jump svg { display: block; width: 18px; height: 18px; fill: none;
               stroke: currentColor; stroke-width: 2;
               stroke-linecap: round; stroke-linejoin: round; }
@@ -578,6 +581,11 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .dclose:hover { color: var(--accent); }
   .dlg-intro { margin: 0 0 16px; color: var(--ink-2); font-size: 14px;
                line-height: 1.75; }
+  /* 学校栏里的分区小标题（教务账号 / 其他学校）：细线隔开学校卡片与
+     跟随选择出现的表单块，选了什么下面就是什么，不再分栏跳转 */
+  .pane-sub { margin: 4px 0 10px; padding-top: 12px; border-top: 1px solid var(--rule-2);
+              font-family: var(--mono); font-size: 11.5px; letter-spacing: .1em;
+              color: var(--ink-3); }
 
   /* ── 设置栏目：左侧目录 + 右侧办理内容。选中栏目与会话列表同一语言：
      朱砂竖线 + 浮起纸片；目录不滚动，滚的永远是右侧内容 ── */
@@ -1278,28 +1286,28 @@ export function chatPage(options: { demo?: boolean } = {}): string {
       <div class="set-frame">
         <nav class="set-tabs" id="setTabs" role="tablist" aria-label="设置栏目">
           <button class="set-tab on" type="button" role="tab" id="setTabSchool" aria-controls="setPaneSchool" aria-selected="true" data-pane="school"><i class="sdot" aria-hidden="true"></i>学校</button>
-          <button class="set-tab" type="button" role="tab" id="setTabAccount" aria-controls="setPaneAccount" aria-selected="false" data-pane="account"><i class="sdot" aria-hidden="true"></i>教务账号</button>
           <button class="set-tab" type="button" role="tab" id="setTabModel" aria-controls="setPaneModel" aria-selected="false" data-pane="model"><i class="sdot" aria-hidden="true"></i>AI 模型</button>
           <button class="set-tab" type="button" role="tab" id="setTabQQ" aria-controls="setPaneQQ" aria-selected="false" data-pane="qq"><i class="sdot" aria-hidden="true"></i>QQ 机器人</button>
           <button class="set-tab" type="button" role="tab" id="setTabData" aria-selected="false" data-pane="data">本地数据</button>
         </nav>
         <div class="set-main">
           <section class="set-pane on" id="setPaneSchool" role="tabpanel" aria-labelledby="setTabSchool" data-pane="school">
-            <p class="dlg-intro">先选学校：已适配的学校可以自动查课表、成绩、考试与教务通知；其他学校用手动导入课表，AI 帮你把文字或文件解析成课表。学校切换保存后生效。</p>
+            <p class="dlg-intro">先选学校：已适配的学校在下方填写教务账号，即可自动查课表、成绩、考试与教务通知；选「其他学校」则改为手动导入课表，AI 帮你把文字或文件解析成课表。学校切换保存后生效。</p>
             <div class="model-cards" id="schoolCards" role="radiogroup" aria-label="选择学校"></div>
+            <div id="schoolJwglBox" hidden>
+              <div class="pane-sub">教务账号</div>
+              <label class="fld"><span>学号</span><input id="sUser" type="text" autocomplete="off" ${demo ? "disabled" : ""}></label>
+              <label class="fld"><span>登录密码</span><span class="fld-row"><input id="sPass" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyePass" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
+              <div class="cur" id="curJwgl"></div>
+              <div class="diagrow"><button class="tbtn" id="testJwgl" type="button" ${demo ? "disabled" : ""}>检测教务连接</button><span class="diagstate" id="diagJwgl"></span></div>
+            </div>
             <div id="schoolCustomBox" hidden>
+              <div class="pane-sub">其他学校</div>
               <label class="fld"><span>学校名称（选填）</span><input id="sSchoolName" type="text" autocomplete="off" maxlength="40" placeholder="如：某某大学（仅用于显示）" ${demo ? "disabled" : ""}></label>
               <label class="fld"><span>所在城市（选填）</span><input id="sSchoolCity" type="text" autocomplete="off" maxlength="20" placeholder="问天气时的默认城市" ${demo ? "disabled" : ""}></label>
+              <div class="cur" id="curSchool"></div>
+              <div class="diagrow" id="schoolImportRow"><button class="tbtn" id="openImport" type="button" ${demo ? "disabled" : ""}>导入 / 重新导入课表</button><span class="diagstate" id="diagSchool"></span></div>
             </div>
-            <div class="cur" id="curSchool"></div>
-            <div class="diagrow" id="schoolImportRow" hidden><button class="tbtn" id="openImport" type="button" ${demo ? "disabled" : ""}>导入 / 重新导入课表</button><span class="diagstate" id="diagSchool"></span></div>
-          </section>
-          <section class="set-pane" id="setPaneAccount" role="tabpanel" aria-labelledby="setTabAccount" data-pane="account">
-            <p class="dlg-intro">正式查询课表、成绩、考试与通知前，请先配置教务账号。已保存的信息不会在页面中完整显示，留空即保持不变；账号仅加密保存在当前电脑。</p>
-            <label class="fld"><span>学号</span><input id="sUser" type="text" autocomplete="off" ${demo ? "disabled" : ""}></label>
-            <label class="fld"><span>登录密码</span><span class="fld-row"><input id="sPass" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyePass" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
-            <div class="cur" id="curJwgl"></div>
-            <div class="diagrow"><button class="tbtn" id="testJwgl" type="button" ${demo ? "disabled" : ""}>检测教务连接</button><span class="diagstate" id="diagJwgl"></span></div>
           </section>
           <section class="set-pane" id="setPaneModel" role="tabpanel" aria-labelledby="setTabModel" data-pane="model">
             <p class="dlg-intro" id="dsIntro">模型服务使用 DeepSeek API。API Key 与所选型号仅加密保存在当前电脑，留空即保持不变。</p>
