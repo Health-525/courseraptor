@@ -1140,7 +1140,7 @@ const HALL_CARDS = [
   { id: "import", t: "导入课表", d: "粘贴或上传课表，AI 解析后手动确认", group: "系统", hidden: true },
   /* 我的账号：托管版专有（改本站登录密码），quota 探测成功后现身 */
   { id: "account", t: "我的账号", d: "修改本站登录密码", group: "系统", hidden: true },
-  { id: "settings", t: "设置", d: "学校、教务账号、AI 模型、QQ 与本地数据", group: "系统" },
+  { id: "settings", t: "设置", d: "学校与教务账号、AI 模型、QQ 与本地数据", group: "系统" },
 ];
 const HALL_GROUPS = ["学习安排", "效率工具", "系统"];
 const HALL_TITLES = Object.fromEntries(HALL_CARDS.map((c) => [c.id, c.t]));
@@ -3281,9 +3281,7 @@ function setTab(name) {
   for (const pane of document.querySelectorAll(".set-pane")) {
     pane.classList.toggle("on", pane.dataset.pane === name);
   }
-  document.getElementById("saveSettings").hidden = !["school", "account", "model", "qq"].includes(
-    name,
-  );
+  document.getElementById("saveSettings").hidden = !["school", "model", "qq"].includes(name);
 }
 for (const tab of setTabs) tab.addEventListener("click", () => setTab(tab.dataset.pane));
 /* 方向键在栏目间移动焦点：大厅里目录是横排（左右）+ 窄屏也是横排，竖排同样支持上下 */
@@ -3305,9 +3303,10 @@ function renderSetDots(d) {
     dot.className = "sdot " + (ok ? "ok" : optional ? "" : "warn");
     dot.title = ok ? "已配置" : optional ? "" : "未配置，需要填写";
   };
-  /* 学校一选就是已配置（默认南京工业大学，不存在「未选」态） */
-  mark("school", true, false);
-  mark("account", !!(d.jwgl && d.jwgl.configured), false);
+  /* 学校栏合并了教务账号：适配学校看教务账号是否已配，其他学校看
+     是否已导入课表（默认南京工业大学，不存在「未选学校」态） */
+  const sch = d.school || {};
+  mark("school", sch.manual ? !!sch.scheduleCached : !!(d.jwgl && d.jwgl.configured), false);
   mark("model", !!(d.deepseek && d.deepseek.configured), false);
   mark("qq", !!(d.qq && d.qq.configured), true);
 }
@@ -3351,7 +3350,7 @@ function renderSchoolCards(d) {
     note.className = "mc-note";
     note.textContent = o.manual
       ? "成绩、考试与教务通知需要学校适配，此模式暂不可用"
-      : "需要教务账号（下一栏）登录后查询";
+      : "需要下方教务账号登录后查询";
     card.appendChild(note);
     card.addEventListener("click", () => {
       if (HALL_DEMO) return;
@@ -3363,31 +3362,25 @@ function renderSchoolCards(d) {
     box.appendChild(card);
   });
 }
-/* 学校相关 UI 的可见性/文案随「选中态」走：保存前预览，保存后即为现状 */
+/* 学校相关 UI 的可见性/文案随「选中态」走：保存前预览，保存后即为现状。
+   教务账号与学校同栏（2026-10-02 起）：选适配学校 → 下方是教务账号表单；
+   选「其他学校」→ 下方是自定义信息 + 导入课表入口 */
 function syncSchoolUi(preview) {
   const picked = schoolPicked || (schoolState && schoolState.current) || "njtech";
   const manual =
     preview && schoolPicked
       ? !!((schoolState && schoolState.options) || []).find((o) => o.id === picked && o.manual)
       : schoolManual();
+  const jwglBox = document.getElementById("schoolJwglBox");
   const customBox = document.getElementById("schoolCustomBox");
-  const importRow = document.getElementById("schoolImportRow");
-  const cur = document.getElementById("curSchool");
+  if (jwglBox) jwglBox.hidden = manual;
   if (customBox) customBox.hidden = !manual;
-  if (importRow) importRow.hidden = !manual;
-  /* 手动课表模式没有教务系统：教务账号栏整个收起，避免填了也用不上 */
-  const accountTab = document.querySelector('#setTabs .set-tab[data-pane="account"]');
-  if (accountTab) accountTab.hidden = manual;
-  if (accountTab && manual && setLastTab === "account") setTab("school");
+  const cur = document.getElementById("curSchool");
   if (cur) {
     const cached = schoolState && schoolState.scheduleCached;
-    if (!manual) {
-      cur.textContent = "已适配学校：填写下一栏教务账号后即可查课表 / 成绩 / 通知";
-    } else {
-      cur.textContent = cached
-        ? "已有导入的课表；换学期或课表有变时重新导入即可"
-        : "还没有导入课表：点下方按钮粘贴或上传，AI 解析后确认";
-    }
+    cur.textContent = cached
+      ? "已有导入的课表；换学期或课表有变时重新导入即可"
+      : "还没有导入课表：点下方按钮粘贴或上传，AI 解析后确认";
   }
 }
 
