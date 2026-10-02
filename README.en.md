@@ -13,6 +13,8 @@
 [![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
 [![ISC License](https://img.shields.io/badge/License-ISC-8f2b21)](LICENSE)
 [![Node 24+](https://img.shields.io/badge/Node.js-24%2B-8f2b21?logo=nodedotjs&logoColor=white)](https://nodejs.org/en/download)
+[![GitHubDaily](https://img.shields.io/badge/GitHubDaily-Featured-1DA1F2?logo=x&logoColor=white)](https://x.com/GitHub_Daily)
+[![Indie Dev List](https://img.shields.io/badge/China_Indie_Dev_List-Featured-9B59B6)](https://github.com/1c7/chinese-independent-developer/blob/master/.github/pages/README-Programmer-Edition.md)
 
 [Try the demo](#try-it-without-credentials) · [Quick start](#use-your-own-academic-account) · [Discuss](https://github.com/Health-525/courseraptor/discussions) · [Contribute](CONTRIBUTING.md)
 

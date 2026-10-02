@@ -13,6 +13,8 @@
 [![Vercel AI SDK](https://img.shields.io/badge/Vercel%20AI%20SDK-v7-black.svg)](https://ai-sdk.dev)
 [![LLM](https://img.shields.io/badge/LLM-DeepSeek-4D6BFE.svg)](https://www.deepseek.com)
 [![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social)](https://github.com/Health-525/courseraptor)
+[![GitHubDaily](https://img.shields.io/badge/GitHubDaily-%E5%B7%B2%E6%8E%A8%E8%8D%90-1DA1F2?logo=x&logoColor=white)](https://x.com/GitHub_Daily)
+[![独立开发者列表](https://img.shields.io/badge/%E7%8B%AC%E7%AB%8B%E5%BC%80%E5%8F%91%E8%80%85%E5%88%97%E8%A1%A8-%E5%B7%B2%E6%94%B6%E5%BD%95-9B59B6)](https://github.com/1c7/chinese-independent-developer/blob/master/.github/pages/README-Programmer-Edition.md)
 
 **[简体中文](README.md) · [English](README.en.md)**
 
