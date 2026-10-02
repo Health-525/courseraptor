@@ -666,6 +666,21 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .mc-id { grid-column: 1 / -1; font-family: var(--mono); font-size: 12px;
            color: var(--ink-3); letter-spacing: .03em; }
   .mc-note { grid-column: 1 / -1; font-size: 12px; color: var(--ink-2); line-height: 1.65; }
+
+  /* 学校选择：单选圆点一行一项（复选框语言），选中谁下方就出谁的表单 */
+  .school-opts { display: grid; gap: 8px; margin: 2px 0 14px; }
+  .sch-opt { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px;
+             cursor: pointer; border: 1px solid var(--rule); border-radius: 3px;
+             background: var(--card);
+             transition: border-color .15s ease, background .15s ease; }
+  .sch-opt:hover { border-color: var(--rule-2); }
+  .sch-opt.picked { border-color: var(--accent); background: var(--accent-soft); }
+  .sch-opt:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .sch-opt input[type="radio"] { flex: none; margin: 3px 0 0; accent-color: var(--accent); }
+  .sch-opt .so-body { display: grid; gap: 3px; min-width: 0; }
+  .sch-opt .so-name { font-size: 13.5px; font-weight: 600; color: var(--ink);
+                      display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .sch-opt .so-desc { font-size: 12px; line-height: 1.6; color: var(--ink-3); }
   .model-empty { border: 1px dashed var(--rule-2); border-radius: 3px;
                  background: var(--card); color: var(--ink-3);
                  font-size: 13px; text-align: center; padding: 16px 10px; }
@@ -1212,7 +1227,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     /* 按压反馈：这些行/卡此前只有桌面 hover 态，触屏按下没有丝毫回应；
        给一记纸面压深（accent 族给朱砂浅底），松手即散——不用 JS */
     .hall-card:active, .sess li:active, .ds-opt:active, .set-tab:active,
-    .model-card:active, .hall-item:active { background: var(--shade); }
+    .model-card:active, .sch-opt:active, .hall-item:active { background: var(--shade); }
     .chip:active { background: var(--accent-soft); border-color: var(--accent);
                    color: var(--accent-deep); }
     .tool summary:active, .think summary:active { background: var(--paper-deep); }
@@ -1293,7 +1308,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
         <div class="set-main">
           <section class="set-pane on" id="setPaneSchool" role="tabpanel" aria-labelledby="setTabSchool" data-pane="school">
             <p class="dlg-intro">先选学校：已适配的学校在下方填写教务账号，即可自动查课表、成绩、考试与教务通知；选「其他学校」则改为手动导入课表，AI 帮你把文字或文件解析成课表。学校切换保存后生效。</p>
-            <div class="model-cards" id="schoolCards" role="radiogroup" aria-label="选择学校"></div>
+            <div class="school-opts" id="schoolCards" role="radiogroup" aria-label="选择学校"></div>
             <div id="schoolJwglBox" hidden>
               <div class="pane-sub">教务账号</div>
               <label class="fld"><span>学号</span><input id="sUser" type="text" autocomplete="off" ${demo ? "disabled" : ""}></label>
