@@ -1286,6 +1286,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
           </section>
           <section class="set-pane" id="setPaneModel" role="tabpanel" aria-labelledby="setTabModel" data-pane="model">
             <p class="dlg-intro" id="dsIntro">模型服务使用 DeepSeek API。API Key 与所选型号仅加密保存在当前电脑，留空即保持不变。</p>
+            <label class="fld"><span>供应商</span><select disabled aria-label="模型供应商（当前仅支持 DeepSeek）"><option>DeepSeek</option></select></label>
             <div class="ds-mode" id="dsMode" hidden>
               <button type="button" class="ds-opt" id="dsSite" aria-pressed="false">
                 <b>站点免费额度</b>
