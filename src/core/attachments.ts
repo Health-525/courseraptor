@@ -117,7 +117,7 @@ function unescapeXml(s: string): string {
  * pptx 抽正文：pptx = zip，幻灯片正文是 ppt/slides/slideN.xml 里的 <a:t> 文本段。
  * pptxgenjs 生成、Office 另存的都吃这个结构；按自然页序拼段。
  */
-async function extractPptxText(buf: Buffer): Promise<string> {
+export async function extractPptxText(buf: Buffer): Promise<string> {
   const JSZip = require("jszip") as typeof import("jszip");
   const zip = await JSZip.loadAsync(buf);
   const slideNo = (name: string) => Number(name.match(/slide(\d+)\.xml$/)?.[1] ?? 0);
