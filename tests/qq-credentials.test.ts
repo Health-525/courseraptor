@@ -13,7 +13,7 @@ import { test } from "node:test";
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-qq-cred-"));
 process.env.RAPTOR_CREDENTIALS_FILE = path.join(dataDir, "credentials.enc");
 
-const { config, resolveQQBotCredentials } = await import("../src/core/config");
+const { config, parseQQPushOpenids, resolveQQBotCredentials } = await import("../src/core/config");
 const { loadCredentialsStore } = await import("../src/core/credentials");
 const { getQQBotStatus, maskQQAppId, setQQBotCredentials } = await import("../src/core/onboarding");
 
@@ -96,4 +96,13 @@ test("maskQQAppId：过短值只报已配置，正常值首尾可见", () => {
   assert.equal(maskQQAppId("1234"), "已配置");
   assert.equal(maskQQAppId("1023456789"), "1023••••89");
   assert.equal(maskQQAppId("  1023456789  "), "1023••••89");
+});
+
+test("parseQQPushOpenids：未配置为空数组（关闭推送），多分隔符去空去重", () => {
+  assert.deepEqual(parseQQPushOpenids(undefined), []);
+  assert.deepEqual(parseQQPushOpenids(""), []);
+  assert.deepEqual(parseQQPushOpenids("   "), []);
+  assert.deepEqual(parseQQPushOpenids("openid-1"), ["openid-1"]);
+  // 逗号/分号/空白混分 + 首尾空白 + 重复项去重
+  assert.deepEqual(parseQQPushOpenids(" a , b; c  a "), ["a", "b", "c"]);
 });

@@ -176,6 +176,7 @@ npm run qq
 | `GITHUB_TOKEN` / `GITEE_TOKEN` | 日历订阅发布令牌（可选）：配后 `publish_calendar` 可把课表/考试发到名下公开仓库、手机用订阅链接自动同步。国内手机优先 `GITEE_TOKEN`，GitHub 令牌需 `repo` 权限 | 否 |
 | `QQBOT_APP_ID` / `QQBOT_APP_SECRET` | QQ 官方机器人凭证（可选；也可在网页「功能大厅 → 设置」里填写，AES 加密保存且保存后桥自动上线。两边都配时 `.env` 优先） | 否 |
 | `QQBOT_PASSCODE` | QQ 授权暗号：首次给机器人发此暗号完成授权（同样可在网页设置里设置） | 否 |
+| `QQBOT_PUSH_OPENIDS` | QQ 主动推送目标（openid，逗号分隔）：待办到期等提醒只发给显式列出的 openid（宿主本人）；不配置则关闭主动推送，避免把本机待办广播给全部授权用户 | 否 |
 | `RAPTOR_DISABLE_CAPTCHA_OCR` | 设 `1` 停用附件下载里的图形验证码自动识别（默认启用、重试上限 3 次） | 否 |
 | `RAPTOR_MAX_RPS` | 教务请求全局限速上限：只允许下调、请勿调高，尊重教务系统承载 | 否 |
 | `RAPTOR_NO_TODO_REMINDERS` | 设 `1` 关闭待办到期自动提醒（默认开启） | 否 |
