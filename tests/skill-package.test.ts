@@ -88,3 +88,90 @@ test("技能打包：独立目录 + 单文件 bundle + zip，自包含可运行"
   assert.ok(asLatin1.includes("njtech-jwgl/scripts/query.mjs"), "zip 应含 bundle");
   assert.equal(built.files.length, 6, "zip 条目数应为 6（无多余文件混入）");
 });
+
+test("技能打包：export-schedule 独立包结构 + 自包含可运行", async (t) => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-skill-exp-"));
+  t.after(() => fs.rmSync(outDir, { recursive: true, force: true }));
+
+  // includeBinaries:false 跳过 resvg 原生模块暂装（不打网络请求）
+  const built = await buildSkillPackage({
+    outDir,
+    skill: "export-schedule",
+    includeBinaries: false,
+  });
+  const script = path.join(built.skillDir, "scripts", "export.mjs");
+
+  for (const rel of [
+    "SKILL.md",
+    "README.md",
+    ".env.example",
+    "scripts/export.mjs",
+    "assets/courseraptor-logo.png",
+  ]) {
+    assert.ok(fs.existsSync(path.join(built.skillDir, rel)), `产物应包含 ${rel}`);
+  }
+
+  const bundle = fs.readFileSync(script, "utf8");
+  assert.ok(!/(?:from|import\()\s*["']\.\.?\//.test(bundle), "bundle 不应残留相对导入（要自包含）");
+  // PNG 原生模块必须 external（.node 二进制没法进单文件 JS，随包另发）
+  assert.ok(!bundle.includes('from"@resvg/resvg-js"'), "resvg 应为 external 惰性加载");
+
+  const run = (args: string[]) =>
+    spawnSync(process.execPath, [script, ...args], {
+      encoding: "utf8",
+      cwd: built.skillDir,
+      env: childEnv(),
+    });
+
+  // --help → 用法清单（证明 bundle 在干净环境独立可跑）
+  const help = run(["--help"]);
+  assert.equal(help.status, 0, `help 应成功：${help.stderr}`);
+  assert.match(help.stdout, /--mode/);
+  assert.match(help.stdout, /--cache/);
+
+  // 无缓存 → 非零退出 + 引导配置（不编造课表）
+  const noCache = run([]);
+  assert.notEqual(noCache.status, 0);
+  assert.match(noCache.stderr, /还没有课表缓存/);
+  assert.match(noCache.stderr, /--cache/);
+
+  // --cache 指向缓存 → 导出成功。本包不带 resvg 二进制（includeBinaries:false），
+  // PNG 应自动降级为 SVG 而不是崩溃——断言放行两种后缀，钉住「不崩」契约
+  const cacheFile = path.join(outDir, "schedule-cache.json");
+  fs.writeFileSync(
+    cacheFile,
+    JSON.stringify({
+      savedAt: Date.now(),
+      schedule: {
+        year: 2026,
+        semester: 3,
+        label: "2026-2027学年第一学期",
+        courses: [
+          {
+            title: "打包测试课",
+            weekday: 1,
+            periods: [1, 2],
+            weeks: "1-16",
+            location: "A101",
+            teacher: "",
+          },
+        ],
+      },
+      schoolId: "njtech",
+    }),
+  );
+  const exported = run(["--cache", cacheFile, "--week", "1", "--out", path.join(outDir, "exports")]);
+  assert.equal(exported.status, 0, `带缓存导出应成功：${exported.stderr}`);
+  assert.match(exported.stdout, /已导出/);
+  const produced = fs
+    .readdirSync(path.join(outDir, "exports"))
+    .filter((f) => /^schedule-week1-2026-1\.(png|svg)$/.test(f));
+  assert.equal(produced.length, 1, "应产出 schedule-week1-2026-1.png 或降级 .svg");
+
+  // zip：本地头签名 + 条目前缀
+  const zip = fs.readFileSync(built.zipPath);
+  assert.equal(zip.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
+  const asLatin1 = zip.toString("latin1");
+  assert.ok(asLatin1.includes("export-schedule/SKILL.md"), "zip 应含 SKILL.md");
+  assert.ok(asLatin1.includes("export-schedule/scripts/export.mjs"), "zip 应含 bundle");
+});
