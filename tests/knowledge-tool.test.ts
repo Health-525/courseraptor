@@ -221,3 +221,15 @@ test("无课表缓存：subject 仍可作自定义分类，正文匹配保持未
     fs.writeFileSync(cacheFile, backup, "utf8");
   }
 });
+
+test("坏文件隔离：损坏的 knowledge.json 先留档再当空，不被空基回写清光", async () => {
+  const file = path.join(tmpData, "knowledge.json");
+  fs.writeFileSync(file, "{ 不是合法 JSON", "utf8");
+  const r = await manage.execute({
+    action: "add",
+    items: [{ title: "新知识", content: "坏文件后新增的条目" }],
+  });
+  assert.ok(!("error" in (r as object)), "坏文件不应让新增失败");
+  const quarantined = fs.readdirSync(tmpData).some((f) => f.startsWith("knowledge.json.corrupt-"));
+  assert.ok(quarantined, "坏文件应被隔离留档而非直接覆盖");
+});

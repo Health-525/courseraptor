@@ -1338,8 +1338,10 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
             json(res, { error: "上传文件不存在或已过期，请重新选择文件" }, 400);
             return;
           }
-          // 与聊天附件同一条预解析流水线：xlsx/csv 出表格行、docx/pdf/txt 出全文
-          const result = await openLocalFile(upload.storedPath);
+          // 与聊天附件同一条预解析流水线：xlsx/csv 出表格行、docx/pdf/txt 出全文。
+          // 课表导入要的是「全部课程行」：默认预览每 sheet 15 行装不下真实课表
+          //（15-25 门课），后面的课会被静默丢掉、同学还以为导全了
+          const result = await openLocalFile(upload.storedPath, { previewRows: 1000 });
           content = importTextOf(result);
           fileName = upload.name;
           if (!content.trim()) {

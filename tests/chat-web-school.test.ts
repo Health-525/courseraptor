@@ -6,6 +6,7 @@
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -142,6 +143,43 @@ test("POST /api/schedule/import：上传文件走同一条解析（uploadId）",
     body: JSON.stringify({ uploadId: "no-such" }),
   });
   assert.equal(gone.status, 400);
+});
+
+test("POST /api/schedule/import：上传 Excel 全部课程行都进解析（不截前 15 行）", async () => {
+  const require = createRequire(import.meta.url);
+  const XLSX = require("xlsx") as typeof import("xlsx");
+  // 30 门课的课表：默认每 sheet 预览 15 行会把第 16 门起全部静默丢掉
+  const rows: unknown[][] = [["课程", "星期", "节次", "周次"]];
+  for (let i = 1; i <= 30; i++)
+    rows.push([`课程${String(i).padStart(2, "0")}`, "周一", "3-4", "1-16"]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), "课表");
+  const up = await wfetch(`${await base()}/api/uploads`, {
+    method: "POST",
+    body: JSON.stringify({
+      name: "课表.xlsx",
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      data: XLSX.write(wb, { bookType: "xlsx", type: "base64" }),
+    }),
+  });
+  const upload = (await up.json()).upload;
+
+  let seenPrompt = "";
+  setScheduleParser(async (prompt) => {
+    seenPrompt = prompt;
+    return FAKE_MODEL_OUTPUT;
+  });
+  try {
+    const r = await wfetch(`${await base()}/api/schedule/import`, {
+      method: "POST",
+      body: JSON.stringify({ uploadId: upload.id }),
+    });
+    assert.equal(r.status, 200);
+    assert.match(seenPrompt, /课程25/, "第 25 行课程必须进入解析（默认 15 行预览会丢）");
+    assert.match(seenPrompt, /课程30/, "最后一行课程必须进入解析");
+  } finally {
+    setScheduleParser(async () => FAKE_MODEL_OUTPUT);
+  }
 });
 
 test("POST /api/schedule/import/commit：落盘课表缓存与开学日期（校验周一）", async () => {

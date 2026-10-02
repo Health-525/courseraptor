@@ -14,7 +14,7 @@ delete process.env.RAPTOR_SCHOOL;
 
 await import("../src/adapters");
 const { school, selectSchool } = await import("../src/core/school");
-const { saveScheduleCache, loadScheduleCache } = await import("../src/core/schedule-cache");
+const { loadScheduleCache, saveScheduleCache } = await import("../src/core/schedule-cache");
 const { recordManualTermStart, manualTermStarts } = await import("../src/core/manual-terms");
 
 /** 切到自定义学校再执行，结束后切回（不影响同进程后续断言） */
@@ -126,4 +126,34 @@ test("能力边界：无教务登录、无通知面；fetchSmart 即读缓存", 
     assert.match(sections.tools + sections.background, /手动导入/);
     assert.match(sections.background, /不可用/);
   });
+});
+
+test("课表缓存分校：custom 的缓存在 njtech 下不可见，反之亦然", () => {
+  selectSchool("custom");
+  saveScheduleCache({
+    year: 2026,
+    semester: 3,
+    label: "2026-2027学年第一学期",
+    courses: [
+      {
+        title: "某某大学课程",
+        weekday: 1,
+        periods: [1, 2],
+        weeks: "1-16",
+        location: "",
+        teacher: "",
+      },
+    ],
+  });
+  // custom 自己读得到
+  assert.ok(loadScheduleCache()?.schedule.courses[0].title === "某某大学课程");
+  // 切回 njtech：不得把别校导入的课表当「最后已知课表」回退
+  selectSchool("njtech");
+  assert.equal(loadScheduleCache(), null, "跨学校缓存必须失效");
+  selectSchool("custom");
+  assert.ok(loadScheduleCache(), "切回后缓存仍在（文件没删）");
+  // 旧格式（无 schoolId）兼容：视为当前学校写入
+  selectSchool("njtech");
+  const legacy = loadScheduleCache();
+  assert.equal(legacy, null, "njtech 下 custom 标记的缓存仍不可见");
 });

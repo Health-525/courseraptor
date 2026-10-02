@@ -110,6 +110,16 @@ test("考试事件带时刻、考场座位与提前 30 分钟提醒", () => {
   assert.equal(r.examEvents, 1);
 });
 
+test("无时刻的考试是全天事件：不挂 30 分钟提醒（否则前一夜 23:30 响铃）", () => {
+  const fx = fixture();
+  fx.exams = [
+    { date: "2026-12-28", subject: "思想政治理论", time: "", location: "", seatNumber: "" },
+  ];
+  const r = buildTermICS(fx);
+  assert.ok(r.ics.includes("VALUE=DATE:20261228"), "应为全天事件");
+  assert.ok(!r.ics.includes("TRIGGER"), "全天考试事件不得携带提醒");
+});
+
 test("RFC 5545 基本面：CRLF、转义、日历名、UID 稳定", () => {
   const a = buildTermICS(fixture());
   const b = buildTermICS(fixture());

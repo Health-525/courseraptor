@@ -270,7 +270,9 @@ export function buildTermICS(opts: {
         [e.time || undefined, e.seatNumber ? `座位：${e.seatNumber}` : undefined]
           .filter(Boolean)
           .join("\n") || undefined,
-      alarmMinutesBefore: 30,
+      // 无具体时刻 → 全天事件：挂 30 分钟提醒会变成「前一夜 23:30」响铃，
+      // 多数日历 App 下体验怪；只在有时刻时提醒
+      ...(time ? { alarmMinutesBefore: 30 } : {}),
     });
     counts.examEvents++;
   }

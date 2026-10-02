@@ -14,7 +14,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { writeFileAtomicSync } from "./atomic-write";
+import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
 import { dataDir } from "./paths";
 import { loadScheduleCache } from "./schedule-cache";
 
@@ -42,6 +42,9 @@ function readState(): KnowledgeState {
     const value = JSON.parse(fs.readFileSync(knowledgePath(), "utf8")) as Partial<KnowledgeState>;
     return { entries: Array.isArray(value.entries) ? value.entries : [] };
   } catch {
+    // 坏文件先隔离留档再当空（与 memory/json-cache 同一约定）：直接当空的
+    // 话，下一次写入以空为基回写，全部知识无声消失
+    quarantineCorruptFileSync(knowledgePath());
     return { entries: [] };
   }
 }
