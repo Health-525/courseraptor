@@ -452,10 +452,11 @@ export function buildTodayBrief(now: Date = new Date(), requestedWeek?: number):
     requested !== undefined && requested >= 1 && requested <= maxWeek
       ? requested
       : currentWeek?.week;
-  const week = selectedWeek && currentWeek ? { ...currentWeek, week: selectedWeek } : null;
-  // 假期里 currentWeekOf 返回 null，但周次换算还得有基准（找下一节课要用）
-  const week1Monday =
-    currentWeek?.week1Monday ?? terms.week1MondayOf(schedule.year, schedule.semester).week1Monday;
+  // 假期里 currentWeekOf 返回 null，但周次换算还得有基准：显式选周
+  // （?week=N）时用开学日期兜底出周视图——寒暑假正是翻下学期课表的场景
+  const weekBase = currentWeek ?? terms.week1MondayOf(schedule.year, schedule.semester);
+  const week = selectedWeek != null ? { ...weekBase, week: selectedWeek } : null;
+  const week1Monday = weekBase.week1Monday;
   const todayPlan = planForDate(schedule.courses, todayIso, week1Monday);
   const courses = todayPlan.courses.map((c) => toBriefCourse(c, nowMin));
 

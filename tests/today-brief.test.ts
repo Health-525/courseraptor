@@ -251,6 +251,21 @@ test("假期/未开学：周概览歇档，下一节课为空", () => {
   assert.match(b.schedule.note ?? "", /不在教学周内/);
 });
 
+test("假期里显式选周：周视图照常给出（翻下学期课表的场景）", () => {
+  saveScheduleCache({ ...term, courses });
+  // 同样在 2026-06-15（开学前），但显式请求第 1 周
+  const b = buildTodayBrief(new Date("2026-06-15T10:00:00"), 1);
+  assert.ok(b.week, "显式选周时周概览不得为空");
+  assert.equal(b.term.week, 1);
+  assert.equal(b.term.weekLabel, "第 1 周");
+  assert.equal(b.term.weekSource, "known", "开学日期基准沿用实测记录");
+  // 周一锚点是 2026-08-31，第 1 周周一应就是它
+  assert.equal(b.week.days[0].dateISO, "2026-08-31");
+  // 不选周默认行为不变（上面的假期用例钉住），selectedWeek 越界回落默认
+  const far = buildTodayBrief(new Date("2026-06-15T10:00:00"), 99);
+  assert.equal(far.week, null, "请求超出 maxWeek 时回落默认（假期歇档）");
+});
+
 test("待办：未完成按截止升序进简报，逾期/今天标注与标签正确", () => {
   saveScheduleCache({ ...term, courses });
   addReminder({ title: "已完成的旧待办", dueAt: "2026-08-29T10:00:00" });

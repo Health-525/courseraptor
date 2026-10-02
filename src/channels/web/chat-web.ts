@@ -989,28 +989,40 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     if (url === "/today" || url === "/today/") {
       // 独立日程页：今日头条/今日速览/临近考试，纯本地缓存渲染
       todayPageHtml ??= todayPage();
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+      });
       res.end(withCsrf(todayPageHtml));
       return;
     }
     if (url === "/schedule" || url === "/schedule/") {
       // 独立课表页：教学周导航 + 周课表网格，纯本地缓存渲染
       schedulePageHtml ??= schedulePage();
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+      });
       res.end(withCsrf(schedulePageHtml));
       return;
     }
     if (url === "/todos" || url === "/todos/") {
       // 独立待办页：分组清单与勾选/删除，纯本地存储渲染
       todosPageHtml ??= todosPage();
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+      });
       res.end(withCsrf(todosPageHtml));
       return;
     }
     if (url === "/knowledge" || url === "/knowledge/") {
       // 独立知识库页：对话中沉淀的知识条目，纯本地存储渲染
       knowledgePageHtml ??= knowledgePage();
-      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+      });
       res.end(withCsrf(knowledgePageHtml));
       return;
     }
@@ -1234,7 +1246,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       });
       return;
     }
-    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
     chatPageHtml ??= chatPage();
     res.end(withCsrf(chatPageHtml));
     return;
