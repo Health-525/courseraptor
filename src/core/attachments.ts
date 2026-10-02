@@ -11,8 +11,8 @@
  * - 本地解析全部离线完成（mammoth + SheetJS + pdf-parse），数据不出本机。
  */
 
-import fs from "node:fs/promises";
 import { realpathSync } from "node:fs";
+import fs from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
 import {
@@ -594,7 +594,9 @@ export function assertWithinLocalFileRoot(abs: string): void {
   const rootReal = realpathSync(root);
   const real = realpathSync(abs);
   if (real !== rootReal && !real.startsWith(rootReal + path.sep)) {
-    throw new Error(`当前环境只允许读取你的数据目录（${root}）内的文件，其余本机路径不可读：${abs}`);
+    throw new Error(
+      `当前环境只允许读取你的数据目录（${root}）内的文件，其余本机路径不可读：${abs}`,
+    );
   }
 }
 

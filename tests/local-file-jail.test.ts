@@ -47,9 +47,9 @@ test("设置 RAPTOR_LOCAL_FILE_ROOT：目录外路径被拒，目录内照常", 
 });
 
 test("assertWithinLocalFileRoot：符号链接逃逸跟随真实路径拦截", () => {
-  const escape = path.join(tmpData, "escape-link.txt");
+  const escapeLink = path.join(tmpData, "escape-link.txt");
   try {
-    fs.symlinkSync(outsideFile, escape);
+    fs.symlinkSync(outsideFile, escapeLink);
   } catch (e) {
     // Windows 无开发者模式/管理员权限时建不了符号链接：本地跳过，
     // Linux CI 上正常执行（ realpath 拦截逻辑正是在那里生效）
@@ -57,8 +57,8 @@ test("assertWithinLocalFileRoot：符号链接逃逸跟随真实路径拦截", (
     throw e;
   }
   try {
-    assert.throws(() => assertWithinLocalFileRoot(escape), /只允许读取你的数据目录/);
+    assert.throws(() => assertWithinLocalFileRoot(escapeLink), /只允许读取你的数据目录/);
   } finally {
-    fs.rmSync(escape, { force: true });
+    fs.rmSync(escapeLink, { force: true });
   }
 });
