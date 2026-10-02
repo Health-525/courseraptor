@@ -264,6 +264,18 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
           model: liveAgent ? "DeepSeek 实时生成（虚构数据演示）" : "离线固定回答",
           models: [],
           quickQuestions: DEFAULT_QUESTIONS,
+          /* 学校块与正式版同形状（chat-web.ts statusPayload）：没有它演示页
+             设置里「选择学校」是空的，看不出复选框选学校 → 下方出表单的联动 */
+          school: {
+            current: "njtech",
+            manual: false,
+            scheduleCached: true,
+            custom: { name: "", city: "" },
+            options: [
+              { id: "njtech", name: "南京工业大学", shortName: "NJTECH", manual: false },
+              { id: "custom", name: "其他学校（手动课表）", shortName: "自定义", manual: true },
+            ],
+          },
         });
       } else if (req.method === "GET" && url.startsWith("/api/models")) {
         json(res, {

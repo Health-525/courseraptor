@@ -3327,39 +3327,42 @@ function renderSchoolCards(d) {
   const pickedId = schoolPicked || school.current;
   box.innerHTML = "";
   options.forEach((o) => {
-    const card = document.createElement("button");
-    card.type = "button";
-    card.className = "model-card" + (o.id === pickedId ? " picked" : "");
-    card.setAttribute("role", "radio");
-    card.setAttribute("aria-checked", o.id === pickedId ? "true" : "false");
+    /* 单选圆点行（复选框语言）：原生 radio 管选中态与键盘操作，点整行即选 */
+    const row = document.createElement("label");
+    row.className = "sch-opt" + (o.id === pickedId ? " picked" : "");
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "schoolPick";
+    radio.checked = o.id === pickedId;
+    const body = document.createElement("span");
+    body.className = "so-body";
     const name = document.createElement("span");
-    name.className = "mc-name";
+    name.className = "so-name";
     name.textContent = schoolCardName(o);
-    card.appendChild(name);
-    const badge = document.createElement("span");
-    badge.className = "mc-badge";
-    badge.textContent = o.id === school.current ? "当前" : o.id === pickedId ? "已选" : "";
-    if (badge.textContent) card.appendChild(badge);
-    const id = document.createElement("span");
-    id.className = "mc-id";
-    id.textContent = o.manual
-      ? "粘贴/上传课表 → AI 解析；课表本地保存"
-      : "教务系统已适配：课表 / 成绩 / 考试 / 通知自动抓取";
-    card.appendChild(id);
-    const note = document.createElement("span");
-    note.className = "mc-note";
-    note.textContent = o.manual
-      ? "成绩、考试与教务通知需要学校适配，此模式暂不可用"
-      : "需要下方教务账号登录后查询";
-    card.appendChild(note);
-    card.addEventListener("click", () => {
-      if (HALL_DEMO) return;
+    if (o.id === school.current) {
+      const badge = document.createElement("span");
+      badge.className = "mc-badge";
+      badge.textContent = "当前";
+      name.appendChild(badge);
+    }
+    const desc = document.createElement("span");
+    desc.className = "so-desc";
+    desc.textContent = o.manual
+      ? "手动导入：粘贴 / 上传课表，AI 解析后保存；成绩、考试与教务通知暂不可用"
+      : "教务系统已适配：课表 / 成绩 / 考试 / 通知自动抓取，需下方教务账号登录";
+    body.appendChild(name);
+    body.appendChild(desc);
+    row.appendChild(radio);
+    row.appendChild(body);
+    row.addEventListener("click", () => {
+      /* 演示页也放行：纯客户端预览，「保存设置」在演示里本就禁用，不落任何数据 */
+      if (schoolPicked === o.id) return;
       schoolPicked = o.id;
       renderSchoolCards(d);
-      /* 切到「其他学校」直接展开自定义信息与导入入口；切回适配学校则收起 */
+      /* 选中谁下方就出谁：适配学校 → 教务账号表单；其他学校 → 自定义信息 + 导入 */
       syncSchoolUi(true);
     });
-    box.appendChild(card);
+    box.appendChild(row);
   });
 }
 /* 学校相关 UI 的可见性/文案随「选中态」走：保存前预览，保存后即为现状。
