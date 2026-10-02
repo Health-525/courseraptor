@@ -50,6 +50,37 @@ const FAILURES_TO_LOCK = 5;
 const LOCK_DURATION_MS = 15 * 60_000;
 const FAILURE_IDLE_MS = 30 * 60_000;
 
+/**
+ * 站点设置展示用的厂商清单。网关是纯 mjs 跑（不 import TS），这里维护
+ * 一份精简镜像；tests/gateway-admin.test.ts 钉住它与 src/core/providers.ts
+ * 的 BUILTIN_PROVIDERS 一致——加厂商时两处同步改，测试红灯兜底。
+ */
+const SITE_PROVIDERS = [
+  { id: "deepseek", label: "DeepSeek", keyPattern: /^sk-[A-Za-z0-9]{16,}$/ },
+  { id: "qwen", label: "通义千问（阿里百炼）" },
+  { id: "glm", label: "智谱 GLM" },
+  { id: "kimi", label: "Kimi（月之暗面）" },
+  { id: "doubao", label: "豆包（火山方舟）" },
+  { id: "hunyuan", label: "腾讯混元" },
+  { id: "minimax", label: "MiniMax" },
+  { id: "step", label: "阶跃星辰" },
+  { id: "ernie", label: "文心（百度千帆）" },
+  { id: "spark", label: "讯飞星火" },
+  { id: "siliconflow", label: "硅基流动" },
+];
+
+/** 站点 Key 的形状校验：deepseek 严格 sk-（历史行为），其余宽松 */
+function siteKeyLooksValid(providerId, key) {
+  const def = SITE_PROVIDERS.find((p) => p.id === providerId);
+  if (!def) return false;
+  if (def.keyPattern) return def.keyPattern.test(key);
+  return key.length >= 16 && key.length <= 200 && !/\s/.test(key);
+}
+
+function maskSiteKey(key) {
+  return `${key.slice(0, 3)}${"•".repeat(8)}${key.slice(-4)}`;
+}
+
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -421,18 +452,51 @@ export function createAdminUi({
       if (pathname === "/admin/api/site") {
         if (req.method === "GET") {
           const site = await registry.getSiteSettings();
+          const providerKeys = await registry.getSiteProviderKeys();
           sendJson(res, 200, {
             deepseekKeySet: Boolean(site.deepseekKey),
-            deepseekKeyMasked: site.deepseekKey
-              ? `${site.deepseekKey.slice(0, 3)}${"•".repeat(8)}${site.deepseekKey.slice(-4)}`
-              : "",
+            deepseekKeyMasked: site.deepseekKey ? maskSiteKey(site.deepseekKey) : "",
             envDeepseekKeySet,
             defaultDailyTurns: defaultDailyTurns,
+            /* 各厂商站点 Key 状态（多厂商）：keyMasked 为空即未设 */
+            providers: SITE_PROVIDERS.map((p) => ({
+              id: p.id,
+              label: p.label,
+              keySet: Boolean(providerKeys[p.id]),
+              keyMasked: providerKeys[p.id] ? maskSiteKey(providerKeys[p.id]) : "",
+              /* deepseek 兜底链路提示：面板未设但 env 有 */
+              envFallback: p.id === "deepseek" && !providerKeys[p.id] && envDeepseekKeySet,
+            })),
           });
           return true;
         }
         if (req.method === "POST") {
           const body = await readJsonBody(req);
+          // 新形状：{provider, key} 按厂商保存/清除；旧形状 {deepseekKey} 兼容转发
+          if (body.provider !== undefined) {
+            const provider = String(body.provider ?? "");
+            const key = String(body.key ?? "").trim();
+            const def = SITE_PROVIDERS.find((p) => p.id === provider);
+            if (!def) {
+              sendJson(res, 400, { error: "未知供应商（自定义端点没有站点 Key）" });
+              return true;
+            }
+            if (key && !siteKeyLooksValid(provider, key)) {
+              sendJson(res, 400, {
+                error: def.keyPattern
+                  ? `${def.label} Key 应以 sk- 开头且长度足够`
+                  : "Key 长度或字符不合常理，请检查是否复制完整",
+              });
+              return true;
+            }
+            await registry.setSiteProviderKey(provider, key);
+            console.log(
+              `[gw-admin] 站点 ${def.label} Key 已${key ? "更新" : "清空"}（新拉起的实例生效）`,
+            );
+            await audit(ip, `站点 ${def.label} Key ${key ? "更新" : "清空"}`);
+            sendJson(res, 200, { ok: true });
+            return true;
+          }
           const key = String(body.deepseekKey ?? "").trim();
           if (
             body.deepseekKey !== undefined &&

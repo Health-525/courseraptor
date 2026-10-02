@@ -58,7 +58,7 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 sudo mkdir -p /var/lib/raptor-gateway /var/lib/raptor-users
 sudo tee /etc/raptor-gateway.env >/dev/null <<'EOF'
 GATEWAY_SECRET=<openssl rand -hex 32 生成>
-GATEWAY_DEEPSEEK_KEY=<站点统一 DeepSeek Key，可留空>
+GATEWAY_DEEPSEEK_KEY=<站点统一 DeepSeek Key，可留空；多厂商站点 Key 在管理台「站点设置」按厂商配置>
 GATEWAY_STATE_DIR=/var/lib/raptor-gateway
 GATEWAY_USERS_DIR=/var/lib/raptor-users
 GATEWAY_MAX_CONCURRENT=4

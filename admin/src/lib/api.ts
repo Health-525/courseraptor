@@ -70,11 +70,21 @@ export type Security = {
   recoveryLeft: number
 }
 
+export type SiteProviderInfo = {
+  id: string
+  label: string
+  keySet: boolean
+  keyMasked: string
+  envFallback: boolean
+}
+
 export type SiteInfo = {
   deepseekKeySet: boolean
   deepseekKeyMasked: string
   envDeepseekKeySet: boolean
   defaultDailyTurns: number
+  /** 各厂商站点 Key 状态（多厂商）；旧后端缺省为空数组 */
+  providers?: SiteProviderInfo[]
 }
 
 /** 更新后台的调用包装：连不上/未配置 → {unavailable}，拒绝 → {error} */
@@ -204,6 +214,12 @@ export async function resetReject(id: string) {
 
 export async function siteSaveKey(deepseekKey: string) {
   const res = await api.post('/site', { deepseekKey })
+  return res.data as { ok: boolean }
+}
+
+/** 按厂商保存/清空站点 Key（key 为空串 = 清除该厂商的面板 Key） */
+export async function siteSaveProviderKey(provider: string, key: string) {
+  const res = await api.post('/site', { provider, key })
   return res.data as { ok: boolean }
 }
 

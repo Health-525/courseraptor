@@ -59,6 +59,13 @@ const spawner = createSpawner({
   getForceSiteKey: (userId) => registry.findUserById(userId).then((u) => u?.dsMode === "site"),
   // 同学当前选的模型供应商（users.json，/api/provider 切换后踢实例生效）
   getProviderId: (userId) => registry.findUserById(userId).then((u) => u?.providerId || "deepseek"),
+  // 指定供应商的站点 Key（site.json providerKeys；deepseek 回退 env GATEWAY_DEEPSEEK_KEY）
+  getProviderSiteKey: async (providerId) => {
+    const keys = await registry.getSiteProviderKeys();
+    if (keys[providerId]) return keys[providerId];
+    if (providerId === "deepseek") return env.GATEWAY_DEEPSEEK_KEY || "";
+    return "";
+  },
   maxConcurrent: Number(env.GATEWAY_MAX_CONCURRENT) || 4,
   idleMinutes: Number(env.GATEWAY_IDLE_MINUTES) || 30,
 });

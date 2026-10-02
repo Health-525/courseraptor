@@ -81,3 +81,26 @@ test("buildInstanceEnv：注入同学选择的供应商与托管标志", () => {
   assert.equal(bare.RAPTOR_PROVIDER_ID, undefined, "未选择不注入（实例回落 deepseek）");
   assert.equal(bare.RAPTOR_HOSTED, "1");
 });
+
+test("buildInstanceEnv：按供应商注入站点 Key（多厂商）", () => {
+  // 智谱会话：站点 Key 走 RAPTOR_PROVIDER_KEY，绝不经 DEEPSEEK_API_KEY 泄露
+  const glm = buildInstanceEnv(
+    {},
+    { port: 1, dataDir: "d", credFile: "c", providerId: "glm", providerSiteKey: "glm-site-key" },
+  );
+  assert.equal(glm.RAPTOR_PROVIDER_KEY, "glm-site-key");
+  assert.equal(glm.DEEPSEEK_API_KEY, undefined, "非 deepseek 会话不得带 DeepSeek 通道的 Key");
+
+  // deepseek 会话：RAPTOR_PROVIDER_KEY 与历史通道 DEEPSEEK_API_KEY 同值双注
+  const ds = buildInstanceEnv(
+    {},
+    { port: 2, dataDir: "d", credFile: "c", providerId: "deepseek", providerSiteKey: "sk-site1" },
+  );
+  assert.equal(ds.RAPTOR_PROVIDER_KEY, "sk-site1");
+  assert.equal(ds.DEEPSEEK_API_KEY, "sk-site1");
+
+  // 站点没配该厂商 Key：什么都不注入（同学必须自带）
+  const bare = buildInstanceEnv({}, { port: 3, dataDir: "d", credFile: "c", providerId: "qwen" });
+  assert.equal(bare.RAPTOR_PROVIDER_KEY, undefined);
+  assert.equal(bare.DEEPSEEK_API_KEY, undefined);
+});

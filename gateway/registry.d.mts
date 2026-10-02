@@ -38,6 +38,10 @@ export interface Registry {
   setDsMode(id: string, mode: string): Promise<void>;
   /** 模型供应商选择（合法形状的内置厂商 id；custom 一律拒绝） */
   setProviderId(id: string, providerId: string): Promise<void>;
+  /** 站点各厂商 Key（新格式 providerKeys 优先，旧 deepseekKey 迁移映射） */
+  getSiteProviderKeys(): Promise<Record<string, string>>;
+  /** 按厂商保存/清除站点 Key（custom 拒绝；deepseek 双写旧字段兼容） */
+  setSiteProviderKey(providerId: string, key: string): Promise<void>;
   getSiteSettings(): Promise<{ deepseekKey: string }>;
   setSiteSettings(patch: { deepseekKey?: string }): Promise<void>;
   getAdminTotp(): Promise<AdminTotpDoc | null>;

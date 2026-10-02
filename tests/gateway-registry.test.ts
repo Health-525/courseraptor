@@ -130,3 +130,44 @@ test("注册表：文件不存在（首启）仍按空表起步，不受损坏�
   assert.equal((await registry.listUsers()).length, 0);
   assert.equal((await registry.listInvites()).length, 0);
 });
+
+/* ── 站点多厂商 Key（site.json providerKeys）── */
+
+test("getSiteProviderKeys：新格式优先，旧 deepseekKey 迁移映射，脏值清洗", async () => {
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-reg-prov-"));
+  const registry = createRegistry({ stateDir });
+  // 旧格式：只有 deepseekKey
+  await registry.setSiteSettings({ deepseekKey: "sk-legacydeepseek12345678" });
+  let keys = await registry.getSiteProviderKeys();
+  assert.deepEqual(keys, { deepseek: "sk-legacydeepseek12345678" }, "旧字段迁移进 deepseek 键");
+
+  // 新格式写入另一厂商：与旧字段共存
+  await registry.setSiteProviderKey("glm", "opaque-glm-key-0123456789");
+  keys = await registry.getSiteProviderKeys();
+  assert.deepEqual(keys, {
+    deepseek: "sk-legacydeepseek12345678",
+    glm: "opaque-glm-key-0123456789",
+  });
+
+  // deepseek 经新接口更新：旧字段同步双写（旧客户端读 getSiteSettings 也拿到新值）
+  await registry.setSiteProviderKey("deepseek", "sk-newdeepseek1234567890");
+  assert.equal((await registry.getSiteSettings()).deepseekKey, "sk-newdeepseek1234567890");
+
+  // 清除：键消失、旧字段同步清空；custom 与脏值拒绝
+  await registry.setSiteProviderKey("deepseek", "");
+  keys = await registry.getSiteProviderKeys();
+  assert.ok(!keys.deepseek);
+  await assert.rejects(
+    () => registry.setSiteProviderKey("custom", "some-key-0123456789"),
+    /自定义端点/,
+  );
+  await assert.rejects(
+    () => registry.setSiteProviderKey("glm", "short"),
+    /长度或字符/,
+    "站点 Key 也做形状校验",
+  );
+  await assert.rejects(
+    () => registry.setSiteProviderKey("GPT!", "some-key-0123456789"),
+    /供应商标识/,
+  );
+});

@@ -747,11 +747,37 @@ else { input.type = "password"; this.textContent = "显示"; }
       }
 
       // 模型供应商切换（多厂商）：选择存网关（users.json），踢实例让新供应商
-      // 立刻生效（站点 Key 注入与 Key 判定都按它走）。custom 一律拒绝。
+      // 立刻生效（站点 Key 注入与 Key 判定都按它走）。custom 一律拒绝；
+      // 钉在站点免费额度的同学只能切到站点配了 Key 的厂商（否则实例拿不到
+      // 任何 Key，对话直接报错）。
       if (req.method === "POST" && pathname === "/api/provider") {
         const body = await readJsonBody(req);
+        const raw = typeof body.providerId === "string" ? body.providerId.trim() : "";
+        // 空值 = 回落 deepseek；非空必须形状合法（脏值是客户端 bug 信号，明拒）
+        const normalized = raw === "" ? "deepseek" : raw;
+        if (normalized === "custom") {
+          sendJson(res, 400, { error: "托管环境不支持自定义端点" });
+          finish(400);
+          return;
+        }
+        if (!/^[a-z][a-z0-9-]{0,20}$/.test(normalized)) {
+          sendJson(res, 400, { error: "供应商标识不合法" });
+          finish(400);
+          return;
+        }
+        if (user.dsMode === "site" && normalized !== "deepseek") {
+          const siteKeys = await registry.getSiteProviderKeys();
+          if (!siteKeys[normalized]) {
+            sendJson(res, 400, {
+              error:
+                "站点免费额度暂未提供该供应商：请先切到「我自己的 API Key」，或填入该供应商自己的 Key",
+            });
+            finish(400);
+            return;
+          }
+        }
         try {
-          await registry.setProviderId(user.id, String(body.providerId ?? ""));
+          await registry.setProviderId(user.id, normalized);
         } catch (error) {
           sendJson(res, 400, {
             error: error instanceof Error ? error.message : "供应商切换失败",
@@ -760,7 +786,7 @@ else { input.type = "password"; this.textContent = "显示"; }
           return;
         }
         spawner.kick(user.id);
-        console.log(`[gw] ${user.username} 模型供应商 → ${String(body.providerId)}`);
+        console.log(`[gw] ${user.username} 模型供应商 → ${normalized}`);
         sendJson(res, 200, { ok: true });
         finish(200);
         return;
@@ -777,6 +803,11 @@ else { input.type = "password"; this.textContent = "显示"; }
         const ownKeyActive = hasOwnKey && user.dsMode !== "site";
         const used = await registry.turnsToday(user.id);
         const ownUsed = await registry.ownTurnsToday(user.id);
+        // 站点配了 Key 的厂商（前端「站点免费额度」模式下供应商下拉据此过滤；
+        // env GATEWAY_DEEPSEEK_KEY 兜底也算 deepseek 可用）
+        const siteKeys = await registry.getSiteProviderKeys();
+        const siteProviders = Object.keys(siteKeys);
+        if (!siteKeys.deepseek && envDeepseekKeySet) siteProviders.push("deepseek");
         sendJson(res, 200, {
           username: user.username,
           used,
@@ -787,6 +818,8 @@ else { input.type = "password"; this.textContent = "显示"; }
           ownKeyActive,
           /* 当前供应商（前端 Key 提示与站点模式的供应商过滤都用它） */
           providerId,
+          /* 站点免费额度可用的供应商清单 */
+          siteProviders,
           /* 同学选的来源（dsMode=site 钉在站点；空串=跟随，没存 Key 时实际仍
              走站点额度）。前端开关按「选择」渲染而不是按 ownKeyActive「实际
              生效」渲染——否则没存 Key 的同学点「自己的 Key」会被立刻刷回
