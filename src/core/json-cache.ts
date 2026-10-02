@@ -44,3 +44,12 @@ export function writeJsonCache(filename: string, envelope: unknown, logTag: stri
     logger.error(`[${logTag}] 保存失败`, { error: (e as Error).message });
   }
 }
+
+/** 删缓存文件（缓存条目被判定失效时用）；文件不存在也静默 */
+export function deleteJsonCache(filename: string, logTag: string): void {
+  try {
+    fs.rmSync(cacheFile(filename), { force: true });
+  } catch (e) {
+    logger.error(`[${logTag}] 删除失败`, { error: (e as Error).message });
+  }
+}

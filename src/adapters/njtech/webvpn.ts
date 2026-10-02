@@ -23,7 +23,7 @@ import { ocrCaptcha } from "../../core/attachments";
 import { config } from "../../core/config";
 import { isSessionExpiredError, RaptorError } from "../../core/errors";
 import { createClient, httpFailure } from "../../core/http";
-import { readJsonCache, writeJsonCache } from "../../core/json-cache";
+import { deleteJsonCache, readJsonCache, writeJsonCache } from "../../core/json-cache";
 
 const VPN_BASE = "https://vpn.njtech.edu.cn";
 const WWW_BASE = "https://www.njtech.edu.cn";
@@ -303,6 +303,9 @@ export async function getWebvpnSession(force = false): Promise<VpnSession> {
   if (force) {
     cachedSession = null;
     sessionInflight = null;
+    // 磁盘会话一并作废：只清内存的话，TTL 内的死会话会被下面原样读回，
+    // 「失效后强制重登」实际拿的还是同一个死会话
+    deleteJsonCache(SESSION_FILE, "webvpn");
   }
   if (cachedSession) return cachedSession;
   const stored = readJsonCache(SESSION_FILE, sessionValid);
@@ -326,6 +329,7 @@ export async function getWebvpnSession(force = false): Promise<VpnSession> {
 /** 丢弃会话（会话被服务端判定失效时调用，下次访问重新登录） */
 export function invalidateWebvpnSession(): void {
   cachedSession = null;
+  deleteJsonCache(SESSION_FILE, "webvpn");
 }
 
 // ── 代理抓取 ─────────────────────────────────────────────────

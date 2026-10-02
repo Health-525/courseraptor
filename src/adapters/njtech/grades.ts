@@ -196,7 +196,11 @@ export async function fetchAllGrades(cookie: string, username: string): Promise<
     allCourses: deduped,
     failedTerms,
   };
-  gradesMemo = { result, at: Date.now() };
+  // 残缺结果不进快照：挂了学期的「半份成绩」被缓存 10 分钟的话，同学
+  // 看到 dataComplete=false 后最自然的重问会拿到同一份残缺数据
+  if (failedTerms.length === 0) {
+    gradesMemo = { result, at: Date.now() };
+  }
   return result;
 }
 
