@@ -30,6 +30,7 @@ const { fetchJwcArticle, fetchJwcNews, fetchJwcNewsDetailed, _setPdfTextParserFo
 const {
   _setCaptchaSolverForTest,
   encryptCasPassword,
+  getWebvpnSession,
   invalidateWebvpnSession,
   jwcUrlToPath,
   webvpnUrlToPublic,
@@ -225,6 +226,35 @@ test("校外直连被拦截页命中时，经 WebVPN 抓取列表并映射回公
       fs.existsSync(path.join(process.env.RAPTOR_DATA_DIR!, "jwc-news-cache.json")),
       "成功抓取后应写缓存",
     );
+  } finally {
+    restoreHttp();
+    resetSessionState();
+  }
+});
+
+test("TTL 内的死会话：force 重登不再从磁盘读回同一个会话", async () => {
+  resetSessionState();
+  // 磁盘上放一个「TTL 仍有效、但已被服务端踢掉」的会话
+  writeJsonCache(
+    "webvpn-session.json",
+    {
+      cookie: "dead-cookie-marker",
+      jwcPrefix: "/http/webvpn" + "a".repeat(64),
+      createdAt: Date.now(),
+    },
+    "webvpn-test",
+  );
+  _setCaptchaSolverForTest(async () => "ab31");
+  installDirectBlocked();
+  installWebvpnScript(happyPathScript);
+  try {
+    const session = await getWebvpnSession(true);
+    assert.notEqual(
+      session.cookie,
+      "dead-cookie-marker",
+      "force=true 必须丢弃磁盘死会话并重新登录",
+    );
+    assert.ok(session.cookie.length > 0);
   } finally {
     restoreHttp();
     resetSessionState();

@@ -15,8 +15,9 @@ export const studentTools = {
     inputSchema: z.object({}),
     execute: async () => {
       const profile = await withAuthRetry((c) => fetchProfile(c));
-      // 敏感字段打码（只留前4后4），避免完整证件/卡号进入模型上下文
-      const SENSITIVE = /证件号码|银行卡|考生号/;
+      // 敏感字段打码（只留前4后4）：证件/卡号之外，手机号、住址、邮箱、
+      // 家长联系方式同样是个人隐私，不应完整进入模型上下文
+      const SENSITIVE = /证件号码|银行卡|考生号|手机|电话|住址|邮箱|电子邮|家长|联系/;
       const masked: Record<string, string> = {};
       let maskedCount = 0;
       for (const [k, v] of Object.entries(profile)) {

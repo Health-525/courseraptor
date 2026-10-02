@@ -45,11 +45,15 @@ export async function loginJwgl(username: string, password: string): Promise<Jwg
   // 正方教务系统登录失败时仍返回 200，但响应体包含错误信息
   const body = loginResp.body || "";
 
-  if (
-    body.includes("用户名或密码不正确") ||
-    body.includes("密码错误") ||
-    body.includes("验证码错误")
-  ) {
+  // 验证码错误单列：正方一旦开启登录验证码（选课季常见），同学会被
+  // 「密码不正确」误导去改一个根本没错的密码
+  if (body.includes("验证码错误")) {
+    throw new RaptorError(
+      "AUTH_INVALID",
+      "教务开启了登录验证码，暂无法自动登录，请稍后再试或到教务网页直接操作",
+    );
+  }
+  if (body.includes("用户名或密码不正确") || body.includes("密码错误")) {
     throw new RaptorError("AUTH_INVALID", "学号或密码不正确");
   }
 

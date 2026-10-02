@@ -173,6 +173,7 @@ async function watchLoop(
   const loop = await XkSessionLoop.start(events);
   let rounds = 0;
   let submitAttempts = 0;
+  let submitCapped = false;
   let grabbed: LoopResult["grabbed"] = null;
   let lastSnapshot: LoopResult["lastSnapshot"] = [];
 
@@ -224,10 +225,13 @@ async function watchLoop(
           if (await loop.refreshIfExpired(result.message)) break;
           if (submitAttempts >= 10) {
             events.push({ time: now(), message: "提交失败次数达到上限（10 次），停止重试" });
+            submitCapped = true;
             break;
           }
         }
-        if (grabbed) break;
+        // 上限到达必须终止整个监控循环：只 break 内层 for 的话外层 while
+        // 下一轮会继续提交，事件流却宣称「已停止重试」——文案与真实写操作相反
+        if (grabbed || submitCapped) break;
       }
     }
 

@@ -32,6 +32,7 @@ const { fetchEnrolledClasses, fetchLabGradesSmart, fetchRetakeCourses } = await 
 const { getCookie, invalidateAuthCache, withAuthRetry } = await import(
   "../src/adapters/njtech/session"
 );
+const { loginJwgl } = await import("../src/adapters/njtech/auth");
 
 // ── mock：https.request 进程内替身（借 jwgl-http.test.ts 的模式）──────
 
@@ -116,6 +117,39 @@ function loginQueue(sessionId: string): MockSpec[] {
     { status: 200, chunks: [Buffer.from("<html>main frame</html>")] },
   ];
 }
+
+// ── 0. 登录失败文案分类 ─────────────────────────────────────────
+
+test("登录遇验证码错误：如实说验证码，不误导同学改密码", async () => {
+  looseRate();
+  const queue: MockSpec[] = [
+    // 登录页
+    {
+      status: 200,
+      headers: { "set-cookie": ["JSESSIONID=captcha-sess; Path=/"] },
+      chunks: [LOGIN_PAGE_HTML("tok-captcha")],
+    },
+    // RSA 公钥
+    {
+      status: 200,
+      chunks: [
+        Buffer.from(JSON.stringify({ modulus: keyPair.modulusB64, exponent: keyPair.exponentB64 })),
+      ],
+    },
+    // 登录响应：正方开启验证码时的失败文案
+    { status: 200, chunks: [Buffer.from("<html>验证码错误</html>")] },
+  ];
+  const mock = installMock(() => queue.shift());
+  try {
+    await assert.rejects(loginJwgl("20230101", "correct-password"), (e: Error) => {
+      assert.match(e.message, /验证码/);
+      assert.ok(!/密码不正确/.test(e.message), "不得再说「密码不正确」误导同学改密码");
+      return true;
+    });
+  } finally {
+    mock.restore();
+  }
+});
 
 // ── 1. portal 错误可见性：故障 ≠ 空列表 ─────────────────────────
 
