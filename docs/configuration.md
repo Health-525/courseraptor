@@ -19,6 +19,7 @@
 | `FIRECRAWL_API_KEY` | 可选，公开通知附件的云解析兜底；本地解析无需此项 |
 | `RAPTOR_CJK_FONT` | 可选，中文 PDF 使用的本机字体绝对路径 |
 | `QQBOT_APP_ID` / `QQBOT_APP_SECRET` / `QQBOT_PASSCODE` | 可选，QQ 官方机器人凭证与准入暗号；仍共用本机教务身份 |
+| `QQBOT_PUSH_OPENIDS` | 可选，QQ 主动推送目标 openid（逗号分隔）：待办到期提醒只发给这些人；不配置则不发推送，白名单里的其他授权用户收不到你的提醒 |
 | `GITHUB_TOKEN` / `GITEE_TOKEN` | 可选，将课表日历发布到公开仓库；分享范围需本人确认 |
 | `RAPTOR_NO_UPDATE_CHECK` | `1` 关闭启动时版本检查 |
 | `RAPTOR_LOG_LEVEL` | 后台诊断日志级别 `debug\|info\|warn\|error`（默认 `info`），写入 `data/raptor.log`，超 5MB 自动轮转 |

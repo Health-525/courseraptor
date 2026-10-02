@@ -355,10 +355,25 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
   log.log("🦖 CourseRaptor QQ 桥已启动（官方机器人 · WebSocket）");
   log.log(`已授权用户：${allowedOpenids.size} 个（暗号激活：发送 QQBOT_PASSCODE）`);
 
-  // 主动推送通道：白名单用户收系统提醒（待办到期等）。target 省略 msgId
-  // 即主动消息；平台对主动推送有频率限制，失败只记日志、不影响桥本体
+  // 主动推送通道：只发 QQBOT_PUSH_OPENIDS 显式列出的 openid（宿主本人）。
+  // 白名单是对话授权名单（同学激活后都能聊），不是推送名单——待办等提醒
+  // 读的是本机单用户数据，广播给全部授权用户等于把宿主私事发给同学。
+  // target 省略 msgId 即主动消息；平台对主动推送有频率限制，失败只记
+  // 日志、不影响桥本体
+  const pushTargets = config.qqPushOpenids;
+  if (pushTargets.length === 0) {
+    log.log(
+      "主动推送未启用：待办提醒不会发到 QQ。想接收请把本人 openid 填进 .env 的 QQBOT_PUSH_OPENIDS（openid 见启动日志 [auth] 行）",
+    );
+  } else {
+    const notAuthorized = pushTargets.filter((id) => !allowedOpenids.has(id));
+    if (notAuthorized.length > 0) {
+      log.warn(`[qq] 推送目标尚未授权，先在 QQ 里给机器人发暗号激活：${notAuthorized.join("、")}`);
+    }
+    log.log(`主动推送目标：${pushTargets.length} 个 openid`);
+  }
   registerQQPush(async (text) => {
-    for (const openid of allowedOpenids) {
+    for (const openid of pushTargets) {
       await bot.sendText({ scope: "c2c", targetId: openid }, text).catch((e) => {
         log.warn(`[qq] 主动推送失败（openid=${openid}）：${(e as Error)?.message ?? e}`);
       });

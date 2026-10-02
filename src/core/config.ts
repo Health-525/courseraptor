@@ -39,6 +39,12 @@ export interface RaptorConfig {
   qqBotAppId?: string;
   qqBotAppSecret?: string;
   qqBotPasscode?: string;
+  /**
+   * QQ 主动推送目标（openid 列表）：待办到期等提醒只发给显式列在这里的
+   * openid（宿主本人）。白名单是对话授权名单，不是推送名单——为空时
+   * 桥关闭主动推送，绝不把本机单用户数据广播给全部授权用户。
+   */
+  qqPushOpenids: string[];
   /** QQ 凭证来源（诊断用）；「完整可用」指 AppID 与 AppSecret 都在 */
   qqBotSource: QQBotSource;
   /** 抢课功能开关（选课季设为 1 才暴露抢课/盯课工具，平时关闭回到日常对话） */
@@ -83,6 +89,18 @@ export function resolveQQBotCredentials(input: {
     };
   }
   return { passcode, source: "unset" };
+}
+
+/** QQ 主动推送目标解析：QQBOT_PUSH_OPENIDS 以逗号/分号/空白分隔多个 openid，
+ *  去空去重；未配置返回空数组（桥据此关闭主动推送） */
+export function parseQQPushOpenids(raw: string | undefined): string[] {
+  if (!raw?.trim()) return [];
+  const seen = new Set<string>();
+  for (const part of raw.split(/[,;\s]+/)) {
+    const id = part.trim();
+    if (id) seen.add(id);
+  }
+  return [...seen];
 }
 
 export interface ResolvedDeepSeekApiKey {
@@ -200,6 +218,7 @@ function loadConfig(): RaptorConfig {
     qqBotAppSecret: resolvedQQ.appSecret,
     qqBotPasscode: resolvedQQ.passcode,
     qqBotSource: resolvedQQ.source,
+    qqPushOpenids: parseQQPushOpenids(env("QQBOT_PUSH_OPENIDS")),
     enableGrab: env("RAPTOR_ENABLE_GRAB") === "1",
     rateLimit: parseRateLimit(),
   };
