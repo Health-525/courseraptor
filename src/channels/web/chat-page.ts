@@ -617,24 +617,43 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .fld { display: grid; gap: 5px; margin: 0 0 10px; }
   .fld span { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
               letter-spacing: .12em; }
-  .fld input, .fld select { width: 100%; border: 1px solid var(--rule-2);
+  .fld input, .fld select, .fld .dd-btn { width: 100%; border: 1px solid var(--rule-2);
                background: var(--card); color: var(--ink);
                font-family: var(--mono); font-size: 14px; padding: 9px 10px;
                border-radius: 2px; outline: none; }
-  .fld input:focus, .fld select:focus { border-color: var(--accent);
+  .fld input:focus, .fld select:focus, .fld .dd-btn:focus-visible { border-color: var(--accent);
                box-shadow: 0 0 0 3px rgba(173, 57, 44, .09); }
   /* 下拉框：去原生外观，细墨线圆头箭头（与全站 2px 描边图标同一语言）；
      禁用态（如「供应商」锁定行）读作「印好的固定栏」——墨色浅一档、箭头
      隐去、纸底不动：是锁定，不是坏掉 */
-  .fld select { appearance: none; -webkit-appearance: none;
+  .fld select, .fld .dd-btn { appearance: none; -webkit-appearance: none;
                padding-right: 34px; cursor: pointer;
                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236E6656' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
                background-repeat: no-repeat;
                background-position: right 11px center;
                background-size: 12px; }
-  .fld select:hover:not(:disabled) { border-color: var(--ink-3); }
+  .fld .dd-btn { text-align: left; white-space: nowrap; overflow: hidden;
+                 text-overflow: ellipsis; }
+  .fld select:hover:not(:disabled), .fld .dd-btn:hover { border-color: var(--ink-3); }
+  .fld .dd-btn[aria-expanded="true"] { border-color: var(--accent); }
   .fld select:disabled { color: var(--ink-2); background-color: var(--card);
                          background-image: none; cursor: default; }
+  /* 点开后的选项清单：纸片浮层（与会话 ⋯ 菜单同一语言）。原生 <select>
+     的弹出列表浏览器不让改样式，所以清单自绘；选项两行：名称 + 说明 */
+  .dd-pop { position: fixed; z-index: 60; border: 1px solid var(--rule-2);
+            border-radius: 4px; background: var(--card);
+            box-shadow: 0 10px 34px rgba(50, 42, 31, .16);
+            padding: 4px; display: grid; gap: 1px;
+            overflow-y: auto; max-height: min(320px, 45dvh); }
+  .dd-item { display: grid; gap: 2px; width: 100%; border: 0; background: none;
+             cursor: pointer; text-align: left; padding: 8px 10px; min-height: 38px;
+             border-radius: 2px; border-left: 2px solid transparent;
+             font-family: var(--mono); font-size: 13.5px; color: var(--ink); }
+  .dd-item:hover, .dd-item:focus-visible { background: var(--accent-soft); outline: none; }
+  .dd-item.on { border-left-color: var(--accent); }
+  .dd-item.on .dd-main { color: var(--accent-deep); font-weight: 600; }
+  .dd-item .dd-note { font-size: 11.5px; line-height: 1.5; color: var(--ink-3);
+                      white-space: normal; }
   .fld input::placeholder { color: var(--ink-3); opacity: .75; }
   /* 密码类字段：右侧「显示/隐藏」切换，长 Key 手填时能核对 */
   .fld-row { position: relative; display: block; }
@@ -1282,7 +1301,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
         <div class="set-main">
           <section class="set-pane on" id="setPaneSchool" role="tabpanel" aria-labelledby="setTabSchool" data-pane="school">
             <p class="dlg-intro">先选学校：适配学校填教务账号自动查询；其他学校导入课表即可。</p>
-            <label class="fld"><span>学校</span><select id="schoolSelect"></select></label>
+            <label class="fld"><span>学校</span><button type="button" class="dd-btn" id="schoolSelect" aria-haspopup="listbox" aria-expanded="false"></button></label>
             <div id="schoolJwglBox" hidden>
               <div class="pane-sub">教务账号</div>
               <label class="fld"><span>学号</span><input id="sUser" type="text" autocomplete="off" ${demo ? "disabled" : ""}></label>
@@ -1312,7 +1331,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             <label class="fld" id="sKeyRow"><span>API Key</span><span class="fld-row"><input id="sKey" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyeKey" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
             <div class="cur" id="curKey"></div>
             <div class="cur" id="curQuota" hidden></div>
-            <label class="fld"><span>模型</span><select id="modelSelect"></select></label>
+            <label class="fld"><span>模型</span><button type="button" class="dd-btn" id="modelSelect" aria-haspopup="listbox" aria-expanded="false"></button></label>
             <input type="hidden" id="sModel" value="">
             <div class="cur" id="curModel"></div>
             <div class="diagrow"><button class="tbtn" id="testDeepseek" type="button" ${demo ? "disabled" : ""}>检测模型连接</button><span class="diagstate" id="diagDeepseek"></span></div>
