@@ -10,8 +10,17 @@
 ## 安装
 
 1. 安装 [Node.js](https://nodejs.org/) ≥ 18。
-2. 解压本包到任意目录（作为 agent 技能使用时，解压到技能目录，如
-   `~/.workbuddy/skills/`）。
+2. 解压本包。只想命令行用：任意目录即可。要作为 agent 技能：把
+   `export-schedule/` 整个文件夹放进你所用工具的技能目录——
+
+   | 工具 | 技能目录 |
+   | --- | --- |
+   | Claude Code | `~/.claude/skills/`（或项目内 `.claude/skills/`） |
+   | ZCode | `~/.zcode/skills/`（或项目内 `.zcode/skills/`） |
+   | WorkBuddy | `~/.workbuddy/skills/` |
+   | 其他支持 Agent Skills 规范的工具 | 多数认 `~/.agents/skills/`，详见各工具文档 |
+
+   放好后无需重启配置，对话里说「导出课表」即可触发。
 
 ## 首次配置：准备课表缓存
 
