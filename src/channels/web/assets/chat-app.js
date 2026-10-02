@@ -3096,8 +3096,6 @@ function settingsDirty() {
   if (document.body.dataset.demo === "true") return false;
   return !!(
     (schoolPicked && schoolState && schoolPicked !== schoolState.current) ||
-    (schoolManual() && sSchoolName.value.trim() !== ((schoolState.custom || {}).name || "")) ||
-    (schoolManual() && sSchoolCity.value.trim() !== ((schoolState.custom || {}).city || "")) ||
     sUser.value.trim() ||
     sPass.value ||
     sKey.value.trim() ||
@@ -3311,63 +3309,32 @@ function renderSetDots(d) {
   mark("qq", !!(d.qq && d.qq.configured), true);
 }
 
-/* ── 学校栏目：卡片选择 + 自定义学校信息 + 导入课表入口 ── */
-const sSchoolName = document.getElementById("sSchoolName");
-const sSchoolCity = document.getElementById("sSchoolCity");
-function schoolCardName(o) {
-  if (o.id !== "custom") return o.name;
-  const custom = (schoolState && schoolState.custom) || {};
-  return custom.name ? "其他学校 · " + custom.name : "其他学校（手动导入课表）";
-}
+/* ── 学校栏目：下拉框选学校 + 随选择出现的教务账号 / 导入课表 ── */
+const schoolSelect = document.getElementById("schoolSelect");
+/* 下拉框选项与选中值：options 来自 /api/settings；选中「其他学校」后下方只出导入入口 */
 function renderSchoolCards(d) {
-  const box = document.getElementById("schoolCards");
-  if (!box) return;
+  if (!schoolSelect) return;
   const school = d.school || {};
   const options = Array.isArray(school.options) ? school.options : [];
   const pickedId = schoolPicked || school.current;
-  box.innerHTML = "";
+  schoolSelect.innerHTML = "";
   options.forEach((o) => {
-    /* 单选圆点行（复选框语言）：原生 radio 管选中态与键盘操作，点整行即选 */
-    const row = document.createElement("label");
-    row.className = "sch-opt" + (o.id === pickedId ? " picked" : "");
-    const radio = document.createElement("input");
-    radio.type = "radio";
-    radio.name = "schoolPick";
-    radio.checked = o.id === pickedId;
-    const body = document.createElement("span");
-    body.className = "so-body";
-    const name = document.createElement("span");
-    name.className = "so-name";
-    name.textContent = schoolCardName(o);
-    if (o.id === school.current) {
-      const badge = document.createElement("span");
-      badge.className = "mc-badge";
-      badge.textContent = "当前";
-      name.appendChild(badge);
-    }
-    const desc = document.createElement("span");
-    desc.className = "so-desc";
-    desc.textContent = o.manual
-      ? "手动导入：粘贴 / 上传课表，AI 解析后保存；成绩、考试与教务通知暂不可用"
-      : "教务系统已适配：课表 / 成绩 / 考试 / 通知自动抓取，需下方教务账号登录";
-    body.appendChild(name);
-    body.appendChild(desc);
-    row.appendChild(radio);
-    row.appendChild(body);
-    row.addEventListener("click", () => {
-      /* 演示页也放行：纯客户端预览，「保存设置」在演示里本就禁用，不落任何数据 */
-      if (schoolPicked === o.id) return;
-      schoolPicked = o.id;
-      renderSchoolCards(d);
-      /* 选中谁下方就出谁：适配学校 → 教务账号表单；其他学校 → 自定义信息 + 导入 */
-      syncSchoolUi(true);
-    });
-    box.appendChild(row);
+    const opt = document.createElement("option");
+    opt.value = o.id;
+    opt.textContent = o.id === "custom" ? "其他学校（手动导入课表）" : o.name;
+    schoolSelect.appendChild(opt);
   });
+  if (options.some((o) => o.id === pickedId)) schoolSelect.value = pickedId;
 }
-/* 学校相关 UI 的可见性/文案随「选中态」走：保存前预览，保存后即为现状。
-   教务账号与学校同栏（2026-10-02 起）：选适配学校 → 下方是教务账号表单；
-   选「其他学校」→ 下方是自定义信息 + 导入课表入口 */
+if (schoolSelect)
+  schoolSelect.addEventListener("change", () => {
+    if (!schoolSelect.value) return;
+    /* 演示页同样放行：纯客户端预览，「保存设置」在演示里本就禁用，不落数据 */
+    schoolPicked = schoolSelect.value;
+    /* 选适配学校 → 下方出教务账号表单；选「其他学校」→ 只出导入课表入口 */
+    syncSchoolUi(true);
+  });
+/* 学校相关 UI 的可见性/文案随「选中态」走：保存前预览，保存后即为现状 */
 function syncSchoolUi(preview) {
   const picked = schoolPicked || (schoolState && schoolState.current) || "njtech";
   const manual =
@@ -3375,9 +3342,9 @@ function syncSchoolUi(preview) {
       ? !!((schoolState && schoolState.options) || []).find((o) => o.id === picked && o.manual)
       : schoolManual();
   const jwglBox = document.getElementById("schoolJwglBox");
-  const customBox = document.getElementById("schoolCustomBox");
+  const importBox = document.getElementById("schoolImportBox");
   if (jwglBox) jwglBox.hidden = manual;
-  if (customBox) customBox.hidden = !manual;
+  if (importBox) importBox.hidden = !manual;
   const cur = document.getElementById("curSchool");
   if (cur) {
     const cached = schoolState && schoolState.scheduleCached;
@@ -3426,8 +3393,6 @@ function showSettings() {
   sQQSecret.value = "";
   sQQPass.value = "";
   schoolPicked = "";
-  sSchoolName.value = "";
-  sSchoolCity.value = "";
   document.getElementById("diagJwgl").textContent = "";
   document.getElementById("diagDeepseek").textContent = "";
   document.getElementById("diagSchool").textContent = "";
@@ -3439,8 +3404,6 @@ function showSettings() {
       renderSetDots(d);
       applySchoolState(d.school);
       renderSchoolCards(d);
-      sSchoolName.placeholder = d.school.custom.name || "如：某某大学（仅用于显示）";
-      sSchoolCity.placeholder = d.school.custom.city || "问天气时的默认城市";
       sUser.value = "";
       sUser.placeholder = d.jwgl.username || "请输入教务系统学号";
       sPass.placeholder = d.jwgl.configured ? "已保存；留空不修改" : "请输入教务系统密码";
@@ -3546,20 +3509,9 @@ document.getElementById("saveSettings").addEventListener("click", () => {
   const u = sUser.value.trim(),
     pw = sPass.value,
     k = sKey.value.trim();
-  /* 学校切换：只在选了别的卡片时提交（点回当前学校不算修改） */
+  /* 学校切换：只在下拉框选了别的学校时提交（选回当前学校不算修改） */
   if (schoolPicked && schoolState && schoolPicked !== schoolState.current) {
     body.schoolId = schoolPicked;
-  }
-  /* 自定义学校信息：选了「其他学校」才随保存提交（清空即恢复默认显示） */
-  const pickedManual = (() => {
-    const id = schoolPicked || (schoolState && schoolState.current) || "";
-    const opt = ((schoolState && schoolState.options) || []).find((o) => o.id === id);
-    return !!(opt && opt.manual);
-  })();
-  if (pickedManual && setStatus && setStatus.school) {
-    const stored = setStatus.school.custom || {};
-    if (sSchoolName.value.trim() !== (stored.name || "")) body.customSchoolName = sSchoolName.value.trim();
-    if (sSchoolCity.value.trim() !== (stored.city || "")) body.customCity = sSchoolCity.value.trim();
   }
   if (pw) {
     /* 只改密码时自动带上现有学号，免得来回填 */
@@ -3618,16 +3570,12 @@ document.getElementById("saveSettings").addEventListener("click", () => {
         sPass.value = "";
         sKey.value = "";
         renderSetDots(d.status);
-        /* 学校切换/自定义信息落库后：同步模式标记并重绘卡片（含教务账号栏显隐） */
+        /* 学校切换落库后：同步模式标记并重绘下拉框（含下方表单显隐） */
         if (d.status.school) {
           applySchoolState(d.status.school);
           renderSchoolCards(d.status);
-          sSchoolName.placeholder = d.status.school.custom.name || "如：某某大学（仅用于显示）";
-          sSchoolCity.placeholder = d.status.school.custom.city || "问天气时的默认城市";
         }
         schoolPicked = "";
-        sSchoolName.value = "";
-        sSchoolCity.value = "";
         sUser.placeholder = d.status.jwgl.username || "请输入教务系统学号";
         sPass.placeholder = d.status.jwgl.configured ? "已保存；留空不修改" : "请输入教务系统密码";
         document.getElementById("curJwgl").textContent = d.status.jwgl.configured
