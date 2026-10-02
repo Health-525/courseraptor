@@ -6,13 +6,14 @@
  * - 整学期汇总：课程按 (星期, 节次) 定位，课格标注周次，同时段不同周次的
  *   课（冲突）横向并排分栏
  * - 单周：与网页周课表同口径——放假清空、调休按被补周几换课表、单双周
- *   过滤（换算真值在 core/calendar/week-plan.ts），今天列铺底突出
+ *   过滤（换算真值在 core/calendar/week-plan.ts）。导出图是静态存档，
+ *   不标「今天」（网页实时课表的当天高亮在 schedule-page.ts，互不影响）
  *
  * 两套风格（style 参数）：
  * - classic 红头档案：暖纸底 + 墨字 + 单一朱砂 + 楷体课名，与 /schedule 网页同源
  * - color 彩色课格：每门课一个稳定柔和色块（同亮度马卡龙底、文字一律墨色），
  *   品牌元素收敛成小节——顶部朱砂细条 + 底部「COURSERAPTOR · 生成于」小字
- *   落款，今天列与补课角标仍用朱砂，整体暖白底不脱离红头档案的血统
+ *   落款，补课角标仍用朱砂，整体暖白底不脱离红头档案的血统
  *
  * 文字排版是 SVG 手工活：CJK 感知折行 + 超行省略号，长度全靠字宽估算
  * （中文全宽、ASCII 约 0.56 倍），宁可估宽不估窄，避免溢出课格。
@@ -72,8 +73,6 @@ interface Skin {
   accent: string;
   accentDeep: string;
   accentSoft: string;
-  /** 今天列铺底 */
-  todayCol: string;
   cardRadius: number;
   cardShadow: boolean;
   titleFont: string;
@@ -89,8 +88,6 @@ interface Skin {
   brandBar: boolean;
   /** 画不画满格网格线（classic 红头档案要格线；color 卡片浮底、零格线噪音） */
   gridLines: boolean;
-  /** 今天日头用朱砂胶囊垫名（color 的现代标记，替代整列铺底的唯一强调） */
-  todayPill: boolean;
   /** 课格与所在格位边缘的留白 */
   cardPad: number;
   margin: number;
@@ -119,7 +116,6 @@ const SKINS: Record<ScheduleStyle, Skin> = {
     accent: "#AD392C",
     accentDeep: "#852B22",
     accentSoft: "#F3E3DE",
-    todayCol: "#F3E3DE",
     cardRadius: 3,
     cardShadow: true,
     titleFont: FONT_KAI,
@@ -131,7 +127,6 @@ const SKINS: Record<ScheduleStyle, Skin> = {
     seal: true,
     brandBar: false,
     gridLines: true,
-    todayPill: false,
     cardPad: 4,
     margin: 28,
     titleH: 70,
@@ -154,7 +149,6 @@ const SKINS: Record<ScheduleStyle, Skin> = {
     accent: "#AD392C",
     accentDeep: "#852B22",
     accentSoft: "#F6E3DD",
-    todayCol: "#F8E7DA",
     cardRadius: 9,
     cardShadow: false,
     titleFont: FONT_SANS,
@@ -166,7 +160,6 @@ const SKINS: Record<ScheduleStyle, Skin> = {
     seal: false,
     brandBar: true,
     gridLines: false,
-    todayPill: true,
     cardPad: 6,
     margin: 24,
     titleH: 50,
@@ -432,7 +425,6 @@ interface DayColumn {
   headerSub?: string;
   /** 角标（如「补课」） */
   tag?: string;
-  isToday: boolean;
   /** 整列放假（周模式）：竖排虚线块 */
   holiday?: string;
   slots: Slot[];
@@ -553,13 +545,7 @@ function buildScheduleSvg(opts: {
       `<text x="${tableX + s.timeW / 2}" y="${tableY + s.headH / 2 + 4}" text-anchor="middle" font-family="${FONT_MONO}" font-size="11" letter-spacing="2" fill="${s.ink3}">节次</text>`,
     );
   } else {
-    // color：今天列整列极淡底（帮视线追踪，强调交给日头胶囊），时间轨一条细竖线
-    const todayIdx = days.findIndex((d) => d.isToday);
-    if (todayIdx >= 0) {
-      p.push(
-        `<rect x="${tableX + s.timeW + GAP + todayIdx * dayPitch}" y="${tableY}" width="${s.dayW}" height="${gridH}" fill="${s.todayCol}"/>`,
-      );
-    }
+    // color：时间轨一条细竖线
     p.push(
       `<line x1="${tableX + s.timeW}" y1="${tableY}" x2="${tableX + s.timeW}" y2="${tableY + gridH}" stroke="${s.gridRule}" stroke-width="1"/>`,
     );
@@ -569,15 +555,10 @@ function buildScheduleSvg(opts: {
   days.forEach((d, i) => {
     const x = tableX + s.timeW + GAP + i * dayPitch;
     if (s.gridLines) {
-      p.push(
-        `<rect x="${x}" y="${tableY}" width="${s.dayW}" height="${s.headH}" fill="${d.isToday ? s.todayCol : s.bg}"/>`,
-      );
-      if (d.isToday) {
-        p.push(`<rect x="${x}" y="${tableY}" width="${s.dayW}" height="2" fill="${s.accent}"/>`);
-      }
+      p.push(`<rect x="${x}" y="${tableY}" width="${s.dayW}" height="${s.headH}" fill="${s.bg}"/>`);
       const mainX = d.headerSub ? x + 10 : x + s.dayW / 2;
       p.push(
-        `<text x="${mainX}" y="${tableY + (d.headerSub ? 19 : s.headH / 2 + 5)}" ${d.headerSub ? "" : 'text-anchor="middle"'} font-family="${s.dayFont}" font-size="15.5" fill="${d.isToday ? s.accentDeep : s.ink}">${esc(d.headerMain)}</text>`,
+        `<text x="${mainX}" y="${tableY + (d.headerSub ? 19 : s.headH / 2 + 5)}" ${d.headerSub ? "" : 'text-anchor="middle"'} font-family="${s.dayFont}" font-size="15.5" fill="${s.ink}">${esc(d.headerMain)}</text>`,
       );
       if (d.headerSub) {
         p.push(
@@ -593,22 +574,14 @@ function buildScheduleSvg(opts: {
       }
       return;
     }
-    // color 日头：星期名居中 + 日期小字；今天朱砂胶囊垫名（白字）替代整列强调
+    // color 日头：星期名居中 + 日期小字
     const cx = x + s.dayW / 2;
-    if (d.isToday && s.todayPill) {
-      const pillW = measure(d.headerMain, 12.5, 0.56) + 18;
-      p.push(
-        `<rect x="${round1(cx - pillW / 2)}" y="${tableY + 3}" width="${round1(pillW)}" height="21" rx="10.5" fill="${s.accent}"/>`,
-        `<text x="${cx}" y="${tableY + 18}" text-anchor="middle" font-family="${s.dayFont}" font-size="12.5" font-weight="700" fill="#FFFFFF">${esc(d.headerMain)}</text>`,
-      );
-    } else {
-      p.push(
-        `<text x="${cx}" y="${tableY + 18}" text-anchor="middle" font-family="${s.dayFont}" font-size="13.5" font-weight="600" fill="${s.ink}">${esc(d.headerMain)}</text>`,
-      );
-    }
+    p.push(
+      `<text x="${cx}" y="${tableY + 18}" text-anchor="middle" font-family="${s.dayFont}" font-size="13.5" font-weight="600" fill="${s.ink}">${esc(d.headerMain)}</text>`,
+    );
     if (d.headerSub) {
       p.push(
-        `<text x="${cx}" y="${tableY + 33}" text-anchor="middle" font-family="${FONT_MONO}" font-size="9.5" fill="${d.isToday ? s.accentDeep : s.ink3}">${esc(d.headerSub)}</text>`,
+        `<text x="${cx}" y="${tableY + 33}" text-anchor="middle" font-family="${FONT_MONO}" font-size="9.5" fill="${s.ink3}">${esc(d.headerSub)}</text>`,
       );
     }
     if (d.tag) {
@@ -639,12 +612,10 @@ function buildScheduleSvg(opts: {
       );
     }
     if (s.gridLines) {
-      days.forEach((d2, i2) => {
+      for (let i2 = 0; i2 < days.length; i2++) {
         const x = tableX + s.timeW + GAP + i2 * dayPitch;
-        p.push(
-          `<rect x="${x}" y="${y}" width="${s.dayW}" height="${s.rowH}" fill="${d2.isToday ? s.todayCol : s.bg}"/>`,
-        );
-      });
+        p.push(`<rect x="${x}" y="${y}" width="${s.dayW}" height="${s.rowH}" fill="${s.bg}"/>`);
+      }
     }
   }
 
@@ -746,7 +717,6 @@ export function renderTermScheduleSVG(opts: {
     return {
       weekday,
       headerMain: terms.weekdayName(weekday),
-      isToday: false,
       slots,
       unscheduled,
       splitSlots,
@@ -769,7 +739,7 @@ export function renderTermScheduleSVG(opts: {
 
 /**
  * 第 week 周的实际课表：放假清空、调休按被补周几换课表、单双周过滤
- * （真值在 planForDate）。今天落在本周时铺底突出。
+ * （真值在 planForDate）。导出图是静态存档，不标「今天」。
  */
 export function renderWeekScheduleSVG(opts: {
   courses: CourseData[];
@@ -785,7 +755,6 @@ export function renderWeekScheduleSVG(opts: {
   const now = opts.now ?? new Date();
   const style = opts.style ?? "classic";
   const terms = school().terms;
-  const todayIso = isoOf(now);
 
   const monday = datePlusDays(week1Monday, (week - 1) * 7);
   const days: DayColumn[] = [];
@@ -799,9 +768,8 @@ export function renderWeekScheduleSVG(opts: {
     days.push({
       weekday: weekdayOf(date),
       headerMain: terms.weekdayName(weekdayOf(date)),
-      headerSub: `${date.getMonth() + 1}/${date.getDate()}${iso === todayIso ? " ·今" : ""}`,
+      headerSub: `${date.getMonth() + 1}/${date.getDate()}`,
       ...(plan.makeup ? { tag: "补课" } : {}),
-      isToday: iso === todayIso,
       ...(plan.holiday ? { holiday: plan.holiday } : {}),
       slots,
       unscheduled,
