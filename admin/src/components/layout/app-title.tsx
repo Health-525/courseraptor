@@ -50,7 +50,10 @@ export function AppTitle() {
                 </span>
                 <span className='truncate font-bold tracking-tight'>
                   CourseRaptor
-                  <span className='text-sidebar-primary font-medium'> · 管理台</span>
+                  <span className='text-sidebar-primary font-medium'>
+                    {' '}
+                    · 管理台
+                  </span>
                 </span>
               </span>
               <span className='text-sidebar-foreground/60 mt-0.5 truncate text-[11px]'>

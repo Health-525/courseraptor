@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { AdminHeader } from '@/components/admin-header'
-import { Main } from '@/components/layout/main'
 import { useBootstrap, useInvalidateBootstrap } from '@/lib/admin-data'
 import { siteSaveProviderKey } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
@@ -14,9 +12,11 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AdminHeader } from '@/components/admin-header'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { Main } from '@/components/layout/main'
 
 /** 站点设置：各厂商站点 Key（多厂商）+ 限额分账 */
 export function SitePage() {
@@ -49,7 +49,8 @@ export function SitePage() {
             label: 'DeepSeek',
             keySet: Boolean(site?.deepseekKeySet),
             keyMasked: site?.deepseekKeyMasked ?? '',
-            envFallback: Boolean(site?.envDeepseekKeySet) && !site?.deepseekKeySet,
+            envFallback:
+              Boolean(site?.envDeepseekKeySet) && !site?.deepseekKeySet,
           },
         ]
   }, [site])
@@ -64,7 +65,11 @@ export function SitePage() {
       DeepSeek 站点额度可用
       {site?.deepseekKeySet ? (
         <>
-          （面板 <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-xs'>{site.deepseekKeyMasked}</code>）
+          （面板{' '}
+          <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-xs'>
+            {site.deepseekKeyMasked}
+          </code>
+          ）
         </>
       ) : (
         <>（面板未设，回退服务器 env 的 GATEWAY_DEEPSEEK_KEY）</>
@@ -82,7 +87,7 @@ export function SitePage() {
       (u) =>
         u.dsMode !== 'site' &&
         u.ownTurns.date === new Date().toISOString().slice(0, 10) &&
-        u.ownTurns.count > 0,
+        u.ownTurns.count > 0
     ).length ?? 0
 
   return (
@@ -93,8 +98,8 @@ export function SitePage() {
           <CardHeader>
             <CardTitle>站点统一 Key（按供应商）</CardTitle>
             <CardDescription>
-              同学端「站点免费额度」只能选这里配了 Key 的供应商；没配的厂商同学须自带
-              Key。保存后新拉起的实例立即使用。
+              同学端「站点免费额度」只能选这里配了 Key
+              的供应商；没配的厂商同学须自带 Key。保存后新拉起的实例立即使用。
             </CardDescription>
           </CardHeader>
           <CardContent className='space-y-4'>
@@ -104,10 +109,17 @@ export function SitePage() {
             ) : (
               <div className='divide-y rounded-md border'>
                 {providers.map((p) => (
-                  <div key={p.id} className='flex items-center justify-between gap-3 px-3 py-2'>
+                  <div
+                    key={p.id}
+                    className='flex items-center justify-between gap-3 px-3 py-2'
+                  >
                     <div className='flex min-w-0 items-center gap-2'>
-                      <span className='truncate text-sm font-medium'>{p.label}</span>
-                      {p.id === provider && <Badge variant='secondary'>编辑中</Badge>}
+                      <span className='truncate text-sm font-medium'>
+                        {p.label}
+                      </span>
+                      {p.id === provider && (
+                        <Badge variant='secondary'>编辑中</Badge>
+                      )}
                     </div>
                     <div className='flex shrink-0 items-center gap-2'>
                       {p.keySet ? (
@@ -115,9 +127,13 @@ export function SitePage() {
                           {p.keyMasked}
                         </code>
                       ) : p.envFallback ? (
-                        <span className='text-muted-foreground text-xs'>回退 env</span>
+                        <span className='text-muted-foreground text-xs'>
+                          回退 env
+                        </span>
                       ) : (
-                        <span className='text-muted-foreground text-xs'>未设置</span>
+                        <span className='text-muted-foreground text-xs'>
+                          未设置
+                        </span>
                       )}
                       <Button
                         variant={p.id === provider ? 'default' : 'outline'}
@@ -153,16 +169,22 @@ export function SitePage() {
                   !selected ||
                   (key.trim() !== '' &&
                     (selectedIsDeepseek
-                      ? !(key.trim().startsWith('sk-') && key.trim().length >= 20)
+                      ? !(
+                          key.trim().startsWith('sk-') &&
+                          key.trim().length >= 20
+                        )
                       : key.trim().length < 16))
                 }
-                onClick={() => (key.trim() ? setConfirming(true) : save.mutate())}
+                onClick={() =>
+                  key.trim() ? setConfirming(true) : save.mutate()
+                }
               >
                 保存
               </Button>
             </div>
             <p className='text-muted-foreground text-xs'>
-              在线实例下次拉起时切换；同学保存自己的 Key 后优先用自己的，不消耗站点额度。
+              在线实例下次拉起时切换；同学保存自己的 Key
+              后优先用自己的，不消耗站点额度。
             </p>
           </CardContent>
         </Card>
@@ -170,7 +192,9 @@ export function SitePage() {
         <Card className='mt-4'>
           <CardHeader>
             <CardTitle>对话限额与分账</CardTitle>
-            <CardDescription>限额只管用站点 Key 的轮数；同学自有 Key 的轮数单独记账</CardDescription>
+            <CardDescription>
+              限额只管用站点 Key 的轮数；同学自有 Key 的轮数单独记账
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -178,29 +202,41 @@ export function SitePage() {
             ) : (
               <div className='grid gap-3 sm:grid-cols-2'>
                 <div className='flex items-center justify-between gap-4 rounded-md border px-4 py-3'>
-                  <span className='text-muted-foreground text-sm'>站点默认限额</span>
+                  <span className='text-muted-foreground text-sm'>
+                    站点默认限额
+                  </span>
                   <span className='font-semibold tabular-nums'>
                     {site?.defaultDailyTurns ?? '—'} 轮/人/日
                   </span>
                 </div>
                 <div className='flex items-center justify-between gap-4 rounded-md border px-4 py-3'>
-                  <span className='text-muted-foreground text-sm'>今日站点账</span>
+                  <span className='text-muted-foreground text-sm'>
+                    今日站点账
+                  </span>
                   <span className='font-semibold tabular-nums'>
                     {o?.turnsToday ?? '—'} 轮
                   </span>
                 </div>
                 <div className='flex items-center justify-between gap-4 rounded-md border px-4 py-3'>
-                  <span className='text-muted-foreground text-sm'>今日自有账</span>
+                  <span className='text-muted-foreground text-sm'>
+                    今日自有账
+                  </span>
                   <span className='font-semibold tabular-nums'>
                     {o?.ownTurnsToday ?? '—'} 轮（不限额）
                   </span>
                 </div>
                 <div className='flex items-center justify-between gap-4 rounded-md border px-4 py-3'>
-                  <span className='text-muted-foreground text-sm'>Key 模式分布</span>
+                  <span className='text-muted-foreground text-sm'>
+                    Key 模式分布
+                  </span>
                   <span className='flex items-center gap-1.5'>
-                    <Badge variant='outline'>{data?.users.length ?? 0} 人</Badge>
+                    <Badge variant='outline'>
+                      {data?.users.length ?? 0} 人
+                    </Badge>
                     <Badge variant='secondary'>钉站点 {pinnedCount}</Badge>
-                    <Badge variant='outline'>自有今日活跃 {ownActiveCount}</Badge>
+                    <Badge variant='outline'>
+                      自有今日活跃 {ownActiveCount}
+                    </Badge>
                   </span>
                 </div>
               </div>

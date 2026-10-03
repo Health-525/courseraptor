@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { Copy, Ticket, Trash2 } from 'lucide-react'
-import { AdminHeader } from '@/components/admin-header'
-import { Main } from '@/components/layout/main'
+import { toast } from 'sonner'
 import { useBootstrap, useInvalidateBootstrap } from '@/lib/admin-data'
 import { inviteCreate, inviteDelete, type Invite } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
@@ -17,7 +15,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -29,6 +26,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { AdminHeader } from '@/components/admin-header'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { Main } from '@/components/layout/main'
 
 /** 邀请码面板：生成（数量/备注/有效期）+ 列表（复制/删除） */
 export function InvitesPage() {
@@ -105,7 +105,10 @@ export function InvitesPage() {
                 />
               </div>
               <Button
-                disabled={create.isPending || !(Number(count) >= 1 && Number(count) <= 50)}
+                disabled={
+                  create.isPending ||
+                  !(Number(count) >= 1 && Number(count) <= 50)
+                }
                 onClick={() => create.mutate()}
               >
                 <Ticket />
@@ -118,7 +121,9 @@ export function InvitesPage() {
         <Card className='mt-4'>
           <CardHeader>
             <CardTitle>邀请码列表</CardTitle>
-            <CardDescription>已使用或已过期的不支持删除（保留作记录）</CardDescription>
+            <CardDescription>
+              已使用或已过期的不支持删除（保留作记录）
+            </CardDescription>
           </CardHeader>
           <CardContent className='px-0'>
             {isLoading && (
@@ -143,13 +148,20 @@ export function InvitesPage() {
                   <TableBody>
                     {data.invites.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className='text-muted-foreground py-8 text-center'>
+                        <TableCell
+                          colSpan={5}
+                          className='text-muted-foreground py-8 text-center'
+                        >
                           还没有邀请码
                         </TableCell>
                       </TableRow>
                     )}
                     {data.invites.map((inv) => (
-                      <InviteRow key={inv.code} invite={inv} onDelete={() => setDeleting(inv)} />
+                      <InviteRow
+                        key={inv.code}
+                        invite={inv}
+                        onDelete={() => setDeleting(inv)}
+                      />
                     ))}
                   </TableBody>
                 </Table>
@@ -175,9 +187,17 @@ export function InvitesPage() {
   )
 }
 
-function InviteRow({ invite, onDelete }: { invite: Invite; onDelete: () => void }) {
+function InviteRow({
+  invite,
+  onDelete,
+}: {
+  invite: Invite
+  onDelete: () => void
+}) {
   const used = (invite.usedBy?.length ?? 0) >= (invite.maxUses ?? 1)
-  const expired = Boolean(invite.expiresAt && new Date(invite.expiresAt) < new Date())
+  const expired = Boolean(
+    invite.expiresAt && new Date(invite.expiresAt) < new Date()
+  )
   const active = !used && !expired
 
   const status = useMemo(() => {
@@ -198,7 +218,9 @@ function InviteRow({ invite, onDelete }: { invite: Invite; onDelete: () => void 
     <TableRow>
       <TableCell className='font-mono'>{invite.code}</TableCell>
       <TableCell className='max-w-40 truncate'>{invite.note || '—'}</TableCell>
-      <TableCell className='max-w-40 truncate'>{users.join('、') || '—'}</TableCell>
+      <TableCell className='max-w-40 truncate'>
+        {users.join('、') || '—'}
+      </TableCell>
       <TableCell>{status}</TableCell>
       <TableCell>
         {active && (

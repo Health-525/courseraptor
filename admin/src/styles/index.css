@@ -4,8 +4,7 @@
 
 /* dist 随仓库提交（未被 .gitignore 忽略），必须从源扫描里显式排除：
    扫到上一轮构建的压缩产物会让 Tailwind 候选类不稳定、甚至随机丢类。
-   @source 路径相对本文件（src/styles/），dist 在两级之上——曾写成
-   '../dist'（指向不存在的 src/dist），排除从未生效，构建产物逐轮漂移 */
+   @source 路径相对本文件（src/styles/），dist 在两级之上 */
 @source not '../../dist';
 
 @custom-variant dark (&:is(.dark *));
