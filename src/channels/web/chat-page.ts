@@ -1330,7 +1330,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
               </button>
             </div>
             <label class="fld" id="sKeyRow"><span>API Key</span><span class="fld-row"><input id="sKey" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyeKey" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
-            <div class="cur" id="curKey"></div>
             <div class="cur" id="curQuota" hidden></div>
             <label class="fld"><span>模型</span><button type="button" class="dd-btn" id="modelSelect" aria-haspopup="listbox" aria-expanded="false"></button></label>
             <label class="fld" id="customModelRow" hidden><span>型号 ID</span><input id="customModelId" type="text" autocomplete="off" spellcheck="false" placeholder="该端点的模型 ID（清单拉不到时手填）" ${demo ? "disabled" : ""}></label>
