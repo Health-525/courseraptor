@@ -11,7 +11,7 @@
 [![下载最新版](https://img.shields.io/github/v/release/Health-525/courseraptor?label=%E4%B8%8B%E8%BD%BD%E6%9C%80%E6%96%B0%E7%89%88&color=orange)](https://github.com/Health-525/courseraptor/releases/latest)
 [![License: ISC](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
 [![Vercel AI SDK](https://img.shields.io/badge/Vercel%20AI%20SDK-v7-black.svg)](https://ai-sdk.dev)
-[![LLM](https://img.shields.io/badge/LLM-DeepSeek-4D6BFE.svg)](https://www.deepseek.com)
+[![LLM](https://img.shields.io/badge/LLM-DeepSeek%20%C2%B7%20%E5%A4%9A%E5%8E%82%E5%95%86-4D6BFE.svg)](https://www.deepseek.com)
 [![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social)](https://github.com/Health-525/courseraptor)
 [![GitHubDaily](https://img.shields.io/badge/GitHubDaily-%E5%B7%B2%E6%8E%A8%E8%8D%90-1DA1F2?logo=x&logoColor=white)](https://x.com/github_daily/status/2105560876132757969)
 [![独立开发者列表](https://img.shields.io/badge/%E7%8B%AC%E7%AB%8B%E5%BC%80%E5%8F%91%E8%80%85%E5%88%97%E8%A1%A8-%E5%B7%B2%E6%94%B6%E5%BD%95-9B59B6)](https://github.com/1c7/chinese-independent-developer/blob/master/.github/pages/README-Programmer-Edition.md)
@@ -26,7 +26,7 @@
 
 把散落在教务系统各处的信息收进一句对话：问「这周课表」「我的 GPA」「最近的考试」「通识学分还缺哪几类」，agent 自动登录教务、抓取、结构化后回答。**终端敲 `raptor`、浏览器开 `localhost:3210`、QQ 里 @机器人**——三个入口共用同一个 Agent 内核与同一份记忆。
 
-一切都在你自己的电脑上运行：凭证 AES-256-GCM 加密落盘、无遥测上报、教务数据不经第三方；接的是你自己的 DeepSeek Key，按量计费、用量透明。目前对南京工业大学做了全量适配，**其他学校开箱可用「手动课表」模式**；对开发者，这也是一套「Vercel AI SDK + 端口适配器架构」的本地 Agent 完整工程样例。
+一切都在你自己的电脑上运行：凭证 AES-256-GCM 加密落盘、无遥测上报、教务数据不经第三方；接的是你自己的模型 API Key——默认 DeepSeek，也内置**通义千问、智谱 GLM、Kimi、豆包、混元、MiniMax、阶跃、文心、讯飞、硅基流动**等 11 家国内厂商，外加自定义 OpenAI 兼容端点，按量计费、用量透明。目前对南京工业大学做了全量适配，**其他学校开箱可用「手动课表」模式**；对开发者，这也是一套「Vercel AI SDK + 端口适配器架构」的本地 Agent 完整工程样例。
 
 ---
 
@@ -42,7 +42,8 @@ Agent 共装备 **36 个工具**（默认装载 32 个：4 个抢课工具属真
 - **记忆 · 知识 · 待办** —— 两层记忆（会话跨重启延续 + 长期事实自主维护）；知识点对话自动沉淀、按课表真实课程归类；待办三端同步，到期桌面通知 + QQ 推送双提醒
 - **手动课表（其他学校）** —— 粘贴课表文字（教务网页表格、Excel、其他课表 App 导出都行）或上传 Excel / CSV / PDF / Word / TXT，AI 解析成结构化课表，拿不准会追问，预览里逐行确认
 - **三端入口** —— 终端 TUI（首屏即今日课表、待办、考试、通知速览）、本地网页「功能大厅」（九大面板、会话管理、文件上传）、QQ 官方机器人（白名单制、零封号）
-- **更多** —— 番茄钟、天气与穿衣建议、模型设置面板、自动更新；另有无头 CLI 可脚本化直查教务，不经模型、不耗 token
+- **多厂商模型** —— 11 家国内厂商 + 自定义 OpenAI 兼容端点任选：每家 Key 独立加密保存、切换不丢，型号列表实时拉取，网页端下拉即切
+- **更多** —— 番茄钟、天气与穿衣建议、自动更新；另有无头 CLI 可脚本化直查教务，不经模型、不耗 token
 
 ---
 
@@ -87,7 +88,7 @@ npm run demo
 - **`portable-win-x64.exe`（最省事，推荐）**：双击即用。exe 放哪、程序就装到哪——首次双击在旁边释放 `CourseRaptor` 文件夹（约 110 MB）后直接进入对话；之后秒开，删文件夹即卸载。**升级 = 新版 exe 放进原文件夹再双击**，账号、记忆、数据全部保留
 - **`portable-win-x64.zip`（绿色版）**：解压后双击文件夹里的 `start.bat`，适合 U 盘携带或机房电脑
 
-首次启动引导录入教务账号和 DeepSeek API Key，加密存本机、之后免填；教务账号可回车跳过，之后在网页「功能大厅 → 设置 → 教务账号」补填。
+首次启动引导录入教务账号和模型 API Key（默认 DeepSeek，其他厂商在网页「设置 → AI 模型」里切换），加密存本机、之后免填；教务账号可回车跳过，之后在网页「功能大厅 → 设置 → 教务账号」补填。
 
 > 双击没反应或被拦截：安装包未做代码签名（exe 是自释放启动器、zip 里的 `runtime\node.exe` 是 Node 官方运行时），SmartScreen 弹窗选「更多信息 → 仍要运行」，或把安装/解压目录加入杀软信任区。
 
@@ -98,7 +99,7 @@ git clone https://github.com/Health-525/courseraptor.git
 cd courseraptor
 npm install        # 需 Node.js ≥ 24
 
-# DeepSeek Key：cp .env.example .env 后编辑填入
+# 模型 Key（默认 DeepSeek）：cp .env.example .env 后编辑填入；其余 11 家厂商与自定义端点可在网页设置里配
 # 教务账号：留空即可，首次启动引导录入并加密保存本机；可跳过后在网页设置里补填
 
 npm link           # 注册全局命令（一次即可，任意目录可用）
@@ -120,6 +121,8 @@ npm run njtech -- search-courses 高等数学
 
 12 个子命令：`schedule` · `grades` · `exams` · `lab-grades` · `news` · `student-info` · `enrolled-courses` · `retake-courses` · `selection-status` · `search-courses` · `search-classes` · `watch`。协议细节与安全红线见 [SKILL.md](skills/njtech-jwgl/SKILL.md) 与其 `references/`。
 
+另附 [`skills/export-schedule/`](skills/export-schedule/) 独立技能包：把课表渲染成图片供下载，适配各平台聊天里直接发图看课表的场景。
+
 > 抢课 / 退课属真实写操作，**不进无头 CLI**，仅交互式 `raptor` 可用且需本人二次确认。
 
 <details>
@@ -131,7 +134,7 @@ npm run njtech -- search-courses 高等数学
 | **Node.js** | ≥ 24（安装包已内置 Node 运行时，**无需预装**） |
 | **内存** | ≥ 512 MB 可用（运行时约 150-300 MB） |
 | **磁盘** | ≥ 300 MB（含运行时、依赖、本地数据） |
-| **网络** | 首次配置需联网拉取 DeepSeek API、教务系统；之后可离线使用已缓存数据 |
+| **网络** | 首次配置需联网拉取模型 API（默认 DeepSeek，可换厂商）、教务系统；之后可离线使用已缓存数据 |
 
 </details>
 
@@ -179,7 +182,7 @@ npm run njtech -- search-courses 高等数学
 
 **本地优先（Local-first）**：交互入口、Agent 内核、两层记忆与知识库全部跑在本机，数据不出电脑；教务系统、天气等外部服务仅在查询时按需访问。
 
-**技术栈**：[Vercel AI SDK v7](https://ai-sdk.dev)（`ToolLoopAgent` + `runAgentTUI`）· DeepSeek（默认 `deepseek-flash`，即 V4.1-Flash）· TypeScript + Node 内置 HTTP（网页端零框架）· Biome + node:test
+**技术栈**：[Vercel AI SDK v7](https://ai-sdk.dev)（`ToolLoopAgent` + `runAgentTUI`）· 模型层：DeepSeek（默认 `deepseek-flash`，即 V4.1-Flash）+ 通义千问 / 智谱 GLM / Kimi / 豆包 / 混元 / MiniMax / 阶跃 / 文心 / 讯飞 / 硅基流动 + 自定义 OpenAI 兼容端点（供应商注册表纯数据、模型工厂统一装配）· TypeScript + Node 内置 HTTP（网页端零框架）· Biome + node:test
 
 **项目结构**（完整树见 [能力文档](docs/capabilities.md#-项目结构完整树)）：
 
@@ -228,8 +231,8 @@ npm run njtech -- search-courses 高等数学
 **双击安装包没反应，或被系统 / 杀软拦截？**
 安装包未做代码签名（exe 是自释放启动器、zip 里的 `runtime\node.exe` 是 Node 官方运行时），SmartScreen 弹窗选「更多信息 → 仍要运行」，或把安装 / 解压目录加入杀软信任区。
 
-**没有 DeepSeek API Key，能先用吗？**
-可以先跑上面的离线演示，零凭证体验界面。正式对话需要自己的 Key（在 DeepSeek 开放平台注册获取，按量计费）；教务账号可以跳过，之后在网页「功能大厅 → 设置 → 教务账号」补填。
+**没有模型 API Key，能先用吗？**
+可以先跑上面的离线演示，零凭证体验界面。正式对话需要自己的 Key——默认 DeepSeek，但**通义千问、智谱 GLM、Kimi、豆包等 11 家国内厂商任选一家**，或填自定义 OpenAI 兼容端点；教务账号可以跳过，之后在网页「功能大厅 → 设置 → 教务账号」补填。
 
 **网页打不开，或提示端口被占用？**
 以终端启动时打印的实际地址为准（默认 `http://127.0.0.1:3210`，被占用会自动换端口）；页面表现异常先 `Ctrl+F5` 强刷缓存。
