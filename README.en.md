@@ -20,7 +20,7 @@
 
 </div>
 
-CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Ask in the terminal, the browser, or QQ — three entrances sharing one agent kernel and one memory store. Everything runs on your own machine: credentials are AES-256-GCM encrypted on disk, there is no telemetry, and it talks to your own DeepSeek API key.
+CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Ask in the terminal, the browser, or QQ — three entrances sharing one agent kernel and one memory store. Everything runs on your own machine: credentials are AES-256-GCM encrypted on disk, there is no telemetry, and it talks to your own model API key — DeepSeek by default, with 10 more built-in Chinese providers (Qwen, Zhipu GLM, Kimi, Doubao, Hunyuan, MiniMax, Step, ERNIE, Spark, SiliconFlow) plus custom OpenAI-compatible endpoints.
 
 > ⚠️ **The online academic-system integration supports Nanjing Tech University only.** This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project. The [Chinese README](README.md) is the authoritative, fully detailed version.
 
@@ -69,14 +69,14 @@ To showcase real AI analysis with the same fictional data, run `npm run demo:liv
 
 ## Use your own academic account
 
-Windows users can grab a self-contained installer (bundled Node runtime, ~110 MB) from [Releases](https://github.com/Health-525/courseraptor/releases/latest) — no development environment needed. From source, run `npm start` (or double-click `start.bat` on Windows). Follow the prompts to configure your university credentials and DeepSeek API key. You can also skip the campus account with an empty Enter and fill it in later via the web Settings panel. Provider API usage may incur charges.
+Windows users can grab a self-contained installer (bundled Node runtime, ~110 MB) from [Releases](https://github.com/Health-525/courseraptor/releases/latest) — no development environment needed. From source, run `npm start` (or double-click `start.bat` on Windows). Follow the prompts to configure your university credentials and model API key (DeepSeek by default; other providers can be switched in the web Settings panel). You can also skip the campus account with an empty Enter and fill it in later via the web Settings panel. Provider API usage may incur charges.
 
 The browser UI usually runs at `http://localhost:3210`; follow the actual startup address if that port is busy. Keep the terminal running. To change your API key securely, enter `/key` without arguments in the terminal.
 
 ## Architecture overview
 
 - **Agent runtime**: Vercel AI SDK v7 (`ToolLoopAgent` + `runAgentTUI` for terminal)
-- **LLM**: DeepSeek (default `deepseek-flash` / V4.1-Flash)
+- **LLM**: DeepSeek by default (`deepseek-flash` / V4.1-Flash), switchable to 10 more Chinese providers or a custom OpenAI-compatible endpoint — each provider's key stored and hot-swapped independently
 - **Academic protocol**: Custom NJTECH 正方新版 adapter (RSA + CSRF login; course selection reverse-engineered from official frontend)
 - **Web UI**: Single-page Node server (`src/channels/web/`) with push-panel layout, session history, and real-time tool result sync
 - **Ports and adapters**: `src/core/school.ts` defines the `SchoolAdapter` port; core never imports adapters, so adding a school means adding one self-contained directory under `src/adapters/`
@@ -120,7 +120,7 @@ Other schools work through the manual timetable mode (paste or upload a timetabl
 
 ## Build with us
 
-TypeScript, Vercel AI SDK, DeepSeek, and a Node HTTP browser interface. School adapters live in `src/adapters/` behind the `SchoolAdapter` port (`src/core/school.ts`), generic tools in `src/core/tools/`, and the production/demo shared view in `src/channels/web/`.
+TypeScript, Vercel AI SDK, a multi-provider model layer (DeepSeek default + OpenAI-compatible providers), and a Node HTTP browser interface. School adapters live in `src/adapters/` behind the `SchoolAdapter` port (`src/core/school.ts`), generic tools in `src/core/tools/`, and the production/demo shared view in `src/channels/web/`.
 
 ```bash
 npm run typecheck
