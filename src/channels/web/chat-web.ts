@@ -681,6 +681,20 @@ const SOURCE_LABEL: Record<string, string> = {
   unset: "未配置",
 };
 
+/** 学校下拉选项的能力说明：按适配器 capabilities 生成，接了什么说什么 */
+function schoolOptionNote(capabilities: readonly string[]): string {
+  const labels: Array<[string, string]> = [
+    ["schedule", "课表"],
+    ["grades", "成绩"],
+    ["exams", "考试"],
+    ["notices", "通知"],
+    ["student", "学籍"],
+    ["courseSelection", "选课"],
+  ];
+  const have = labels.filter(([cap]) => capabilities.includes(cap)).map(([, label]) => label);
+  return have.length ? `教务系统已适配：${have.join(" / ")}` : "教务系统已适配";
+}
+
 /** 给设置弹窗的状态：只有脱敏摘要，永远不回显密码与完整 Key */
 function settingsPayload() {
   const ds = getDeepSeekKeyStatus();
@@ -691,6 +705,8 @@ function settingsPayload() {
       configured: !!(config.jwglUsername && config.jwglPassword),
       username: config.jwglUsername || "",
       sourceLabel: SOURCE_LABEL[config.credentialsSource] ?? config.credentialsSource,
+      /** 教务账号保存时的学校 id：与当前学校不一致时前端要提醒更新账号 */
+      savedSchoolId: creds?.jwglSchoolId,
     },
     deepseek: { ...ds, sourceLabel: SOURCE_LABEL[ds.source] ?? ds.source },
     qq: { ...qq, sourceLabel: SOURCE_LABEL[qq.source] ?? qq.source },
@@ -724,6 +740,8 @@ function settingsPayload() {
         name: a.info.name,
         shortName: a.info.shortName,
         manual: a.info.manual === true,
+        /** 能力说明按本校 capabilities 如实生成（hebau 没接通知就不写通知） */
+        note: a.info.manual ? undefined : schoolOptionNote(a.capabilities),
       })),
     },
   };
@@ -852,17 +870,25 @@ function applySettings(body: Record<string, unknown>): {
   // 学校切换（设置第一栏）：保存偏好 + 运行期换适配器；工具集跟 agent 重建换新
   const schoolId = typeof body.schoolId === "string" ? body.schoolId.trim() : "";
   if (schoolId) {
-    if (schoolId === school().info.id) {
+    const currentSchoolId = school().info.id;
+    if (schoolId === currentSchoolId) {
       results.push({ field: "school", ok: true, message: "所选学校已是当前学校，无需切换" });
     } else if (selectSchool(schoolId)) {
       saveCredentialsStore({ schoolId });
       schoolChanged = true;
       const name = listSchoolOptions().find((a) => a.info.id === schoolId)?.info.name ?? schoolId;
-      results.push({
-        field: "school",
-        ok: true,
-        message: `学校已切换为「${name}」：对话与各面板下一条起生效（终端界面重启后生效）`,
-      });
+      // 教务账号字段不分学校：切校后旧账号对不上新校，必须提醒更新，
+      // 否则拿 A 校学号去登 B 校教务，报「密码错误」还以为密码真错了。
+      // 旧凭据没有 jwglSchoolId 标记时，按「切换前所在学校」推断（几乎必然属于它）
+      const accountSchoolId = loadCredentialsStore()?.jwglSchoolId ?? currentSchoolId;
+      let message = `学校已切换为「${name}」：对话与各面板下一条起生效（终端界面重启后生效）`;
+      if (config.jwglUsername && accountSchoolId !== schoolId) {
+        const accountSchoolName =
+          listSchoolOptions().find((a) => a.info.id === accountSchoolId)?.info.name ??
+          accountSchoolId;
+        message += `。⚠️ 已保存的教务账号（学号 ${config.jwglUsername.slice(0, 4)}****）是「${accountSchoolName}」的，请在下方更新为${name}的学号与密码，否则登录会用错账号`;
+      }
+      results.push({ field: "school", ok: true, message });
     } else {
       results.push({
         field: "school",
@@ -887,7 +913,12 @@ function applySettings(body: Record<string, unknown>): {
     if (!user || !pass) {
       results.push({ field: "jwgl", ok: false, message: "学号与密码需要一起提交" });
     } else {
-      saveCredentialsStore({ username: user, password: pass });
+      // 落 jwglSchoolId：这份账号是当前学校下保存的，切校时据此提醒更新
+      saveCredentialsStore({
+        username: user,
+        password: pass,
+        jwglSchoolId: school().info.id,
+      });
       config.jwglUsername = user;
       config.jwglPassword = pass;
       config.credentialsSource = "encrypted";

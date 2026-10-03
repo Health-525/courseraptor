@@ -3572,9 +3572,8 @@ if (schoolSelect) {
       options.map((o) => ({
         id: o.id,
         label: schoolOptionLabel(o),
-        note: o.manual
-          ? "粘贴 / 上传课表，AI 解析后保存"
-          : "教务系统已适配：课表 / 成绩 / 考试 / 通知",
+        /* 能力说明由后端按本校 capabilities 生成（接了什么说什么），前端不再写死 */
+        note: o.manual ? "粘贴 / 上传课表，AI 解析后保存" : o.note || "教务系统已适配",
         on: o.id === active,
       })),
       (id) => {
@@ -3586,6 +3585,23 @@ if (schoolSelect) {
       },
     );
   });
+}
+/* 教务账号状态行：凭据不分学校，保存时的学校与当前学校不一致要明说，
+   否则切校后旧学号对不上新校，看起来就像「还在登原来的学校」 */
+function jwglCurText(d) {
+  if (!d.jwgl || !d.jwgl.configured) return "尚未配置教务账号";
+  const base = "已保存：学号 " + d.jwgl.username + " · " + d.jwgl.sourceLabel;
+  const opts = (d.school && d.school.options) || [];
+  const saved = d.jwgl.savedSchoolId;
+  const cur = d.school && d.school.current;
+  if (saved && cur && saved !== cur) {
+    const name = (id) => {
+      const o = opts.filter((x) => x.id === id)[0];
+      return o ? (o.id === "custom" ? "其他学校" : o.name) : id;
+    };
+    return base + "（⚠️ 此账号保存于" + name(saved) + "；当前学校是" + name(cur) + "，请更新教务账号）";
+  }
+  return base;
 }
 /* 学校相关 UI 的可见性/文案随「选中态」走：保存前预览，保存后即为现状 */
 function syncSchoolUi(preview) {
@@ -3662,9 +3678,7 @@ function showSettings() {
       sUser.value = "";
       sUser.placeholder = d.jwgl.username || "请输入教务系统学号";
       sPass.placeholder = d.jwgl.configured ? "已保存；留空不修改" : "请输入教务系统密码";
-      document.getElementById("curJwgl").textContent = d.jwgl.configured
-        ? "已保存：学号 " + d.jwgl.username + " · " + d.jwgl.sourceLabel
-        : "尚未配置教务账号";
+      document.getElementById("curJwgl").textContent = jwglCurText(d);
       fillProviders(d);
       renderCurKey(d);
       refreshQuota();
@@ -3844,9 +3858,7 @@ document.getElementById("saveSettings").addEventListener("click", () => {
         schoolPicked = "";
         sUser.placeholder = d.status.jwgl.username || "请输入教务系统学号";
         sPass.placeholder = d.status.jwgl.configured ? "已保存；留空不修改" : "请输入教务系统密码";
-        document.getElementById("curJwgl").textContent = d.status.jwgl.configured
-          ? "已保存：学号 " + d.status.jwgl.username + " · " + d.status.jwgl.sourceLabel
-          : "尚未配置教务账号";
+        document.getElementById("curJwgl").textContent = jwglCurText(d.status);
         fillProviders(d.status);
         renderCurKey(d.status);
         refreshQuota();
