@@ -126,6 +126,12 @@ export type UpdateKeysData = {
 
 export type LogEntry = { at: string; ip: string; text: string }
 
+/** 清空操作日志（清空动作本身会作为新日志的第一笔） */
+export async function logClear() {
+  const res = await api.post('/log/clear')
+  return res.data as { ok: boolean }
+}
+
 export type Bootstrap = {
   overview: Overview
   users: AdminUser[]
@@ -207,6 +213,12 @@ export async function resetApprove(id: string) {
 
 export async function resetReject(id: string) {
   const res = await api.post('/reset/reject', { id })
+  return res.data as { ok: boolean }
+}
+
+/** 作废一枚未兑换的重置码（发错人 / 码外泄时立即失效，不等 24h） */
+export async function resetRevoke(code: string) {
+  const res = await api.post('/reset/revoke', { code })
   return res.data as { ok: boolean }
 }
 

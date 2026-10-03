@@ -278,6 +278,181 @@ test("管理台：构建产物按内容类型下发、白名单外路径 404", a
   assert.equal(unknown.status, 404);
 });
 
+test("管理台：静态产物按 Accept-Encoding 协商压缩（br/gzip），不带则原样", async (t) => {
+  const backendPort = await startBackend(t);
+  const usersDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-cmp-"));
+  t.after(() => fs.rmSync(usersDir, { recursive: true, force: true }));
+  const { base } = await startGateway(t, { backendPort, usersDir });
+
+  const distRoot = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "admin",
+    "dist",
+  );
+  // 挑最大的 js（入口 chunk 500KB+，压缩收益最直观）
+  const files = fs.readdirSync(path.join(distRoot, "assets")).filter((f) => f.endsWith(".js"));
+  const file = files.reduce((a, b) =>
+    fs.statSync(path.join(distRoot, "assets", a)).size >
+    fs.statSync(path.join(distRoot, "assets", b)).size
+      ? a
+      : b,
+  );
+  const rawSize = fs.statSync(path.join(distRoot, "assets", file)).size;
+
+  // fetch（undici）自带 accept-encoding 且自动解压——协商行为用原始 http 请求钉
+  const raw = (pathname: string, headers: Record<string, string> = {}) =>
+    new Promise<{
+      status: number;
+      headers: Record<string, string | string[] | undefined>;
+      size: number;
+    }>((resolve, reject) => {
+      const url = new URL(base);
+      const req = http.get(
+        {
+          hostname: url.hostname,
+          port: url.port,
+          path: pathname,
+          headers,
+        },
+        (res) => {
+          let size = 0;
+          res.on("data", (chunk: Buffer) => {
+            size += chunk.length;
+          });
+          res.on("end", () => resolve({ status: res.statusCode ?? 0, headers: res.headers, size }));
+        },
+      );
+      req.on("error", reject);
+    });
+
+  // 不带 Accept-Encoding：原样字节、无 content-encoding
+  const plain = await raw(`/admin/assets/${file}`);
+  assert.equal(plain.status, 200);
+  assert.equal(plain.headers["content-encoding"], undefined);
+  assert.equal(plain.size, rawSize);
+
+  // gzip：content-encoding + vary，且明显变小
+  const gz = await raw(`/admin/assets/${file}`, { "accept-encoding": "gzip, deflate" });
+  assert.equal(gz.headers["content-encoding"], "gzip");
+  assert.equal(gz.headers.vary, "accept-encoding");
+  assert.ok(gz.size < rawSize * 0.5, `gzip 后应显著变小（${gz.size} < ${rawSize} 的一半）`);
+
+  // br 优先于 gzip；同一进程内命中缓存也应一致
+  const br = await raw(`/admin/assets/${file}`, { "accept-encoding": "gzip, br" });
+  assert.equal(br.headers["content-encoding"], "br");
+  assert.ok(br.size < rawSize * 0.5);
+
+  // 二进制扩展名（png）带了压缩头也不压
+  const pngName = fs.readdirSync(path.join(distRoot, "assets")).find((f) => f.endsWith(".png"));
+  if (pngName) {
+    const png = await raw(`/admin/assets/${pngName}`, { "accept-encoding": "gzip, br" });
+    assert.equal(png.headers["content-encoding"], undefined, "png 不应压缩");
+  }
+});
+
+test("重置审批：有效重置码可作废，作废后立即失效", async (t) => {
+  const backendPort = await startBackend(t);
+  const usersDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-rvk-"));
+  t.after(() => fs.rmSync(usersDir, { recursive: true, force: true }));
+  const { base } = await startGateway(t, { backendPort, usersDir });
+  const cookie = await adminLogin(base);
+
+  const created = (await (
+    await fetch(`${base}/admin/api/user/create`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ username: "rvkuser", password: "password123" }),
+    })
+  ).json()) as { user: { id: string } };
+
+  await fetch(`${base}/forgot`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ username: "rvkuser" }),
+  });
+  const boot0 = (await (
+    await fetch(`${base}/admin/api/bootstrap`, { headers: { cookie } })
+  ).json()) as { resets: { pending: Array<{ id: string }>; codes: unknown[] } };
+  assert.equal(boot0.resets.pending.length, 1);
+
+  const approved = (await (
+    await fetch(`${base}/admin/api/reset/approve`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ id: boot0.resets.pending[0].id }),
+    })
+  ).json()) as { ok: boolean; code: string };
+  assert.ok(approved.ok);
+
+  // 作废后：codes 清空，重复作废被拒，同学端兑换该码失败
+  const revoke = await fetch(`${base}/admin/api/reset/revoke`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ code: approved.code }),
+  });
+  assert.equal(revoke.status, 200);
+  const revokeAgain = await fetch(`${base}/admin/api/reset/revoke`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ code: approved.code }),
+  });
+  assert.equal(revokeAgain.status, 400);
+
+  const boot = (await (
+    await fetch(`${base}/admin/api/bootstrap`, { headers: { cookie } })
+  ).json()) as { resets: { codes: unknown[] }; log: Array<{ text: string }> };
+  assert.equal(boot.resets.codes.length, 0, "作废后有效重置码应清空");
+  assert.ok(
+    boot.log.some((e) => e.text.includes("作废")),
+    "作废动作应写审计日志",
+  );
+
+  const redeem = await fetch(`${base}/reset-password`, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      username: "rvkuser",
+      code: approved.code,
+      next: "newpassword123",
+      next2: "newpassword123",
+    }),
+    redirect: "manual",
+  });
+  assert.ok(redeem.status >= 400, "已作废的码不得再兑换");
+});
+
+test("操作日志：清空后从零开始，清空动作本身留一笔", async (t) => {
+  const backendPort = await startBackend(t);
+  const usersDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-logc-"));
+  t.after(() => fs.rmSync(usersDir, { recursive: true, force: true }));
+  const { base } = await startGateway(t, { backendPort, usersDir });
+  const cookie = await adminLogin(base);
+
+  // 先制造几条日志
+  await fetch(`${base}/admin/api/invite`, {
+    method: "POST",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({ count: 1, note: "待清" }),
+  });
+  const before = (await (
+    await fetch(`${base}/admin/api/bootstrap`, { headers: { cookie } })
+  ).json()) as { log: unknown[] };
+  assert.ok(before.log.length >= 2);
+
+  const clear = await fetch(`${base}/admin/api/log/clear`, {
+    method: "POST",
+    headers: { cookie },
+  });
+  assert.equal(clear.status, 200);
+
+  const after = (await (
+    await fetch(`${base}/admin/api/bootstrap`, { headers: { cookie } })
+  ).json()) as { log: Array<{ text: string }> };
+  assert.equal(after.log.length, 1, "清空后只剩清空动作这一笔");
+  assert.ok(after.log[0].text.includes("清空操作日志"));
+});
+
 test("管理台页面：SPA 入口可服务（登录与否一致）", async (t) => {
   const backendPort = await startBackend(t);
   const usersDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-gw-page-"));
