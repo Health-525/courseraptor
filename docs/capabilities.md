@@ -1,8 +1,6 @@
 # CourseRaptor 能力详细清单
 
 > 本文档为 README 的补充，列出所有工具参数、环境变量、教务模块覆盖等完整细节。README 仅保留核心能力卡片。
->
-> **学校差异**：下述教务工具清单以**南京工业大学（njtech）全量适配**为准。选**河北农业大学（hebau）**时可用 `get_schedule` / `set_holidays` / `get_grades`（5.0 满绩制 GPA）/ `get_exams` / `export_calendar` / `export_schedule_image` / `publish_calendar`，另加 `submit_auth_code`（CAS 统一认证动态验证码续登）；选课、学籍、实验成绩、教务通知类工具该校未接入（教务系统无对应端点），设置页选校后仅装载本校工具。选「其他学校（custom）」时只有手动课表与通用工具。
 
 ---
 
@@ -186,6 +184,19 @@ npm run qq
 | `RAPTOR_UPDATE_SERVER` | 仅维护者本地测试时覆盖更新后台地址；必须为 HTTPS，正式安装包由发版命令内置地址 | 否 |
 | `UPDATE_SERVER_URL` / `UPDATE_ADMIN_TOKEN` | 维护者配置：更新后台地址与发布管理员密钥 | 否 |
 | `DEEPSEEK_BASE_URL` | 自定义 API 地址（可选） | 否 |
+
+---
+
+## 🏫 河北农业大学适配差异（hebau）
+
+以下两节的「55 个菜单模块覆盖清单」为 NJTECH 口径。河北农业大学（`src/adapters/hebau/`）走 CAS 统一认证 + 正方 URP 学生端（`urp.hebau.edu.cn:1009`），能力面与差异如下：
+
+- **教务工具**：`get_schedule`（课表）、`get_exams`（考试，含未排考场）、`get_grades`（成绩 + GPA）、`submit_auth_code`（二次认证）、`set_holidays`（跨校通用）。选课、学籍、通知、实验成绩学校无对应接口，不声明 capability，对话如实报「暂不支持」
+- **二次认证**：CAS 账密通过后可能要求动态验证码（短信/微信/企业微信/邮箱/钉钉）——工具报「需要二次认证」并给出脱敏投递目标，模型向用户索要验证码后调 `submit_auth_code` 续登；待验证会话落盘 `data/school-mfa-hebau.json`，10 分钟过期，同一账号仅保留最新一条
+- **学期**：URP 用 `XNXQDM` 字符串学期编码（如 `2026-2027-1`），内部换算关在适配层；学期叫法为「秋冬学期 / 春夏学期」
+- **绩点**：5.0 满绩制（百分制折算 = 分数/10 − 5；优秀 4.5、良好 3.5、中等 2.5、及格 1.5），仅必修课计入；合格/免修/缓考移出分子分母，另记 `passFailCredits`
+- **周次**：URP 的 `SKZC` 为 20 位 0/1 位串形态，适配层归一为 `10-15` 这类范围式后再交给通用周次展开
+- **学校专属数据文件**（均带学校前缀，防止与 NJTECH 真值互相污染）：`data/term-dates-hebau.json`（开学日期真值，人工校准直接编辑）、`data/school-mfa-hebau.json`（二次认证待验证会话）
 
 ---
 

@@ -1,5 +1,6 @@
 /**
- * 成绩与考试工具：get_grades / get_exams（河北农大 5.0 满绩制）
+ * 成绩与考试工具：get_grades / get_exams
+ * （get_lab_grades / get_student_info 等能力河北农大教务没有对应接口，不提供）
  */
 
 import { tool } from "ai";
@@ -7,28 +8,20 @@ import { z } from "zod";
 import { config } from "../../../core/config";
 import { loadExamCache, saveExamCache } from "../../../core/exam-cache";
 import { saveGradesCache } from "../../../core/grades-cache";
-import type { ExamResult, GradeResult } from "../../../core/model";
+import type { ExamResult } from "../../../core/model";
 import { fetchExamsSmart, parseSemesterString } from "../academics";
 import { fetchHebauGrades } from "../grades";
 import { withAuthRetry } from "../session";
-import { secondFactorGate } from "./schedule";
 
 export const gradesTools = {
   /** 成绩查询 */
   get_grades: tool({
     description:
-      "查询全部学期的成绩与 GPA（本校 5.0 满绩制，仅必修课计入）、已获必修学分与通过型学分。重复课程取最高有效成绩；failedTerms 非空时先说明对应学期数据不全。转述 GPA 必须带上 gpaBasis 的口径说明，不要说成 4.0 制。",
+      "查询全部学期的成绩与 GPA（河北农大 5.0 满绩制，仅必修课计入；合格/免修/缓考不计 GPA）。重复课程取最高有效成绩；只统计已通过课程的学分，不代替培养方案或毕业审核。",
     inputSchema: z.object({}),
     execute: async () => {
-      // 会话失效自动重登一次；全部学期失败会进 failedTerms，坏数据不会落进缓存
-      let result: GradeResult;
-      try {
-        result = await withAuthRetry((c) => fetchHebauGrades(c, config.jwglUsername));
-      } catch (e) {
-        const gate = secondFactorGate(e);
-        if (gate) return gate;
-        throw e;
-      }
+      // 会话失效自动重登一次；全部学期失败时 failedTerms 会如实上报，坏数据不会静默
+      const result = await withAuthRetry((c) => fetchHebauGrades(c, config.jwglUsername));
 
       // 落盘成绩缓存：成绩面板（/api/grades）纯读缓存零登录，对话里问一次即刷新
       const semesters = [...new Set(result.allCourses.map((g) => g.semester))].sort();
@@ -59,6 +52,9 @@ export const gradesTools = {
         requiredCourses: result.requiredCourses,
         courseCount: result.allCourses.length,
         failedTerms: result.failedTerms?.length ? result.failedTerms : undefined,
+        failedTermsNote: result.failedTerms?.length
+          ? "以上学期彻底查询失败（不是没有成绩），相关结论（如「无挂科」）对这些学期不成立，建议稍后重试。"
+          : undefined,
         courses: result.allCourses.map((g) => ({
           course: g.course,
           courseCode: g.courseCode || undefined,
@@ -74,7 +70,7 @@ export const gradesTools = {
   /** 考试安排 */
   get_exams: tool({
     description:
-      "查询考试安排：科目、日期、时间、考场、座位号；已报名但未排考场的科目也会列出（date/time 为空）。默认自动探测最新学期（也可指定，如「2026-2027-1」）。",
+      "查询考试安排：科目、日期、时间、考场、座位号。已排考场与未排考场都会返回（未排的 location/time 为空，要向用户说明「还没排考场」而不是漏掉）。默认自动探测最新学期（也可指定，如「2026-2027-1」）。",
     inputSchema: z.object({
       semester: z
         .string()
@@ -105,8 +101,6 @@ export const gradesTools = {
           staleAt = cached.savedAt;
         }
       } catch (e) {
-        const gate = secondFactorGate(e);
-        if (gate) return gate;
         const cached = loadExamCache();
         if (!cached) throw e;
         data = cached.exams;
@@ -118,10 +112,11 @@ export const gradesTools = {
         total: exams.length,
         exams: exams.map((e) => ({
           subject: e.subject,
-          date: e.date,
-          time: e.time,
-          location: e.location,
+          date: e.date || undefined,
+          time: e.time || undefined,
+          location: e.location || undefined,
           seatNumber: e.seatNumber || undefined,
+          notArranged: !e.location || undefined,
         })),
         staleNote:
           staleAt !== undefined

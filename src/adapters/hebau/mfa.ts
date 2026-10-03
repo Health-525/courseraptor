@@ -1,16 +1,18 @@
 /**
- * 二次认证（动态码）待验证会话存储 —— 面向所有可能要求验证码的学校
+ * 二次认证（动态码）待验证会话存储 —— hebau 适配器自包含
  *
- * 场景：走学校统一认证（CAS）的学校（首个：河北农大）在账密通过后，
- * 常被要求再填一个手机/邮箱/微信动态码。对话式 agent 拿不到用户手机，只能：
+ * 场景：河北农大走 CAS 统一认证，账密通过后常被要求再填一个手机/邮箱验证码。
+ * 对话式 agent 拿不到用户手机，只能：
  *   第 1 轮 登录 -> 抛「需要验证码，已发往 138****1234」 -> 存下待验证会话
  *   第 2 轮 用户把验证码发进对话 -> 模型调 submit_auth_code -> 用同一份 Cookie 续完登录
  *
  * 因此待验证状态必须跨请求活着，而且要落盘而不是只在内存里：
  * 网页/TUI 与 QQ 桥是两个进程，用户也很可能在上一个窗口问完、下一个窗口才回验证码。
- * 不要求二次认证的学校（njtech）不会走到这里，行为零变化。
  *
- * 三条护栏：
+ * 与旧架构（src/schools/mfa.ts）的差异只有两点：存储文件带学校前缀
+ * （school-mfa-hebau.json），原子写/隔离坏文件复用 core/atomic-write。
+ *
+ * 三条护栏（沿用旧实现）：
  * 1. 校验 challengeId 时必须同时匹配学校与学号，防止拿别人的 challenge 冒领会话。
  * 2. 10 分钟过期（CAS 侧验证码本身也短命），过期即销毁。
  * 3. 存储里是 Cookie（等同临时登录态），落在 data/ 下——data 整体不打包、不参与更新覆盖。
@@ -18,9 +20,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
-import { RaptorError } from "./errors";
-import { dataDir } from "./paths";
+import { quarantineCorruptFileSync, writeFileAtomicSync } from "../../core/atomic-write";
+import { RaptorError } from "../../core/errors";
+import { dataDir } from "../../core/paths";
 
 const CHALLENGE_TTL_MS = 10 * 60 * 1000;
 
@@ -40,7 +42,7 @@ export interface PendingSecondFactor {
 }
 
 function storePath(): string {
-  return path.join(dataDir(), "school-mfa.json");
+  return path.join(dataDir(), "school-mfa-hebau.json");
 }
 
 function readStore(): Record<string, PendingSecondFactor> {
@@ -68,7 +70,7 @@ function writeStore(store: Record<string, PendingSecondFactor>): void {
 }
 
 function isPending(value: unknown): value is PendingSecondFactor {
-  if (!value || typeof value !== "object") return false;
+  if (!value || typeof value === "object") return false;
   const p = value as Partial<PendingSecondFactor>;
   return (
     typeof p.challengeId === "string" &&
@@ -158,9 +160,11 @@ export function findSecondFactor(schoolId: string, username: string): PendingSec
 
 /**
  * 需要验证码时抛出的信号错误。
- * 必须是 RaptorError(AUTH_CHALLENGE, retryable=false)：重试等于反复给用户手机
- * 发码，登录层的 withRetry 要能立刻放行它。
- * message 是给模型看的：必须含「把验证码发给我」这个可执行动作，
+ *
+ * 继承 RaptorError（code=BUSINESS_REJECT，默认不可重试）而不是裸 Error：
+ * session.withAuthRetry 的 withRetry 按 RaptorError.retryable 决定是否重试，
+ * 裸 Error 会被盲目重试 5 次 → 给用户连发 5 条验证码短信。
+ * message 是给模型看的：必须含「把验证码发给我 + submit_auth_code」这个可执行动作，
  * 否则模型会把它当普通失败转述成「登录失败，请稍后再试」。
  */
 export class SecondFactorRequiredError extends RaptorError {
@@ -168,10 +172,11 @@ export class SecondFactorRequiredError extends RaptorError {
   readonly maskedTarget: string;
 
   constructor(challengeId: string, maskedTarget: string) {
+    // BUSINESS_REJECT 默认就不可重试：withRetry 若盲目重试，用户会连收多条验证码短信
     super(
-      "AUTH_CHALLENGE",
+      "BUSINESS_REJECT",
       `需要二次认证：验证码已发送到${maskedTarget || "绑定的手机/邮箱"}，` +
-        `10 分钟内有效。请向用户索要验证码原文，拿到后调用 submit_auth_code（code=验证码，challenge_id="${challengeId}"）完成登录，` +
+        `10 分钟内有效。请向用户索要验证码原文，拿到后调用 submit_auth_code(code, challenge_id="${challengeId}") 完成登录，` +
         `然后重新执行刚才的查询。在用户提供验证码之前不要重复触发登录。`,
       { retryable: false },
     );

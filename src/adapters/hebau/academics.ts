@@ -1,111 +1,96 @@
 /**
- * 河北农大教务规则与智能抓取：学期口径（秋冬/春夏）、候选学期探测、节次作息、
- * 课表/考试的 Smart 层（候选学期逐个试，取第一个有数据的）。
+ * 河北农大学期规则与课表/考试 Smart 抓取
  *
- * 跨校通用的纯计算（周次展开/学期解析/周分组/假期叠加）都在 core/academic-utils，
- * 这里只持有本校规则：春夏学期占 2～7 月（比南工大宽一个月，7 月还在考试周，
- * 不能像南工大那样 7 月就探秋学期）、自己的节次表与开学日期真值。
+ * 跨校通用件（学期候选探测、学期串解析、周次展开、课表周分组）全部来自
+ * core/academic-utils，这里只包一层河北农大的差异：
+ * - 学期叫法是「秋冬/春夏学期」（与南工大「第一/第二学期」不同）
+ * - 节次作息表不同（第 1 节 08:00，下午 14:30 起）
+ * - URP 用 XNXQDM 字符串学期编码（换算在 urp.ts）
  */
 
 import {
   type AnnotatedWeekGroup,
   annotateWeekGroups as annotateWith,
   buildWeekIndex as buildIndexWith,
-  courseLineBody as courseLineWith,
+  candidateTerms,
+  termLabel as coreTermLabel,
+  courseLineBody as courseLineOf,
+  expandWeeks,
+  parseSemesterString as parseSemesterStringCore,
   periodTimeRangeOf,
+  WEEKDAY_NAMES,
 } from "../../core/academic-utils";
-import { RaptorError } from "../../core/errors";
+import { RaptorError, SESSION_EXPIRED_MESSAGE } from "../../core/errors";
 import type { FetchResult } from "../../core/fetch-result";
-import type { CourseData, ExamResult, ScheduleResult, WeekGroup } from "../../core/model";
+import type {
+  CourseData,
+  ExamData,
+  ExamResult,
+  ScheduleResult,
+  TermCandidate,
+  WeekGroup,
+} from "../../core/model";
 import { fetchHebauExams } from "./exams";
+import { HEBAU_PERIOD_TIMES } from "./period-times";
 import { fetchHebauSchedule } from "./schedule";
+import { currentWeekOf as resolveCurrentWeek, resolveWeek1Monday } from "./term-dates";
 
 export type { AnnotatedWeekGroup } from "../../core/academic-utils";
-export { expandWeeks, parseSemesterString, WEEKDAY_NAMES } from "../../core/academic-utils";
-export { currentWeekOf, resolveWeek1Monday } from "./term-dates";
+export { expandWeeks, WEEKDAY_NAMES };
 
-// ── 节次作息表 ────────────────────────────────────────────────
+/** 解析学期串（core 通用实现：「2026-2027-1」「2025-2026第2学期」这类格式都认） */
+export function parseSemesterString(s: string): TermCandidate | null {
+  return parseSemesterStringCore(s);
+}
 
-/** 河北农业大学：第 1 节 08:00，下午 14:30 起，晚自习 18:40 起（与南工大不同，勿共用） */
-export const HEBAU_PERIOD_TIMES: Record<string, string> = {
-  "1": "08:00-08:45",
-  "2": "08:55-09:40",
-  "3": "10:10-10:55",
-  "4": "11:05-11:50",
-  "5": "14:30-15:15",
-  "6": "15:25-16:10",
-  "7": "16:20-17:05",
-  "8": "17:15-18:00",
-  "9": "18:40-19:25",
-  "10": "19:35-20:20",
-};
+/** 学期候选（core 通用实现：两学期制 3=秋、12=春，交界月优先探新学期） */
+export const candidateXnxqList = candidateTerms;
 
-/** 节次号 -> 上课时间段，如 [7,8] -> "16:20-18:00"（作息表是本校规则） */
+/**
+ * 河北农大的学期叫法：秋冬学期 / 春夏学期（校历口径），不是「第一/第二学期」。
+ * core 的 termLabel 给的是后者，这里覆写成本校口径。
+ */
+export function termLabel(year: number, semester: number): string {
+  const core = coreTermLabel(year, semester);
+  if (semester === 3) return core.replace("第一学期", "秋冬学期");
+  if (semester === 12) return core.replace("第二学期", "春夏学期");
+  return core;
+}
+
+export function currentWeekOf(year: number, semester: number, now: Date = new Date()) {
+  return resolveCurrentWeek(year, semester, now);
+}
+
+export { resolveWeek1Monday };
+
+// ── 节次作息（河北农大：第 1 节 08:00，下午 14:30 起，晚自习 18:40 起）──────
+
+export const HEBAU_PERIOD_TIMES_TABLE = HEBAU_PERIOD_TIMES;
+
+/** 节次号 -> 上课时间段，如 [7,8] -> "16:20-17:05"（作息表是本校规则） */
 export function periodTimeRange(periods: number[]): string | undefined {
   return periodTimeRangeOf(HEBAU_PERIOD_TIMES, periods);
 }
 
-// ── 学期口径 ──────────────────────────────────────────────────
-
-/** 河北农大的学期展示名用「秋冬/春夏」（URP 官方口径），不是「第一/第二」 */
-export function hebauTermLabel(year: number, semester: number): string {
-  return `${year}-${year + 1}学年${semester === 3 ? "秋冬" : "春夏"}学期`;
+export function weekdayName(weekday: number): string {
+  return WEEKDAY_NAMES[weekday] ?? `周${weekday}`;
 }
 
-/** 春夏学期覆盖的月份区间（含端点）：2～7 月（7 月初还有考试周） */
-export const HEBAU_SECOND_SEMESTER_MONTHS = [2, 7] as const;
-
-/**
- * 候选学期（新到旧）。与 core 的 candidateTerms 分支结构一致，差别只在
- * 春夏学期的月份区间换成学校自己的：
- * - m >= 9：秋冬学期进行中
- * - hi < m < 9：假期/交界（河农大仅 8 月），新学期课表通常已生成，先探秋冬
- * - m <= hi：春夏学期进行中（学年始于上一年）
- * 参数化的 window 版本供测试逐月对照南工大口径。
- */
-export function candidateTermsIn(
-  months: readonly [number, number],
-  now: Date = new Date(),
-): Array<{ year: number; semester: number }> {
-  const y = now.getFullYear();
-  const m = now.getMonth() + 1;
-  const [, hi] = months;
-  if (m >= 9) {
-    return [
-      { year: y, semester: 3 },
-      { year: y - 1, semester: 12 },
-    ];
-  }
-  if (m > hi) {
-    return [
-      { year: y, semester: 3 },
-      { year: y - 1, semester: 12 },
-      { year: y - 1, semester: 3 },
-    ];
-  }
-  return [
-    { year: y - 1, semester: 12 },
-    { year: y - 1, semester: 3 },
-  ];
-}
-
-export function hebauCandidateTerms(now: Date = new Date()) {
-  return candidateTermsIn(HEBAU_SECOND_SEMESTER_MONTHS, now);
-}
-
-// ── 周分组与课表行渲染（core 通用实现 + 本校节次表）────────────
-
-/** 课程行去掉星期后的主体（节次 · 时间 · 课程 · 地点 · 教师） */
+/** 课程行去掉星期后的主体（节次 · 时间 · 课程 · 地点 · 教师），供周分组复用 */
 export function courseLineBody(c: CourseData): string {
-  return courseLineWith(c, periodTimeRange);
+  return courseLineOf(c, periodTimeRange);
 }
 
-/** 按周预分组课表：week -> 该周实际要上的课（core 实现，本校节次表渲染） */
+/** 按周预分组课表：week -> 该周实际要上的课（只含有课的周） */
 export function buildWeekIndex(courses: CourseData[]): WeekGroup[] {
   return buildIndexWith(courses, periodTimeRange);
 }
 
-/** 把假期/调休叠加到周分组上（core 实现，本校节次表渲染） */
+/**
+ * 把假期/调休叠加到 buildWeekIndex 的周分组上（实现在 core/academic-utils，
+ * 节次时间段按本校作息表渲染）。返回新数组（不改入参）；没有特殊日的周与
+ * 原分组完全一致。
+ */
 export function annotateWeekGroups(
   courses: CourseData[],
   week1Monday: string,
@@ -114,42 +99,38 @@ export function annotateWeekGroups(
   return annotateWith(courses, week1Monday, groups, periodTimeRange);
 }
 
-// ── 智能抓取（候选学期探测）──────────────────────────────────
-
-/** URP 会话失效的可读信号（urp.ts 的错误文案里带这两个词） */
-function isSessionDown(error: string): boolean {
-  return /会话已失效|重新登录/.test(error);
-}
+// ── Smart 抓取：候选学期探测 + 错误归类 ──────────────────────
 
 /**
  * 智能课表抓取：未指定学期时按候选列表探测，返回第一个有数据的学期。
- * 语义约定与 njtech 一致：
- * - ok=false：全部候选学期都没拿到数据（断网/会话失效/接口改版），如实上报；
- * - ok=true 且 courses 为空：确实查到了、但就是没排课（假期属正常）。
+ *
+ * 语义约定（与 njtech 一致）：
+ * - 会话失效抛 SESSION_EXPIRED（withAuthRetry 换 cookie 自动重试）
+ * - ok=false：全部候选学期都没拿到数据（断网/接口改版），调用方必须如实上报 error，
+ *   不许降级成「课表为空」
+ * - ok=true 且 courses 为空：确实查到了、但就是没排课（假期属正常）
  */
 export async function fetchScheduleSmart(
   cookie: string,
   xnm?: number,
   xqm?: number,
 ): Promise<FetchResult<ScheduleResult>> {
-  const candidates = xnm && xqm ? [{ year: xnm, semester: xqm }] : hebauCandidateTerms();
+  const candidates: TermCandidate[] =
+    xnm && xqm ? [{ year: xnm, semester: xqm }] : candidateXnxqList();
 
   const failures: string[] = [];
 
   for (const c of candidates) {
-    const r = await fetchHebauSchedule(cookie, c.year, c.semester);
-    if (!r.ok) {
-      if (isSessionDown(r.error)) {
-        throw new RaptorError("SESSION_EXPIRED", "河北农大教务会话已失效（可能被服务端提前下线）");
-      }
-      failures.push(`${hebauTermLabel(c.year, c.semester)}：${r.error}`);
+    let courses: CourseData[];
+    try {
+      courses = await fetchHebauSchedule(cookie, c.year, c.semester);
+    } catch (e) {
+      if (e instanceof RaptorError && e.code === "SESSION_EXPIRED") throw e;
+      failures.push(`${termLabel(c.year, c.semester)}：${(e as Error).message}`);
       continue;
     }
-    if (r.data.length > 0) {
-      return {
-        ok: true,
-        data: { ...c, label: hebauTermLabel(c.year, c.semester), courses: r.data },
-      };
+    if (courses.length > 0) {
+      return { ok: true, data: { ...c, label: termLabel(c.year, c.semester), courses } };
     }
   }
 
@@ -161,31 +142,32 @@ export async function fetchScheduleSmart(
   const first = candidates[0];
   return {
     ok: true,
-    data: { ...first, label: hebauTermLabel(first.year, first.semester), courses: [] },
+    data: { ...first, label: termLabel(first.year, first.semester), courses: [] },
   };
 }
 
-/** 智能考试安排抓取：未指定学期时按候选列表探测（与课表同一套学期策略） */
+/** 智能考试抓取：同上语义 */
 export async function fetchExamsSmart(
   cookie: string,
   xnm?: number,
   xqm?: number,
 ): Promise<FetchResult<ExamResult>> {
-  const candidates = xnm && xqm ? [{ year: xnm, semester: xqm }] : hebauCandidateTerms();
+  const candidates: TermCandidate[] =
+    xnm && xqm ? [{ year: xnm, semester: xqm }] : candidateXnxqList();
 
   const failures: string[] = [];
 
   for (const c of candidates) {
-    const r = await fetchHebauExams(cookie, c.year, c.semester);
-    if (!r.ok) {
-      if (isSessionDown(r.error)) {
-        throw new RaptorError("SESSION_EXPIRED", "河北农大教务会话已失效（可能被服务端提前下线）");
-      }
-      failures.push(`${hebauTermLabel(c.year, c.semester)}：${r.error}`);
+    let exams: ExamData[];
+    try {
+      exams = await fetchHebauExams(cookie, c.year, c.semester);
+    } catch (e) {
+      if (e instanceof RaptorError && e.code === "SESSION_EXPIRED") throw e;
+      failures.push(`${termLabel(c.year, c.semester)}：${(e as Error).message}`);
       continue;
     }
-    if (r.data.length > 0) {
-      return { ok: true, data: { ...c, label: hebauTermLabel(c.year, c.semester), exams: r.data } };
+    if (exams.length > 0) {
+      return { ok: true, data: { ...c, label: termLabel(c.year, c.semester), exams } };
     }
   }
 
@@ -196,6 +178,10 @@ export async function fetchExamsSmart(
   const first = candidates[0];
   return {
     ok: true,
-    data: { ...first, label: hebauTermLabel(first.year, first.semester), exams: [] },
+    data: { ...first, label: termLabel(first.year, first.semester), exams: [] },
   };
 }
+
+// 会话失效哨兵：urp 层抛的 SESSION_EXPIRED 冒泡到这里直接上抛，
+// 由 session.withAuthRetry 换新 cookie 重试（哨兵值保留给可能的结构化消费方）
+export const SESSION_DOWN = SESSION_EXPIRED_MESSAGE;

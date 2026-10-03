@@ -7,7 +7,7 @@
  * 而不是把没排的那几门直接漏掉（漏了就是「你只有 3 门考试」这种错话）。
  */
 
-import type { FetchResult } from "../../core/fetch-result";
+import { RaptorError } from "../../core/errors";
 import type { ExamData } from "../../core/model";
 import { extractUrpRows, pickString, urpPostExams, xnxqdm } from "./urp";
 
@@ -101,24 +101,24 @@ export function dedupeExams(rows: ExamData[]): ExamData[] {
   return [...best.values()].sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
 }
 
+/** 抓单个学期考试安排。会话失效等错误以 RaptorError 抛出 */
 export async function fetchHebauExams(
   cookie: string,
   year: number,
   semester: number,
-): Promise<FetchResult<ExamData[]>> {
+): Promise<ExamData[]> {
   const xnxqdmValue = xnxqdm(year, semester);
   const action = `获取${xnxqdmValue}考试安排`;
-  const resp = await urpPostExams(
+  const data = await urpPostExams(
     cookie,
     new URLSearchParams({ XNXQDM: xnxqdmValue }).toString(),
     action,
   );
-  if (!resp.ok) return resp;
 
-  const rows = extractUrpRows(resp.data, "queryMyExamArrangeMent");
+  const rows = extractUrpRows(data, "queryMyExamArrangeMent");
   if (!rows) {
-    return { ok: false, error: `${action}失败：教务系统响应结构异常（找不到考试数据行）` };
+    throw new RaptorError("PARSE", `${action}失败：教务系统响应结构异常（找不到考试数据行）`);
   }
   const exams = rows.map(toExamRow).filter((e): e is ExamData => e !== null);
-  return { ok: true, data: dedupeExams(exams) };
+  return dedupeExams(exams);
 }

@@ -98,12 +98,6 @@ export interface SchoolAuth {
   login(username: string, password: string): Promise<void>;
   /** 取已登录会话 Cookie（无则自动登录）；force=true 强制重登 */
   getCookie(force?: boolean): Promise<string>;
-  /**
-   * 二次认证续登（可选）：统一认证要求动态验证码的学校实现。
-   * 登录抛 SecondFactorRequiredError 后，用户交码经此完成登录并写入会话缓存。
-   * 不要求验证码的学校（njtech/custom）不实现，core/onboarding 据此决定是否收码。
-   */
-  submitSecondFactor?(input: { code: string; challengeId?: string }): Promise<void>;
 }
 
 /** 教务处通知 */
