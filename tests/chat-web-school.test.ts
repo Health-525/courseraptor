@@ -70,6 +70,54 @@ test("GET /api/settings：school 块带清单与手动课表标记，默认 njte
   assert.equal(r.school.options[2].manual, true);
 });
 
+test("切校带旧账号要提醒更新；能力说明按学校如实生成", async () => {
+  // ① njtech 下保存教务账号（应落 jwglSchoolId=njtech）
+  const save = await wfetch(`${await base()}/api/settings`, {
+    method: "POST",
+    body: JSON.stringify({ jwglUsername: "202321144057", jwglPassword: "fake-pass-1" }),
+  });
+  assert.equal(save.status, 200);
+  assert.equal(loadCredentialsStore()?.jwglSchoolId, "njtech");
+
+  // ② 带着南工大账号切到河北农大：结果消息必须提醒账号是原学校的
+  const r = await wfetch(`${await base()}/api/settings`, {
+    method: "POST",
+    body: JSON.stringify({ schoolId: "hebau" }),
+  });
+  assert.equal(r.status, 200);
+  const d = await r.json();
+  const line = d.results.find((x: { field: string }) => x.field === "school");
+  assert.match(line.message, /已切换为「河北农业大学」/);
+  assert.match(line.message, /「南京工业大学」的.*更新为河北农业大学的学号与密码/s);
+  // 状态：保存学校标记 + 当前学校已是 hebau
+  assert.equal(d.status.school.current, "hebau");
+  assert.equal(d.status.jwgl.savedSchoolId, "njtech");
+
+  // ③ 学校清单的能力说明按 capabilities 生成：hebau 没接通知就不能写通知
+  const opts = d.status.school.options as Array<{ id: string; note?: string }>;
+  const hebauNote = opts.find((o) => o.id === "hebau")?.note ?? "";
+  assert.match(hebauNote, /课表 \/ 成绩 \/ 考试/);
+  assert.doesNotMatch(hebauNote, /通知/);
+  assert.match(opts.find((o) => o.id === "njtech")?.note ?? "", /通知/);
+  assert.equal(opts.find((o) => o.id === "custom")?.note, undefined);
+
+  // ④ hebau 下重新保存账号：标记随当前学校更新；再切回 njtech 不再有提醒
+  const resave = await wfetch(`${await base()}/api/settings`, {
+    method: "POST",
+    body: JSON.stringify({ jwglUsername: "202501010203", jwglPassword: "fake-pass-2" }),
+  });
+  assert.equal(resave.status, 200);
+  assert.equal(loadCredentialsStore()?.jwglSchoolId, "hebau");
+  const back = await wfetch(`${await base()}/api/settings`, {
+    method: "POST",
+    body: JSON.stringify({ schoolId: "njtech" }),
+  });
+  const bd = await back.json();
+  const backLine = bd.results.find((x: { field: string }) => x.field === "school");
+  // 反方向同理：现在账号是河北农大的，切回南工大也要提醒换账号（对称行为）
+  assert.match(backLine.message, /「河北农业大学」的.*更新为南京工业大学的学号与密码/s);
+});
+
 test("POST /api/settings 切换学校：运行期生效并落凭证", async () => {
   const r = await wfetch(`${await base()}/api/settings`, {
     method: "POST",

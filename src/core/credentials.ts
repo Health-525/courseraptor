@@ -15,6 +15,7 @@ import os from "node:os";
 import path from "node:path";
 import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
 import { PROJECT_ROOT } from "./paths";
+import { registeredSchool } from "./school";
 
 // RAPTOR_CREDENTIALS_FILE 可把凭证文件指到别处（测试隔离用），默认项目根
 const CRED_FILE = process.env.RAPTOR_CREDENTIALS_FILE || path.join(PROJECT_ROOT, "credentials.enc");
@@ -65,8 +66,14 @@ export interface CredentialsStore {
   qqBotPasscode?: string;
   /** 网页「提示词」模板（用户在提示词模板面板自选；空/缺失即回默认清单） */
   webQuickQuestions?: string[];
-  /** 设置里选定的学校适配器 id（"njtech" / "custom"）；未存过按 RAPTOR_SCHOOL / 默认 njtech */
+  /** 设置里选定的学校适配器 id（"njtech" / "hebau" / "custom"）；未存过按 RAPTOR_SCHOOL / 默认 njtech */
   schoolId?: string;
+  /**
+   * 教务账号（username/password）保存时所在的学校 id。教务凭证字段本身
+   * 不分学校，切学校后旧账号对不上新校——有这个标记，设置页才能提醒
+   * 「已保存的账号是原学校的，请更新」。旧数据无此字段视为未知。
+   */
+  jwglSchoolId?: string;
   /** custom：用户自填的学校显示名（空则用「其他学校」） */
   customSchoolName?: string;
   /** custom：所在城市（天气默认城市；空则问用户） */
@@ -144,7 +151,8 @@ export function loadStoredCredentials(): CredentialsStore | null {
 }
 
 export function saveStoredCredentials(username: string, password: string): void {
-  saveCredentialsStore({ username, password });
+  const schoolId = registeredSchool()?.info.id;
+  saveCredentialsStore({ username, password, ...(schoolId ? { jwglSchoolId: schoolId } : {}) });
 }
 
 export function clearStoredCredentials(): void {
