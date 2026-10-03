@@ -5,7 +5,7 @@
  * - 只读封装 src/core 的已验证渲染器（schedule-svg / schedule-png），
  *   与网页「本周图片/整学期图片」按钮、AI 工具 export_schedule_image 同一套代码。
  * - 零登录零网络：只读本地课表缓存（data/schedule-cache.json）。
- * - 导出成功即自动在默认浏览器打开预览（file:// 本地直读；--no-open 关闭，
+ * - 导出后默认不弹窗；--open 可选用默认浏览器打开预览（file:// 本地直读，
  *   打不开也不影响导出结果与退出码）。
  * - 仓库内直跑：npx tsx skills/export-schedule/scripts/export.ts [参数]；
  *   独立技能包（npm run package:skill -- export-schedule）里是同逻辑的
@@ -43,7 +43,7 @@ function usage(): string {
     "",
     "用法: node export.mjs [--mode week|term] [--week N] [--style classic|color]",
     "                     [--format png|svg] [--out <目录|文件名>] [--cache <schedule-cache.json>]",
-    "                     [--no-open]",
+    "                     [--open]",
     "",
     "  --mode    week=第 N 周课表（默认）；term=整学期汇总",
     "  --week    周次（week 模式；缺省取当前教学周）",
@@ -51,7 +51,7 @@ function usage(): string {
     "  --format  png=2 倍宽位图（默认）；svg=矢量",
     "  --out     输出位置（目录或文件名；缺省当前目录）",
     "  --cache   直接指定 schedule-cache.json（缺省读技能 data/ 下的缓存）",
-    "  --no-open 只导出，不在默认浏览器自动打开预览（自动化/无桌面环境）",
+    "  --open    导出后用默认浏览器打开预览（默认只导出，不弹窗）",
   ].join("\n");
 }
 
@@ -63,7 +63,7 @@ function parseArgs(argv: string[]): CliArgs {
     format: "png",
     out: null,
     cache: null,
-    open: true,
+    open: false,
   };
   const die = (msg: string): never => {
     process.stderr.write(`${msg}\n\n${usage()}\n`);
@@ -95,8 +95,8 @@ function parseArgs(argv: string[]): CliArgs {
       args.out = next();
     } else if (a === "--cache") {
       args.cache = next();
-    } else if (a === "--no-open") {
-      args.open = false;
+    } else if (a === "--open") {
+      args.open = true;
     } else if (a === "--help" || a === "-h") {
       process.stdout.write(`${usage()}\n`);
       process.exit(0);

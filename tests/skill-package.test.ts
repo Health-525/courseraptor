@@ -128,7 +128,7 @@ test("技能打包：export-schedule 独立包结构 + 自包含可运行", asyn
   assert.equal(help.status, 0, `help 应成功：${help.stderr}`);
   assert.match(help.stdout, /--mode/);
   assert.match(help.stdout, /--cache/);
-  assert.match(help.stdout, /--no-open/);
+  assert.match(help.stdout, /--open/);
 
   // 无缓存 → 非零退出 + 引导配置（不编造课表）
   const noCache = run([]);
@@ -161,7 +161,7 @@ test("技能打包：export-schedule 独立包结构 + 自包含可运行", asyn
       schoolId: "njtech",
     }),
   );
-  // --no-open：跑测试别在宿主机弹浏览器（交互场景默认自动打开预览）
+  // 默认不弹浏览器（对话内嵌交付），跑测试不会在宿主机开窗口
   const exported = run([
     "--cache",
     cacheFile,
@@ -169,7 +169,6 @@ test("技能打包：export-schedule 独立包结构 + 自包含可运行", asyn
     "1",
     "--out",
     path.join(outDir, "exports"),
-    "--no-open",
   ]);
   assert.equal(exported.status, 0, `带缓存导出应成功：${exported.stderr}`);
   assert.match(exported.stdout, /已导出/);

@@ -39,12 +39,12 @@ node scripts/export.mjs --week 8 --style color         # 第 8 周 · 彩色课�
 node scripts/export.mjs --mode term                    # 整学期汇总 PNG
 node scripts/export.mjs --mode term --format svg       # 整学期 SVG（矢量）
 node scripts/export.mjs --out D:/课表                  # 指定输出目录
-node scripts/export.mjs --no-open                      # 只导出，不自动弹浏览器
+node scripts/export.mjs --open                         # 导出后用默认浏览器打开
 node scripts/export.mjs --help                         # 完整参数说明
 ```
 
-导出成功后会**自动用默认浏览器打开图片**（`file://` 本地直读，不联网），
-当场即可预览；自动化或无桌面环境加 `--no-open` 关闭。
+默认只导出文件、不弹窗；加 `--open` 导出后用默认浏览器打开预览
+（`file://` 本地直读，不联网）。
 
 输出文件名形如 `schedule-week5-2026-1.png`、`schedule-term-2026-1.png`
 （color 风格带 `-color` 后缀）。

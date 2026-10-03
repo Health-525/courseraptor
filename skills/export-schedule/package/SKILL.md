@@ -52,7 +52,7 @@ node scripts/export.mjs [--mode week|term] [--week N] [--style classic|color]
 | `--format` | `png`（默认）/ `svg` | PNG 为 2 倍宽高清 |
 | `--out` | 目录或文件名 | 缺省落当前工作目录 |
 | `--cache` | 文件路径 | 直接指定 schedule-cache.json |
-| `--no-open` | 开关 | 只导出，不在默认浏览器自动打开预览（自动化/无桌面环境） |
+| `--open` | 开关 | 导出后用默认浏览器打开预览（默认只导出，不弹窗） |
 
 示例：
 
@@ -63,10 +63,10 @@ node scripts/export.mjs --mode term --format svg       # 整学期 SVG
 node scripts/export.mjs --cache D:/backup/schedule-cache.json --week 3
 ```
 
-成功时最后一行输出 `已导出 <绝对路径>（…）`，把该路径以 Markdown 链接给用户。
-导出完成后脚本会**自动在默认浏览器打开该图片**（`file://` 本地直读，零网络），
-用户当场就能看到图；回复里说明「图已在浏览器打开」，浏览器没弹出来时再让
-用户点路径链接。自动化/无桌面场景才需要 `--no-open`。
+成功时最后一行输出 `已导出 <绝对路径>（…）`。交付以「用户在对话里直接看到图」
+为目标：用你所用工具能显示图片的手段（读图/附件工具）把图带进对话，回复正文
+内嵌 `![课表](file:///<绝对路径>)`（支持 Markdown 图片的客户端直接渲染），并附
+文件路径链接兜底；用户明确要在浏览器打开时加 `--open`。默认不弹窗。
 
 ## PNG 平台说明
 
