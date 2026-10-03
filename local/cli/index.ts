@@ -127,7 +127,14 @@ void import("../../src/core/todo-reminders").then(({ startTodoReminderScheduler 
  * 回到原 UI，避免 API Key 出现在 TUI 帧、会话或 Agent 中。
  */
 type UIMode = "card" | "inline";
-let mode: UIMode = process.env.RAPTOR_TUI_INLINE === "1" ? "inline" : "card";
+// 卡片 TUI 依赖真实终端（逐帧重绘、终端能力探测）：后台/管道等无 TTY 环境
+// 探测得不到回应会死锁，事件循环被拖死并连带同进程的网页服务。
+// 因此无 TTY 时无条件用行内渲染，RAPTOR_TUI_INLINE 只在交互终端里生效。
+const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+if (!interactive) {
+  console.log("ℹ️ 未检测到交互式终端：卡片界面已停用，自动改用行内渲染（网页对话不受影响）");
+}
+let mode: UIMode = !interactive || process.env.RAPTOR_TUI_INLINE === "1" ? "inline" : "card";
 let running = true;
 while (running) {
   if (mode === "card") {
@@ -220,7 +227,11 @@ while (running) {
     if (result === "setup-key") {
       await runDeepSeekKeySetup();
     } else if (result === "switch-card") {
-      mode = "card";
+      if (interactive) {
+        mode = "card";
+      } else {
+        console.log("⚠️ 当前环境没有交互式终端，卡片界面不可用，保持行内模式");
+      }
     } else {
       running = false;
     }
