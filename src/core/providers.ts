@@ -84,9 +84,13 @@ export const BUILTIN_PROVIDERS: ProviderDef[] = [
     note: "阿里百炼 · qwen 系列与开源模型一站接入",
     keyHint: "sk-…（阿里云百炼控制台）",
     fallbackModels: [
-      { id: "qwen-plus", label: "qwen-plus", note: "主力型号 · 效果与成本均衡" },
-      { id: "qwen-flash", label: "qwen-flash", note: "轻量高速 · 日常问答够用" },
-      { id: "qwen-max", label: "qwen-max", note: "旗舰 · 复杂任务更强" },
+      { id: "qwen3.8-max", label: "qwen3.8-max", note: "最新旗舰 · 2.4T MoE 多模态" },
+      { id: "qwen3.8-flash", label: "qwen3.8-flash", note: "高性价比 · 1M 上下文" },
+      { id: "qwen-plus", label: "qwen-plus", note: "通用别名 · 自动跟随官方升级" },
+    ],
+    legacyModels: [
+      { id: "qwen-max", label: "qwen-max", note: "通用别名 · 自动跟随官方升级" },
+      { id: "qwen-flash", label: "qwen-flash", note: "通用别名 · 自动跟随官方升级" },
     ],
   },
   {
@@ -96,8 +100,12 @@ export const BUILTIN_PROVIDERS: ProviderDef[] = [
     note: "智谱开放平台 · GLM-5 系列",
     keyHint: "…（智谱 bigmodel 控制台）",
     fallbackModels: [
-      { id: "glm-5", label: "GLM-5", note: "最新基座 · Agent 与工具调用强" },
-      { id: "glm-5.2", label: "GLM-5.2", note: "旗舰 · 1M 长上下文" },
+      { id: "glm-5.3-flash", label: "GLM-5.3-Flash", note: "最新 · 原生多模态 + 1M 上下文，价低" },
+      { id: "glm-5.3", label: "GLM-5.3", note: "最新旗舰" },
+    ],
+    legacyModels: [
+      { id: "glm-5.2", label: "GLM-5.2", note: "上一代旗舰 · 1M 长上下文" },
+      { id: "glm-5", label: "GLM-5", note: "上一代基座" },
     ],
   },
   {
@@ -115,8 +123,16 @@ export const BUILTIN_PROVIDERS: ProviderDef[] = [
     note: "字节火山方舟 · 也托管 DeepSeek/GLM 等",
     keyHint: "…（火山方舟控制台 API Key）",
     fallbackModels: [
-      { id: "doubao-seed-1-8", label: "Doubao Seed 1.8", note: "最新旗舰 · 256K 上下文全模态" },
-      { id: "doubao-seed-1-6", label: "Doubao Seed 1.6", note: "通用型号 · 日常够用" },
+      {
+        id: "doubao-seed-2-0-pro",
+        label: "Seed 2.0 Pro",
+        note: "最新旗舰 · 多模态（需在方舟控制台开通）",
+      },
+      { id: "doubao-seed-2-0-lite", label: "Seed 2.0 Lite", note: "轻量高速 · 多模态" },
+    ],
+    legacyModels: [
+      { id: "doubao-seed-1-8", label: "Seed 1.8", note: "上一代旗舰 · 256K 上下文全模态" },
+      { id: "doubao-seed-1-6", label: "Seed 1.6", note: "上一代通用" },
     ],
   },
   {
@@ -137,7 +153,14 @@ export const BUILTIN_PROVIDERS: ProviderDef[] = [
     note: "MiniMax 开放平台 · M 系列",
     keyHint: "…（MiniMax 开放平台，注意国内站 Key）",
     fallbackModels: [
-      { id: "MiniMax-M2", label: "MiniMax-M2", note: "主力型号（国内站 Key 与海外站不通用）" },
+      {
+        id: "MiniMax-M2.5",
+        label: "MiniMax-M2.5",
+        note: "最新主力 · 价格极低（国内站 Key 与海外站不通用）",
+      },
+    ],
+    legacyModels: [
+      { id: "MiniMax-M2", label: "MiniMax-M2", note: "上一代主力（国内站 Key 与海外站不通用）" },
     ],
   },
   {
@@ -147,7 +170,8 @@ export const BUILTIN_PROVIDERS: ProviderDef[] = [
     note: "StepFun 开放平台 · 多模态",
     keyHint: "…（StepFun 控制台）",
     fallbackModels: [
-      { id: "step-3.7-flash", label: "step-3.7-flash", note: "旗舰多模态推理 · 响应快" },
+      { id: "step-5-preview", label: "Step 5 Preview", note: "最新（预览版）· 1M 上下文开源 MoE" },
+      { id: "step-3.7-flash", label: "step-3.7-flash", note: "多模态推理 · 响应快" },
     ],
   },
   {
@@ -157,6 +181,7 @@ export const BUILTIN_PROVIDERS: ProviderDef[] = [
     note: "百度千帆模型服务 · ERNIE 系列",
     keyHint: "bce-v3…（千帆控制台 API Key）",
     fallbackModels: [
+      { id: "ernie-5.0", label: "ERNIE 5.0", note: "最新旗舰 · 原生全模态" },
       { id: "ernie-4.5-turbo-128k", label: "ERNIE 4.5 Turbo", note: "高频轻量 · 128K 上下文" },
     ],
   },

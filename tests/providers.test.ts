@@ -127,3 +127,27 @@ test("describeProviderModel：已知型号带说明，未知型号裸 id 展示"
   assert.equal(unknown.label, "glm-9x-preview");
   assert.equal(unknown.note, "模型服务返回的型号");
 });
+
+test("兜底清单首位是各厂商当前旗舰（2026-10 核对官方文档后更新）", () => {
+  const flagship: Record<string, string> = {
+    deepseek: "deepseek-flash", // 官方在售仅 deepseek-flash（V4.1-Flash）与 deepseek-v4-pro
+    qwen: "qwen3.8-max",
+    glm: "glm-5.3-flash",
+    kimi: "kimi-k3",
+    doubao: "doubao-seed-2-0-pro",
+    minimax: "MiniMax-M2.5",
+    ernie: "ernie-5.0",
+    step: "step-5-preview",
+  };
+  for (const [id, expected] of Object.entries(flagship)) {
+    assert.equal(
+      getProviderDef(id).fallbackModels[0]?.id,
+      expected,
+      `${id} 兜底清单首位应是当前旗舰（厂商换代时随官方公告更新）`,
+    );
+  }
+  // 旧旗舰仍在展示表里（legacyModels），存了旧型号的同学看到的还是可读名而非裸 id
+  assert.equal(describeProviderModel("glm", "glm-5.2").label, "GLM-5.2");
+  assert.equal(describeProviderModel("doubao", "doubao-seed-1-8").label, "Seed 1.8");
+  assert.equal(describeProviderModel("qwen", "qwen-max").label, "qwen-max");
+});

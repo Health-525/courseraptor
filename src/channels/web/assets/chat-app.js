@@ -2675,23 +2675,14 @@ let dsUiMode = "";
 /* 托管版标记：/api/quota（网关专属接口）探测成功才置 true。AI 模型栏目里
    凡是「本地 / 托管」语义不同的文案都看它——本地版探测永远失败，一行不动 */
 var dsHosted = false;
-/* curKey 状态行：本地版如实说「本机加密」；托管版同一份加密存储对同学而言
-   在服务器上，换「已加密保存」，不拿本地语境的话术给 web 同学看 */
+/* Key 状态不再常驻一行小字（供应商、型号下拉各自可见，掩码 Key + 来源 +
+   供应商 + 型号的拼接行是纯重复）：已配置改由输入框 placeholder 表达
+   「已保存；留空不修改」（与教务密码同一语言），未配置显示该供应商的
+   Key 形状提示；切换由 applyProviderUi 统一落 placeholder */
+let keyConfigured = false;
 function renderCurKey(d) {
-  var el = document.getElementById("curKey");
-  if (!el || !d || !d.deepseek) return;
-  var label = d.deepseek.sourceLabel;
-  if (dsHosted && label === "本机加密") label = "已加密保存";
-  el.textContent = d.deepseek.configured
-    ? "已保存：" +
-      (d.deepseek.masked || "API Key") +
-      " · " +
-      label +
-      " · " +
-      providerLabelOf(providerCurrent) +
-      " " +
-      d.model
-    : "尚未配置 API Key · 当前 " + providerLabelOf(providerCurrent) + " " + d.model;
+  keyConfigured = !!(d && d.deepseek && d.deepseek.configured);
+  applyProviderUi();
 }
 function setDsMode(m) {
   var site = document.getElementById("dsSite");
@@ -2764,7 +2755,7 @@ function refreshQuota() {
           intro.textContent =
             "模型服务支持多家供应商。下方选择 Key 来源：站点免费额度开箱即用；自己的 Key 由服务器加密保存，留空即保持不变。";
         }
-        /* curKey 已按本地语境渲染过（loadSettings 先于探测完成），补一次托管版渲染 */
+        /* renderCurKey 幂等：探测完成后重放一次，确保 placeholder 按最新状态落定 */
         renderCurKey(setStatus);
       }
       /* 站点配了 Key 的厂商清单（供应商下拉在站点额度模式下据此过滤；
@@ -3357,7 +3348,11 @@ function applyProviderUi() {
   const modelRow = document.getElementById("customModelRow");
   if (modelRow) modelRow.hidden = !isCustom;
   const kk = document.getElementById("sKey");
-  if (kk) kk.placeholder = providerKeyHintOf(providerCurrent) + "；留空不修改";
+  if (kk)
+    kk.placeholder =
+      keyConfigured && providerCurrent === providerSaved
+        ? "已保存；留空不修改"
+        : providerKeyHintOf(providerCurrent);
   const note = document.getElementById("dsOwnNote");
   if (note)
     note.textContent =
@@ -3469,11 +3464,13 @@ function fillModels(options, current, message) {
   modelOptions = list.filter((m) => m && typeof m.id === "string");
   modelEmptyMsg = modelOptions.length ? "" : (message || "型号清单读取中…");
   pickModel(sModel.value && modelOptions.some((m) => m.id === sModel.value) ? sModel.value : "");
-  const picked = modelOptions.filter((m) => m.id === current)[0];
-  let note = "当前：" + ((picked && picked.label) || current || "未设置");
-  if (picked && picked.note) note += " · " + picked.note;
-  if (message && modelOptions.length) note += " · " + message;
-  curModel.textContent = note;
+  /* 当前型号由下拉按钮自身显示（按钮文案即在用型号），不常驻一行小字重复；
+     这行只在服务端带话时出现：清单降级原因 / 自定义端点引导 */
+  if (curModel) {
+    const note = message && modelOptions.length ? message : "";
+    curModel.textContent = note;
+    curModel.hidden = !note;
+  }
 }
 const modelSelectBtn = document.getElementById("modelSelect");
 if (modelSelectBtn) {
@@ -3850,13 +3847,13 @@ document.getElementById("saveSettings").addEventListener("click", () => {
         document.getElementById("curJwgl").textContent = d.status.jwgl.configured
           ? "已保存：学号 " + d.status.jwgl.username + " · " + d.status.jwgl.sourceLabel
           : "尚未配置教务账号";
+        fillProviders(d.status);
         renderCurKey(d.status);
         refreshQuota();
         sQQAppId.value = "";
         sQQSecret.value = "";
         sQQPass.value = "";
         qqApplyStatus(d.status.qq);
-        fillProviders(d.status);
         pickModel("");
         fillModels(d.status.models, d.status.model, "");
         /* 凭证已落库：dirty 归零，「关闭」不必再二次确认；按钮短暂亮一下完成感 */
