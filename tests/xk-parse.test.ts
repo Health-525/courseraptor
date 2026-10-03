@@ -174,7 +174,7 @@ function fakeSession(round: Partial<XkRound>): XkSession {
     studentParams: { jg_id: "123" },
     isXkOpen: true,
     csrftoken: "CSRF",
-    username: "202321144057",
+    username: "202301010203",
   };
 }
 
