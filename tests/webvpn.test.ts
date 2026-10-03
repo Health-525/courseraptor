@@ -22,7 +22,7 @@ import { test } from "node:test";
 
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-webvpn-"));
 process.env.CAS_PASSWORD = "cas-pass-123";
-process.env.JWGL_USERNAME = "202321144057";
+process.env.JWGL_USERNAME = "202301010203";
 process.env.JWGL_PASSWORD = "jwgl-pass";
 
 const { fetchJwcArticle, fetchJwcNews, fetchJwcNewsDetailed, _setPdfTextParserForTest } =
@@ -46,9 +46,13 @@ function resetSessionState(): void {
 
 // ── 纯函数 ───────────────────────────────────────────────────
 
-test("统一认证密码加密与真实浏览器密文一致（2026-09-24 抓包钉住）", () => {
-  // croypto=wZKr1gt/Dcg= + 密码 @Jiangshu.6 → 浏览器 crypto-js 发出的密文
-  assert.equal(encryptCasPassword("wZKr1gt/Dcg=", "@Jiangshu.6"), "UAoqdnMEiYp+bty0G78tVg==");
+test("统一认证密码加密向量（2026-09-24 抓包钉住，2026-10 凭据换假值防泄漏）", () => {
+  // 向量最初用真实抓包的盐+密文钉住 crypto-js 行为；现改为假密码 + 本实现
+  // 按同一算法（DES-ECB-PKCS7）重算的期望值，钉算法不钉真实凭据
+  assert.equal(
+    encryptCasPassword("wZKr1gt/Dcg=", "test-password-42"),
+    "bOVgcqCNBza3tvUTKBoCtXfxyJlZ6CXq",
+  );
 });
 
 test("WebVPN 改写 URL 与公网 URL 互相映射", () => {

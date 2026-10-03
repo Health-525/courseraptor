@@ -62,7 +62,7 @@ test("空/未知标记返回 null，不猜", () => {
 // ── 入学年份推断 ──────────────────────────────────────────────
 
 test("入学年份从学号前四位推", () => {
-  assert.equal(enrollYearFromStudentId("202321144057"), 2023);
+  assert.equal(enrollYearFromStudentId("202301010203"), 2023);
   assert.equal(enrollYearFromStudentId("202511100001"), 2025);
 });
 
