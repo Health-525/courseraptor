@@ -72,6 +72,23 @@ export async function ownDeepseekKeyActive(usersDir, userId, providerId = "deeps
 }
 
 /**
+ * 实际生效的供应商：同学自选（users.json providerId）> 站点默认
+ * （site.json defaultProvider，管理台「站点默认模型」）> deepseek——
+ * 与 spawner 的注入链一致；/api/quota 展示与 /api/chat 分账都按它判
+ * 「当前供应商」，否则站点默认切到别家时会查错同学的自有 Key。
+ */
+export async function effectiveProviderIdFor(registry, user) {
+  if (user?.providerId) return user.providerId;
+  try {
+    const site = await registry.getSiteSettings();
+    if (site.defaultProvider) return site.defaultProvider;
+  } catch {
+    // 查询失败按未配置站点默认处理
+  }
+  return "deepseek";
+}
+
+/**
  * 切回站点免费额度：清掉该同学存储的自己 Key（重新加密落盘，其他字段保留）。
  * 文件不存在/解不开时静默成功——本来就没有自己的 Key。
  */

@@ -1,8 +1,12 @@
 import { useMemo, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { useBootstrap, useInvalidateBootstrap } from '@/lib/admin-data'
-import { siteSaveProviderKey } from '@/lib/api'
+import {
+  siteGetModels,
+  siteSaveDefaultModel,
+  siteSaveProviderKey,
+} from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,8 +21,176 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { AdminHeader } from '@/components/admin-header'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Main } from '@/components/layout/main'
+import { SelectDropdown } from '@/components/select-dropdown'
 
-/** 站点设置：各厂商站点 Key（多厂商）+ 限额分账 */
+/** 站点默认模型卡片：全站「没自选过模型」的同学统一用这里定的供应商+型号 */
+function SiteDefaultModelCard({
+  providers,
+  current,
+}: {
+  providers: {
+    id: string
+    label: string
+    keySet: boolean
+    envFallback?: boolean
+  }[]
+  current: { provider: string; model: string }
+}) {
+  const invalidate = useInvalidateBootstrap()
+  const [provider, setProvider] = useState(current.provider || 'deepseek')
+  const [model, setModel] = useState(current.model)
+  const [confirming, setConfirming] = useState(false)
+  const [clearing, setClearing] = useState(false)
+
+  const modelsQuery = useQuery({
+    queryKey: ['site-models', provider],
+    queryFn: () => siteGetModels(provider),
+    staleTime: 60_000,
+    retry: false,
+  })
+
+  const save = useMutation({
+    mutationFn: () => siteSaveDefaultModel(provider, model.trim()),
+    onSuccess: () => {
+      toast.success('站点默认模型已保存（同学自选优先，新拉起的实例生效）')
+      setConfirming(false)
+      void invalidate()
+    },
+    onError: (e: Error) => toast.error(e.message || '保存失败'),
+  })
+
+  const clear = useMutation({
+    mutationFn: () => siteSaveDefaultModel('', ''),
+    onSuccess: () => {
+      toast.success('站点默认模型已清除（回落系统默认 DeepSeek）')
+      setClearing(false)
+      void invalidate()
+    },
+    onError: (e: Error) => toast.error(e.message || '清除失败'),
+  })
+
+  const selected = providers.find((p) => p.id === provider)
+  const keyMissing = selected && !selected.keySet && !selected.envFallback
+  const models = modelsQuery.data?.models ?? []
+  const modelItems = models.map((id) => ({ label: id, value: id }))
+
+  return (
+    <Card className='mt-4'>
+      <CardHeader>
+        <CardTitle>站点默认模型</CardTitle>
+        <CardDescription>
+          从没自选过模型的同学统一用这里的供应商与型号（例如全站切到移动云）；
+          同学自己选过的供应商与型号永远优先，不受这里影响。新拉起的实例生效。
+        </CardDescription>
+      </CardHeader>
+      <CardContent className='space-y-4'>
+        {current.provider ? (
+          <p className='text-sm'>
+            当前：
+            <Badge variant='secondary' className='mx-1'>
+              {providers.find((p) => p.id === current.provider)?.label ??
+                current.provider}
+            </Badge>
+            <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-xs'>
+              {current.model}
+            </code>
+          </p>
+        ) : (
+          <p className='text-muted-foreground text-sm'>
+            未设置——没自选过的同学用系统默认（DeepSeek · deepseek-flash）
+          </p>
+        )}
+        <div className='flex flex-wrap items-center gap-2'>
+          <SelectDropdown
+            isControlled
+            defaultValue={provider}
+            onValueChange={(v) => {
+              setProvider(v)
+              setModel('')
+            }}
+            items={providers.map((p) => ({ label: p.label, value: p.id }))}
+            placeholder='选择供应商'
+            className='w-52'
+          />
+          {modelsQuery.isLoading ? (
+            <Skeleton className='h-9 w-56' />
+          ) : modelItems.length > 0 ? (
+            <SelectDropdown
+              isControlled
+              defaultValue={model}
+              onValueChange={setModel}
+              items={modelItems}
+              placeholder='选择型号'
+              className='w-56'
+            />
+          ) : (
+            <Input
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              placeholder='手动输入型号 ID'
+              autoComplete='off'
+              className='w-56 font-mono'
+            />
+          )}
+          <Button
+            className='shrink-0'
+            disabled={save.isPending || !provider || !model.trim()}
+            onClick={() => setConfirming(true)}
+          >
+            保存
+          </Button>
+          {current.provider && (
+            <Button
+              variant='outline'
+              className='shrink-0'
+              disabled={clear.isPending}
+              onClick={() => setClearing(true)}
+            >
+              清除
+            </Button>
+          )}
+        </div>
+        {modelsQuery.data?.error && (
+          <p className='text-muted-foreground text-xs'>
+            {modelsQuery.data.error}
+          </p>
+        )}
+        {keyMissing && (
+          <p className='text-xs text-amber-600 dark:text-amber-400'>
+            {selected?.label}还没配站点
+            Key：用站点额度的同学调不动它，请先在上方配 Key，或让同学自带 Key。
+          </p>
+        )}
+      </CardContent>
+      <ConfirmDialog
+        open={confirming}
+        onOpenChange={setConfirming}
+        title='保存站点默认模型'
+        desc={`确定把站点默认模型设为 ${
+          selected?.label ?? provider
+        } / ${model.trim()} 吗？只影响从没自选过模型的同学。`}
+        cancelBtnText='取消'
+        confirmText='保存'
+        isLoading={save.isPending}
+        handleConfirm={() => save.mutate()}
+        className='sm:max-w-sm'
+      />
+      <ConfirmDialog
+        open={clearing}
+        onOpenChange={setClearing}
+        title='清除站点默认模型'
+        desc='清除后，没自选过模型的同学回落系统默认（DeepSeek · deepseek-flash）。'
+        cancelBtnText='取消'
+        confirmText='清除'
+        isLoading={clear.isPending}
+        handleConfirm={() => clear.mutate()}
+        className='sm:max-w-sm'
+      />
+    </Card>
+  )
+}
+
+/** 站点设置：各厂商站点 Key（多厂商）+ 站点默认模型 + 限额分账 */
 export function SitePage() {
   const { data, isLoading } = useBootstrap()
   const invalidate = useInvalidateBootstrap()
@@ -188,6 +360,19 @@ export function SitePage() {
             </p>
           </CardContent>
         </Card>
+
+        <SiteDefaultModelCard
+          providers={providers.map((p) => ({
+            id: p.id,
+            label: p.label,
+            keySet: p.keySet,
+            envFallback: 'envFallback' in p ? p.envFallback : false,
+          }))}
+          current={{
+            provider: site?.defaultProvider ?? '',
+            model: site?.defaultModel ?? '',
+          }}
+        />
 
         <Card className='mt-4'>
           <CardHeader>

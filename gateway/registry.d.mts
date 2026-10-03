@@ -42,8 +42,14 @@ export interface Registry {
   getSiteProviderKeys(): Promise<Record<string, string>>;
   /** 按厂商保存/清除站点 Key（custom 拒绝；deepseek 双写旧字段兼容） */
   setSiteProviderKey(providerId: string, key: string): Promise<void>;
-  getSiteSettings(): Promise<{ deepseekKey: string }>;
+  getSiteSettings(): Promise<{
+    deepseekKey: string;
+    defaultProvider: string;
+    defaultModel: string;
+  }>;
   setSiteSettings(patch: { deepseekKey?: string }): Promise<void>;
+  /** 站点默认模型（管理台「站点默认模型」）：双空=清除；custom 与半填拒绝 */
+  setSiteDefaultModel(providerId: string, model: string): Promise<void>;
   getAdminTotp(): Promise<AdminTotpDoc | null>;
   setAdminTotp(doc: AdminTotpDoc): Promise<void>;
   clearAdminTotp(): Promise<void>;

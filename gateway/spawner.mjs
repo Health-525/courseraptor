@@ -70,6 +70,7 @@ export function buildInstanceEnv(
     forceSite = false,
     providerId = "",
     providerSiteKey = "",
+    siteModel = "",
   },
 ) {
   const env = {};
@@ -98,6 +99,9 @@ export function buildInstanceEnv(
   const deepseekEffective = providerSiteKey || siteKey || fallbackKey;
   if (isDeepseek && deepseekEffective) env.DEEPSEEK_API_KEY = deepseekEffective;
   if (forceSite) env.RAPTOR_DISABLE_DS_OVERRIDE = "1";
+  // 站点默认型号（site.json，管理台「站点默认模型」）：实例内优先级在同学
+  // 自选之后（config.ts），只兜底从没选过型号的同学，不动任何人的选择。
+  if (siteModel) env.RAPTOR_SITE_MODEL = siteModel;
   return env;
 }
 
@@ -113,6 +117,8 @@ export function createSpawner({
   getProviderId = null,
   /** 每次拉起时问一次：指定供应商的站点 Key（site.json providerKeys，含 env 兜底） */
   getProviderSiteKey = null,
+  /** 每次拉起时问一次：站点默认模型 {provider, model}（site.json，管理台配置；可缺省） */
+  getSiteDefault = null,
   maxConcurrent = 4,
   idleMinutes = 30,
   reapIntervalMs = 60_000,
@@ -162,13 +168,40 @@ export function createSpawner({
     }
   }
 
-  /** 该同学当前选的供应商（取不到按 deepseek，绝不让查询失败拦住拉起） */
+  /**
+   * 该同学当前选的供应商：同学自选（users.json，/api/provider 切换）优先；
+   * 没选过时用站点默认供应商（site.json，管理台「站点默认模型」），再落
+   * 回 deepseek——绝不让查询失败拦住拉起。
+   */
   async function currentProviderId(userId) {
-    if (!getProviderId) return "deepseek";
+    let own = "";
+    if (getProviderId) {
+      try {
+        own = (await getProviderId(userId)) || "";
+      } catch {
+        own = "";
+      }
+    }
+    if (own) return own;
+    if (getSiteDefault) {
+      try {
+        const site = await getSiteDefault();
+        if (site && site.provider) return String(site.provider);
+      } catch {
+        // 查询失败按未配置处理
+      }
+    }
+    return "deepseek";
+  }
+
+  /** 站点默认型号（site.json）；查询失败按未配置，绝不让它拦住拉起 */
+  async function currentSiteModel() {
+    if (!getSiteDefault) return "";
     try {
-      return (await getProviderId(userId)) || "deepseek";
+      const site = await getSiteDefault();
+      return site && site.model ? String(site.model) : "";
     } catch {
-      return "deepseek";
+      return "";
     }
   }
 
@@ -203,6 +236,7 @@ export function createSpawner({
     forceSite = false,
     providerId = "",
     providerSiteKey = "",
+    siteModel = "",
   ) {
     const dataDir = path.join(userDataDir(userId), "data");
     const credFile = path.join(userDataDir(userId), "credentials.enc");
@@ -217,6 +251,7 @@ export function createSpawner({
       forceSite,
       providerId,
       providerSiteKey,
+      siteModel,
     });
 
     const child = spawn(nodeExec, ["--import", tsxUrl, "gateway/headless/entry.ts"], {
@@ -268,9 +303,18 @@ export function createSpawner({
           currentSiteKey(),
           forceSiteKey(userId),
           currentProviderId(userId).then((id) => Promise.all([id, providerSiteKeyFor(id)])),
+          currentSiteModel(),
         ])
-          .then(([key, force, [providerId, providerSiteKey]]) =>
-            spawnInstance(userId, effectiveRestarts + 1, key, force, providerId, providerSiteKey),
+          .then(([key, force, [providerId, providerSiteKey], siteModel]) =>
+            spawnInstance(
+              userId,
+              effectiveRestarts + 1,
+              key,
+              force,
+              providerId,
+              providerSiteKey,
+              siteModel,
+            ),
           )
           .catch((e) => {
             // 自动重启失败（如端口段耗尽）：可见地记录，不留未处理 rejection
@@ -328,12 +372,21 @@ export function createSpawner({
       }
       const task = (async () => {
         try {
-          const [siteKey, forceSite, [providerId, providerSiteKey]] = await Promise.all([
+          const [siteKey, forceSite, [providerId, providerSiteKey], siteModel] = await Promise.all([
             currentSiteKey(),
             forceSiteKey(userId),
             currentProviderId(userId).then((id) => Promise.all([id, providerSiteKeyFor(id)])),
+            currentSiteModel(),
           ]);
-          const it = spawnInstance(userId, 0, siteKey, forceSite, providerId, providerSiteKey);
+          const it = spawnInstance(
+            userId,
+            0,
+            siteKey,
+            forceSite,
+            providerId,
+            providerSiteKey,
+            siteModel,
+          );
           const port = await it.ready;
           it.lastRequestAt = Date.now();
           return port;

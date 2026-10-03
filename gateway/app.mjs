@@ -13,7 +13,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
-import { ownDeepseekKeyActive } from "./admin/credentials-peek.mjs";
+import { effectiveProviderIdFor, ownDeepseekKeyActive } from "./admin/credentials-peek.mjs";
 import { createAdminUi } from "./admin/ui.mjs";
 
 const COOKIE_NAME = "raptor_sess";
@@ -839,7 +839,7 @@ else { input.type = "password"; this.textContent = "显示"; }
       // 同学端额度查询：设置弹窗「账号与模型」里展示剩余免费对话次数
       if (req.method === "GET" && pathname === "/api/quota") {
         const limit = user.dailyTurns > 0 ? user.dailyTurns : dailyTurns;
-        const providerId = user.providerId || "deepseek";
+        const providerId = await effectiveProviderIdFor(registry, user);
         const hasOwnKey = usersDir
           ? await ownDeepseekKeyActive(usersDir, user.id, providerId)
           : false;
@@ -906,7 +906,11 @@ else { input.type = "password"; this.textContent = "显示"; }
       let chatTurnLedger = null;
       if (req.method === "POST" && pathname === "/api/chat") {
         const hasOwnKey = usersDir
-          ? await ownDeepseekKeyActive(usersDir, user.id, user.providerId || "deepseek")
+          ? await ownDeepseekKeyActive(
+              usersDir,
+              user.id,
+              await effectiveProviderIdFor(registry, user),
+            )
           : false;
         const ownKeyActive = hasOwnKey && user.dsMode !== "site";
         if (!ownKeyActive) {

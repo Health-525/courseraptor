@@ -1578,18 +1578,122 @@ test("钉站点模式的供应商切换：没配站点 Key 的厂商被拒，配
   assert.equal((await call("deepseek")).status, 200, "deepseek 是兜底供应商，恒可切");
 });
 
+test("站点默认模型：保存/读取/清除 + 在线型号清单代理 + bootstrap 同形状", async (t) => {
+  const backendPort = await startBackend(t);
+  const { base, registry } = await startGateway(t, {
+    backendPort,
+    adminPassword: "admin-master-pw",
+  });
+  const { cookie } = await adminLogin(base, "admin-master-pw");
+  const adminCall = (body: unknown) =>
+    fetch(`${base}/admin/api/site`, {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  // 初始未设置；GET /site 与 bootstrap（SPA 数据源）形状一致
+  const s0 = (await (await fetch(`${base}/admin/api/site`, { headers: { cookie } })).json()) as {
+    defaultProvider: string;
+    defaultModel: string;
+    providers: unknown[];
+  };
+  assert.equal(s0.defaultProvider, "");
+  assert.equal(s0.defaultModel, "");
+  const boot = (await (
+    await fetch(`${base}/admin/api/bootstrap`, { headers: { cookie } })
+  ).json()) as { site: typeof s0 };
+  assert.ok(
+    Array.isArray(boot.site.providers) && boot.site.providers.length >= 10,
+    "bootstrap 必须带 providers——否则站点设置页静默退回单行 DeepSeek 兜底",
+  );
+  assert.equal(boot.site.defaultProvider, "");
+  assert.equal(boot.site.defaultModel, "");
+
+  // 保存 → 读取回显
+  assert.equal(
+    (await adminCall({ defaultProvider: "zhenze", defaultModel: "deepseek-v4.1-flash" })).status,
+    200,
+  );
+  const s1 = (await (await fetch(`${base}/admin/api/site`, { headers: { cookie } })).json()) as {
+    defaultProvider: string;
+    defaultModel: string;
+  };
+  assert.equal(s1.defaultProvider, "zhenze");
+  assert.equal(s1.defaultModel, "deepseek-v4.1-flash");
+
+  // 校验：未知厂商 / custom / 只填一半 / 脏型号
+  assert.equal((await adminCall({ defaultProvider: "nope", defaultModel: "x" })).status, 400);
+  assert.equal((await adminCall({ defaultProvider: "custom", defaultModel: "x" })).status, 400);
+  assert.equal((await adminCall({ defaultProvider: "zhenze", defaultModel: "" })).status, 400);
+  assert.equal((await adminCall({ defaultProvider: "", defaultModel: "glm-5.3" })).status, 400);
+  assert.equal(
+    (await adminCall({ defaultProvider: "zhenze", defaultModel: "bad id" })).status,
+    400,
+  );
+
+  // 型号清单代理：未配站点 Key → 空清单带提示（不是 5xx）
+  const noKey = (await (
+    await fetch(`${base}/admin/api/site/models?provider=zhenze`, { headers: { cookie } })
+  ).json()) as { models: string[]; error?: string };
+  assert.deepEqual(noKey.models, []);
+  assert.ok(noKey.error, "未配 Key 时给出可行动的提示");
+  assert.equal(
+    (await fetch(`${base}/admin/api/site/models?provider=custom`, { headers: { cookie } })).status,
+    400,
+  );
+
+  // 型号清单代理：配 Key 后网关实时代理 {base}/models（stub 外联，脏条目过滤）
+  await registry.setSiteProviderKey("zhenze", "zhenze-site-key-0123456789");
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input) === "https://zhenze-huhehaote.cmecloud.cn/v1/models") {
+      const headers = init?.headers as Record<string, string> | undefined;
+      assert.match(
+        headers?.Authorization ?? "",
+        /^Bearer zhenze-site-key/,
+        "代理请求带该厂商站点 Key 的 Bearer",
+      );
+      return new Response(
+        JSON.stringify({
+          data: [{ id: "glm-5.3" }, { id: "deepseek-v4.1-flash" }, { id: "bad id" }, 42, {}],
+        }),
+        { status: 200 },
+      );
+    }
+    return realFetch(input, init);
+  }) as typeof fetch;
+  try {
+    const list = (await (
+      await fetch(`${base}/admin/api/site/models?provider=zhenze`, { headers: { cookie } })
+    ).json()) as { models: string[] };
+    assert.deepEqual(list.models, ["deepseek-v4.1-flash", "glm-5.3"], "过滤脏条目、去重排序");
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+
+  // 清除 → 回落未设置
+  assert.equal((await adminCall({ defaultProvider: "", defaultModel: "" })).status, 200);
+  const s2 = (await (await fetch(`${base}/admin/api/site`, { headers: { cookie } })).json()) as {
+    defaultProvider: string;
+  };
+  assert.equal(s2.defaultProvider, "");
+});
+
 test("网关侧厂商清单与 src/core/providers.ts 保持一致（防漂移钉）", async () => {
   const ui = await fs.promises.readFile(path.join(ROOT, "gateway/admin/ui.mjs"), "utf8");
   const m = ui.match(/const SITE_PROVIDERS = \[([\s\S]*?)\];/);
   assert.ok(m, "SITE_PROVIDERS 常量应存在于 ui.mjs");
   const gatewayIds = [...m[1].matchAll(/id: "([a-z0-9-]+)"/g)].map((x) => x[1]);
+  const gatewayUrls = [...m[1].matchAll(/baseUrl: "([^"]+)"/g)].map((x) => x[1]);
   const { BUILTIN_PROVIDERS } = await import("../src/core/providers");
-  const coreIds = BUILTIN_PROVIDERS.filter((p: { id: string }) => p.id !== "custom").map(
-    (p: { id: string }) => p.id,
-  );
+  const core = BUILTIN_PROVIDERS.filter((p: { id: string }) => p.id !== "custom");
+  const coreIds = core.map((p: { id: string }) => p.id);
+  const coreUrls = core.map((p: { baseUrl: string }) => p.baseUrl);
   assert.deepEqual(
     gatewayIds,
     coreIds,
     "加/改厂商时两处清单要同步：gateway/admin/ui.mjs 的 SITE_PROVIDERS 与 src/core/providers.ts",
   );
+  assert.deepEqual(gatewayUrls, coreUrls, "在线型号清单代理按 baseUrl 外联，端点漂移等于拉错厂商");
 });

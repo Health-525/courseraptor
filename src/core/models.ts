@@ -39,6 +39,11 @@ export const FALLBACK_MODEL_ID = DEEPSEEK_DEF.fallbackModels[0]?.id ?? "deepseek
 /** 模型 id 形状白名单：只接受 API 可能返回的标识字符（含硅基流动的 "厂商/型号" 斜杠） */
 const MODEL_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,63}$/;
 
+/** 供配置层甄别 env/存储里的脏型号值（如 RAPTOR_SITE_MODEL）用 */
+export function isValidModelId(raw: string | undefined | null): boolean {
+  return typeof raw === "string" && MODEL_ID_RE.test(raw);
+}
+
 /** 兜底清单（历史导出：DeepSeek 的内置清单）；其他供应商见 fallbackModelsFor */
 export const FALLBACK_MODELS: ModelOption[] = DEEPSEEK_DEF.fallbackModels.map((m) => ({ ...m }));
 
@@ -55,14 +60,21 @@ export function describeModel(id: string): ModelOption {
 /**
  * 与 resolveDeepSeekApiKey 同构：交互式（设置弹窗）明确选过的值优先于 .env，
  * 否则用户在界面里换了型号、重启又被 RAPTOR_MODEL 拉回去。
+ *
+ * siteModel（RAPTOR_SITE_MODEL，多用户网关注入的站点默认型号）插在
+ * environmentModel 与旧格式 storedModel 之间：同学按供应商的型号记忆
+ * （storedOverride 语义）与本地 RAPTOR_MODEL 都压过它，站点默认只兜底
+ * 「从没选过型号」的同学——站长切站点默认不会劫持任何人的明确选择。
  */
 export function resolveStoredModel(input: {
   environmentModel?: string;
   storedModel?: string;
   storedOverride?: boolean;
+  siteModel?: string;
 }): string {
   if (input.storedOverride && input.storedModel) return input.storedModel;
   if (input.environmentModel) return input.environmentModel;
+  if (input.siteModel) return input.siteModel;
   if (input.storedModel) return input.storedModel;
   return FALLBACK_MODEL_ID;
 }

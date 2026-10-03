@@ -171,3 +171,59 @@ test("getSiteProviderKeys：新格式优先，旧 deepseekKey 迁移映射，脏
     /供应商标识/,
   );
 });
+
+test("站点默认模型：保存/读取/清除与校验（site.json defaultProvider/defaultModel）", async () => {
+  const { registry } = makeRegistry();
+  const s0 = await registry.getSiteSettings();
+  assert.equal(s0.defaultProvider, "", "存量 site.json 无此字段按未设置");
+  assert.equal(s0.defaultModel, "");
+
+  await registry.setSiteDefaultModel("zhenze", "deepseek-v4.1-flash");
+  const s1 = await registry.getSiteSettings();
+  assert.equal(s1.defaultProvider, "zhenze");
+  assert.equal(s1.defaultModel, "deepseek-v4.1-flash");
+
+  await registry.setSiteDefaultModel("", "");
+  assert.equal((await registry.getSiteSettings()).defaultProvider, "", "双空即清除");
+
+  await assert.rejects(() => registry.setSiteDefaultModel("custom", "x"), /自定义端点/);
+  await assert.rejects(() => registry.setSiteDefaultModel("zhenze", ""), /要么都填/);
+  await assert.rejects(() => registry.setSiteDefaultModel("", "glm-5.3"), /要么都填/);
+  await assert.rejects(() => registry.setSiteDefaultModel("zhenze", "bad id"), /型号标识/);
+  await assert.rejects(() => registry.setSiteDefaultModel("BadId", "glm-5.3"), /供应商标识/);
+});
+
+test("effectiveProviderIdFor：同学自选 > 站点默认 > deepseek（与 spawner 注入链一致）", async () => {
+  const { effectiveProviderIdFor } = await import("../gateway/admin/credentials-peek.mjs");
+  const siteZhenze = {
+    async getSiteSettings() {
+      return { deepseekKey: "", defaultProvider: "zhenze", defaultModel: "deepseek-v4.1-flash" };
+    },
+  };
+  assert.equal(await effectiveProviderIdFor(siteZhenze, { providerId: "glm" }), "glm");
+  assert.equal(await effectiveProviderIdFor(siteZhenze, {}), "zhenze");
+  assert.equal(
+    await effectiveProviderIdFor(
+      {
+        async getSiteSettings() {
+          return { deepseekKey: "", defaultProvider: "" };
+        },
+      },
+      {},
+    ),
+    "deepseek",
+    "未配置站点默认回落 deepseek",
+  );
+  assert.equal(
+    await effectiveProviderIdFor(
+      {
+        async getSiteSettings() {
+          throw new Error("io");
+        },
+      },
+      {},
+    ),
+    "deepseek",
+    "查询失败按未配置，绝不拦请求",
+  );
+});
