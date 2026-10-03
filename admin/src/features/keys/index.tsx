@@ -1,9 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { Copy, KeyRound, Trash2 } from 'lucide-react'
-import { AdminHeader } from '@/components/admin-header'
-import { Main } from '@/components/layout/main'
+import { toast } from 'sonner'
 import { useBootstrap, useInvalidateBootstrap } from '@/lib/admin-data'
 import { keyCreate, keyDelete } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
@@ -17,7 +15,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
   Dialog,
   DialogContent,
@@ -36,6 +33,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { AdminHeader } from '@/components/admin-header'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { Main } from '@/components/layout/main'
 
 /** 密钥管理：更新后台的面板密钥（crak_ 前缀、明文仅此一次展示、与主密钥同权） */
 export function KeysPage() {
@@ -43,7 +43,9 @@ export function KeysPage() {
   const invalidate = useInvalidateBootstrap()
   const [name, setName] = useState('')
   const [created, setCreated] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null)
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(
+    null
+  )
 
   const create = useMutation({
     mutationFn: () => keyCreate(name.trim()),
@@ -78,7 +80,9 @@ export function KeysPage() {
         <Card>
           <CardHeader>
             <CardTitle>更新后台密钥</CardTitle>
-            <CardDescription>命令行发版与后台登录用，与主密钥同权</CardDescription>
+            <CardDescription>
+              命令行发版与后台登录用，与主密钥同权
+            </CardDescription>
           </CardHeader>
           <CardContent className='space-y-4'>
             <div className='flex gap-2'>
@@ -122,7 +126,10 @@ export function KeysPage() {
                   <TableBody>
                     {(keys.data?.keys ?? []).length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={5} className='text-muted-foreground py-8 text-center'>
+                        <TableCell
+                          colSpan={5}
+                          className='text-muted-foreground py-8 text-center'
+                        >
                           还没有面板密钥
                         </TableCell>
                       </TableRow>
@@ -141,7 +148,9 @@ export function KeysPage() {
                           {fmtDateTime(k.createdAt)}
                         </TableCell>
                         <TableCell className='text-muted-foreground text-xs'>
-                          {k.lastUsedAt ? fmtDateTime(k.lastUsedAt) : '从未使用'}
+                          {k.lastUsedAt
+                            ? fmtDateTime(k.lastUsedAt)
+                            : '从未使用'}
                         </TableCell>
                         <TableCell>
                           {!k.isEnv && (
@@ -150,7 +159,9 @@ export function KeysPage() {
                               size='icon'
                               className='text-destructive size-8'
                               aria-label='删除密钥'
-                              onClick={() => setDeleting({ id: k.id, name: k.name })}
+                              onClick={() =>
+                                setDeleting({ id: k.id, name: k.name })
+                              }
                             >
                               <Trash2 />
                             </Button>
@@ -163,13 +174,17 @@ export function KeysPage() {
               </div>
             )}
             <p className='text-muted-foreground text-xs'>
-              主密钥来自服务器环境变量 UPDATE_ADMIN_TOKEN，始终可用且不能在这里删除；面板密钥删除后立即失效。明文只在创建时展示一次。
+              主密钥来自服务器环境变量
+              UPDATE_ADMIN_TOKEN，始终可用且不能在这里删除；面板密钥删除后立即失效。明文只在创建时展示一次。
             </p>
           </CardContent>
         </Card>
 
         {/* 一次性明文令牌 */}
-        <Dialog open={created !== null} onOpenChange={(v) => !v && setCreated(null)}>
+        <Dialog
+          open={created !== null}
+          onOpenChange={(v) => !v && setCreated(null)}
+        >
           <DialogContent className='sm:max-w-md'>
             <DialogHeader>
               <DialogTitle>密钥已创建（明文仅此一次展示）</DialogTitle>
@@ -178,7 +193,11 @@ export function KeysPage() {
               </DialogDescription>
             </DialogHeader>
             <div className='flex gap-2'>
-              <Input readOnly value={created ?? ''} className='font-mono text-xs' />
+              <Input
+                readOnly
+                value={created ?? ''}
+                className='font-mono text-xs'
+              />
               <Button
                 variant='outline'
                 className='shrink-0'

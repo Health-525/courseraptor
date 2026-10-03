@@ -46,7 +46,7 @@ export function ConfigDrawer() {
         <Button
           size='icon'
           variant='ghost'
-          aria-label='打开外观设置'
+          aria-label='Open theme settings'
           aria-describedby='config-drawer-description'
           className='rounded-full'
         >
@@ -55,9 +55,9 @@ export function ConfigDrawer() {
       </SheetTrigger>
       <SheetContent className='flex flex-col'>
         <SheetHeader className='pb-0 text-start'>
-          <SheetTitle>外观与布局</SheetTitle>
+          <SheetTitle>Theme Settings</SheetTitle>
           <SheetDescription id='config-drawer-description'>
-            按喜好调整主题、侧栏与布局。
+            Adjust the appearance and layout to suit your preferences.
           </SheetDescription>
         </SheetHeader>
         <div className='space-y-6 overflow-y-auto px-4'>
@@ -70,7 +70,7 @@ export function ConfigDrawer() {
           <Button
             variant='destructive'
             onClick={handleReset}
-            aria-label='恢复默认设置'
+            aria-label='Reset all settings to default values'
           >
             Reset
           </Button>
@@ -173,7 +173,7 @@ function ThemeConfig() {
   return (
     <div>
       <SectionTitle
-        title='主题'
+        title='Theme'
         showReset={theme !== defaultTheme}
         onReset={() => setTheme(defaultTheme)}
       />
@@ -181,23 +181,23 @@ function ThemeConfig() {
         value={theme}
         onValueChange={setTheme}
         className='grid w-full max-w-md grid-cols-3 gap-4'
-        aria-label='选择主题偏好'
+        aria-label='Select theme preference'
         aria-describedby='theme-description'
       >
         {[
           {
             value: 'system',
-            label: '跟随系统',
+            label: 'System',
             icon: IconThemeSystem,
           },
           {
             value: 'light',
-            label: '浅色',
+            label: 'Light',
             icon: IconThemeLight,
           },
           {
             value: 'dark',
-            label: '深色',
+            label: 'Dark',
             icon: IconThemeDark,
           },
         ].map((item) => (
@@ -216,7 +216,7 @@ function SidebarConfig() {
   return (
     <div className='max-md:hidden'>
       <SectionTitle
-        title='侧栏样式'
+        title='Sidebar'
         showReset={defaultVariant !== variant}
         onReset={() => setVariant(defaultVariant)}
       />
@@ -224,23 +224,23 @@ function SidebarConfig() {
         value={variant}
         onValueChange={setVariant}
         className='grid w-full max-w-md grid-cols-3 gap-4'
-        aria-label='选择侧栏样式'
+        aria-label='Select sidebar style'
         aria-describedby='sidebar-description'
       >
         {[
           {
             value: 'inset',
-            label: '内嵌',
+            label: 'Inset',
             icon: IconSidebarInset,
           },
           {
             value: 'floating',
-            label: '悬浮',
+            label: 'Floating',
             icon: IconSidebarFloating,
           },
           {
             value: 'sidebar',
-            label: '经典',
+            label: 'Sidebar',
             icon: IconSidebarSidebar,
           },
         ].map((item) => (
@@ -263,7 +263,7 @@ function LayoutConfig() {
   return (
     <div className='max-md:hidden'>
       <SectionTitle
-        title='布局'
+        title='Layout'
         showReset={radioState !== 'default'}
         onReset={() => {
           setOpen(true)
@@ -281,23 +281,23 @@ function LayoutConfig() {
           setCollapsible(v as Collapsible)
         }}
         className='grid w-full max-w-md grid-cols-3 gap-4'
-        aria-label='选择布局密度'
+        aria-label='Select layout style'
         aria-describedby='layout-description'
       >
         {[
           {
             value: 'default',
-            label: '标准',
+            label: 'Default',
             icon: IconLayoutDefault,
           },
           {
             value: 'icon',
-            label: '紧凑',
+            label: 'Compact',
             icon: IconLayoutCompact,
           },
           {
             value: 'offcanvas',
-            label: '全宽',
+            label: 'Full layout',
             icon: IconLayoutFull,
           },
         ].map((item) => (
@@ -316,7 +316,7 @@ function DirConfig() {
   return (
     <div>
       <SectionTitle
-        title='文字方向'
+        title='Direction'
         showReset={defaultDir !== dir}
         onReset={() => setDir(defaultDir)}
       />
@@ -324,20 +324,20 @@ function DirConfig() {
         value={dir}
         onValueChange={setDir}
         className='grid w-full max-w-md grid-cols-3 gap-4'
-        aria-label='选择文字方向'
+        aria-label='Select site direction'
         aria-describedby='direction-description'
       >
         {[
           {
             value: 'ltr',
-            label: '从左到右',
+            label: 'Left to Right',
             icon: (props: SVGProps<SVGSVGElement>) => (
               <IconDir dir='ltr' {...props} />
             ),
           },
           {
             value: 'rtl',
-            label: '从右到左（RTL）',
+            label: 'Right to Left',
             icon: (props: SVGProps<SVGSVGElement>) => (
               <IconDir dir='rtl' {...props} />
             ),

@@ -6,10 +6,10 @@ import {
   SidebarHeader,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import { AppTitle } from './app-title'
 import { sidebarData } from './data/sidebar-data'
 import { NavGroup } from './nav-group'
 import { NavUser } from './nav-user'
-import { AppTitle } from './app-title'
 
 export function AppSidebar() {
   const { collapsible, variant } = useLayout()

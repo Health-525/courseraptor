@@ -33,7 +33,7 @@ export function CommandMenu() {
       <CommandInput placeholder='输入命令或搜索…' />
       <CommandList>
         <ScrollArea type='hover' className='h-72 pe-1'>
-          <CommandEmpty>没有匹配项</CommandEmpty>
+          <CommandEmpty>没有匹配的结果</CommandEmpty>
           {sidebarData.navGroups.map((group) => (
             <CommandGroup key={group.title} heading={group.title}>
               {group.items.map((navItem, i) => {

@@ -1,9 +1,7 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { Trash2 } from 'lucide-react'
-import { AdminHeader } from '@/components/admin-header'
-import { Main } from '@/components/layout/main'
+import { toast } from 'sonner'
 import { useBootstrap, useInvalidateBootstrap } from '@/lib/admin-data'
 import { logClear } from '@/lib/api'
 import { fmtDateTime } from '@/lib/format'
@@ -15,7 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
@@ -25,6 +22,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { AdminHeader } from '@/components/admin-header'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { Main } from '@/components/layout/main'
 
 /** 操作日志：最近 200 条管理动作（环形 500 条，等落盘再响应），可整体清空 */
 export function LogPage() {
@@ -85,14 +85,17 @@ export function LogPage() {
                   <TableBody>
                     {data.log.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={2} className='text-muted-foreground py-8 text-center'>
+                        <TableCell
+                          colSpan={2}
+                          className='text-muted-foreground py-8 text-center'
+                        >
                           暂无记录
                         </TableCell>
                       </TableRow>
                     )}
                     {data.log.map((entry, i) => (
                       <TableRow key={`${entry.at}-${i}`}>
-                        <TableCell className='text-muted-foreground whitespace-nowrap text-xs'>
+                        <TableCell className='text-muted-foreground text-xs whitespace-nowrap'>
                           {fmtDateTime(entry.at)}
                         </TableCell>
                         <TableCell>{entry.text}</TableCell>

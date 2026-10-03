@@ -1,9 +1,7 @@
 import { useRef, useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { FileArchive, RotateCcw, Trash2, Upload, X } from 'lucide-react'
-import { AdminHeader } from '@/components/admin-header'
-import { Main } from '@/components/layout/main'
+import { toast } from 'sonner'
 import { useBootstrap, useInvalidateBootstrap } from '@/lib/admin-data'
 import { updateDelete, updatePublish, updateRollback } from '@/lib/api'
 import { fmtBytes, fmtDateTime, nextPatch } from '@/lib/format'
@@ -17,10 +15,12 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AdminHeader } from '@/components/admin-header'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { Main } from '@/components/layout/main'
 
 const MAX_UPLOAD_BYTES = 200 * 1024 * 1024
 
@@ -45,7 +45,8 @@ export function ReleasePage() {
 
   // 历史分发里挑个「当前版本 +1」预填；用户手改过就不再覆盖（渲染期派生，不用 effect）
   const currentVersion = data?.update?.overview?.data?.current?.version ?? ''
-  const displayVersion = versionTouched || !currentVersion ? version : nextPatch(currentVersion)
+  const displayVersion =
+    versionTouched || !currentVersion ? version : nextPatch(currentVersion)
 
   const pickFile = (f: File | null | undefined) => {
     if (!f) return
@@ -69,9 +70,12 @@ export function ReleasePage() {
     try {
       await updatePublish(file, displayVersion.trim(), notes.trim(), {
         signal: abort.signal,
-        onProgress: (loaded, total) => setProgress({ loaded, total, phase: '上传中' }),
+        onProgress: (loaded, total) =>
+          setProgress({ loaded, total, phase: '上传中' }),
       })
-      toast.success(`v${displayVersion.trim()} 发布成功，学生端下次启动时提示更新`)
+      toast.success(
+        `v${displayVersion.trim()} 发布成功，学生端下次启动时提示更新`
+      )
       setFile(null)
       setNotes('')
       setVersionTouched(false)
@@ -79,7 +83,8 @@ export function ReleasePage() {
     } catch (err) {
       if (abort.signal.aborted) toast.info('已取消上传')
       else {
-        const msg = (err as { response?: { data?: { error?: string } } }).response?.data?.error
+        const msg = (err as { response?: { data?: { error?: string } } })
+          .response?.data?.error
         toast.error(msg ?? '发布失败')
       }
     } finally {
@@ -122,7 +127,9 @@ export function ReleasePage() {
         <Card>
           <CardHeader>
             <CardTitle>上传新版本</CardTitle>
-            <CardDescription>同学端安装包 · 与 npm run publish 共用接口</CardDescription>
+            <CardDescription>
+              同学端安装包 · 与 npm run publish 共用接口
+            </CardDescription>
           </CardHeader>
           <CardContent className='space-y-3'>
             <div className='flex flex-wrap gap-3'>
@@ -148,7 +155,7 @@ export function ReleasePage() {
                   value={notes}
                   maxLength={2000}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="如：修复课表周次显示错误"
+                  placeholder='如：修复课表周次显示错误'
                   autoComplete='off'
                 />
               </div>
@@ -166,7 +173,8 @@ export function ReleasePage() {
               }`}
               onClick={() => fileInputRef.current?.click()}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click()
+                if (e.key === 'Enter' || e.key === ' ')
+                  fileInputRef.current?.click()
               }}
               onDragOver={(e) => {
                 e.preventDefault()
@@ -181,7 +189,9 @@ export function ReleasePage() {
             >
               <Upload className='size-6' />
               <p className='text-sm'>
-                {file ? '点击重新选择文件' : '点击选择，或拖入 zip 安装包（最大 200 MB）'}
+                {file
+                  ? '点击重新选择文件'
+                  : '点击选择，或拖入 zip 安装包（最大 200 MB）'}
               </p>
             </div>
             <input
@@ -195,8 +205,12 @@ export function ReleasePage() {
             {file && (
               <div className='flex items-center gap-2 rounded-md border px-3 py-2 text-sm'>
                 <FileArchive className='size-4 shrink-0' />
-                <span className='min-w-0 flex-1 truncate font-mono'>{file.name}</span>
-                <span className='text-muted-foreground shrink-0 text-xs'>{fmtBytes(file.size)}</span>
+                <span className='min-w-0 flex-1 truncate font-mono'>
+                  {file.name}
+                </span>
+                <span className='text-muted-foreground shrink-0 text-xs'>
+                  {fmtBytes(file.size)}
+                </span>
                 {!uploading && (
                   <Button
                     variant='ghost'
@@ -216,7 +230,8 @@ export function ReleasePage() {
                 <div className='text-muted-foreground flex justify-between text-xs'>
                   <span>{progress.phase}</span>
                   <span>
-                    {fmtBytes(progress.loaded)} / {fmtBytes(progress.total || progress.loaded)}
+                    {fmtBytes(progress.loaded)} /{' '}
+                    {fmtBytes(progress.total || progress.loaded)}
                   </span>
                 </div>
                 <div className='bg-secondary h-2 overflow-hidden rounded-full'>
@@ -228,7 +243,11 @@ export function ReleasePage() {
                   />
                 </div>
                 <div className='text-end'>
-                  <Button variant='outline' size='sm' onClick={() => abortRef.current?.abort()}>
+                  <Button
+                    variant='outline'
+                    size='sm'
+                    onClick={() => abortRef.current?.abort()}
+                  >
                     取消上传
                   </Button>
                 </div>
@@ -237,14 +256,19 @@ export function ReleasePage() {
 
             <div className='flex items-center gap-3'>
               <Button
-                disabled={!file || uploading || !/^\d+\.\d+\.\d+$/.test(displayVersion.trim())}
+                disabled={
+                  !file ||
+                  uploading ||
+                  !/^\d+\.\d+\.\d+$/.test(displayVersion.trim())
+                }
                 onClick={() => void startUpload()}
               >
                 <Upload />
                 发布新版本
               </Button>
               <p className='text-muted-foreground text-xs'>
-                发布后学生端下次启动 raptor 时提示更新；版本号需大于当前分发版本才会触发更新。
+                发布后学生端下次启动 raptor
+                时提示更新；版本号需大于当前分发版本才会触发更新。
               </p>
             </div>
           </CardContent>
@@ -267,8 +291,11 @@ export function ReleasePage() {
             <div className='text-muted-foreground text-xs'>
               {updOverview?.data?.current ? (
                 <span>
-                  当前分发 <code className='font-mono font-semibold text-foreground'>v{updOverview.data.current.version}</code> ·{' '}
-                  {fmtDateTime(updOverview.data.current.publishedAt)}
+                  当前分发{' '}
+                  <code className='text-foreground font-mono font-semibold'>
+                    v{updOverview.data.current.version}
+                  </code>{' '}
+                  · {fmtDateTime(updOverview.data.current.publishedAt)}
                 </span>
               ) : (
                 '尚未发布过版本'
@@ -296,7 +323,9 @@ export function ReleasePage() {
                     key={v.version}
                     className='flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border px-3 py-2.5 text-sm'
                   >
-                    <code className='font-mono font-semibold'>v{v.version}</code>
+                    <code className='font-mono font-semibold'>
+                      v{v.version}
+                    </code>
                     {v.isCurrent ? (
                       <Badge>分发中</Badge>
                     ) : v.rolledBackAt ? (

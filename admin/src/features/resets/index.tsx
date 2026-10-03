@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import { Check, Copy, Trash2, X } from 'lucide-react'
-import { AdminHeader } from '@/components/admin-header'
-import { Main } from '@/components/layout/main'
+import { toast } from 'sonner'
 import { useBootstrap, useInvalidateBootstrap } from '@/lib/admin-data'
-import { resetApprove, resetReject, resetRevoke, type ResetCode } from '@/lib/api'
+import {
+  resetApprove,
+  resetReject,
+  resetRevoke,
+  type ResetCode,
+} from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
 import { fmtDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
@@ -16,7 +19,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
   Dialog,
   DialogContent,
@@ -35,6 +37,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { AdminHeader } from '@/components/admin-header'
+import { ConfirmDialog } from '@/components/confirm-dialog'
+import { Main } from '@/components/layout/main'
 
 /**
  * 重置审批：同意即生成一次性码（24h、用后即焚），经群转交同学自设新密码。
@@ -111,14 +116,19 @@ export function ResetsPage() {
                   <TableBody>
                     {pending.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={3} className='text-muted-foreground py-8 text-center'>
+                        <TableCell
+                          colSpan={3}
+                          className='text-muted-foreground py-8 text-center'
+                        >
                           没有待审批的申请
                         </TableCell>
                       </TableRow>
                     )}
                     {pending.map((r) => (
                       <TableRow key={r.id}>
-                        <TableCell className='font-mono font-semibold'>{r.username}</TableCell>
+                        <TableCell className='font-mono font-semibold'>
+                          {r.username}
+                        </TableCell>
                         <TableCell className='text-muted-foreground text-xs'>
                           {fmtDateTime(r.requestedAt)}
                         </TableCell>
@@ -154,7 +164,9 @@ export function ResetsPage() {
         <Card className='mt-4'>
           <CardHeader>
             <CardTitle>有效重置码</CardTitle>
-            <CardDescription>24 小时内有效 · 用后即焚 · 发错人或码外泄可立即作废</CardDescription>
+            <CardDescription>
+              24 小时内有效 · 用后即焚 · 发错人或码外泄可立即作废
+            </CardDescription>
           </CardHeader>
           <CardContent className='px-0'>
             {isLoading && <Skeleton className='mx-6 mb-4 h-16 w-full' />}
@@ -172,7 +184,10 @@ export function ResetsPage() {
                   <TableBody>
                     {codes.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={4} className='text-muted-foreground py-8 text-center'>
+                        <TableCell
+                          colSpan={4}
+                          className='text-muted-foreground py-8 text-center'
+                        >
                           暂无有效重置码
                         </TableCell>
                       </TableRow>
@@ -181,8 +196,12 @@ export function ResetsPage() {
                       const expired = new Date(c.expiresAt).getTime() < now
                       return (
                         <TableRow key={c.code}>
-                          <TableCell className='font-mono font-semibold'>{c.username}</TableCell>
-                          <TableCell className='font-mono font-bold'>{c.code}</TableCell>
+                          <TableCell className='font-mono font-semibold'>
+                            {c.username}
+                          </TableCell>
+                          <TableCell className='font-mono font-bold'>
+                            {c.code}
+                          </TableCell>
                           <TableCell className='text-muted-foreground text-xs'>
                             {expired ? (
                               <span className='text-destructive'>已过期</span>
@@ -225,7 +244,10 @@ export function ResetsPage() {
         </Card>
 
         {/* 同意后展示一次性码 */}
-        <Dialog open={approved !== null} onOpenChange={(v) => !v && setApproved(null)}>
+        <Dialog
+          open={approved !== null}
+          onOpenChange={(v) => !v && setApproved(null)}
+        >
           <DialogContent className='sm:max-w-sm'>
             <DialogHeader>
               <DialogTitle>重置码已生成</DialogTitle>
@@ -235,7 +257,11 @@ export function ResetsPage() {
               </DialogDescription>
             </DialogHeader>
             <div className='flex gap-2'>
-              <Input readOnly value={approved?.code ?? ''} className='font-mono font-bold' />
+              <Input
+                readOnly
+                value={approved?.code ?? ''}
+                className='font-mono font-bold'
+              />
               <Button
                 variant='outline'
                 className='shrink-0'

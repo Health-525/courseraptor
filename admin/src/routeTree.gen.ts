@@ -17,6 +17,7 @@ import { Route as errors404RouteImport } from './routes/(errors)/404'
 import { Route as errors500RouteImport } from './routes/(errors)/500'
 import { Route as errors503RouteImport } from './routes/(errors)/503'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
+import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedInvitesIndexRouteImport } from './routes/_authenticated/invites/index'
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
 import { Route as AuthenticatedLogIndexRouteImport } from './routes/_authenticated/log/index'
@@ -65,6 +66,12 @@ const AuthenticatedIndexRoute = AuthenticatedIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedErrorsErrorRoute =
+  AuthenticatedErrorsErrorRouteImport.update({
+    id: '/errors/$error',
+    path: '/errors/$error',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedInvitesIndexRoute =
   AuthenticatedInvitesIndexRouteImport.update({
     id: '/invites/',
@@ -118,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/404': typeof errors404Route
   '/500': typeof errors500Route
   '/503': typeof errors503Route
+  '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/invites/': typeof AuthenticatedInvitesIndexRoute
   '/keys/': typeof AuthenticatedKeysIndexRoute
   '/log/': typeof AuthenticatedLogIndexRoute
@@ -135,6 +143,7 @@ export interface FileRoutesByTo {
   '/500': typeof errors500Route
   '/503': typeof errors503Route
   '/': typeof AuthenticatedIndexRoute
+  '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/invites': typeof AuthenticatedInvitesIndexRoute
   '/keys': typeof AuthenticatedKeysIndexRoute
   '/log': typeof AuthenticatedLogIndexRoute
@@ -154,6 +163,7 @@ export interface FileRoutesById {
   '/(errors)/500': typeof errors500Route
   '/(errors)/503': typeof errors503Route
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/_authenticated/invites/': typeof AuthenticatedInvitesIndexRoute
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
   '/_authenticated/log/': typeof AuthenticatedLogIndexRoute
@@ -173,6 +183,7 @@ export interface FileRouteTypes {
     | '/404'
     | '/500'
     | '/503'
+    | '/errors/$error'
     | '/invites/'
     | '/keys/'
     | '/log/'
@@ -190,6 +201,7 @@ export interface FileRouteTypes {
     | '/500'
     | '/503'
     | '/'
+    | '/errors/$error'
     | '/invites'
     | '/keys'
     | '/log'
@@ -208,6 +220,7 @@ export interface FileRouteTypes {
     | '/(errors)/500'
     | '/(errors)/503'
     | '/_authenticated/'
+    | '/_authenticated/errors/$error'
     | '/_authenticated/invites/'
     | '/_authenticated/keys/'
     | '/_authenticated/log/'
@@ -286,6 +299,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/errors/$error': {
+      id: '/_authenticated/errors/$error'
+      path: '/errors/$error'
+      fullPath: '/errors/$error'
+      preLoaderRoute: typeof AuthenticatedErrorsErrorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/invites/': {
       id: '/_authenticated/invites/'
       path: '/invites'
@@ -347,6 +367,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedInvitesIndexRoute: typeof AuthenticatedInvitesIndexRoute
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
   AuthenticatedLogIndexRoute: typeof AuthenticatedLogIndexRoute
@@ -359,6 +380,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
   AuthenticatedInvitesIndexRoute: AuthenticatedInvitesIndexRoute,
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
   AuthenticatedLogIndexRoute: AuthenticatedLogIndexRoute,

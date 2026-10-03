@@ -1,10 +1,10 @@
 import { Loader2, RefreshCw } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Header } from '@/components/layout/header'
-import { ThemeSwitch } from '@/components/theme-switch'
-import { ConfigDrawer } from '@/components/config-drawer'
 import { useBootstrap, useInvalidateBootstrap } from '@/lib/admin-data'
 import { fmtUptime } from '@/lib/format'
+import { Button } from '@/components/ui/button'
+import { ConfigDrawer } from '@/components/config-drawer'
+import { Header } from '@/components/layout/header'
+import { ThemeSwitch } from '@/components/theme-switch'
 
 /**
  * 全站统一的页头：左侧眉题 + 页面标题，右侧运行信息胶囊 / 刷新 / 主题。
@@ -35,8 +35,7 @@ export function AdminHeader({
       <div className='ms-auto flex items-center gap-1.5'>
         {meta && (
           <span className='text-muted-foreground hidden max-w-72 items-center gap-1.5 truncate rounded-full border px-3 py-1 font-mono text-[11px] tabular-nums md:inline-flex'>
-            <span className='bg-primary size-1.5 rounded-full' />
-            v{meta.version}
+            <span className='bg-primary size-1.5 rounded-full' />v{meta.version}
             <span className='text-muted-foreground/40'>·</span>
             运行 {fmtUptime(meta.uptimeSec)}
             <span className='text-muted-foreground/40'>·</span>

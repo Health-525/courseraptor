@@ -186,7 +186,7 @@ export async function userCreate(username: string, password: string) {
 export async function userAction(
   action: 'quota' | 'enable' | 'disable' | 'kick' | 'delete',
   user: string,
-  extra: Record<string, unknown> = {},
+  extra: Record<string, unknown> = {}
 ) {
   const res = await api.post(`/user/${action}`, { user, ...extra })
   return res.data as { ok: boolean }
@@ -208,7 +208,12 @@ export async function inviteDelete(code: string) {
 
 export async function resetApprove(id: string) {
   const res = await api.post('/reset/approve', { id })
-  return res.data as { ok: boolean; code: string; username: string; expiresAt: string }
+  return res.data as {
+    ok: boolean
+    code: string
+    username: string
+    expiresAt: string
+  }
 }
 
 export async function resetReject(id: string) {
@@ -274,7 +279,10 @@ export function updatePublish(
   file: File,
   version: string,
   notes: string,
-  opts: { onProgress?: (loaded: number, total: number) => void; signal?: AbortSignal } = {},
+  opts: {
+    onProgress?: (loaded: number, total: number) => void
+    signal?: AbortSignal
+  } = {}
 ) {
   return api
     .post('/update/publish', file, {
@@ -284,7 +292,8 @@ export function updatePublish(
         'x-version': version,
         'x-notes': encodeURIComponent(notes),
       },
-      onUploadProgress: (e) => opts.onProgress?.(e.loaded ?? 0, e.total ?? file.size),
+      onUploadProgress: (e) =>
+        opts.onProgress?.(e.loaded ?? 0, e.total ?? file.size),
       signal: opts.signal,
     })
     .then((res) => res.data as Record<string, unknown> & { error?: string })

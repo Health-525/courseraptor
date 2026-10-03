@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { AxiosError } from 'axios'
 import { z } from 'zod'
+import { AxiosError } from 'axios'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from '@tanstack/react-router'
@@ -70,8 +70,7 @@ export function UserAuthForm({
     } catch (err) {
       if (err instanceof AxiosError) {
         const body = err.response?.data as
-          | { error?: string; locked?: boolean }
-          | undefined
+          { error?: string; locked?: boolean } | undefined
         if (body?.error) setError(body.error)
         else if (err.response?.status === 429) setError('尝试过多，请稍后再试')
         else setError('登录失败，请检查网络后重试')

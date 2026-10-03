@@ -1,11 +1,9 @@
 import { useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
 import { AxiosError } from 'axios'
+import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { toast } from 'sonner'
 import { Copy, ShieldCheck } from 'lucide-react'
-import { AdminHeader } from '@/components/admin-header'
-import { Main } from '@/components/layout/main'
+import { toast } from 'sonner'
 import { useBootstrap, useInvalidateBootstrap } from '@/lib/admin-data'
 import { totpDisable, totpEnable, totpRecovery, totpSetup } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
@@ -30,6 +28,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AdminHeader } from '@/components/admin-header'
+import { Main } from '@/components/layout/main'
 
 /**
  * 安全设置：TOTP 两步验证（绑定扫码 → 验证启用 → 恢复码仅此一次展示）。
@@ -47,11 +47,14 @@ export function SecurityPage() {
         <Card>
           <CardHeader>
             <CardTitle>两步验证（TOTP）</CardTitle>
-            <CardDescription>登录需密码 + 手机验证器 6 位动态码</CardDescription>
+            <CardDescription>
+              登录需密码 + 手机验证器 6 位动态码
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading && <Skeleton className='h-32 w-full' />}
-            {security && (security.mfaEnabled ? <EnabledView /> : <SetupView />)}
+            {security &&
+              (security.mfaEnabled ? <EnabledView /> : <SetupView />)}
           </CardContent>
         </Card>
       </Main>
@@ -61,7 +64,9 @@ export function SecurityPage() {
 
 /** ── 未启用：绑定流程 ──────────────────────────────────────── */
 function SetupView() {
-  const [setup, setSetup] = useState<{ secret: string; qrSvg: string } | null>(null)
+  const [setup, setSetup] = useState<{ secret: string; qrSvg: string } | null>(
+    null
+  )
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [recovery, setRecovery] = useState<string[] | null>(null)
@@ -82,7 +87,11 @@ function SetupView() {
       setSetup(null)
     },
     onError: (e) => {
-      setError(e instanceof AxiosError ? (e.response?.data as { error?: string })?.error ?? '验证失败' : '验证失败')
+      setError(
+        e instanceof AxiosError
+          ? ((e.response?.data as { error?: string })?.error ?? '验证失败')
+          : '验证失败'
+      )
     },
   })
 
@@ -94,7 +103,9 @@ function SetupView() {
         <p className='text-muted-foreground text-sm'>
           启用后登录管理台需要「管理密码 + 手机验证器动态码」，并附 10
           枚一次性恢复码。手机与恢复码全丢时，需要 SSH 上服务器执行
-          <code className='bg-muted mx-1 rounded px-1.5 py-0.5 font-mono text-xs'>admin.mjs totp off</code>
+          <code className='bg-muted mx-1 rounded px-1.5 py-0.5 font-mono text-xs'>
+            admin.mjs totp off
+          </code>
           才能恢复仅密码登录。
         </p>
         <Button disabled={start.isPending} onClick={() => start.mutate()}>
@@ -111,10 +122,12 @@ function SetupView() {
   return (
     <div className='space-y-4'>
       <ol className='text-muted-foreground list-decimal space-y-1 ps-5 text-sm'>
-        <li>用手机验证器（Google / Microsoft Authenticator 等）扫下面的二维码</li>
+        <li>
+          用手机验证器（Google / Microsoft Authenticator 等）扫下面的二维码
+        </li>
         <li>输入验证器当前显示的 6 位数字完成绑定</li>
       </ol>
-      <div className='flex justify-center rounded-lg border bg-white p-4 [&>svg]:size-52 dark:border-border'>
+      <div className='dark:border-border flex justify-center rounded-lg border bg-white p-4 [&>svg]:size-52'>
         <div dangerouslySetInnerHTML={{ __html: setup.qrSvg }} />
       </div>
       <div className='space-y-1.5'>
@@ -125,7 +138,12 @@ function SetupView() {
           <code className='bg-muted min-w-0 flex-1 truncate rounded px-2 py-1.5 font-mono text-sm'>
             {grouped}
           </code>
-          <Button variant='outline' size='sm' className='shrink-0' onClick={() => void copyText(setup.secret)}>
+          <Button
+            variant='outline'
+            size='sm'
+            className='shrink-0'
+            onClick={() => void copyText(setup.secret)}
+          >
             <Copy />
             复制
           </Button>
@@ -174,7 +192,9 @@ function EnabledView() {
     },
     onSuccess: (res) => {
       if (action === 'disable') {
-        toast.success('两步验证已关闭，恢复仅密码登录（所有会话已注销，请重新登录）')
+        toast.success(
+          '两步验证已关闭，恢复仅密码登录（所有会话已注销，请重新登录）'
+        )
         setAction(null)
         navigate({ to: '/sign-in', replace: true })
         return
@@ -184,11 +204,16 @@ function EnabledView() {
       void invalidate()
     },
     onError: (e) => {
-      setError(e instanceof AxiosError ? (e.response?.data as { error?: string })?.error ?? '验证失败' : '验证失败')
+      setError(
+        e instanceof AxiosError
+          ? ((e.response?.data as { error?: string })?.error ?? '验证失败')
+          : '验证失败'
+      )
     },
   })
 
-  if (recovery) return <RecoveryCodes codes={recovery} onClose={() => setRecovery(null)} />
+  if (recovery)
+    return <RecoveryCodes codes={recovery} onClose={() => setRecovery(null)} />
 
   return (
     <div className='space-y-4'>
@@ -196,7 +221,8 @@ function EnabledView() {
         <ShieldCheck />
         <AlertTitle>两步验证已启用</AlertTitle>
         <AlertDescription>
-          启用于 {fmtDate(security.enabledAt)} · 恢复码剩余 {security.recoveryLeft} 枚
+          启用于 {fmtDate(security.enabledAt)} · 恢复码剩余{' '}
+          {security.recoveryLeft} 枚
         </AlertDescription>
       </Alert>
       <div className='max-w-xs space-y-1.5'>
@@ -241,7 +267,8 @@ function EnabledView() {
       </div>
       {error && <p className='text-destructive text-sm'>{error}</p>}
       <p className='text-muted-foreground text-xs'>
-        高危操作需再验一次动态码；关闭后所有管理会话立即注销。SSH 兜底：admin.mjs totp off。
+        高危操作需再验一次动态码；关闭后所有管理会话立即注销。SSH
+        兜底：admin.mjs totp off。
       </p>
     </div>
   )
@@ -260,7 +287,10 @@ function RecoveryCodes({
   const navigate = useNavigate()
   return (
     <Dialog open>
-      <DialogContent className='sm:max-w-md' onInteractOutside={(e) => e.preventDefault()}>
+      <DialogContent
+        className='sm:max-w-md'
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>恢复码（仅此一次展示）</DialogTitle>
           <DialogDescription>
@@ -271,13 +301,19 @@ function RecoveryCodes({
         </DialogHeader>
         <div className='grid grid-cols-2 gap-2 font-mono text-sm'>
           {codes.map((c) => (
-            <code key={c} className='bg-muted rounded px-2 py-1.5 tracking-wider'>
+            <code
+              key={c}
+              className='bg-muted rounded px-2 py-1.5 tracking-wider'
+            >
               {c}
             </code>
           ))}
         </div>
         <DialogFooter className='gap-2 sm:gap-0'>
-          <Button variant='outline' onClick={() => void copyText(codes.join('\n'))}>
+          <Button
+            variant='outline'
+            onClick={() => void copyText(codes.join('\n'))}
+          >
             <Copy />
             复制全部
           </Button>
