@@ -39,8 +39,17 @@ node scripts/export.mjs --week 8 --style color         # 第 8 周 · 彩色课�
 node scripts/export.mjs --mode term                    # 整学期汇总 PNG
 node scripts/export.mjs --mode term --format svg       # 整学期 SVG（矢量）
 node scripts/export.mjs --out D:/课表                  # 指定输出目录
+node scripts/export.mjs --open                         # 导出后用默认浏览器打开
+node scripts/export.mjs --week 5 --serve               # 导出并挂本地预览服务
 node scripts/export.mjs --help                         # 完整参数说明
 ```
+
+默认只导出文件、不弹窗；`--open` 导出后用默认浏览器打开预览。
+
+`--serve` 导出后把输出目录挂到 `http://127.0.0.1:<端口>/`（默认 8917，只绑
+本机回环，空闲 30 分钟自动退出，`--port`/`--idle-min` 可调）——聊天客户端
+普遍不渲染 `file://` 本地图，**本地 http 地址才能内嵌进对话框**，agent 技能
+就靠它把课表图直接显示在对话里。
 
 输出文件名形如 `schedule-week5-2026-1.png`、`schedule-term-2026-1.png`
 （color 风格带 `-color` 后缀）。

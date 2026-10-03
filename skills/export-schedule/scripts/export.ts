@@ -5,14 +5,20 @@
  * - 只读封装 src/core 的已验证渲染器（schedule-svg / schedule-png），
  *   与网页「本周图片/整学期图片」按钮、AI 工具 export_schedule_image 同一套代码。
  * - 零登录零网络：只读本地课表缓存（data/schedule-cache.json）。
+ * - 导出后默认不弹窗；--open 可选用默认浏览器打开预览（file:// 本地直读，
+ *   打不开也不影响导出结果与退出码）。
+ * - --serve 导出后挂本地 http 预览服务（只绑 127.0.0.1，空闲自动退出）：
+ *   聊天客户端普遍不渲染 file:// 本地图，本地 http 地址才能内嵌进对话框。
  * - 仓库内直跑：npx tsx skills/export-schedule/scripts/export.ts [参数]；
  *   独立技能包（npm run package:skill -- export-schedule）里是同逻辑的
  *   单文件 bundle（scripts/export.mjs），用法参数完全一致。
  */
 
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
+import http from "node:http";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import "../../../src/adapters"; // 学校适配器装配（school() / terms 周期依赖它）
 import { loadScheduleCache } from "../../../src/core/schedule-cache";
@@ -31,6 +37,10 @@ interface CliArgs {
   format: "png" | "svg";
   out: string | null;
   cache: string | null;
+  open: boolean;
+  serve: boolean;
+  port: number | null;
+  idleMin: number | null;
 }
 
 function usage(): string {
@@ -39,6 +49,7 @@ function usage(): string {
     "",
     "用法: node export.mjs [--mode week|term] [--week N] [--style classic|color]",
     "                     [--format png|svg] [--out <目录|文件名>] [--cache <schedule-cache.json>]",
+    "                     [--open | --serve [--port N] [--idle-min M]]",
     "",
     "  --mode    week=第 N 周课表（默认）；term=整学期汇总",
     "  --week    周次（week 模式；缺省取当前教学周）",
@@ -46,6 +57,10 @@ function usage(): string {
     "  --format  png=2 倍宽位图（默认）；svg=矢量",
     "  --out     输出位置（目录或文件名；缺省当前目录）",
     "  --cache   直接指定 schedule-cache.json（缺省读技能 data/ 下的缓存）",
+    "  --open    导出后用默认浏览器打开预览（默认只导出，不弹窗）",
+    "  --serve   导出后挂本地预览服务（127.0.0.1），供聊天对话框内嵌显示",
+    "  --port    预览端口（默认 8917；被占用时自动向后找可用端口）",
+    "  --idle-min 预览服务空闲自动退出的分钟数（默认 30；0=不自动退出）",
   ].join("\n");
 }
 
@@ -57,6 +72,10 @@ function parseArgs(argv: string[]): CliArgs {
     format: "png",
     out: null,
     cache: null,
+    open: false,
+    serve: false,
+    port: null,
+    idleMin: null,
   };
   const die = (msg: string): never => {
     process.stderr.write(`${msg}\n\n${usage()}\n`);
@@ -88,6 +107,18 @@ function parseArgs(argv: string[]): CliArgs {
       args.out = next();
     } else if (a === "--cache") {
       args.cache = next();
+    } else if (a === "--open") {
+      args.open = true;
+    } else if (a === "--serve") {
+      args.serve = true;
+    } else if (a === "--port") {
+      const n = Number(next());
+      if (!Number.isInteger(n) || n < 1 || n > 65535) die("--port 需要是 1-65535 的端口号");
+      args.port = n;
+    } else if (a === "--idle-min") {
+      const n = Number(next());
+      if (!Number.isInteger(n) || n < 0) die("--idle-min 需要是非负整数分钟数");
+      args.idleMin = n;
     } else if (a === "--help" || a === "-h") {
       process.stdout.write(`${usage()}\n`);
       process.exit(0);
@@ -112,6 +143,136 @@ function logoDataUri(): string | undefined {
     }
   }
   return undefined;
+}
+
+// ── 导出后预览：默认浏览器打开（file:// 本地直读，零网络） ────────────
+// Windows 上 ShellExecute（start/rundll32）对 file: 协议按扩展名走关联程序，
+// PNG 会开到「照片」而不是浏览器；所以从注册表解析默认浏览器 exe 直接拉起。
+// 打不开（无浏览器/无桌面/被拦截）只静默放弃，绝不让预览问题影响导出结果与退出码。
+function regSz(key: string, value: string): string | null {
+  try {
+    const r = spawnSync("reg", ["query", key, ...(value ? ["/v", value] : ["/ve"])], {
+      encoding: "utf8",
+    });
+    if (r.status !== 0) return null;
+    return /REG_SZ\s+(.*\S)\s*$/m.exec(r.stdout)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function windowsDefaultBrowserExe(): string | null {
+  // 默认浏览器 ProgId（https 关联）→ 打开命令 → 第一个带 .exe 的带引号路径
+  const progId = regSz(
+    "HKCU\\Software\\Microsoft\\Windows\\Shell\\Associations\\UrlAssociations\\https\\UserChoice",
+    "ProgId",
+  );
+  const command = progId ? regSz(`HKCR\\${progId}\\shell\\open\\command`, "") : null;
+  const exe = command ? (/"([^"]+\.exe)"/i.exec(command)?.[1] ?? null) : null;
+  if (exe && fs.existsSync(exe)) return exe;
+  // 解析失败时兜底常见安装位置：Chrome → Edge（Win10/11 必有 Edge）
+  return (
+    [
+      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe",
+      "C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe",
+      "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    ].find((p) => fs.existsSync(p)) ?? null
+  );
+}
+
+function openImageInBrowser(file: string): void {
+  const url = pathToFileURL(file).href;
+  let child: ReturnType<typeof spawn>;
+  if (process.platform === "win32") {
+    const exe = windowsDefaultBrowserExe();
+    if (!exe) return;
+    child = spawn(exe, [url], { detached: true, stdio: "ignore" });
+  } else if (process.platform === "darwin") {
+    child = spawn("open", [url], { detached: true, stdio: "ignore" });
+  } else {
+    child = spawn("xdg-open", [url], { detached: true, stdio: "ignore" });
+  }
+  child.on("error", () => {});
+  child.unref();
+}
+
+// ── 本地预览服务（--serve）：把导出目录挂到 http://127.0.0.1 ──────────
+// 聊天客户端普遍不渲染 file:// 本地图、上传回链也可能被拦，本地 http 地址
+// 各端都能内嵌。只绑回环地址不对外；空闲 idleMin 分钟无请求自动退出，避免
+// 残留后台进程。目录内任意文件可取（agent 可能连续导出多张）。
+function servePreview(dir: string, entryFile: string, firstPort: number, idleMin: number): void {
+  const root = path.resolve(dir);
+  let idleTimer: NodeJS.Timeout | null = null;
+  const server = http.createServer((req, res) => {
+    touchIdle();
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      res.writeHead(405).end();
+      return;
+    }
+    const rel = decodeURIComponent(
+      new URL(req.url ?? "/", "http://127.0.0.1").pathname,
+    ).replace(/^\/+/, "");
+    const abs = path.resolve(root, rel);
+    if (!abs.startsWith(`${root}${path.sep}`)) {
+      res.writeHead(403).end("forbidden");
+      return;
+    }
+    let data: Buffer;
+    try {
+      data = fs.readFileSync(abs);
+    } catch {
+      res.writeHead(404).end("not found");
+      return;
+    }
+    const type = abs.endsWith(".png")
+      ? "image/png"
+      : abs.endsWith(".svg")
+        ? "image/svg+xml"
+        : "application/octet-stream";
+    res.writeHead(200, {
+      "Content-Type": type,
+      "Content-Length": data.length,
+      "Cache-Control": "no-store",
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(req.method === "HEAD" ? undefined : data);
+  });
+
+  function touchIdle(): void {
+    if (idleTimer) clearTimeout(idleTimer);
+    if (idleMin > 0) {
+      idleTimer = setTimeout(() => {
+        server.close();
+        process.exit(0);
+      }, idleMin * 60_000);
+    }
+  }
+
+  let retry = 0;
+  server.on("error", (e: NodeJS.ErrnoException) => {
+    if (e.code === "EADDRINUSE" && retry < 20) {
+      retry++;
+      server.listen(firstPort + retry, "127.0.0.1");
+      return;
+    }
+    process.stderr.write(`预览服务启动失败：${e.message}\n`);
+    process.exit(1);
+  });
+  server.listen(firstPort, "127.0.0.1", () => {
+    touchIdle();
+    const addr = server.address();
+    const port = typeof addr === "object" && addr ? addr.port : firstPort;
+    process.stdout.write(
+      [
+        `预览服务 http://127.0.0.1:${port}/（只绑本机回环）`,
+        `预览地址 http://127.0.0.1:${port}/${encodeURIComponent(entryFile)}`,
+        idleMin > 0
+          ? `空闲 ${idleMin} 分钟自动退出（Ctrl+C 立即退出）`
+          : "不会自动退出（Ctrl+C 结束）",
+      ].join("\n") + "\n",
+    );
+  });
 }
 
 // ── 主流程 ──────────────────────────────────────────────────────────
@@ -235,3 +396,9 @@ const kb = (fs.statSync(outFile).size / 1024).toFixed(1);
 process.stdout.write(
   `已导出 ${outFile}（${schedule.label} · ${describe} · ${args.style} · ${path.extname(outFile).slice(1).toUpperCase()} · ${kb} KB）\n`,
 );
+
+if (args.serve) {
+  servePreview(path.dirname(outFile), path.basename(outFile), args.port ?? 8917, args.idleMin ?? 30);
+} else if (args.open) {
+  openImageInBrowser(outFile);
+}
