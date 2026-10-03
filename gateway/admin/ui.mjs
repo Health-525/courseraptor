@@ -77,7 +77,7 @@ const SITE_PROVIDERS = [
   { id: "ernie", label: "文心（百度千帆）", baseUrl: "https://qianfan.baidubce.com/v2" },
   { id: "spark", label: "讯飞星火", baseUrl: "https://spark-api-open.xf-yun.com/v1" },
   { id: "siliconflow", label: "硅基流动", baseUrl: "https://api.siliconflow.cn/v1" },
-  { id: "zhenze", label: "移动云（臻泽）", baseUrl: "https://zhenze-huhehaote.cmecloud.cn/v1" },
+  { id: "zhenze", label: "移动云", baseUrl: "https://zhenze-huhehaote.cmecloud.cn/v1" },
 ];
 
 /** 站点 Key 的形状校验：deepseek 严格 sk-（历史行为），其余宽松 */

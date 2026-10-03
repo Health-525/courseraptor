@@ -217,10 +217,10 @@ export const BUILTIN_PROVIDERS: ProviderDef[] = [
   },
   {
     id: "zhenze",
-    label: "移动云（臻泽）",
+    label: "移动云",
     baseUrl: "https://zhenze-huhehaote.cmecloud.cn/v1",
-    note: "中国移动云 · 臻泽平台聚合 DeepSeek/GLM/Qwen/九天等模型",
-    keyHint: "…（移动云臻泽平台 API Key）",
+    note: "中国移动云 · 聚合 DeepSeek/GLM/Qwen/九天等模型",
+    keyHint: "…（移动云 API Key）",
     fallbackModels: [
       {
         id: "deepseek-v4.1-flash",

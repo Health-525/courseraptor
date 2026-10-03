@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { maskDeepSeekApiKey, resolveDeepSeekApiKey } from "../src/core/config";
+import { config, maskDeepSeekApiKey, resolveDeepSeekApiKey } from "../src/core/config";
 import { type KeySetupIO, runDeepSeekKeySetup } from "../src/core/onboarding";
+import { getProviderDef } from "../src/core/providers";
 
 const NEW_KEY = "sk-NewKey1234567890ABCDE";
 
@@ -45,7 +46,11 @@ test("确认覆盖后静音读取新 Key，界面只显示脱敏旧 Key", async 
   assert.equal(result, "saved");
   assert.deepEqual(saved, [NEW_KEY]);
   assert.ok(output.some((message) => message.includes("sk-••••••••••••BCDE")));
-  assert.ok(output.some((message) => message.includes("请粘贴或输入新的 DeepSeek API Key")));
+  // 提示语按当前供应商动态渲染（本机凭据可能存过非 deepseek 供应商，别写死 DeepSeek）
+  const expectedLabel = getProviderDef(config.providerId).label;
+  assert.ok(
+    output.some((message) => message.includes(`请粘贴或输入新的 ${expectedLabel} API Key`)),
+  );
   assert.ok(output.every((message) => !message.includes(NEW_KEY)));
 });
 
