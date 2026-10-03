@@ -1,0 +1,1 @@
+import{j as x,c as l}from"./index-BLjMRNZ_.js";function c({fixed:t,className:o,fluid:n,...a}){return x.jsx("main",{"data-layout":t?"fixed":"auto",className:l("px-4 py-6",t&&"flex grow flex-col overflow-hidden",!n&&"@7xl/content:mx-auto @7xl/content:w-full @7xl/content:max-w-7xl",o),...a})}export{c as M};
