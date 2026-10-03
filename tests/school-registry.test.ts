@@ -21,10 +21,11 @@ test("未存过 schoolId 时默认 njtech；登记序即清单序（真实学校
   await import("../src/adapters");
   assert.equal(school().info.id, "njtech");
   const ids = listSchoolOptions().map((a) => a.info.id);
-  assert.deepEqual(ids, ["njtech", "custom"]);
-  // 手动课表标记：custom 有、njtech 没有
-  assert.equal(listSchoolOptions()[1].info.manual, true);
+  assert.deepEqual(ids, ["njtech", "hebau", "custom"]);
+  // 手动课表标记：custom 有、真实学校没有
+  assert.equal(listSchoolOptions()[2].info.manual, true);
   assert.notEqual(listSchoolOptions()[0].info.manual, true);
+  assert.notEqual(listSchoolOptions()[1].info.manual, true);
 });
 
 test("凭证里保存 schoolId=custom：新进程默认落在自定义学校", async () => {

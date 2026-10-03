@@ -22,7 +22,8 @@ src/
 │   └── school.ts   # SchoolAdapter 端口定义（唯一的契约文件）
 ├── adapters/   # 学校适配层：每校一个自包含目录
 │   ├── index.ts    # 装配点：注册表 + RAPTOR_SCHOOL 环境变量切换
-│   └── njtech/     # 参考实现（南京工业大学，正方新版）
+│   ├── njtech/     # 参考实现一（南京工业大学，正方新版 jwgl）
+│   └── hebau/      # 参考实现二（河北农业大学，CAS 统一认证 + 正方 URP）
 └── channels/   # 输出渠道：cli / web / qq
 ```
 
@@ -40,7 +41,7 @@ src/
 | `info` | ✅ | 学校 id（`RAPTOR_SCHOOL` 取值）、全名、短名、城市、时区 |
 | `capabilities` | ✅ | 能力面清单：声明了哪项，agent 才有哪组工具 |
 | `terms` | ✅ | 学期规则：学期编码、校历真值与开学周推算、周次表达式展开（`2-6,8-12(单)`）、节次作息表 |
-| `auth` | ✅ | `login(学号, 密码)` 与 `getCookie()`（会话管理，含自动重登） |
+| `auth` | ✅ | `login(学号, 密码)` 与 `getCookie()`（会话管理，含自动重登）；走统一认证的学校可选实现 `submitSecondFactor`（CAS 动态验证码续登，参考 `core/school-mfa.ts` 与 `hebau/session.ts`） |
 | `schedule` | ➖ | 课表 / 考试抓取 |
 | `notices` | ➖ | 教务通知列表与正文 |
 | `tools` | ✅ | 贡献给 agent 的工具集（与 capabilities 对应；先给空对象也合法） |
@@ -118,6 +119,6 @@ npm run typecheck && npm run lint && npm test
 
 ## 6. 卡住了怎么办
 
-- 先看 [NJTECH 参考实现](../src/adapters/njtech/index.ts)——正方系学校大概率能对号入座；
+- 先看 [NJTECH 参考实现](../src/adapters/njtech/index.ts)——正方系学校大概率能对号入座；走学校统一认证（CAS）的学校看 [HEBAU 参考实现](../src/adapters/hebau/index.ts)——跨主机 302 攒 Cookie、密码 AES-CBC 前端加密、动态验证码二次认证都有现成打法；
 - 端口语义拿不准：开 issue 或 Discussion，标题带「适配咨询」；
 - 教务接口逆向细节：F12 Network 面板是主要手段；学校侧改版导致失效时，适配维护者（文件头署名者）会收到 issue 提醒。

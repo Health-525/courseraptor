@@ -65,9 +65,9 @@ test("GET /api/settings：school 块带清单与手动课表标记，默认 njte
   assert.equal(r.school.manual, false);
   assert.deepEqual(
     r.school.options.map((o: { id: string }) => o.id),
-    ["njtech", "custom"],
+    ["njtech", "hebau", "custom"],
   );
-  assert.equal(r.school.options[1].manual, true);
+  assert.equal(r.school.options[2].manual, true);
 });
 
 test("POST /api/settings 切换学校：运行期生效并落凭证", async () => {
