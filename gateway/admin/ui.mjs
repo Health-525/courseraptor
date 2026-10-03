@@ -29,6 +29,7 @@ import fs from "node:fs";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { brotliCompressSync, gzipSync } from "node:zlib";
 import QRCode from "qrcode";
 import {
   generateRecoveryCodes,
@@ -298,9 +299,15 @@ export function createAdminUi({
    * 下发 admin/dist 里的构建产物。/admin/xxx 映射 dist/xxx，路径先净化
    * （拒绝 ..、反斜杠、空段），解析后再确认仍落在 DIST_DIR 内（双保险）。
    * assets/ 下的文件名带内容哈希 → 一年不变缓存；其余（index.html 等）不缓存。
+   * 文本产物按 Accept-Encoding 协商压缩（br 优先）——入口 JS 500KB+，不压的话
+   * 跨公网每次打开管理台都要原样拉约 1MB。压缩结果按路径缓存（产物在部署
+   * 周期内不可变，重启即随进程清空），整进程内存开销几百 KB。
    * 找不到文件返回 false（调用方决定 404 还是回落 index.html）。
    */
-  async function serveDistFile(res, rel) {
+  const COMPRESSIBLE_EXTS = new Set([".html", ".js", ".mjs", ".css", ".svg", ".json", ".txt"]);
+  const compressedCache = new Map();
+
+  async function serveDistFile(req, res, rel) {
     if (!/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(rel)) return false;
     const file = path.join(DIST_DIR, rel);
     if (file !== DIST_DIR && !file.startsWith(DIST_DIR + path.sep)) return false;
@@ -313,17 +320,33 @@ export function createAdminUi({
     const ext = path.extname(file).toLowerCase();
     const type = CONTENT_TYPES[ext] ?? "application/octet-stream";
     const hashed = rel.startsWith("assets/");
+    let encoding = "";
+    if (COMPRESSIBLE_EXTS.has(ext)) {
+      const accept = String(req?.headers?.["accept-encoding"] ?? "");
+      if (accept.includes("br")) encoding = "br";
+      else if (accept.includes("gzip")) encoding = "gzip";
+    }
+    let payload = body;
+    if (encoding) {
+      let cached = compressedCache.get(rel);
+      if (!cached) {
+        cached = { br: brotliCompressSync(body), gzip: gzipSync(body) };
+        compressedCache.set(rel, cached);
+      }
+      payload = cached[encoding];
+    }
     res.writeHead(200, {
       "content-type": type,
       "cache-control": hashed ? "public, max-age=31536000, immutable" : "no-store",
-      "content-length": body.length,
+      ...(encoding ? { "content-encoding": encoding, vary: "accept-encoding" } : {}),
+      "content-length": payload.length,
     });
-    res.end(body);
+    res.end(payload);
     return true;
   }
 
-  async function serveIndex(res) {
-    if (await serveDistFile(res, "index.html")) return;
+  async function serveIndex(req, res) {
+    if (await serveDistFile(req, res, "index.html")) return;
     // dist 缺失（一般是开发态没跑 admin 构建）：给出可操作的提示而不是白屏
     send(
       res,
@@ -353,7 +376,7 @@ export function createAdminUi({
 
     // ── 前端 SPA：静态产物 + 前端路由回落 ─────────────────────
     if (req.method === "GET" && pathname === "/admin") {
-      await serveIndex(res);
+      await serveIndex(req, res);
       return true;
     }
     if (req.method === "GET" && pathname.startsWith("/admin/")) {
@@ -361,13 +384,13 @@ export function createAdminUi({
       if (rel !== "api" && !rel.startsWith("api/")) {
         // assets/ 找不到就是 404（不回落 index.html，避免吞掉资源错误）
         if (rel.startsWith("assets/")) {
-          if (await serveDistFile(res, rel)) return true;
+          if (await serveDistFile(req, res, rel)) return true;
           res.writeHead(404);
           res.end();
           return true;
         }
         // 其余未知路径交给前端路由（/admin/sign-in、/admin/users 等）
-        if (!(await serveDistFile(res, rel))) await serveIndex(res);
+        if (!(await serveDistFile(req, res, rel))) await serveIndex(req, res);
         return true;
       }
       // /admin/api/* 的 GET 落到下面的 API 分支
@@ -748,6 +771,18 @@ export function createAdminUi({
       }
       return true;
     }
+    if (req.method === "POST" && pathname === "/admin/api/reset/revoke") {
+      const body = await readJsonBody(req);
+      try {
+        const { username } = await registry.revokeResetCode(String(body.code ?? ""));
+        console.log(`[gw-admin] 作废 ${username} 的重置码`);
+        await audit(ip, `作废 ${username} 的重置码`);
+        sendJson(res, 200, { ok: true });
+      } catch (error) {
+        sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+      }
+      return true;
+    }
     if (req.method === "GET" && pathname === "/admin/api/overview") {
       sendJson(res, 200, await ownOverview());
       return true;
@@ -864,6 +899,14 @@ export function createAdminUi({
     }
     if (req.method === "GET" && pathname === "/admin/api/log") {
       sendJson(res, 200, await registry.listAdminLog());
+      return true;
+    }
+    if (req.method === "POST" && pathname === "/admin/api/log/clear") {
+      // 先清后记：清空动作本身落进新日志，审计链不断头
+      await registry.clearAdminLog();
+      console.log("[gw-admin] 清空操作日志");
+      await audit(ip, "清空操作日志");
+      sendJson(res, 200, { ok: true });
       return true;
     }
     sendJson(res, 404, { error: "not found" });

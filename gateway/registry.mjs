@@ -462,6 +462,16 @@ export function createRegistry({ stateDir }) {
       return store.log.slice(-200).reverse();
     },
 
+    /** 清空操作日志（清完由调用方再 audit 一笔，审计链不断头） */
+    async clearAdminLog() {
+      return serialized(async () => {
+        await writeAtomic(
+          path.join(stateDir, "admin-log.json"),
+          JSON.stringify({ log: [] }, null, 2),
+        );
+      });
+    },
+
     // ── 密码重置：申请（同学）→ 审批（管理员）→ 一次性码 → 同学自设新密码 ──
     // 管理员只经手重置码，从头到尾不知道新密码。
 
@@ -523,6 +533,18 @@ export function createRegistry({ stateDir }) {
         request.status = "rejected";
         request.resolvedAt = new Date().toISOString();
         await writeResets(store);
+      });
+    },
+
+    /** 管理员作废一枚未兑换的重置码（审批错了 / 码外泄时用，等不到 24h 自然过期） */
+    async revokeResetCode(code) {
+      return serialized(async () => {
+        const store = await readResets();
+        const index = store.codes.findIndex((c) => c.code === String(code ?? "").trim());
+        if (index < 0) throw new Error("重置码不存在或已被使用");
+        const [entry] = store.codes.splice(index, 1);
+        await writeResets(store);
+        return { username: entry.username };
       });
     },
 

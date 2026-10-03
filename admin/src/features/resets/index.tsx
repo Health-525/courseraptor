@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Check, Copy, X } from 'lucide-react'
+import { Check, Copy, Trash2, X } from 'lucide-react'
 import { AdminHeader } from '@/components/admin-header'
 import { Main } from '@/components/layout/main'
 import { useBootstrap, useInvalidateBootstrap } from '@/lib/admin-data'
-import { resetApprove, resetReject, type ResetCode } from '@/lib/api'
+import { resetApprove, resetReject, resetRevoke, type ResetCode } from '@/lib/api'
 import { copyText } from '@/lib/clipboard'
 import { fmtDateTime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
@@ -45,6 +45,7 @@ export function ResetsPage() {
   const invalidate = useInvalidateBootstrap()
   const [rejecting, setRejecting] = useState<string | null>(null)
   const [approved, setApproved] = useState<ResetCode | null>(null)
+  const [revoking, setRevoking] = useState<ResetCode | null>(null)
 
   const approve = useMutation({
     mutationFn: (id: string) => resetApprove(id),
@@ -65,6 +66,15 @@ export function ResetsPage() {
     onSuccess: () => {
       toast.success('已拒绝该申请')
       setRejecting(null)
+      void invalidate()
+    },
+  })
+
+  const revoke = useMutation({
+    mutationFn: () => resetRevoke(revoking!.code),
+    onSuccess: () => {
+      toast.success(`已作废 ${revoking?.username} 的重置码`)
+      setRevoking(null)
       void invalidate()
     },
   })
@@ -144,7 +154,7 @@ export function ResetsPage() {
         <Card className='mt-4'>
           <CardHeader>
             <CardTitle>有效重置码</CardTitle>
-            <CardDescription>24 小时内有效 · 用后即焚</CardDescription>
+            <CardDescription>24 小时内有效 · 用后即焚 · 发错人或码外泄可立即作废</CardDescription>
           </CardHeader>
           <CardContent className='px-0'>
             {isLoading && <Skeleton className='mx-6 mb-4 h-16 w-full' />}
@@ -156,7 +166,7 @@ export function ResetsPage() {
                       <TableHead>用户名</TableHead>
                       <TableHead>重置码</TableHead>
                       <TableHead>过期时间</TableHead>
-                      <TableHead className='w-20' />
+                      <TableHead className='w-24' />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -182,15 +192,26 @@ export function ResetsPage() {
                           </TableCell>
                           <TableCell>
                             {!expired && (
-                              <Button
-                                variant='ghost'
-                                size='icon'
-                                className='size-8'
-                                aria-label='复制重置码'
-                                onClick={() => void copyText(c.code)}
-                              >
-                                <Copy />
-                              </Button>
+                              <div className='flex justify-end gap-1'>
+                                <Button
+                                  variant='ghost'
+                                  size='icon'
+                                  className='size-8'
+                                  aria-label='复制重置码'
+                                  onClick={() => void copyText(c.code)}
+                                >
+                                  <Copy />
+                                </Button>
+                                <Button
+                                  variant='ghost'
+                                  size='icon'
+                                  className='text-destructive size-8'
+                                  aria-label='作废重置码'
+                                  onClick={() => setRevoking(c)}
+                                >
+                                  <Trash2 />
+                                </Button>
+                              </div>
                             )}
                           </TableCell>
                         </TableRow>
@@ -240,6 +261,19 @@ export function ResetsPage() {
           destructive
           isLoading={reject.isPending}
           handleConfirm={() => reject.mutate()}
+          className='sm:max-w-sm'
+        />
+
+        <ConfirmDialog
+          open={revoking !== null}
+          onOpenChange={(v) => !v && setRevoking(null)}
+          title='作废重置码'
+          desc={`确定作废 ${revoking?.username} 的这枚重置码吗？作废后码立即失效，同学需重新申请。`}
+          cancelBtnText='取消'
+          confirmText='作废'
+          destructive
+          isLoading={revoke.isPending}
+          handleConfirm={() => revoke.mutate()}
           className='sm:max-w-sm'
         />
       </Main>
