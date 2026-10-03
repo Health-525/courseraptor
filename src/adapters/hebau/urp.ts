@@ -6,12 +6,15 @@
  * - 河北农大：`POST .../cxxszhxqkb.do`，学期用字符串 `XNXQDM=2026-2027-1`
  * 所以学期编码换算、响应结构摘取都关在本目录里，不外泄。
  *
- * 错误语义沿用 FetchResult：拿不到数据必须 ok=false，
- * 绝不能降级成「空列表」——那会被模型转述成「你这学期没课」。
+ * 错误语义：接口层直接抛 RaptorError（会话失效 SESSION_EXPIRED 供
+ * session.withAuthRetry 换 cookie 重试，网络 NETWORK 可重试，结构变化 PARSE
+ * 不可重试），数据获取成功才返回。绝不能把失败降级成「空列表」——
+ * 那会被模型转述成「你这学期没课」。
  */
 
-import type { FetchResult } from "../../core/fetch-result";
-import { CookieJar, type RawResponse, requestWithJar, URP_BASE, xhrHeaders } from "./http";
+import { RaptorError } from "../../core/errors";
+import type { RawResponse } from "./http";
+import { CookieJar, requestWithJar, URP_BASE, xhrHeaders } from "./http";
 
 /** 课表 / 考试 / 成绩三个 XHR 端点 */
 export const URP_ENDPOINTS = {
@@ -28,38 +31,48 @@ const REFERERS = {
 } as const;
 
 /**
- * 内部学期约定沿用工具层的 year + semester（3=秋冬、12=春夏，与 NJTECH 的 xqm 一致），
+ * 内部学期约定沿用端口层的 year + semester（3=秋冬、12=春夏，与 NJTECH 的 xqm 一致），
  * 到这里换算成 URP 的 XNXQDM 字符串。
  */
 export function xnxqdm(year: number, semester: number): string {
   return `${year}-${year + 1}-${semester === 12 ? 2 : 1}`;
 }
 
-/** 会话失效时 URP 不返回 401，而是 200 + 一坨登录页 HTML —— 必须显式识别 */
-function classifyFailure(resp: RawResponse, action: string): string | null {
-  if (resp.status === 0) return `${action}失败：无响应（连接中断）`;
-  if (resp.status >= 500) return `${action}失败：服务端错误 HTTP ${resp.status}`;
+/**
+ * 会话失效时 URP 不返回 401，而是 200 + 一坨登录页 HTML，或 302 —— 必须显式识别。
+ * 命中即抛 RaptorError；返回 null 表示响应形态正常，交给后续解析。
+ */
+function classifyFailure(resp: RawResponse, action: string): RaptorError | null {
+  if (resp.status === 0) return new RaptorError("NETWORK", `${action}失败：无响应（连接中断）`);
+  if (resp.status >= 500)
+    return new RaptorError("UPSTREAM", `${action}失败：服务端错误 HTTP ${resp.status}`);
   if (resp.status >= 300 && resp.status < 400) {
-    return `${action}失败：被重定向到登录页（教务会话已失效，请重试一次）`;
+    return new RaptorError("SESSION_EXPIRED", `${action}失败：被重定向到登录页（教务会话已失效）`);
   }
-  if (resp.status !== 200) return `${action}失败，教务系统返回状态 ${resp.status}`;
+  if (resp.status !== 200)
+    return new RaptorError("UPSTREAM", `${action}失败，教务系统返回状态 ${resp.status}`);
   const body = (resp.body || "").trim();
-  if (!body) return `${action}失败：教务系统返回空响应`;
+  if (!body) return new RaptorError("UPSTREAM", `${action}失败：教务系统返回空响应`);
   if (/<(?:!DOCTYPE|html|body)\b/i.test(body)) {
     const reauth = /authserver|cas\.hebau|统一认证|重新登录/i.test(body);
-    return `${action}失败：教务系统返回了页面而非数据${reauth ? "（会话已失效，请重试一次）" : "（接口可能已改版）"}`;
+    return reauth
+      ? new RaptorError(
+          "SESSION_EXPIRED",
+          `${action}失败：教务系统返回了统一认证登录页（会话已失效）`,
+        )
+      : new RaptorError("PARSE", `${action}失败：教务系统返回了页面而非数据（接口可能已改版）`);
   }
   return null;
 }
 
-/** POST 一个 URP XHR 接口并把响应解析成 JSON（失败一律 ok=false，带上可读成因） */
+/** POST 一个 URP XHR 接口并把响应解析成 JSON；失败抛 RaptorError，成功返回解析结果 */
 export async function urpPostJson(
   path: string,
   cookie: string,
   body: string,
   action: string,
   referer: string,
-): Promise<FetchResult<unknown>> {
+): Promise<unknown> {
   const jar = CookieJar.fromHeader(cookie);
   let resp: RawResponse;
   try {
@@ -69,14 +82,14 @@ export async function urpPostJson(
       body,
     });
   } catch (e) {
-    return { ok: false, error: `${action}失败：${(e as Error).message}` };
+    throw new RaptorError("NETWORK", `${action}失败：${(e as Error).message}`, { cause: e });
   }
   const failure = classifyFailure(resp, action);
-  if (failure) return { ok: false, error: failure };
+  if (failure) throw failure;
   try {
-    return { ok: true, data: JSON.parse(resp.body) as unknown };
+    return JSON.parse(resp.body) as unknown;
   } catch {
-    return { ok: false, error: `${action}失败：响应不是有效 JSON（接口可能已改版）` };
+    throw new RaptorError("PARSE", `${action}失败：响应不是有效 JSON（接口可能已改版）`);
   }
 }
 
@@ -90,7 +103,6 @@ export function urpPostGrades(cookie: string, body: string, action: string) {
   return urpPostJson(URP_ENDPOINTS.grades, cookie, body, action, REFERERS.grades);
 }
 
-/** 按首个等号切 KV：值里带等号（Base64 票据常见）时不能被后面的等号切坏 */
 function pickRows(container: unknown): Record<string, unknown>[] | null {
   if (!container || typeof container !== "object") return null;
   const rows = (container as Record<string, unknown>).rows;
@@ -131,7 +143,7 @@ export function extractUrpRows(
     }
   }
 
-  const data = asObject(root.data) ? asObject(root.data) : undefined;
+  const data = asObject(root.data);
   if (Array.isArray(root.data)) return (root.data as unknown[]).filter(isRow);
   if (data) {
     const rows = pickRows(data);

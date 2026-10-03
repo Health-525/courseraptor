@@ -1,17 +1,18 @@
 /**
  * 河北农大成绩与 GPA（5.0 满绩制）
  *
- * 与 ScholarFlow 侧那套的两处口径差异，都是刻意改的：
- * 1. 「合格/通过/免修/免考」在这里是 **null（不参与 GPA）**，ScholarFlow 记 3.5 计入分母。
+ * 两处刻意与常见实现不同的口径：
+ * 1. 「合格/通过/免修/免考」是 **null（不参与 GPA）**。
  *    军训、劳动、毕业实习这类课只给「合格」，按 3.5 计入会把 GPA 往上抬；
  *    按 0 计入又会往下拽。唯一正确的处理是整体移出分子分母，另记 passFailCredits。
- * 2. 缓考/缺考/空值也返回 null，而不是 ScholarFlow 那样的 0——
+ * 2. 缓考/缺考/空值也返回 null，而不是 0——
  *    把「还没考」当成「考了 0 分」是实打实的数据错误。
  *
- * 抓取侧沿用项目的硬约定：单学期查询失败要重试，重试仍失败要进 failedTerms
+ * 抓取侧沿用 courseraptor 的硬约定：单学期查询失败要重试，重试仍失败要进 failedTerms
  * 报给模型（静默丢一学期会让「你没有挂科」这类结论整个失效）。
  */
 
+import { RaptorError } from "../../core/errors";
 import type { GradeCourse, GradeResult } from "../../core/model";
 import { extractUrpRows, pickString, urpPostGrades } from "./urp";
 
@@ -139,16 +140,30 @@ function querySetting(semesterCode: string): string {
   ]);
 }
 
+async function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
 /** 抓一个学期的全部成绩（分页拿全，单学期失败重试 3 次后报 failedTerms） */
 async function fetchTermGrades(
   cookie: string,
   semesterCode: string,
 ): Promise<GradeCourse[] | null> {
   for (let attempt = 1; attempt <= 3; attempt++) {
-    const page = await fetchGradePage(cookie, semesterCode, 1);
+    let page: Awaited<ReturnType<typeof fetchGradePage>>;
+    try {
+      page = await fetchGradePage(cookie, semesterCode, 1);
+    } catch (e) {
+      // 会话失效/密码错这类结构性错误不值得在学期循环里烧满 3 次重试：
+      // 直接上抛，让 session.withAuthRetry 或工具层接手
+      if (e instanceof RaptorError && !e.retryable) throw e;
+      if (attempt === 3) return null;
+      await sleep(attempt * 1500);
+      continue;
+    }
     if (!page.ok) {
       if (attempt === 3) return null;
-      await new Promise((r) => setTimeout(r, attempt * 1500));
+      await sleep(attempt * 1500);
       continue;
     }
     const rows = page.rows
@@ -182,9 +197,13 @@ async function fetchGradePage(
 > {
   const pageSize = 100;
   const body = `querySetting=${encodeURIComponent(querySetting(semesterCode))}&*order=-XNXQDM,-KCH,-KXH&pageSize=${pageSize}&pageNumber=${pageNumber}&pageNum=${pageSize}&isAjax=true&sort=`;
-  const resp = await urpPostGrades(cookie, body, `获取${semesterCode}成绩`);
-  if (!resp.ok) return { ok: false, error: resp.error };
-  const rows = extractUrpRows(resp.data, "xscjcx");
+  let data: unknown;
+  try {
+    data = await urpPostGrades(cookie, body, `获取${semesterCode}成绩`);
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
+  const rows = extractUrpRows(data, "xscjcx");
   if (!rows) return { ok: false, error: `获取${semesterCode}成绩失败：教务系统响应结构异常` };
   return { ok: true, rows, pageSize };
 }

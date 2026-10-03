@@ -14,7 +14,6 @@ import { loadCredentialsStore, saveCredentialsStore, saveStoredCredentials } fro
 import { isCredentialError } from "./errors";
 import { getProviderDef, validateProviderApiKey } from "./providers";
 import { school } from "./school";
-import { SecondFactorRequiredError } from "./school-mfa";
 import { createMutedTerminalOutput } from "./secret-input";
 
 /** 引导结果：configured=已保存（含用户确认的未验证保存）；skipped=跳过，稍后在设置里补填 */
@@ -80,18 +79,6 @@ export async function ensureCredentials(
         terminal.write("✅ 教务账号验证通过，已加密保存。\n");
         return "configured";
       } catch (e) {
-        // 统一认证要动态验证码的学校（如河北农大）：引导当场收码续完登录，
-        // 免得用户存了个「永远差一步」的账号。学校不支持续登时走通用错误分支
-        if (
-          e instanceof SecondFactorRequiredError &&
-          school().auth.submitSecondFactor &&
-          (await completeSecondFactorInline(terminal, e))
-        ) {
-          services.save(username, password);
-          applyConfiguredCredentials(username, password);
-          terminal.write("✅ 教务账号验证通过，已加密保存。\n");
-          return "configured";
-        }
         const msg = (e as Error).message;
         if (isCredentialError(e)) {
           terminal.write(`❌ ${msg.slice(0, 60)}，请重试`);
@@ -128,27 +115,6 @@ function applyConfiguredCredentials(username: string, password: string): void {
   config.jwglUsername = username;
   config.jwglPassword = password;
   config.credentialsSource = "encrypted";
-}
-
-/** 引导期收码续登：用户交码返回 true（续登成功），留空/失败返回 false 走通用重试 */
-async function completeSecondFactorInline(
-  terminal: CredentialSetupIO,
-  err: SecondFactorRequiredError,
-): Promise<boolean> {
-  const submit = school().auth.submitSecondFactor;
-  if (!submit) return false;
-  terminal.write(
-    `📩 学校统一认证要求动态验证码（已发送到${err.maskedTarget || "绑定的手机/邮箱"}）。`,
-  );
-  const code = (await terminal.ask("请输入验证码完成登录（直接回车跳过）: ")).trim();
-  if (!code) return false;
-  try {
-    await submit({ code, challengeId: err.challengeId });
-    return true;
-  } catch (e) {
-    terminal.write(`❌ 验证码未通过：${(e as Error).message.slice(0, 80)}`);
-    return false;
-  }
 }
 
 function createTerminalCredentialIO(): CredentialSetupIO {

@@ -1,14 +1,14 @@
 /**
- * 河北农业大学学校适配器
+ * HEBAU（河北农业大学）学校适配器
  *
- * 认证：CAS 统一认证（cas.hebau.edu.cn，密码 AES-CBC 前端加密，可能触发动态码二次认证）
- * 数据：正方 URP 学生端（urp.hebau.edu.cn:1009，XHR .do 接口，学期用 XNXQDM 字符串）
- * 能力：课表 / 成绩（5.0 满绩制）/ 考试 / 日历导出。选课、学籍、实验成绩、教务通知
- *      没有对应端点：不声明 capability、不提供工具，如实报「本校未接入」，
- *      不拿南工大的接口猜数据。
+ * 把 CAS 统一认证（cas.hebau.edu.cn）与正方 URP 学生端（urp.hebau.edu.cn:1009）
+ * 的能力组装成 core/school.ts 定义的 SchoolAdapter：
+ * - 认证：CAS 账密（AES-CBC 前端加密）+ 动态码二次认证（MFA 子系统自包含在本目录）
+ * - 数据：URP XHR .do 接口，学期用 XNXQDM 字符串（换算关在 urp.ts）
+ * - 能力：课表 / 成绩 / 考试。选课、学籍、实验成绩、教务通知没有对应端点，
+ *   一律不声明 capability，如实走「暂不支持」，不借用其他学校的接口猜数据。
  *
- * 抓取与登录实现散在同级各模块（cas/urp/schedule/grades/exams…），学校规则
- * （节次作息、绩点算法、校历种子、学期编码）随模块走，工具集在 ./tools。
+ * 维护者：社区（原适配 jiangshu，新架构移植见 git log）
  */
 
 import type { SchoolAdapter } from "../../core/school";
@@ -27,26 +27,27 @@ export const hebauSchool: SchoolAdapter = {
     city: "保定",
     timezone: "Asia/Shanghai",
   },
-  capabilities: ["schedule", "exams", "grades", "calendarExport"],
+  capabilities: ["schedule", "exams", "grades"],
   terms: {
-    label: academics.hebauTermLabel,
-    candidates: (now?: Date) => academics.hebauCandidateTerms(now),
+    label: academics.termLabel,
+    candidates: (now?: Date) => academics.candidateXnxqList(now),
     parseSemesterString: academics.parseSemesterString,
-    weekOf: academics.currentWeekOf,
-    week1MondayOf: academics.resolveWeek1Monday,
-    recordedTerms: () => termDates.loadStore(),
+    weekOf: termDates.currentWeekOf,
+    week1MondayOf: termDates.resolveWeek1Monday,
+    recordedTerms: termDates.loadStore,
     expandWeeks: academics.expandWeeks,
     periodTimeRange: academics.periodTimeRange,
-    periodTime: (period: number) => academics.HEBAU_PERIOD_TIMES[String(period)],
-    periodTimes: () => academics.HEBAU_PERIOD_TIMES,
-    weekdayName: (weekday: number) => academics.WEEKDAY_NAMES[weekday] ?? `周${weekday}`,
+    periodTime: (period: number) => academics.HEBAU_PERIOD_TIMES_TABLE[String(period)],
+    periodTimes: () => academics.HEBAU_PERIOD_TIMES_TABLE,
+    weekdayName: academics.weekdayName,
   },
   auth: {
     login: async (username, password) => {
-      await loginHebau({ username, password });
+      // 二次认证不走这里：auth.login 只验证凭证有效性，动态码续登由
+      // submit_auth_code 工具直接调 completeSecondFactor（会话状态在工具层闭环）
+      await loginHebau(username, password);
     },
     getCookie: (force?: boolean) => session.getCookie(force),
-    submitSecondFactor: (input) => session.submitSecondFactor(input),
   },
   schedule: {
     fetchSmart: academics.fetchScheduleSmart,

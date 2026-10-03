@@ -1,19 +1,20 @@
 /**
  * 河北农大 HTTP 传输层（CAS 与 URP 共用）
  *
- * 为什么不复用 core/http 的 createClient：
- * 那个客户端写死 https、写死正方 jwgl 的 Cookie/Referer 语义，而河北农大是
- * 「http://urp.hebau.edu.cn:1009 + https://cas.hebau.edu.cn」两段式跨主机跳转，
- * 重定向链上必须一路攒 Cookie（CAS 的 TGT、URP 的 GS_SESSIONID 分属不同主机）。
- * 硬塞进单主机客户端会把两边的语义都改脏，所以单独一个薄客户端。
+ * 为什么不复用 core/http.ts 的 createClient：那个客户端写死单 baseURL 的
+ * Cookie/Referer 语义，而河北农大是「http://urp.hebau.edu.cn:1009 +
+ * https://cas.hebau.edu.cn」两段式跨主机跳转，重定向链上必须一路攒 Cookie
+ * （CAS 的 TGT、URP 的 GS_SESSIONID 分属不同主机）。硬塞进单主机客户端
+ * 会把两边的语义都改脏，所以单独一个薄客户端。
  *
- * 唯一必须共享的是节流令牌桶：礼貌边界和防 WAF 是进程级的，
- * 多开一个客户端不该多出一倍速率，所以从 core/http 借用同一个桶。
+ * 限速：礼貌边界和防 WAF 是进程级的。core/http 的令牌桶没有对适配器开放
+ * acquire 入口（core 零改动是适配层的硬约束），这里自带一个按 config.rateLimit
+ * 的 rps 串行间隔的桶——只比全局桶更保守（burst 不用），不会超出 RAPTOR_MAX_RPS。
  */
 
 import http from "node:http";
 import https from "node:https";
-import { acquireRequestToken } from "../../core/http";
+import { config } from "../../core/config";
 
 export const CAS_BASE = "https://cas.hebau.edu.cn";
 export const URP_BASE = "http://urp.hebau.edu.cn:1009";
@@ -85,6 +86,24 @@ function nodeTransport(url: string, opts: RequestOptions): Promise<RawResponse> 
   });
 }
 
+// ── 进程级限速（串行间隔，1/rps）──────────────────────────────
+
+let chain: Promise<void> = Promise.resolve();
+let lastStart = 0;
+
+/** 排队等一个请求槽位。间隔取 1/rps，比 core 的令牌桶更保守（不用 burst 额度） */
+export function acquireRequestSlot(): Promise<void> {
+  const rps = Math.max(0.1, config.rateLimit.rps);
+  const minIntervalMs = Math.max(1, Math.round(1000 / rps));
+  const run = chain.then(async () => {
+    const wait = lastStart + minIntervalMs - Date.now();
+    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+    lastStart = Date.now();
+  });
+  chain = run.catch(() => {});
+  return run;
+}
+
 // ── Cookie jar ────────────────────────────────────────────────
 
 export class CookieJar {
@@ -144,14 +163,15 @@ export interface SessionRequestOptions extends RequestOptions {
 
 /**
  * 发一次请求：自动带 jar 里的 Cookie、自动攒 Set-Cookie、手动跟随重定向（有跳数上限）。
- * 重定向时清空自定义 Cookie 头之外的 Host 相关头由调用方自理（这里保留 UA/Accept 等通用头）。
+ * 跨主机跳转不能把上一跳的 Cookie 头硬带过去：Cookie 由 jar 重算，
+ * Referer 用发出跳转的地址，其余头保留。
  */
 export async function requestWithJar(
   url: string,
   jar: CookieJar,
   opts: SessionRequestOptions = {},
 ): Promise<RawResponse> {
-  await acquireRequestToken();
+  await acquireRequestSlot();
   const { followRedirects = true, headers = {}, ...rest } = opts;
 
   const merged: Record<string, string> = { ...headers };
@@ -174,9 +194,7 @@ export async function requestWithJar(
     referer = currentUrl;
     currentUrl = new URL(target, currentUrl).toString();
     hops++;
-    await acquireRequestToken();
-    // 跨主机跳转不能把上一跳的 Cookie 头硬带过去：Cookie 由 jar 重算，
-    // Referer 用发出跳转的地址，其余头保留
+    await acquireRequestSlot();
     current = await transport(currentUrl, {
       method: "GET",
       headers: { Referer: referer, Cookie: jar.header() },

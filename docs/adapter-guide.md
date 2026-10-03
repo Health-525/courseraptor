@@ -41,7 +41,7 @@ src/
 | `info` | ✅ | 学校 id（`RAPTOR_SCHOOL` 取值）、全名、短名、城市、时区 |
 | `capabilities` | ✅ | 能力面清单：声明了哪项，agent 才有哪组工具 |
 | `terms` | ✅ | 学期规则：学期编码、校历真值与开学周推算、周次表达式展开（`2-6,8-12(单)`）、节次作息表 |
-| `auth` | ✅ | `login(学号, 密码)` 与 `getCookie()`（会话管理，含自动重登）；走统一认证的学校可选实现 `submitSecondFactor`（CAS 动态验证码续登，参考 `core/school-mfa.ts` 与 `hebau/session.ts`） |
+| `auth` | ✅ | `login(学号, 密码)` 与 `getCookie()`（会话管理，含自动重登）；CAS 动态验证码二次认证可自包含在适配器内做（参考 `hebau/mfa.ts` 与 `hebau/tools/auth.ts`） |
 | `schedule` | ➖ | 课表 / 考试抓取 |
 | `notices` | ➖ | 教务通知列表与正文 |
 | `tools` | ✅ | 贡献给 agent 的工具集（与 capabilities 对应；先给空对象也合法） |

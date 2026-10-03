@@ -1,7 +1,7 @@
 /**
  * 河北农大 CAS 统一认证（cas.hebau.edu.cn/authserver）
  *
- * 登录链（每一步都是 ScholarFlow 在生产里踩出来的，顺序不能调）：
+ * 登录链（每一步都是生产环境踩出来的，顺序不能调）：
  *   1. GET  登录页 → 取 execution 与 pwdEncryptSalt
  *   2. POST 登录   → 密码按站点 encrypt.js 的口径做 AES-CBC（64 位随机前缀 + 明文）
  *   3. 可能命中 /reAuthCheck/ → 发动态码，存待验证会话，抛 SecondFactorRequiredError
@@ -9,31 +9,22 @@
  *
  * 为什么手写而不是 fetch：跨主机 302 链上要一路攒 Cookie（CAS 的 TGT 与 URP 的
  * GS_SESSIONID 不同主机），fetch 的自动重定向会把 Set-Cookie 吞在内部拿不到。
+ *
+ * 错误一律 RaptorError：AUTH_INVALID（密码错）/ PARSE（页面结构变化）/
+ * UPSTREAM（拿到认证但拿不到教务会话）/ BUSINESS_REJECT（二次认证，
+ * SecondFactorRequiredError 子类）。code 是 core 判断「重试/重登/引导配置」的
+ * 稳定契约，中文文案随便改，core 不允许匹配文案。
  */
 
 import crypto from "node:crypto";
 import { RaptorError } from "../../core/errors";
+import { CAS_BASE, CookieJar, type RawResponse, requestWithJar, URP_HOME } from "./http";
 import {
   beginSecondFactor,
   clearSecondFactor,
   readSecondFactor,
   SecondFactorRequiredError,
-} from "../../core/school-mfa";
-import { CAS_BASE, CookieJar, type RawResponse, requestWithJar, URP_HOME } from "./http";
-
-/** 登录入参：challengeId+dynamicCode 同传表示「续完上一次的二次认证」 */
-export interface HebaoLoginInput {
-  username: string;
-  password: string;
-  challengeId?: string;
-  dynamicCode?: string;
-}
-
-export interface HebaoSession {
-  /** 后续抓取请求带的 Cookie 串（CAS+URP 多项拼成，整体存储整体使用） */
-  cookie: string;
-  username: string;
-}
+} from "./mfa";
 
 /** 站点 encrypt.js 的随机串字符集（去掉了 0/O/1/l 等易混字符） */
 const AES_CHARS = "ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678";
@@ -109,6 +100,11 @@ function parseJson<T>(body: string): T | null {
   }
 }
 
+export interface HebauSession {
+  cookie: string;
+  username: string;
+}
+
 /** 登录成功判据：URP 的 GS_SESSIONID。拿不到就如实报，不要带着空 Cookie 去请求数据接口 */
 async function finalizeUrpSession(jar: CookieJar): Promise<string> {
   await requestWithJar(`${CAS_BASE}/authserver/login?service=${encodeURIComponent(URP_HOME)}`, jar);
@@ -121,13 +117,16 @@ async function finalizeUrpSession(jar: CookieJar): Promise<string> {
   return jar.header();
 }
 
-export async function loginHebau(input: HebaoLoginInput): Promise<HebaoSession> {
-  const username = (input.username ?? "").trim();
-  const password = input.password ?? "";
-  if (!username || !password) throw new RaptorError("AUTH_MISSING", "请输入学号和密码");
+export async function loginHebau(
+  username: string,
+  password: string,
+  secondFactor?: { challengeId: string; dynamicCode: string },
+): Promise<HebauSession> {
+  const user = (username ?? "").trim();
+  if (!user || !password) throw new RaptorError("AUTH_MISSING", "请输入学号和密码");
 
-  if (input.challengeId && input.dynamicCode) {
-    return completeSecondFactor(input.challengeId, input.dynamicCode, username);
+  if (secondFactor?.challengeId && secondFactor.dynamicCode) {
+    return completeSecondFactor(secondFactor.challengeId, secondFactor.dynamicCode, user);
   }
 
   const jar = new CookieJar();
@@ -135,13 +134,14 @@ export async function loginHebau(input: HebaoLoginInput): Promise<HebaoSession> 
   const page = await requestWithJar(loginUrl, jar);
   const execution = page.body.match(/name="execution"\s+value="([^"]*)"/)?.[1] ?? "";
   const salt = page.body.match(/id="pwdEncryptSalt"\s+value="([^"]*)"/)?.[1] ?? "";
-  if (!execution)
+  if (!execution) {
     throw new RaptorError("PARSE", "无法获取河北农大统一认证登录参数（execution 缺失）", {
       retryable: true,
     });
+  }
 
   const body = new URLSearchParams({
-    username,
+    username: user,
     passwordText: password,
     password: salt ? encryptPassword(password, salt) : password,
     execution,
@@ -168,7 +168,7 @@ export async function loginHebau(input: HebaoLoginInput): Promise<HebaoSession> 
 
   const location = typeof loginResp.headers.location === "string" ? loginResp.headers.location : "";
   if (location.includes("/reAuthCheck/")) {
-    throw await beginDynamicCodeChallenge(location, jar, username, loginResp);
+    throw await beginDynamicCodeChallenge(location, jar, user, loginResp);
   }
 
   // 认证成功：先把 CAS→URP 这一段跳转跟完（票据在这一跳落地），再取 GS_SESSIONID
@@ -177,7 +177,7 @@ export async function loginHebau(input: HebaoLoginInput): Promise<HebaoSession> 
   }
 
   const cookie = await finalizeUrpSession(jar);
-  return { cookie, username };
+  return { cookie, username: user };
 }
 
 /** 触发二次认证：发码 → 落盘待验证会话 → 抛出让对话层去要验证码 */
@@ -196,7 +196,7 @@ async function beginDynamicCodeChallenge(
   const authCodeTypeName = REAUTH_TYPE_TO_CODE_FIELD[reAuthType];
   if (!authCodeTypeName) {
     return new RaptorError(
-      "UPSTREAM",
+      "BUSINESS_REJECT",
       `河北农大要求暂不支持的二次认证方式（reAuthType=${reAuthType || "未知"}），请到统一认证平台手动完成一次登录后再试`,
       { retryable: false },
     );
@@ -218,10 +218,9 @@ async function beginDynamicCodeChallenge(
   const sent = parseJson<{ res?: string; returnMessage?: string }>(send.body);
   const ok = ["success", "wechat_success", "cpdaily_success"].includes(sent?.res ?? "");
   if (!ok) {
-    return new RaptorError(
+    throw new RaptorError(
       "UPSTREAM",
       `河北农大验证码发送失败：${sent?.returnMessage || send.body.slice(0, 80) || "接口无响应"}`,
-      { retryable: false },
     );
   }
 
@@ -247,10 +246,10 @@ export async function completeSecondFactor(
   challengeId: string,
   dynamicCode: string,
   username: string,
-): Promise<HebaoSession> {
+): Promise<HebauSession> {
   const pending = readSecondFactor(challengeId, "hebau", username);
   if (typeof pending === "string")
-    throw new RaptorError("AUTH_CHALLENGE", pending, { retryable: false });
+    throw new RaptorError("BUSINESS_REJECT", pending, { retryable: false });
 
   const jar = new CookieJar(pending.cookies);
   const submit = await requestWithJar(`${CAS_BASE}/authserver/reAuthCheck/reAuthSubmit.do`, jar, {
@@ -272,7 +271,7 @@ export async function completeSecondFactor(
   if (result?.code !== "reAuth_success") {
     // 码错但会话还新：留着，用户重发一次对话就能再试，不必重新走一遍登录
     throw new RaptorError(
-      "AUTH_CHALLENGE",
+      "BUSINESS_REJECT",
       `验证码校验失败：${result?.msg || "未知原因"}。验证码会话仍在有效期内，可再试一次；连续错三次请重新查询以获取新验证码`,
       { retryable: false },
     );
