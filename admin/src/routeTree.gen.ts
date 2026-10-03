@@ -20,6 +20,7 @@ import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenticated/errors/$error'
 import { Route as AuthenticatedInvitesIndexRouteImport } from './routes/_authenticated/invites/index'
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
+import { Route as AuthenticatedLocalUsageIndexRouteImport } from './routes/_authenticated/local-usage/index'
 import { Route as AuthenticatedLogIndexRouteImport } from './routes/_authenticated/log/index'
 import { Route as AuthenticatedReleaseIndexRouteImport } from './routes/_authenticated/release/index'
 import { Route as AuthenticatedResetsIndexRouteImport } from './routes/_authenticated/resets/index'
@@ -83,6 +84,12 @@ const AuthenticatedKeysIndexRoute = AuthenticatedKeysIndexRouteImport.update({
   path: '/keys/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedLocalUsageIndexRoute =
+  AuthenticatedLocalUsageIndexRouteImport.update({
+    id: '/local-usage/',
+    path: '/local-usage/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedLogIndexRoute = AuthenticatedLogIndexRouteImport.update({
   id: '/log/',
   path: '/log/',
@@ -128,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/invites/': typeof AuthenticatedInvitesIndexRoute
   '/keys/': typeof AuthenticatedKeysIndexRoute
+  '/local-usage/': typeof AuthenticatedLocalUsageIndexRoute
   '/log/': typeof AuthenticatedLogIndexRoute
   '/release/': typeof AuthenticatedReleaseIndexRoute
   '/resets/': typeof AuthenticatedResetsIndexRoute
@@ -146,6 +154,7 @@ export interface FileRoutesByTo {
   '/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/invites': typeof AuthenticatedInvitesIndexRoute
   '/keys': typeof AuthenticatedKeysIndexRoute
+  '/local-usage': typeof AuthenticatedLocalUsageIndexRoute
   '/log': typeof AuthenticatedLogIndexRoute
   '/release': typeof AuthenticatedReleaseIndexRoute
   '/resets': typeof AuthenticatedResetsIndexRoute
@@ -166,6 +175,7 @@ export interface FileRoutesById {
   '/_authenticated/errors/$error': typeof AuthenticatedErrorsErrorRoute
   '/_authenticated/invites/': typeof AuthenticatedInvitesIndexRoute
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
+  '/_authenticated/local-usage/': typeof AuthenticatedLocalUsageIndexRoute
   '/_authenticated/log/': typeof AuthenticatedLogIndexRoute
   '/_authenticated/release/': typeof AuthenticatedReleaseIndexRoute
   '/_authenticated/resets/': typeof AuthenticatedResetsIndexRoute
@@ -186,6 +196,7 @@ export interface FileRouteTypes {
     | '/errors/$error'
     | '/invites/'
     | '/keys/'
+    | '/local-usage/'
     | '/log/'
     | '/release/'
     | '/resets/'
@@ -204,6 +215,7 @@ export interface FileRouteTypes {
     | '/errors/$error'
     | '/invites'
     | '/keys'
+    | '/local-usage'
     | '/log'
     | '/release'
     | '/resets'
@@ -223,6 +235,7 @@ export interface FileRouteTypes {
     | '/_authenticated/errors/$error'
     | '/_authenticated/invites/'
     | '/_authenticated/keys/'
+    | '/_authenticated/local-usage/'
     | '/_authenticated/log/'
     | '/_authenticated/release/'
     | '/_authenticated/resets/'
@@ -320,6 +333,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedKeysIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/local-usage/': {
+      id: '/_authenticated/local-usage/'
+      path: '/local-usage'
+      fullPath: '/local-usage/'
+      preLoaderRoute: typeof AuthenticatedLocalUsageIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/log/': {
       id: '/_authenticated/log/'
       path: '/log'
@@ -370,6 +390,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedErrorsErrorRoute: typeof AuthenticatedErrorsErrorRoute
   AuthenticatedInvitesIndexRoute: typeof AuthenticatedInvitesIndexRoute
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
+  AuthenticatedLocalUsageIndexRoute: typeof AuthenticatedLocalUsageIndexRoute
   AuthenticatedLogIndexRoute: typeof AuthenticatedLogIndexRoute
   AuthenticatedReleaseIndexRoute: typeof AuthenticatedReleaseIndexRoute
   AuthenticatedResetsIndexRoute: typeof AuthenticatedResetsIndexRoute
@@ -383,6 +404,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedErrorsErrorRoute: AuthenticatedErrorsErrorRoute,
   AuthenticatedInvitesIndexRoute: AuthenticatedInvitesIndexRoute,
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
+  AuthenticatedLocalUsageIndexRoute: AuthenticatedLocalUsageIndexRoute,
   AuthenticatedLogIndexRoute: AuthenticatedLogIndexRoute,
   AuthenticatedReleaseIndexRoute: AuthenticatedReleaseIndexRoute,
   AuthenticatedResetsIndexRoute: AuthenticatedResetsIndexRoute,

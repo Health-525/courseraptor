@@ -132,6 +132,32 @@ export async function logClear() {
   return res.data as { ok: boolean }
 }
 
+// ── 本地版使用统计（匿名设备号聚合，非账号体系）────────────────
+
+export type LocalUsageStats = {
+  total: number
+  activeToday: number
+  active7d: number
+  active30d: number
+  versions: { name: string; count: number }[]
+  platforms: { name: string; count: number }[]
+  lastPingAt: string
+  recent: {
+    id: string
+    version: string
+    platform: string
+    channel: string
+    firstSeen: string
+    lastSeen: string
+    pings: number
+  }[]
+}
+
+export async function localUsageGet() {
+  const res = await api.get<LocalUsageStats>('/local-usage')
+  return res.data
+}
+
 export type Bootstrap = {
   overview: Overview
   users: AdminUser[]

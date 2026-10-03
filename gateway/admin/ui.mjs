@@ -162,6 +162,7 @@ export function createAdminUi({
   version = "",
   envDeepseekKeySet = false,
   usersDir = "",
+  localUsage = null,
 }) {
   const enabled = typeof password === "string" && password.length >= 8;
   const failures = new Map();
@@ -899,6 +900,15 @@ export function createAdminUi({
     }
     if (req.method === "GET" && pathname === "/admin/api/log") {
       sendJson(res, 200, await registry.listAdminLog());
+      return true;
+    }
+    // 本地版匿名使用统计（只读聚合；上报入口是公开端点 /api/local-usage）
+    if (req.method === "GET" && pathname === "/admin/api/local-usage") {
+      if (!localUsage) {
+        sendJson(res, 503, { error: "本地版使用统计未启用" });
+        return true;
+      }
+      sendJson(res, 200, await localUsage.stats());
       return true;
     }
     if (req.method === "POST" && pathname === "/admin/api/log/clear") {

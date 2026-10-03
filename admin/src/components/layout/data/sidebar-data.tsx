@@ -1,6 +1,7 @@
 import {
   Gauge,
   KeyRound,
+  MonitorSmartphone,
   Rocket,
   ScrollText,
   Settings2,
@@ -93,6 +94,11 @@ export const sidebarData: SidebarData = {
     {
       title: '系统',
       items: [
+        {
+          title: '本地版监控',
+          url: '/local-usage',
+          icon: MonitorSmartphone,
+        },
         {
           title: '操作日志',
           url: '/log',
