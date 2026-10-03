@@ -50,22 +50,23 @@ npx tsx skills/export-schedule/scripts/export.ts --week 8 --style color --out D:
 npx tsx skills/export-schedule/scripts/export.ts --mode term --format svg
 ```
 
-成功时最后一行输出 `已导出 <绝对路径>（…）`。交付以「用户当场看到图」为目标
-（实测多数对话流**不渲染 Markdown 图片**——CDN 回链、localhost 地址都只显示成
-一行文本），可靠路径是**工具界面内的浏览器面板**，按序执行：
+成功时最后一行输出 `已导出 <绝对路径>（…）`。交付以「图片卡片直接显示在对话
+流里（消息下方）」为目标——实测对话流**不渲染 Markdown 图片**（CDN 回链、
+localhost 地址都只显示成一行文本），ZCode 的可靠机制是 `nodeRepl.emitImage`
+图片卡片，按序执行：
 
 1. **本会话首次导出**：输出目录整个会话保持不变（仓库内建议用工作区外的
    固定目录，如 `D:\work\raptor-preview\`），以后台任务运行
    `npx tsx skills/export-schedule/scripts/export.ts --week N --out <该目录> --serve`，
    从输出取「预览地址 http://127.0.0.1:<端口>/<文件名>」一行；
-2. **用界面内浏览器打开预览地址**（必做，用户立即可见）：ZCode 里用 browser-use
-   插件的内置浏览器——先 `Skill: browser-use:control-browser`，再在 node_repl 里
-   `agent.browsers.open(<预览地址>)`，确认加载后 `markDeliverable()` 保持标签页
-   可见；其他工具用等价的界面内预览手段；
-3. 回复正文同时内嵌 `![课表](<预览地址>)` 并附文件路径链接（能渲染图片的
-   客户端白赚，不能渲染也不影响 2）；
+2. **把图发进对话（必做，用户在消息下方直接看到）**：加载
+   `browser-use:control-browser` 技能，在 node_repl 里用内置浏览器打开预览地址
+   （`agent.browsers.open(<预览地址>)`），确认加载后
+   `nodeRepl.emitImage(await tab.screenshot({ fullPage: true }))`——图片卡片
+   直接出现在对话流里；浏览器标签页只是截图载体，发完即可关闭；
+3. 回复正文附文件路径链接（Markdown 内嵌可有可无，多数客户端不渲染）；
 4. **同会话再次导出**：预览服务还活着就直接一次性导出到同一目录（不带
-   `--serve`，服务挂着整个目录），用界面内浏览器打开新文件名对应地址；
+   `--serve`，服务挂着整个目录），对新文件名重复第 2 步；
    服务已退出（空闲 30 分钟自动关）则按 1 重启；
 5. 预览服务起不来（端口被禁等）时退回：Read 图片文件 + 文件路径链接；
 6. 用户明确要在系统浏览器打开时加 `--open`（或点路径链接）。
