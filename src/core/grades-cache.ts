@@ -8,6 +8,7 @@
  */
 
 import { readJsonCache, writeJsonCache } from "./json-cache";
+import { registeredSchool } from "./school";
 
 export interface CachedGradeCourse {
   course: string;
@@ -21,6 +22,8 @@ export interface CachedGradeCourse {
 export interface CachedGrades {
   /** 落盘时间戳（ms），仅展示用，不做过期判断 */
   savedAt: number;
+  /** 写入时的学校 id：切换学校后不得拿别校成绩冒充缓存（与 schedule-cache 同约定） */
+  schoolId?: string;
   /** 两位小数字符串（查询层 toFixed 口径） */
   gpa: number | string;
   gpaBasis?: string;
@@ -37,12 +40,21 @@ function isCachedGrades(parsed: unknown): parsed is CachedGrades {
   return c?.gpa != null && Array.isArray(c.recentCourses);
 }
 
-/** 读缓存；没有或读坏了都返回 null，调用方自行提示去对话里查 */
+/** 读缓存；没有、读坏了或不是当前学校的都返回 null，调用方自行提示去对话里查 */
 export function loadGradesCache(): CachedGrades | null {
-  return readJsonCache("grades-cache.json", isCachedGrades);
+  const cached = readJsonCache("grades-cache.json", isCachedGrades);
+  // 旧缓存没有学校标记：视为当前学校写入（向后兼容）；与 schedule-cache 同款守卫
+  const current = registeredSchool();
+  if (cached?.schoolId && current && cached.schoolId !== current.info.id) return null;
+  return cached;
 }
 
 /** 保存失败只打日志不影响主流程：缓存挂了顶多面板显示「还没有数据」 */
-export function saveGradesCache(payload: Omit<CachedGrades, "savedAt">): void {
-  writeJsonCache("grades-cache.json", { savedAt: Date.now(), ...payload }, "grades-cache");
+export function saveGradesCache(payload: Omit<CachedGrades, "savedAt" | "schoolId">): void {
+  const current = registeredSchool();
+  writeJsonCache(
+    "grades-cache.json",
+    { savedAt: Date.now(), ...(current ? { schoolId: current.info.id } : {}), ...payload },
+    "grades-cache",
+  );
 }

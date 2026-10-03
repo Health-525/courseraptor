@@ -14,6 +14,7 @@ export type RaptorErrorCode =
   | "AUTH_MISSING" // 未配置学号/密码 → 引导配置，不可重试
   | "AUTH_INVALID" // 学号或密码不正确 → 不可重试
   | "AUTH_LOCKED" // 账号被锁定 → 不可重试
+  | "AUTH_CHALLENGE" // 统一认证要求二次验证码 → 等用户交码，重试等于反复发码，不可重试
   | "SESSION_EXPIRED" // 会话失效 → 重登可恢复
   | "NETWORK" // 网络/超时/线路抖动 → 可重试
   | "UPSTREAM" // 上游 5xx/异常响应 → 可重试

@@ -115,6 +115,7 @@ Share the repository URL or an inspected clean installation package, never your 
 | University | Capabilities | Adapter maintainer |
 |---|---|---|
 | [Nanjing Tech University](src/adapters/njtech/) (NJTECH) | All online capabilities | [@Health-525](https://github.com/Health-525) |
+| [Hebei Agricultural University](src/adapters/hebau/) (HEBAU) | Schedule / grades (5.0-scale GPA) / exams / calendar export; CAS SSO with in-chat dynamic-code continuation | [@Health-525](https://github.com/Health-525) |
 
 Other schools work through the manual timetable mode (paste or upload a timetable and let the AI parse it). Your school not listed? [Request an adapter](https://github.com/Health-525/courseraptor/issues/new?template=request-school.yml) with a few details, or [write one yourself](docs/adapter-guide.md) — adapters are self-contained, Zhengfang-based systems have a full reference implementation to copy from, and merged PRs carry your name as that school's maintainer.
 

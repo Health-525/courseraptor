@@ -1,6 +1,8 @@
 # CourseRaptor 能力详细清单
 
 > 本文档为 README 的补充，列出所有工具参数、环境变量、教务模块覆盖等完整细节。README 仅保留核心能力卡片。
+>
+> **学校差异**：下述教务工具清单以**南京工业大学（njtech）全量适配**为准。选**河北农业大学（hebau）**时可用 `get_schedule` / `set_holidays` / `get_grades`（5.0 满绩制 GPA）/ `get_exams` / `export_calendar` / `export_schedule_image` / `publish_calendar`，另加 `submit_auth_code`（CAS 统一认证动态验证码续登）；选课、学籍、实验成绩、教务通知类工具该校未接入（教务系统无对应端点），设置页选校后仅装载本校工具。选「其他学校（custom）」时只有手动课表与通用工具。
 
 ---
 

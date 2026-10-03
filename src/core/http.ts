@@ -75,6 +75,12 @@ export function setRateLimit(rps: number, burst: number): void {
   tokens = Math.min(tokens, burst);
 }
 
+/** 拿一枚全进程共享的节流令牌。供自带传输层但不该多份速率的客户端借用
+ *  （如河北农大的 CAS+URP 双主机客户端）——多开客户端不该多出一倍速率 */
+export async function acquireRequestToken(): Promise<void> {
+  return acquireToken();
+}
+
 async function acquireToken(): Promise<void> {
   const now = Date.now();
   const elapsedSec = (now - lastRefill) / 1000;
