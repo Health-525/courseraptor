@@ -26,7 +26,7 @@
 
 把散落在教务系统各处的信息收进一句对话：问「这周课表」「我的 GPA」「最近的考试」「通识学分还缺哪几类」，agent 自动登录教务、抓取、结构化后回答。**终端敲 `raptor`、浏览器开 `localhost:3210`、QQ 里 @机器人**——三个入口共用同一个 Agent 内核与同一份记忆。
 
-一切都在你自己的电脑上运行：凭证 AES-256-GCM 加密落盘、无遥测上报、教务数据不经第三方；接的是你自己的模型 API Key——默认 DeepSeek，也内置**通义千问、智谱 GLM、Kimi、豆包、混元、MiniMax、阶跃、文心、讯飞、硅基流动**等 11 家国内厂商，外加自定义 OpenAI 兼容端点，按量计费、用量透明。目前对**南京工业大学**做了全量适配，**河北农业大学**支持课表 / 成绩 / 考试 / 日历导出，**其他学校开箱可用「手动课表」模式**；对开发者，这也是一套「Vercel AI SDK + 端口适配器架构」的本地 Agent 完整工程样例。
+一切都在你自己的电脑上运行：凭证 AES-256-GCM 加密落盘、无遥测上报、教务数据不经第三方；接的是你自己的模型 API Key——默认 DeepSeek，也内置**通义千问、智谱 GLM、Kimi、豆包、混元、MiniMax、阶跃、文心、讯飞、硅基流动、移动云（臻泽）**等 12 家国内厂商，外加自定义 OpenAI 兼容端点，按量计费、用量透明。目前对**南京工业大学**做了全量适配，**河北农业大学**支持课表 / 成绩 / 考试 / 日历导出，**其他学校开箱可用「手动课表」模式**；对开发者，这也是一套「Vercel AI SDK + 端口适配器架构」的本地 Agent 完整工程样例。
 
 ---
 
@@ -184,7 +184,7 @@ npm run njtech -- search-courses 高等数学
 
 **本地优先（Local-first）**：交互入口、Agent 内核、两层记忆与知识库全部跑在本机，数据不出电脑；教务系统、天气等外部服务仅在查询时按需访问。
 
-**技术栈**：[Vercel AI SDK v7](https://ai-sdk.dev)（`ToolLoopAgent` + `runAgentTUI`）· 模型层：DeepSeek（默认 `deepseek-flash`，即 V4.1-Flash）+ 通义千问 / 智谱 GLM / Kimi / 豆包 / 混元 / MiniMax / 阶跃 / 文心 / 讯飞 / 硅基流动 + 自定义 OpenAI 兼容端点（供应商注册表纯数据、模型工厂统一装配）· TypeScript + Node 内置 HTTP（网页端零框架）· Biome + node:test
+**技术栈**：[Vercel AI SDK v7](https://ai-sdk.dev)（`ToolLoopAgent` + `runAgentTUI`）· 模型层：DeepSeek（默认 `deepseek-flash`，即 V4.1-Flash）+ 通义千问 / 智谱 GLM / Kimi / 豆包 / 混元 / MiniMax / 阶跃 / 文心 / 讯飞 / 硅基流动 / 移动云（臻泽）+ 自定义 OpenAI 兼容端点（供应商注册表纯数据、模型工厂统一装配）· TypeScript + Node 内置 HTTP（网页端零框架）· Biome + node:test
 
 **项目结构**（完整树见 [能力文档](docs/capabilities.md#-项目结构完整树)）：
 
