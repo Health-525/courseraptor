@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { Menu, X } from 'lucide-react'
-import mascot from '@/assets/raptor-mascot.png'
+import mascot from '@/assets/raptor-logo.png'
 import { cn } from '@/lib/utils'
 import {
   SidebarMenu,
@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/sidebar'
 import { Button } from '../ui/button'
 
-/** 迅猛龙吉祥物（docs/courseraptor-mascot.png，白底整图） */
+/** 绿恐龙 logo（docs/courseraptor-logo.png，README 同款，深底整图） */
 export function RaptorLogo({ className }: { className?: string }) {
   return (
     <img
