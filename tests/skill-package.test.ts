@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -129,6 +129,7 @@ test("技能打包：export-schedule 独立包结构 + 自包含可运行", asyn
   assert.match(help.stdout, /--mode/);
   assert.match(help.stdout, /--cache/);
   assert.match(help.stdout, /--open/);
+  assert.match(help.stdout, /--serve/);
 
   // 无缓存 → 非零退出 + 引导配置（不编造课表）
   const noCache = run([]);
@@ -176,6 +177,56 @@ test("技能打包：export-schedule 独立包结构 + 自包含可运行", asyn
     .readdirSync(path.join(outDir, "exports"))
     .filter((f) => /^schedule-week1-2026-1\.(png|svg)$/.test(f));
   assert.equal(produced.length, 1, "应产出 schedule-week1-2026-1.png 或降级 .svg");
+
+  // --serve：本地 http 预览（对话内嵌显示的底座）——拉起后轮询 fetch，
+  // 应返回预览地址、图片字节与非 image/* Content-Type 不符即失败
+  const port = 20000 + Math.floor(Math.random() * 20000);
+  const serveProc = spawn(
+    process.execPath,
+    [
+      script,
+      "--cache",
+      cacheFile,
+      "--week",
+      "1",
+      "--out",
+      path.join(outDir, "serve"),
+      "--serve",
+      "--port",
+      String(port),
+      "--idle-min",
+      "0",
+    ],
+    { stdio: ["ignore", "pipe", "pipe"] },
+  );
+  t.after(() => serveProc.kill());
+  let serveOut = "";
+  serveProc.stdout.on("data", (d) => {
+    serveOut += d;
+  });
+  serveProc.stderr.on("data", (d) => {
+    serveOut += d;
+  });
+
+  let fetchErr = "未开始";
+  let served = false;
+  for (let i = 0; i < 40 && !served; i++) {
+    await new Promise((r) => setTimeout(r, 150));
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/${produced[0]}`);
+      if (res.ok) {
+        const buf = Buffer.from(await res.arrayBuffer());
+        served =
+          buf.length > 0 && (res.headers.get("content-type") ?? "").startsWith("image/");
+      } else {
+        fetchErr = `HTTP ${res.status}`;
+      }
+    } catch (e) {
+      fetchErr = (e as Error).message;
+    }
+  }
+  assert.ok(served, `预览服务应可访问（${fetchErr}）stdout：${serveOut}`);
+  assert.match(serveOut, /预览地址 http:\/\/127\.0\.0\.1:\d+\//, `stdout：${serveOut}`);
 
   // zip：本地头签名 + 条目前缀
   const zip = fs.readFileSync(built.zipPath);
