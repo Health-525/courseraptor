@@ -70,16 +70,16 @@ test("GET /api/settings：school 块带清单与手动课表标记，默认 njte
   assert.equal(r.school.options[2].manual, true);
 });
 
-test("切校带旧账号要提醒更新；能力说明按学校如实生成", async () => {
-  // ① njtech 下保存教务账号（应落 jwglSchoolId=njtech）
+test("切学校教务账号跟着切：旧校存回名下、新校空则清空待填、切回自动恢复", async () => {
+  // ① njtech 下保存教务账号 → 入 njtech 槽位
   const save = await wfetch(`${await base()}/api/settings`, {
     method: "POST",
     body: JSON.stringify({ jwglUsername: "202321144057", jwglPassword: "fake-pass-1" }),
   });
   assert.equal(save.status, 200);
-  assert.equal(loadCredentialsStore()?.jwglSchoolId, "njtech");
+  assert.equal(loadCredentialsStore()?.jwglAccounts?.njtech?.username, "202321144057");
 
-  // ② 带着南工大账号切到河北农大：结果消息必须提醒账号是原学校的
+  // ② 切到河北农大：没有该校账号 → 当前账号清空，提示填写；南工大账号留在槽里不删
   const r = await wfetch(`${await base()}/api/settings`, {
     method: "POST",
     body: JSON.stringify({ schoolId: "hebau" }),
@@ -88,34 +88,62 @@ test("切校带旧账号要提醒更新；能力说明按学校如实生成", as
   const d = await r.json();
   const line = d.results.find((x: { field: string }) => x.field === "school");
   assert.match(line.message, /已切换为「河北农业大学」/);
-  assert.match(line.message, /「南京工业大学」的.*更新为河北农业大学的学号与密码/s);
-  // 状态：保存学校标记 + 当前学校已是 hebau
+  assert.match(line.message, /还没有保存教务账号.*填写河北农业大学的学号与密码/s);
   assert.equal(d.status.school.current, "hebau");
-  assert.equal(d.status.jwgl.savedSchoolId, "njtech");
+  assert.equal(d.status.jwgl.configured, false);
+  assert.equal(d.status.jwgl.username, "");
+  const store1 = loadCredentialsStore();
+  assert.equal(store1?.username, "");
+  assert.equal(store1?.jwglAccounts?.njtech?.username, "202321144057", "旧校账号必须还在槽里");
 
-  // ③ 学校清单的能力说明按 capabilities 生成：hebau 没接通知就不能写通知
-  const opts = d.status.school.options as Array<{ id: string; note?: string }>;
-  const hebauNote = opts.find((o) => o.id === "hebau")?.note ?? "";
-  assert.match(hebauNote, /课表 \/ 成绩 \/ 考试/);
-  assert.doesNotMatch(hebauNote, /通知/);
-  assert.match(opts.find((o) => o.id === "njtech")?.note ?? "", /通知/);
-  assert.equal(opts.find((o) => o.id === "custom")?.note, undefined);
-
-  // ④ hebau 下重新保存账号：标记随当前学校更新；再切回 njtech 不再有提醒
-  const resave = await wfetch(`${await base()}/api/settings`, {
-    method: "POST",
-    body: JSON.stringify({ jwglUsername: "202501010203", jwglPassword: "fake-pass-2" }),
-  });
-  assert.equal(resave.status, 200);
-  assert.equal(loadCredentialsStore()?.jwglSchoolId, "hebau");
+  // ③ 切回 njtech：自动恢复南工大账号，不用重填
   const back = await wfetch(`${await base()}/api/settings`, {
     method: "POST",
     body: JSON.stringify({ schoolId: "njtech" }),
   });
   const bd = await back.json();
-  const backLine = bd.results.find((x: { field: string }) => x.field === "school");
-  // 反方向同理：现在账号是河北农大的，切回南工大也要提醒换账号（对称行为）
-  assert.match(backLine.message, /「河北农业大学」的.*更新为南京工业大学的学号与密码/s);
+  assert.match(
+    bd.results.find((x: { field: string }) => x.field === "school").message,
+    /已载入本校保存的教务账号（学号 2023\*\*\*\*）/,
+  );
+  assert.equal(bd.status.jwgl.configured, true);
+  assert.equal(bd.status.jwgl.username, "202321144057");
+
+  // ④ 两校各存各的：hebau 存自己的账号后互切，各用各的
+  await wfetch(`${await base()}/api/settings`, {
+    method: "POST",
+    body: JSON.stringify({ schoolId: "hebau" }),
+  });
+  const resave = await wfetch(`${await base()}/api/settings`, {
+    method: "POST",
+    body: JSON.stringify({ jwglUsername: "202501010203", jwglPassword: "fake-pass-2" }),
+  });
+  assert.equal(resave.status, 200);
+  const store2 = loadCredentialsStore();
+  assert.equal(store2?.jwglAccounts?.hebau?.username, "202501010203");
+  assert.equal(store2?.jwglAccounts?.njtech?.username, "202321144057");
+  const toN = await (
+    await wfetch(`${await base()}/api/settings`, {
+      method: "POST",
+      body: JSON.stringify({ schoolId: "njtech" }),
+    })
+  ).json();
+  assert.equal(toN.status.jwgl.username, "202321144057");
+  const toH = await (
+    await wfetch(`${await base()}/api/settings`, {
+      method: "POST",
+      body: JSON.stringify({ schoolId: "hebau" }),
+    })
+  ).json();
+  assert.equal(toH.status.jwgl.username, "202501010203");
+
+  // ⑤ 能力说明按学校 capabilities 生成：hebau 没接通知就不能写通知
+  const opts = toH.status.school.options as Array<{ id: string; note?: string }>;
+  const hebauNote = opts.find((o) => o.id === "hebau")?.note ?? "";
+  assert.match(hebauNote, /课表 \/ 成绩 \/ 考试/);
+  assert.doesNotMatch(hebauNote, /通知/);
+  assert.match(opts.find((o) => o.id === "njtech")?.note ?? "", /通知/);
+  assert.equal(opts.find((o) => o.id === "custom")?.note, undefined);
 });
 
 test("POST /api/settings 切换学校：运行期生效并落凭证", async () => {

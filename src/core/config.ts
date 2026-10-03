@@ -295,10 +295,27 @@ function loadConfig(): RaptorConfig {
   };
 
   // 凭证解析：教务账号保持 .env 优先，缺失时再解密本地存储。
+  // 本地存储按学校分槽（jwglAccounts）：启动选中哪所学校就装哪所的账号——
+  // 旧格式（无槽位）的 username/password 只在其归属校装载：带 jwglSchoolId
+  // 按标记判；无标记的存量账号只可能属于历史默认校 njtech
   if (!config.jwglUsername || !config.jwglPassword) {
-    if (stored?.username && stored.password) {
-      config.jwglUsername = stored.username;
-      config.jwglPassword = stored.password;
+    const selectedSchool = env("RAPTOR_SCHOOL") ?? stored?.schoolId ?? "njtech";
+    const slot = stored?.jwglAccounts?.[selectedSchool];
+    const legacyStamped =
+      stored?.username && stored.password && stored.jwglSchoolId === selectedSchool
+        ? { username: stored.username, password: stored.password }
+        : null;
+    const legacyUnstamped =
+      stored?.username &&
+      stored.password &&
+      stored.jwglSchoolId === undefined &&
+      selectedSchool === "njtech"
+        ? { username: stored.username, password: stored.password }
+        : null;
+    const picked = slot ?? legacyStamped ?? legacyUnstamped;
+    if (picked) {
+      config.jwglUsername = picked.username;
+      config.jwglPassword = picked.password;
       config.credentialsSource = "encrypted";
     } else {
       config.credentialsSource = "unset";

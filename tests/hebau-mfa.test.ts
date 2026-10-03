@@ -369,7 +369,7 @@ test("onboarding 收码被跳过（回车）：走通用失败路径，不保存
   selectSchool("njtech");
 });
 
-test("saveStoredCredentials 盖当前学校的章：切校后设置页据此提醒换账号", async () => {
+test("saveStoredCredentials 按学校入槽：盖章 + 槽位留底，切校不丢", async () => {
   const { saveStoredCredentials, loadCredentialsStore } = await import("../src/core/credentials");
   const { selectSchool } = await import("../src/core/school");
   registerSchoolOption(
@@ -379,6 +379,9 @@ test("saveStoredCredentials 盖当前学校的章：切校后设置页据此提�
   );
   selectSchool("fake-stamp");
   saveStoredCredentials("2023010101", "pw");
-  assert.equal(loadCredentialsStore()?.jwglSchoolId, "fake-stamp");
+  const store = loadCredentialsStore();
+  assert.equal(store?.jwglSchoolId, "fake-stamp");
+  assert.equal(store?.jwglAccounts?.["fake-stamp"]?.username, "2023010101");
+  assert.equal(store?.username, "2023010101", "username 镜像当前学校账号");
   selectSchool("njtech");
 });

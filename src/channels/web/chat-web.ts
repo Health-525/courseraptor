@@ -874,19 +874,40 @@ function applySettings(body: Record<string, unknown>): {
     if (schoolId === currentSchoolId) {
       results.push({ field: "school", ok: true, message: "所选学校已是当前学校，无需切换" });
     } else if (selectSchool(schoolId)) {
-      saveCredentialsStore({ schoolId });
-      schoolChanged = true;
       const name = listSchoolOptions().find((a) => a.info.id === schoolId)?.info.name ?? schoolId;
-      // 教务账号字段不分学校：切校后旧账号对不上新校，必须提醒更新，
-      // 否则拿 A 校学号去登 B 校教务，报「密码错误」还以为密码真错了。
-      // 旧凭据没有 jwglSchoolId 标记时，按「切换前所在学校」推断（几乎必然属于它）
-      const accountSchoolId = loadCredentialsStore()?.jwglSchoolId ?? currentSchoolId;
+      // 教务账号按学校分槽：旧学校的账号存回它名下（不删，切回来还在），
+      // 新学校有自己的账号就载入，没有就清空等用户填——绝不能拿 A 校账号去登 B 校
+      const store = loadCredentialsStore();
+      const accounts: Record<string, { username: string; password: string }> = {
+        ...(store?.jwglAccounts ?? {}),
+      };
+      const hadActive = !!(config.jwglUsername && config.jwglPassword);
+      const fromEnv = config.credentialsSource === "env";
+      if (hadActive && !fromEnv) {
+        accounts[currentSchoolId] = {
+          username: config.jwglUsername,
+          password: config.jwglPassword,
+        };
+      }
+      const next = accounts[schoolId] ?? null;
+      saveCredentialsStore({
+        schoolId,
+        jwglAccounts: accounts,
+        username: next?.username ?? "",
+        password: next?.password ?? "",
+        jwglSchoolId: next ? schoolId : undefined,
+      });
+      config.jwglUsername = next?.username ?? "";
+      config.jwglPassword = next?.password ?? "";
+      config.credentialsSource = next ? "encrypted" : hadActive && fromEnv ? "env" : "unset";
+      schoolChanged = true;
       let message = `学校已切换为「${name}」：对话与各面板下一条起生效（终端界面重启后生效）`;
-      if (config.jwglUsername && accountSchoolId !== schoolId) {
-        const accountSchoolName =
-          listSchoolOptions().find((a) => a.info.id === accountSchoolId)?.info.name ??
-          accountSchoolId;
-        message += `。⚠️ 已保存的教务账号（学号 ${config.jwglUsername.slice(0, 4)}****）是「${accountSchoolName}」的，请在下方更新为${name}的学号与密码，否则登录会用错账号`;
+      if (next) {
+        message += `。已载入本校保存的教务账号（学号 ${next.username.slice(0, 4)}****）`;
+      } else if (hadActive && fromEnv) {
+        message += `。⚠️ 当前教务账号来自 .env 配置（属原学校），查询${name}前请在下方保存本校学号与密码`;
+      } else {
+        message += `。本校还没有保存教务账号，请在下方填写${name}的学号与密码后保存`;
       }
       results.push({ field: "school", ok: true, message });
     } else {
@@ -913,11 +934,15 @@ function applySettings(body: Record<string, unknown>): {
     if (!user || !pass) {
       results.push({ field: "jwgl", ok: false, message: "学号与密码需要一起提交" });
     } else {
-      // 落 jwglSchoolId：这份账号是当前学校下保存的，切校时据此提醒更新
+      // 按学校入槽：这份账号属于当前学校；username/password 镜像当前校供旧读取端
+      const sid = school().info.id;
+      const accounts = { ...(loadCredentialsStore()?.jwglAccounts ?? {}) };
+      accounts[sid] = { username: user, password: pass };
       saveCredentialsStore({
         username: user,
         password: pass,
-        jwglSchoolId: school().info.id,
+        jwglSchoolId: sid,
+        jwglAccounts: accounts,
       });
       config.jwglUsername = user;
       config.jwglPassword = pass;
