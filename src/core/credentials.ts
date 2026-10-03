@@ -74,6 +74,12 @@ export interface CredentialsStore {
    * 「已保存的账号是原学校的，请更新」。旧数据无此字段视为未知。
    */
   jwglSchoolId?: string;
+  /**
+   * 每所学校各自的教务账号槽位（schoolId -> 账号）：切学校跟着切账号，
+   * 各校互不覆盖、切走再切回不丢（与 providerKeys 每厂商一把同一原则）。
+   * username/password 字段始终镜像「当前学校」的账号，供旧读取端兼容。
+   */
+  jwglAccounts?: Record<string, { username: string; password: string }>;
   /** custom：用户自填的学校显示名（空则用「其他学校」） */
   customSchoolName?: string;
   /** custom：所在城市（天气默认城市；空则问用户） */
@@ -152,7 +158,14 @@ export function loadStoredCredentials(): CredentialsStore | null {
 
 export function saveStoredCredentials(username: string, password: string): void {
   const schoolId = registeredSchool()?.info.id;
-  saveCredentialsStore({ username, password, ...(schoolId ? { jwglSchoolId: schoolId } : {}) });
+  if (!schoolId) {
+    saveCredentialsStore({ username, password });
+    return;
+  }
+  // 引导保存同样按学校入槽：username/password 镜像当前学校，槽位留底
+  const accounts = { ...(loadCredentialsStore()?.jwglAccounts ?? {}) };
+  accounts[schoolId] = { username, password };
+  saveCredentialsStore({ username, password, jwglSchoolId: schoolId, jwglAccounts: accounts });
 }
 
 export function clearStoredCredentials(): void {
