@@ -32,6 +32,7 @@ npx tsx skills/export-schedule/scripts/export.ts [参数]
 | `--format` | `png`（默认）/ `svg` | PNG 为 2 倍宽高清 |
 | `--out` | 目录或文件名 | 缺省落当前工作目录 |
 | `--cache` | 文件路径 | 直接指定 schedule-cache.json（缺省读 `data/`） |
+| `--no-open` | 开关 | 只导出，不在默认浏览器自动打开预览（自动化/无桌面环境） |
 
 示例：
 
@@ -47,6 +48,9 @@ npx tsx skills/export-schedule/scripts/export.ts --mode term --format svg
 ```
 
 成功时最后一行输出 `已导出 <绝对路径>（…）`，把该路径以 Markdown 链接给用户。
+导出完成后脚本会**自动在默认浏览器打开该图片**（`file://` 本地直读，零网络），
+用户当场就能看到图；回复里说明「图已在浏览器打开」，浏览器没弹出来时再让
+用户点路径链接。自动化/无桌面场景才需要 `--no-open`。
 
 ## 报错语义（「拿不到」≠「没有」）
 
