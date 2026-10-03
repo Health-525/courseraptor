@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { Menu, X } from 'lucide-react'
+import mascot from '@/assets/raptor-mascot.png'
 import { cn } from '@/lib/utils'
 import {
   SidebarMenu,
@@ -8,6 +9,17 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { Button } from '../ui/button'
+
+/** 迅猛龙吉祥物（docs/courseraptor-mascot.png，白底整图） */
+export function RaptorLogo({ className }: { className?: string }) {
+  return (
+    <img
+      src={mascot}
+      alt='CourseRaptor 恐龙吉祥物'
+      className={cn('object-cover', className)}
+    />
+  )
+}
 
 /** 迅猛龙爪痕：三道渐细的弧形爪印，CourseRaptor 的品牌记号 */
 export function RaptorMark({ className }: { className?: string }) {
@@ -45,8 +57,8 @@ export function AppTitle() {
               className='grid flex-1 text-start text-sm leading-tight'
             >
               <span className='flex items-center gap-2'>
-                <span className='bg-sidebar-primary text-sidebar-primary-foreground flex size-7 shrink-0 items-center justify-center rounded-md'>
-                  <RaptorMark className='size-4' />
+                <span className='bg-sidebar-primary flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md'>
+                  <RaptorLogo className='size-full' />
                 </span>
                 <span className='truncate font-bold tracking-tight'>
                   CourseRaptor

@@ -1,4 +1,4 @@
-import { RaptorMark } from '@/components/layout/app-title'
+import { RaptorLogo, RaptorMark } from '@/components/layout/app-title'
 
 type AuthLayoutProps = {
   children: React.ReactNode
@@ -13,8 +13,8 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         <RaptorMark className='text-sidebar-primary/12 pointer-events-none absolute -end-20 -top-16 size-[30rem] rotate-12' />
 
         <div className='flex items-center gap-2.5'>
-          <span className='bg-sidebar-primary text-sidebar-primary-foreground flex size-8 items-center justify-center rounded-lg'>
-            <RaptorMark className='size-[18px]' />
+          <span className='bg-sidebar-primary flex size-8 items-center justify-center overflow-hidden rounded-lg'>
+            <RaptorLogo className='size-full' />
           </span>
           <span className='text-sm font-bold tracking-tight'>
             CourseRaptor
@@ -57,8 +57,8 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         <div className='w-full max-w-sm'>
           {/* 移动端 / 窄屏的紧凑品牌头 */}
           <div className='mb-8 flex items-center gap-2.5 lg:hidden'>
-            <span className='bg-primary text-primary-foreground flex size-8 items-center justify-center rounded-lg'>
-              <RaptorMark className='size-[18px]' />
+            <span className='bg-primary flex size-8 items-center justify-center overflow-hidden rounded-lg'>
+              <RaptorLogo className='size-full' />
             </span>
             <span className='text-sm font-bold tracking-tight'>
               CourseRaptor
