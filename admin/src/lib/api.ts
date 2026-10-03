@@ -85,6 +85,9 @@ export type SiteInfo = {
   defaultDailyTurns: number
   /** 各厂商站点 Key 状态（多厂商）；旧后端缺省为空数组 */
   providers?: SiteProviderInfo[]
+  /** 站点默认模型（多厂商）：空串 = 未设置（同学未自选时用系统默认 DeepSeek） */
+  defaultProvider?: string
+  defaultModel?: string
 }
 
 /** 更新后台的调用包装：连不上/未配置 → {unavailable}，拒绝 → {error} */
@@ -264,6 +267,21 @@ export async function siteSaveKey(deepseekKey: string) {
 export async function siteSaveProviderKey(provider: string, key: string) {
   const res = await api.post('/site', { provider, key })
   return res.data as { ok: boolean }
+}
+
+/** 站点默认模型：provider/model 都传空串 = 清除（回落系统默认 DeepSeek） */
+export async function siteSaveDefaultModel(provider: string, model: string) {
+  const res = await api.post('/site', {
+    defaultProvider: provider,
+    defaultModel: model,
+  })
+  return res.data as { ok: boolean }
+}
+
+/** 该厂商的在线型号清单（网关用站点 Key 实时代理 /models；拉不到时手输） */
+export async function siteGetModels(provider: string) {
+  const res = await api.get('/site/models', { params: { provider } })
+  return res.data as { models: string[]; error?: string }
 }
 
 // ── 两步验证（TOTP）────────────────────────────────────────────

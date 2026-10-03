@@ -40,5 +40,7 @@ export function buildInstanceEnv(
     forceSite?: boolean;
     providerId?: string;
     providerSiteKey?: string;
+    /** 站点默认型号（site.json）：只兜底从没选过型号的同学 */
+    siteModel?: string;
   },
 ): Record<string, string>;

@@ -58,8 +58,9 @@ const spawner = createSpawner({
   getDeepseekKey: () => registry.getSiteSettings().then((s) => s.deepseekKey),
   // 同学钉在「站点免费额度」模式时，实例禁用其保存的自己 Key（Key 保留不删）
   getForceSiteKey: (userId) => registry.findUserById(userId).then((u) => u?.dsMode === "site"),
-  // 同学当前选的模型供应商（users.json，/api/provider 切换后踢实例生效）
-  getProviderId: (userId) => registry.findUserById(userId).then((u) => u?.providerId || "deepseek"),
+  // 同学当前选的模型供应商（users.json，/api/provider 切换后踢实例生效）；
+  // 没选过返回空串，由 spawner 落到站点默认供应商（site.json）再落 deepseek
+  getProviderId: (userId) => registry.findUserById(userId).then((u) => u?.providerId || ""),
   // 指定供应商的站点 Key（site.json providerKeys；deepseek 回退 env GATEWAY_DEEPSEEK_KEY）
   getProviderSiteKey: async (providerId) => {
     const keys = await registry.getSiteProviderKeys();
@@ -67,6 +68,11 @@ const spawner = createSpawner({
     if (providerId === "deepseek") return env.GATEWAY_DEEPSEEK_KEY || "";
     return "";
   },
+  // 站点默认模型（管理台「站点默认模型」）：只兜底没自选过的同学
+  getSiteDefault: () =>
+    registry
+      .getSiteSettings()
+      .then((s) => ({ provider: s.defaultProvider || "", model: s.defaultModel || "" })),
   maxConcurrent: Number(env.GATEWAY_MAX_CONCURRENT) || 4,
   idleMinutes: Number(env.GATEWAY_IDLE_MINUTES) || 30,
 });

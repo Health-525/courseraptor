@@ -57,18 +57,27 @@ const FAILURE_IDLE_MS = 30 * 60_000;
  * 的 BUILTIN_PROVIDERS 一致——加厂商时两处同步改，测试红灯兜底。
  */
 const SITE_PROVIDERS = [
-  { id: "deepseek", label: "DeepSeek", keyPattern: /^sk-[A-Za-z0-9]{16,}$/ },
-  { id: "qwen", label: "通义千问（阿里百炼）" },
-  { id: "glm", label: "智谱 GLM" },
-  { id: "kimi", label: "Kimi（月之暗面）" },
-  { id: "doubao", label: "豆包（火山方舟）" },
-  { id: "hunyuan", label: "腾讯混元" },
-  { id: "minimax", label: "MiniMax" },
-  { id: "step", label: "阶跃星辰" },
-  { id: "ernie", label: "文心（百度千帆）" },
-  { id: "spark", label: "讯飞星火" },
-  { id: "siliconflow", label: "硅基流动" },
-  { id: "zhenze", label: "移动云（臻泽）" },
+  {
+    id: "deepseek",
+    label: "DeepSeek",
+    baseUrl: "https://api.deepseek.com/v1",
+    keyPattern: /^sk-[A-Za-z0-9]{16,}$/,
+  },
+  {
+    id: "qwen",
+    label: "通义千问（阿里百炼）",
+    baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  },
+  { id: "glm", label: "智谱 GLM", baseUrl: "https://open.bigmodel.cn/api/paas/v4" },
+  { id: "kimi", label: "Kimi（月之暗面）", baseUrl: "https://api.moonshot.cn/v1" },
+  { id: "doubao", label: "豆包（火山方舟）", baseUrl: "https://ark.cn-beijing.volces.com/api/v3" },
+  { id: "hunyuan", label: "腾讯混元", baseUrl: "https://api.hunyuan.cloud.tencent.com/v1" },
+  { id: "minimax", label: "MiniMax", baseUrl: "https://api.minimaxi.com/v1" },
+  { id: "step", label: "阶跃星辰", baseUrl: "https://api.stepfun.com/v1" },
+  { id: "ernie", label: "文心（百度千帆）", baseUrl: "https://qianfan.baidubce.com/v2" },
+  { id: "spark", label: "讯飞星火", baseUrl: "https://spark-api-open.xf-yun.com/v1" },
+  { id: "siliconflow", label: "硅基流动", baseUrl: "https://api.siliconflow.cn/v1" },
+  { id: "zhenze", label: "移动云（臻泽）", baseUrl: "https://zhenze-huhehaote.cmecloud.cn/v1" },
 ];
 
 /** 站点 Key 的形状校验：deepseek 严格 sk-（历史行为），其余宽松 */
@@ -476,28 +485,35 @@ export function createAdminUi({
       }
       if (pathname === "/admin/api/site") {
         if (req.method === "GET") {
-          const site = await registry.getSiteSettings();
-          const providerKeys = await registry.getSiteProviderKeys();
-          sendJson(res, 200, {
-            deepseekKeySet: Boolean(site.deepseekKey),
-            deepseekKeyMasked: site.deepseekKey ? maskSiteKey(site.deepseekKey) : "",
-            envDeepseekKeySet,
-            defaultDailyTurns: defaultDailyTurns,
-            /* 各厂商站点 Key 状态（多厂商）：keyMasked 为空即未设 */
-            providers: SITE_PROVIDERS.map((p) => ({
-              id: p.id,
-              label: p.label,
-              keySet: Boolean(providerKeys[p.id]),
-              keyMasked: providerKeys[p.id] ? maskSiteKey(providerKeys[p.id]) : "",
-              /* deepseek 兜底链路提示：面板未设但 env 有 */
-              envFallback: p.id === "deepseek" && !providerKeys[p.id] && envDeepseekKeySet,
-            })),
-          });
+          sendJson(res, 200, await siteSnapshot());
           return true;
         }
         if (req.method === "POST") {
           const body = await readJsonBody(req);
-          // 新形状：{provider, key} 按厂商保存/清除；旧形状 {deepseekKey} 兼容转发
+          // 新形状①：{defaultProvider, defaultModel} 站点默认模型（两者都空=清除）
+          if (body.defaultProvider !== undefined || body.defaultModel !== undefined) {
+            const provider = String(body.defaultProvider ?? "").trim();
+            const model = String(body.defaultModel ?? "").trim();
+            const def = SITE_PROVIDERS.find((p) => p.id === provider);
+            if (provider && !def) {
+              sendJson(res, 400, { error: "未知供应商（自定义端点没有站点默认模型）" });
+              return true;
+            }
+            try {
+              await registry.setSiteDefaultModel(provider, model);
+            } catch (error) {
+              sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) });
+              return true;
+            }
+            const text = provider
+              ? `站点默认模型 → ${def.label} / ${model}（同学自选优先，新拉起的实例生效）`
+              : "站点默认模型已清除（回落系统默认 DeepSeek）";
+            console.log(`[gw-admin] ${text}`);
+            await audit(ip, text);
+            sendJson(res, 200, { ok: true });
+            return true;
+          }
+          // 新形状②：{provider, key} 按厂商保存/清除；旧形状 {deepseekKey} 兼容转发
           if (body.provider !== undefined) {
             const provider = String(body.provider ?? "");
             const key = String(body.key ?? "").trim();
@@ -540,6 +556,62 @@ export function createAdminUi({
           return true;
         }
       }
+
+      // 站点默认模型的在线型号清单：网关拿该厂商的站点 Key 实时代理
+      // GET {base}/models（管理台「站点默认模型」下拉用；拉不到就手输）。
+      // 只用面板 Key——env 兜底 Key 不经手，避免把进程 env 里的值引进这条链路。
+      if (req.method === "GET" && pathname === "/admin/api/site/models") {
+        const url = new URL(req.url, "http://localhost");
+        const providerId = (url.searchParams.get("provider") ?? "").trim();
+        const def = SITE_PROVIDERS.find((p) => p.id === providerId);
+        if (!def) {
+          sendJson(res, 400, { error: "未知供应商" });
+          return true;
+        }
+        const providerKeys = await registry.getSiteProviderKeys();
+        const key = providerKeys[providerId] ?? "";
+        if (!key) {
+          sendJson(res, 200, {
+            models: [],
+            error: `尚未配置 ${def.label} 的站点 Key：请先在上方配 Key，或直接手动输入型号 ID`,
+          });
+          return true;
+        }
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 10_000);
+        try {
+          const resp = await fetch(`${def.baseUrl}/models`, {
+            headers: { Authorization: `Bearer ${key}` },
+            signal: controller.signal,
+          });
+          if (!resp.ok) {
+            sendJson(res, 200, {
+              models: [],
+              error: `${def.label} 返回 ${resp.status}：可手动输入型号 ID`,
+            });
+            return true;
+          }
+          const payload = await resp.json();
+          const rows = Array.isArray(payload) ? payload : (payload?.data ?? []);
+          const models = [
+            ...new Set(
+              (Array.isArray(rows) ? rows : [])
+                .map((m) => (typeof m?.id === "string" ? m.id : ""))
+                .filter((id) => /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,63}$/.test(id)),
+            ),
+          ].sort();
+          sendJson(res, 200, { models: models.slice(0, 200) });
+        } catch {
+          sendJson(res, 200, {
+            models: [],
+            error: `拉取 ${def.label} 型号清单失败（超时或网络不通）：可手动输入型号 ID`,
+          });
+        } finally {
+          clearTimeout(timer);
+        }
+        return true;
+      }
+
       return await handleApi(req, res, pathname, ip);
     }
 
@@ -585,6 +657,34 @@ export function createAdminUi({
       pendingResets: resets.pending.length,
       uptimeSec: Math.round(process.uptime()),
       version,
+    };
+  }
+
+  /**
+   * 站点设置的公共快照：GET /admin/api/site 与 bootstrap 共用同一形状——
+   * SPA 的数据源是 bootstrap（单请求模式），两处形状漂移会让站点设置页
+   * 静默退回单行 DeepSeek 兜底（#183 的实际线上状态，修于此）。
+   */
+  async function siteSnapshot() {
+    const site = await registry.getSiteSettings();
+    const providerKeys = await registry.getSiteProviderKeys();
+    return {
+      deepseekKeySet: Boolean(site.deepseekKey),
+      deepseekKeyMasked: site.deepseekKey ? maskSiteKey(site.deepseekKey) : "",
+      envDeepseekKeySet,
+      defaultDailyTurns: defaultDailyTurns,
+      /* 站点默认模型（多厂商）：空串 = 未设置（同学未自选时用系统默认 DeepSeek） */
+      defaultProvider: site.defaultProvider || "",
+      defaultModel: site.defaultModel || "",
+      /* 各厂商站点 Key 状态（多厂商）：keyMasked 为空即未设 */
+      providers: SITE_PROVIDERS.map((p) => ({
+        id: p.id,
+        label: p.label,
+        keySet: Boolean(providerKeys[p.id]),
+        keyMasked: providerKeys[p.id] ? maskSiteKey(providerKeys[p.id]) : "",
+        /* deepseek 兜底链路提示：面板未设但 env 有 */
+        envFallback: p.id === "deepseek" && !providerKeys[p.id] && envDeepseekKeySet,
+      })),
     };
   }
 
@@ -712,12 +812,11 @@ export function createAdminUi({
 
     // 一次往返带回全部面板数据：跨公网链路 RTT 大，串行请求是「卡」的主因
     if (req.method === "GET" && pathname === "/admin/api/bootstrap") {
-      const [overview, users, invites, site, resets, totp, updOverview, updVersions, updKeys, log] =
+      const [overview, users, invites, resets, totp, updOverview, updVersions, updKeys, log] =
         await Promise.all([
           ownOverview(),
           registry.listUsers(),
           registry.listInvites(),
-          registry.getSiteSettings(),
           registry.listResetRequests(),
           registry.getAdminTotp(),
           callUpdateApi("GET", "/admin/api/overview"),
@@ -735,14 +834,7 @@ export function createAdminUi({
           enabledAt: totp?.enabledAt ?? "",
           recoveryLeft: totp?.recovery?.length ?? 0,
         },
-        site: {
-          deepseekKeySet: Boolean(site.deepseekKey),
-          deepseekKeyMasked: site.deepseekKey
-            ? `${site.deepseekKey.slice(0, 3)}${"•".repeat(8)}${site.deepseekKey.slice(-4)}`
-            : "",
-          envDeepseekKeySet,
-          defaultDailyTurns,
-        },
+        site: await siteSnapshot(),
         update: { overview: updOverview, versions: updVersions, keys: updKeys },
         log,
       });

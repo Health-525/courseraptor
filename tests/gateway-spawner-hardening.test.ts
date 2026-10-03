@@ -71,6 +71,7 @@ test("buildInstanceEnv：站点 Key 缺省回退构造兜底；钉站点模式�
 test("buildInstanceEnv：注入同学选择的供应商与托管标志", () => {
   const env = buildInstanceEnv({}, { port: 1, dataDir: "d", credFile: "c", providerId: "glm" });
   assert.equal(env.RAPTOR_PROVIDER_ID, "glm", "同学的供应商选择注入实例（users.json 的值）");
+  assert.equal(env.RAPTOR_HOSTED, "1");
   assert.equal(
     env.RAPTOR_HOSTED,
     "1",
@@ -103,4 +104,18 @@ test("buildInstanceEnv：按供应商注入站点 Key（多厂商）", () => {
   const bare = buildInstanceEnv({}, { port: 3, dataDir: "d", credFile: "c", providerId: "qwen" });
   assert.equal(bare.RAPTOR_PROVIDER_KEY, undefined);
   assert.equal(bare.DEEPSEEK_API_KEY, undefined);
+});
+
+test("buildInstanceEnv：站点默认型号按需注入，未配置不设", () => {
+  const withSite = buildInstanceEnv(
+    {},
+    { port: 1, dataDir: "d", credFile: "c", siteModel: "deepseek-v4.1-flash" },
+  );
+  assert.equal(
+    withSite.RAPTOR_SITE_MODEL,
+    "deepseek-v4.1-flash",
+    "站点默认型号注入实例（config.ts 里同学自选优先，这里只兜底）",
+  );
+  const bare = buildInstanceEnv({}, { port: 2, dataDir: "d", credFile: "c" });
+  assert.equal(bare.RAPTOR_SITE_MODEL, undefined, "未配置站点默认时不设变量（本地版零改动）");
 });

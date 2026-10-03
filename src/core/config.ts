@@ -6,7 +6,7 @@
 import path from "node:path";
 import { z } from "zod";
 import { type CredentialsStore, loadCredentialsStore } from "./credentials";
-import { resolveStoredModel } from "./models";
+import { isValidModelId, resolveStoredModel } from "./models";
 // 项目根目录解析独立成 paths.ts，避免与 credentials.ts 循环依赖
 import { PROJECT_ROOT as ROOT } from "./paths";
 import {
@@ -272,6 +272,11 @@ function loadConfig(): RaptorConfig {
       storedOverride: stored?.providerModels?.[providerId]
         ? true
         : (stored?.modelOverride ?? false),
+      // 站点默认型号（RAPTOR_SITE_MODEL，网关注入）：只兜底从没选过型号的
+      // 同学；本地版不设此变量，行为零改动。脏值（含空白/怪字符）按未配置。
+      siteModel: isValidModelId(env("RAPTOR_SITE_MODEL"))
+        ? (env("RAPTOR_SITE_MODEL") as string)
+        : undefined,
     }),
     jwglUsername: env("JWGL_USERNAME") ?? "",
     jwglPassword: env("JWGL_PASSWORD") ?? "",

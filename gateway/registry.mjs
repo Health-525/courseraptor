@@ -246,10 +246,14 @@ export function createRegistry({ stateDir }) {
 
     // ── 站点设置（管理台可改的运行时配置，site.json）──────────
 
-    /** 旧接口（DeepSeek 专用）：读取失败按空处理 */
+    /** 旧接口（DeepSeek 专用）：读取失败按空处理；defaultProvider/Model 是站点默认模型 */
     async getSiteSettings() {
       const data = await readJson(path.join(stateDir, "site.json"), null);
-      return { deepseekKey: typeof data?.deepseekKey === "string" ? data.deepseekKey : "" };
+      return {
+        deepseekKey: typeof data?.deepseekKey === "string" ? data.deepseekKey : "",
+        defaultProvider: typeof data?.defaultProvider === "string" ? data.defaultProvider : "",
+        defaultModel: typeof data?.defaultModel === "string" ? data.defaultModel : "",
+      };
     },
 
     async setSiteSettings(patch) {
@@ -301,6 +305,31 @@ export function createRegistry({ stateDir }) {
         else delete providerKeys[providerId];
         const next = { ...data, providerKeys };
         if (providerId === "deepseek") next.deepseekKey = value;
+        await writeAtomic(path.join(stateDir, "site.json"), JSON.stringify(next, null, 2));
+      });
+    },
+
+    /**
+     * 站点默认模型（管理台「站点默认模型」）：同学没自选供应商/型号时的全站
+     * 兜底（spawner 注入 RAPTOR_PROVIDER_ID/RAPTOR_SITE_MODEL）。两者要么
+     * 都空（=清除，回落系统默认 DeepSeek），要么都给；custom 没有站点语义。
+     */
+    async setSiteDefaultModel(providerId, model) {
+      return serialized(async () => {
+        const provider = typeof providerId === "string" ? providerId.trim() : "";
+        const value = typeof model === "string" ? model.trim() : "";
+        if (provider === "custom") throw new Error("自定义端点没有站点默认模型的概念");
+        if (provider && !/^[a-z][a-z0-9-]{0,20}$/.test(provider)) {
+          throw new Error("供应商标识不合法");
+        }
+        if (value && !/^[A-Za-z0-9][A-Za-z0-9._:/-]{0,63}$/.test(value)) {
+          throw new Error("型号标识不合法");
+        }
+        if ((provider && !value) || (!provider && value)) {
+          throw new Error("供应商与型号要么都填、要么都清空");
+        }
+        const data = (await readJson(path.join(stateDir, "site.json"), null)) ?? {};
+        const next = { ...data, defaultProvider: provider, defaultModel: value };
         await writeAtomic(path.join(stateDir, "site.json"), JSON.stringify(next, null, 2));
       });
     },

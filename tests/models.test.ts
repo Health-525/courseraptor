@@ -19,6 +19,7 @@ const {
   ensureModelAvailable,
   fallbackModelsFor,
   invalidateModelCache,
+  isValidModelId,
   listModelOptions,
   parseModelIds,
   resolveModelDrift,
@@ -89,6 +90,40 @@ test("resolveStoredModel：界面明确选过的值优先于 .env，其次才轮
   );
   assert.equal(resolveStoredModel({ storedModel: "deepseek-v4-pro" }), "deepseek-v4-pro");
   assert.equal(resolveStoredModel({}), FALLBACK_MODEL_ID);
+});
+
+test("isValidModelId：放行 API 形状的型号标识，拒绝脏值", () => {
+  assert.ok(isValidModelId("deepseek-v4.1-flash"));
+  assert.ok(isValidModelId("MiniMax-M2.5"));
+  assert.ok(isValidModelId("Qwen/Qwen3-8B"), "硅基流动的 厂商/型号 斜杠形式");
+  assert.ok(!isValidModelId("bad id"));
+  assert.ok(!isValidModelId(""));
+  assert.ok(!isValidModelId(" leading-space"));
+  assert.ok(!isValidModelId(undefined));
+});
+
+test("resolveStoredModel：站点默认（siteModel）只兜底从没选过型号的同学", () => {
+  assert.equal(
+    resolveStoredModel({
+      storedModel: "glm-5.3",
+      storedOverride: true,
+      siteModel: "deepseek-v4.1-flash",
+    }),
+    "glm-5.3",
+    "同学按供应商的型号记忆（override 语义）压过站点默认",
+  );
+  assert.equal(
+    resolveStoredModel({ environmentModel: "deepseek-chat", siteModel: "site-pick" }),
+    "deepseek-chat",
+    "本地 RAPTOR_MODEL 语义不变，仍压过站点默认",
+  );
+  assert.equal(
+    resolveStoredModel({ storedModel: "deepseek-v4-pro", siteModel: "glm-5.3" }),
+    "glm-5.3",
+    "旧格式未覆盖的存量值让位给站点统一默认（站长显式配置的意图优先）",
+  );
+  assert.equal(resolveStoredModel({ siteModel: "glm-5.3" }), "glm-5.3");
+  assert.equal(resolveStoredModel({}), FALLBACK_MODEL_ID, "无站点默认时行为不变");
 });
 
 test("validateModelChoice 只放行清单内型号，且不改动当前值", () => {
