@@ -216,6 +216,33 @@ export const BUILTIN_PROVIDERS: ProviderDef[] = [
     ],
   },
   {
+    id: "zhenze",
+    label: "移动云（臻泽）",
+    baseUrl: "https://zhenze-huhehaote.cmecloud.cn/v1",
+    note: "中国移动云 · 臻泽平台聚合 DeepSeek/GLM/Qwen/九天等模型",
+    keyHint: "…（移动云臻泽平台 API Key）",
+    fallbackModels: [
+      {
+        id: "deepseek-v4.1-flash",
+        label: "DeepSeek V4.1 Flash",
+        note: "与默认供应商同款主力 · 1M 上下文",
+      },
+      { id: "glm-5.3", label: "GLM-5.3", note: "旗舰 · 1M 上下文推理" },
+      { id: "qwen3.5-397b-a17b", label: "Qwen3.5 397B", note: "开源旗舰 · 262K 上下文" },
+      { id: "MiniMax-M2.5", label: "MiniMax-M2.5", note: "高性价比主力" },
+      { id: "JIUTIAN-75B-32K", label: "九天 75B", note: "移动自研 · 32K 上下文" },
+    ],
+    legacyModels: [
+      {
+        id: "deepseek-v4-flash-0731",
+        label: "DeepSeek V4 Flash (0731)",
+        note: "旧版快照 · 建议用 V4.1-Flash",
+      },
+      { id: "glm-5.2", label: "GLM-5.2", note: "上一代旗舰 · 200K 上下文" },
+      { id: "DeepSeek-V3.1", label: "DeepSeek V3.1", note: "上一代开源旗舰" },
+    ],
+  },
+  {
     id: CUSTOM_PROVIDER_ID,
     label: "自定义（OpenAI 兼容）",
     baseUrl: "",

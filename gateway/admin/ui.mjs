@@ -68,6 +68,7 @@ const SITE_PROVIDERS = [
   { id: "ernie", label: "文心（百度千帆）" },
   { id: "spark", label: "讯飞星火" },
   { id: "siliconflow", label: "硅基流动" },
+  { id: "zhenze", label: "移动云（臻泽）" },
 ];
 
 /** 站点 Key 的形状校验：deepseek 严格 sk-（历史行为），其余宽松 */

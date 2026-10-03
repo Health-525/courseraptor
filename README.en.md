@@ -20,7 +20,7 @@
 
 </div>
 
-CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Ask in the terminal, the browser, or QQ — three entrances sharing one agent kernel and one memory store. Everything runs on your own machine: credentials are AES-256-GCM encrypted on disk, and it talks to your own model API key — DeepSeek by default, with 10 more built-in Chinese providers (Qwen, Zhipu GLM, Kimi, Doubao, Hunyuan, MiniMax, Step, ERNIE, Spark, SiliconFlow) plus custom OpenAI-compatible endpoints. The installer sends one anonymous ping per day (random device id + version, for install counting only, disable with `RAPTOR_NO_TELEMETRY=1`); running from a git clone sends nothing.
+CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Ask in the terminal, the browser, or QQ — three entrances sharing one agent kernel and one memory store. Everything runs on your own machine: credentials are AES-256-GCM encrypted on disk, and it talks to your own model API key — DeepSeek by default, with 11 more built-in Chinese providers (Qwen, Zhipu GLM, Kimi, Doubao, Hunyuan, MiniMax, Step, ERNIE, Spark, SiliconFlow, China Mobile Cloud Zhenze) plus custom OpenAI-compatible endpoints. The installer sends one anonymous ping per day (random device id + version, for install counting only, disable with `RAPTOR_NO_TELEMETRY=1`); running from a git clone sends nothing.
 
 > ⚠️ **The online academic-system integration supports Nanjing Tech University only.** This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project. The [Chinese README](README.md) is the authoritative, fully detailed version.
 
@@ -76,7 +76,7 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 ## Architecture overview
 
 - **Agent runtime**: Vercel AI SDK v7 (`ToolLoopAgent` + `runAgentTUI` for terminal)
-- **LLM**: DeepSeek by default (`deepseek-flash` / V4.1-Flash), switchable to 10 more Chinese providers or a custom OpenAI-compatible endpoint — each provider's key stored and hot-swapped independently
+- **LLM**: DeepSeek by default (`deepseek-flash` / V4.1-Flash), switchable to 11 more Chinese providers or a custom OpenAI-compatible endpoint — each provider's key stored and hot-swapped independently
 - **Academic protocol**: Custom NJTECH 正方新版 adapter (RSA + CSRF login; course selection reverse-engineered from official frontend)
 - **Web UI**: Single-page Node server (`src/channels/web/`) with push-panel layout, session history, and real-time tool result sync
 - **Ports and adapters**: `src/core/school.ts` defines the `SchoolAdapter` port; core never imports adapters, so adding a school means adding one self-contained directory under `src/adapters/`
