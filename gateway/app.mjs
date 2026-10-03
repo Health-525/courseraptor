@@ -52,6 +52,24 @@ function createLoginThrottle() {
   };
 }
 
+/** 本地版使用上报按 IP 滑窗限流：60 次/分钟（正常客户端 24h 才报一次） */
+function createPingThrottle({ limit = 60, windowMs = 60_000 } = {}) {
+  const hits = new Map();
+  return {
+    check(ip, now = Date.now()) {
+      const stamps = (hits.get(ip) ?? []).filter((t) => now - t < windowMs);
+      hits.set(ip, stamps);
+      if (hits.size > 5000) hits.clear(); // 兜底防内存被伪造 IP 撑爆
+      return stamps.length >= limit ? Math.ceil((windowMs - (now - stamps[0])) / 1000) : 0;
+    },
+    note(ip, now = Date.now()) {
+      const stamps = (hits.get(ip) ?? []).filter((t) => now - t < windowMs);
+      stamps.push(now);
+      hits.set(ip, stamps);
+    },
+  };
+}
+
 function parseCookies(req) {
   const raw = req.headers.cookie;
   const out = {};
@@ -132,12 +150,14 @@ export function createGatewayServer({
   usersDir = "",
   appVersion = "",
   envDeepseekKeySet = false,
+  localUsage = null,
 } = {}) {
   if (!registry) throw new Error("createGatewayServer 需要 registry");
   if (!spawner) throw new Error("createGatewayServer 需要 spawner");
   if (!secret || secret.length < 16) throw new Error("GATEWAY_SECRET 至少 16 位");
 
   const throttle = createLoginThrottle();
+  const pingThrottle = createPingThrottle();
 
   // 网页版管理后台（GATEWAY_ADMIN_PASSWORD 未设置时显示「未启用」）
   const adminUi = createAdminUi({
@@ -152,6 +172,7 @@ export function createGatewayServer({
     version: appVersion,
     envDeepseekKeySet,
     usersDir,
+    localUsage,
   });
 
   function signSession(userId, expiresAt) {
@@ -484,6 +505,29 @@ else { input.type = "password"; this.textContent = "显示"; }
     try {
       if (req.method === "GET" && pathname === "/health") {
         sendJson(res, 200, { ok: true, running: spawner.runningCount() });
+        return;
+      }
+
+      // ── 本地版匿名使用上报（公开端点：安装包里的客户端没有账号概念）──
+      // 限流刻意放宽（60 次/分/IP）：校园网大量同学共享同一出口 IP，正常
+      // 上报远到不了这个量；真正要防的是脚本刷量撑爆 local-usage.json。
+      if (req.method === "POST" && pathname === "/api/local-usage") {
+        if (!localUsage) {
+          sendJson(res, 501, { error: "not enabled" });
+          finish(501);
+          return;
+        }
+        const lockSec = pingThrottle.check(ip);
+        if (lockSec) {
+          sendJson(res, 429, { error: "too many requests", retryAfterSec: lockSec });
+          finish(429);
+          return;
+        }
+        pingThrottle.note(ip);
+        const body = await readJsonBody(req, 4096);
+        const ok = await localUsage.record(body);
+        sendJson(res, ok ? 204 : 400, ok ? undefined : { error: "bad payload" });
+        finish(ok ? 204 : 400);
         return;
       }
 

@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createGatewayServer } from "./app.mjs";
+import { createLocalUsageStore } from "./local-usage.mjs";
 import { createRegistry } from "./registry.mjs";
 import { createSpawner } from "./spawner.mjs";
 
@@ -84,6 +85,8 @@ const server = createGatewayServer({
   // 管理台展示用：当前部署的代码版本，以及 env 是否兜底配了站点 Key
   appVersion: String(appVersion || ""),
   envDeepseekKeySet: Boolean(env.GATEWAY_DEEPSEEK_KEY),
+  // 本地版（安装包/TUI）匿名使用统计：POST /api/local-usage 收，管理台看
+  localUsage: createLocalUsageStore({ stateDir }),
 });
 
 // 连接保活拉长到 72s：跨公网 RTT 大、且前端有分钟级轮询，

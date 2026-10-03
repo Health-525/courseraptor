@@ -93,6 +93,27 @@ writeFileSync(
   ),
 );
 
+// 匿名使用上报地址与更新后台分开配（TELEMETRY_PING_URL 指向网关公网入口），
+// 没配则占位符保留、客户端 no-op——只丢监控不丢功能
+const TELEMETRY_URL = (process.env.TELEMETRY_PING_URL || "").replace(/\/+$/, "");
+const stagedUsagePing = path.join(stage, "src", "core", "usage-ping.ts");
+const usagePingSource = readFileSync(stagedUsagePing, "utf8");
+const telemetryPlaceholder = 'const DEFAULT_TELEMETRY_URL = "__RAPTOR_TELEMETRY_URL__";';
+if (!usagePingSource.includes(telemetryPlaceholder)) {
+  throw new Error("未找到客户端上报地址占位符（src/core/usage-ping.ts），已中止打包");
+}
+if (TELEMETRY_URL) {
+  writeFileSync(
+    stagedUsagePing,
+    usagePingSource.replace(
+      telemetryPlaceholder,
+      `const DEFAULT_TELEMETRY_URL = ${JSON.stringify(TELEMETRY_URL)};`,
+    ),
+  );
+} else {
+  console.warn("[!] 未配 TELEMETRY_PING_URL：本包不带使用统计（管理台看不到这批设备）");
+}
+
 function compress(dir, out) {
   if (process.platform === "win32") {
     execSync(

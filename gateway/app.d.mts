@@ -15,4 +15,6 @@ export function createGatewayServer(options: {
   appVersion?: string;
   /** 管理台展示用：env 是否兜底配了站点 DeepSeek Key */
   envDeepseekKeySet?: boolean;
+  /** 本地版匿名使用统计（缺省时 POST /api/local-usage 回 501） */
+  localUsage?: import("./local-usage.mjs").LocalUsageStore | null;
 }): Server;

@@ -39,6 +39,19 @@ import { shouldPackagePath } from "./package-policy.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8"));
 
+/** 读维护者本机 .env 的单个键（打包期专用配置，如上报地址；不覆盖真实环境变量） */
+function readMaintainerEnv(key) {
+  if (process.env[key]) return process.env[key];
+  try {
+    const line = readFileSync(path.join(ROOT, ".env"), "utf8").match(
+      new RegExp(`^\\s*${key}\\s*=\\s*(.*)$`, "m"),
+    );
+    return line ? line[1].trim() : "";
+  } catch {
+    return "";
+  }
+}
+
 // 与本机、package.json engines(>=24) 对齐的 Node LTS 版本；换版本只改这里。
 const NODE_VER = "v24.8.0";
 const RUNTIME_ZIP_URL = `https://nodejs.org/dist/${NODE_VER}/node-${NODE_VER}-win-x64.zip`;
@@ -73,6 +86,29 @@ export function buildPortable({ keep = false } = {}) {
     rmSync(path.join(appDir, ".env"), { force: true }); // 双保险：绝不带出本机 .env
     console.log("已剔除 app/.env");
   }
+
+  // ── 1b) 烘入匿名使用上报地址（TELEMETRY_PING_URL 只在维护者本机 .env，IP 不进仓库）──
+  // 与 update-check 的 RELEASE 占位符同机制：没配则占位符原样保留，客户端整体 no-op。
+  const telemetryUrl = readMaintainerEnv("TELEMETRY_PING_URL");
+  const stagedUsagePing = path.join(appDir, "src", "core", "usage-ping.ts");
+  const usagePingSource = readFileSync(stagedUsagePing, "utf8");
+  const telemetryPlaceholder = 'const DEFAULT_TELEMETRY_URL = "__RAPTOR_TELEMETRY_URL__";';
+  if (!usagePingSource.includes(telemetryPlaceholder)) {
+    throw new Error("未找到客户端上报地址占位符（src/core/usage-ping.ts），已中止打包");
+  }
+  if (telemetryUrl) {
+    writeFileSync(
+      stagedUsagePing,
+      usagePingSource.replace(
+        telemetryPlaceholder,
+        `const DEFAULT_TELEMETRY_URL = ${JSON.stringify(telemetryUrl.replace(/\/+$/, ""))};`,
+      ),
+    );
+    console.log(`匿名使用上报已烘入：${telemetryUrl}`);
+  } else {
+    console.warn("[!] 本机 .env 未配 TELEMETRY_PING_URL：本包不带使用统计（管理台看不到这批设备）");
+  }
+
   console.log("源码已暂存（node_modules / data 未包含）");
 
   // ── 2) 生产依赖装进 app（npm ci 会跑 postinstall: patch-tui，补丁随包固化）──

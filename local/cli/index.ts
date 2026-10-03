@@ -27,10 +27,14 @@ import {
   type UpdateInfo,
 } from "../../src/core/update-check";
 import { runUpdateCommand } from "../../src/core/updater";
+import { pingUsage } from "../../src/core/usage-ping";
 import { SLASH_COMMANDS } from "./tui/slash-menu";
 
 // 更新检查先发出，与凭证加载/agent 构建并行跑，后面收结果
 const updatePromise = checkForUpdate();
+
+// 匿名使用情况上报（随机设备号+版本，24h 一次，失败静默，RAPTOR_NO_TELEMETRY=1 可关）
+void pingUsage();
 
 // 教务凭证缺失时引导录入（.env > credentials.enc 加密文件 > 首次引导）。
 // 引导可回车跳过：不配教务账号也能进入应用，之后在网页设置里补填。

@@ -20,7 +20,7 @@
 
 </div>
 
-CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Ask in the terminal, the browser, or QQ — three entrances sharing one agent kernel and one memory store. Everything runs on your own machine: credentials are AES-256-GCM encrypted on disk, there is no telemetry, and it talks to your own model API key — DeepSeek by default, with 10 more built-in Chinese providers (Qwen, Zhipu GLM, Kimi, Doubao, Hunyuan, MiniMax, Step, ERNIE, Spark, SiliconFlow) plus custom OpenAI-compatible endpoints.
+CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Ask in the terminal, the browser, or QQ — three entrances sharing one agent kernel and one memory store. Everything runs on your own machine: credentials are AES-256-GCM encrypted on disk, and it talks to your own model API key — DeepSeek by default, with 10 more built-in Chinese providers (Qwen, Zhipu GLM, Kimi, Doubao, Hunyuan, MiniMax, Step, ERNIE, Spark, SiliconFlow) plus custom OpenAI-compatible endpoints. The installer sends one anonymous ping per day (random device id + version, for install counting only, disable with `RAPTOR_NO_TELEMETRY=1`); running from a git clone sends nothing.
 
 > ⚠️ **The online academic-system integration supports Nanjing Tech University only.** This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project. The [Chinese README](README.md) is the authoritative, fully detailed version.
 
