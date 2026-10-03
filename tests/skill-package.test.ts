@@ -216,8 +216,7 @@ test("技能打包：export-schedule 独立包结构 + 自包含可运行", asyn
       const res = await fetch(`http://127.0.0.1:${port}/${produced[0]}`);
       if (res.ok) {
         const buf = Buffer.from(await res.arrayBuffer());
-        served =
-          buf.length > 0 && (res.headers.get("content-type") ?? "").startsWith("image/");
+        served = buf.length > 0 && (res.headers.get("content-type") ?? "").startsWith("image/");
       } else {
         fetchErr = `HTTP ${res.status}`;
       }
