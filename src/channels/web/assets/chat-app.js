@@ -591,8 +591,9 @@ function pptLogo() {
 }
 
 /* 自由版式页（代码工具 blank 页）：元素按画布 10 × 5.625 英寸归一成百分比
-   绝对定位，字号/线宽用容器查询单位 cqw 随幻灯片宽度等比缩放——缩影条与
-   全屏查看器共用这一份代码，与成品 pptx 的坐标语义一致 */
+   绝对定位；字号/线宽按容器实际宽度换算成 px（pptFitFreePx 在布局完成后
+   统一算），缩影条与全屏查看器共用这一份代码，与成品 pptx 的坐标语义一致。
+   不用 cqw/container-type：部分内嵌浏览器不支持，还会让宽度回退的舞台塌缩。 */
 const PPT_CANVAS_W = 10;
 const PPT_CANVAS_H = 5.625;
 function pptFreeInner(box, s) {
@@ -604,7 +605,7 @@ function pptFreeInner(box, s) {
     t.style.top = (0.4 / PPT_CANVAS_H) * 100 + "%";
     t.style.width = (8.9 / PPT_CANVAS_W) * 100 + "%";
     t.style.height = (0.85 / PPT_CANVAS_H) * 100 + "%";
-    t.style.fontSize = (s.title.length > 16 ? 28 : 36) / 7.2 + "cqw";
+    t.dataset.ptsize = s.title.length > 16 ? "28" : "36";
     t.style.fontWeight = "700";
     t.style.justifyContent = "flex-end";
     box.appendChild(t);
@@ -620,7 +621,7 @@ function pptFreeInner(box, s) {
       const d = el("pt-el pt-text");
       d.textContent = e.text;
       Object.assign(d.style, pct);
-      d.style.fontSize = ((e.size || 14) / 7.2).toFixed(2) + "cqw";
+      d.dataset.ptsize = String(e.size || 14);
       if (e.color) d.style.color = "#" + e.color;
       if (e.bold) d.style.fontWeight = "700";
       if (e.align) d.style.textAlign = e.align;
@@ -645,18 +646,19 @@ function pptFreeInner(box, s) {
       d.style.top = pct.top;
       d.style.width = pct.width;
       d.style.background = "#" + (e.line || "E1DCCF");
-      const t = e.lineW || 1;
-      /* 高度用 % 保持几何比例，minHeight 兜住细线可见性（横线 h≈0） */
+      /* 高度用 % 保持几何比例；线宽存磅值，布局后换算成 minHeight 兜住可见性 */
       d.style.height = pct.height;
-      d.style.minHeight = (t / 7.2).toFixed(2) + "cqw";
+      d.dataset.ptline = String(e.lineW || 1);
+      d.dataset.ptlineMin = "1";
       box.appendChild(d);
     } else {
       const d = el("pt-el pt-shape" + (e.kind === "ellipse" ? " round" : ""));
       Object.assign(d.style, pct);
       if (e.fill) d.style.background = "#" + e.fill;
       if (e.line) {
-        const t = e.lineW || 1;
-        d.style.border = (t / 7.2).toFixed(2) + "cqw solid #" + e.line;
+        d.style.borderStyle = "solid";
+        d.style.borderColor = "#" + e.line;
+        d.dataset.ptline = String(e.lineW || 1);
       }
       if (e.rotate) d.style.rotate = e.rotate + "deg";
       box.appendChild(d);
@@ -665,10 +667,37 @@ function pptFreeInner(box, s) {
   if (s.elemCut) {
     const cut = el("pt-el pt-elemcut");
     cut.textContent = "+ " + s.elemCut + " 元素";
+    cut.dataset.ptsize = "8";
     box.appendChild(cut);
   }
   /* free 页成品带内容页母版（页脚品牌字+页码+落款 logo），预览同步落款 */
   box.appendChild(pptLogo());
+  /* 元素挂载后才有 clientWidth，布局完成后再统一换算字号/线宽 */
+  requestAnimationFrame(function () {
+    pptFitFreePx(box);
+  });
+}
+
+/* 自由页元素的自适应尺寸：容器宽 ÷ 画布 10 英寸 = 每英寸像素，磅 → px
+   （1pt = 1/72 英寸）。clientWidth 还是 0（尚未进 DOM）就等下一帧再试。 */
+function pptFitFreePx(box) {
+  const w = box.clientWidth;
+  if (!w) {
+    requestAnimationFrame(function () {
+      pptFitFreePx(box);
+    });
+    return;
+  }
+  const pxPerPt = w / PPT_CANVAS_W / 72;
+  box.querySelectorAll("[data-ptsize]").forEach(function (d) {
+    const v = +d.dataset.ptsize;
+    if (v) d.style.fontSize = Math.max(3, v * pxPerPt) + "px";
+  });
+  box.querySelectorAll("[data-ptline]").forEach(function (d) {
+    const t = Math.max(0.75, (+d.dataset.ptline || 1) * pxPerPt);
+    if (d.dataset.ptlineMin) d.style.minHeight = t + "px";
+    else d.style.borderWidth = t + "px";
+  });
 }
 
 function pptSlideInner(box, s, big) {
