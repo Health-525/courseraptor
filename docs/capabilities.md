@@ -48,7 +48,7 @@
 
 | 工具 | 说明 | 典型耗时 |
 |------|------|----------|
-| `generate_document` | 按结构化内容直接生成 **Word / Excel / PPT / PDF** 成品文件，中文原生可写（PDF 自动嵌入系统中文字体）。docx·pdf 给 `blocks`（标题/正文/列表/表格/分页）、pptx 给 `slides`、xlsx 给 `sheets`。成品写进本机 `data/generated/`，返回完整路径；QQ 里会自动把文件回传给你 | ~1-3s |
+| `generate_document` | 按结构化内容直接生成 **Word / Excel / PPT / PDF** 成品文件，中文原生可写（PDF 自动嵌入系统中文字体）。docx·pdf 给 `blocks`（标题/正文/列表/表格/分页）、pptx 给 `slides`、xlsx 给 `sheets`。PPT 自动套**品牌课件模板**（logo 徽章贯穿每页、封面/章节页朱砂整版、内容页暖纸底，与课表导出同源配色），网页端内嵌可翻页预览。成品写进本机 `data/generated/`，返回完整路径；QQ 里会自动把文件回传给你 | ~1-3s |
 | `convert_document` | 跨格式转换重排：把已有内容（`fetch_attachment` 读入的附件 id、或本机文件路径、或一段文本）转成 Word/Excel/PPT/PDF。源文件**只读不动**，成品写 `data/generated/` | ~1-3s |
 
 > 改写润色（换词、调结构）由模型在文本层完成，改好后交给 `generate_document` 出稿；`convert_document` 专注跨格式搬运与排版。

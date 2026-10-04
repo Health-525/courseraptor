@@ -14,6 +14,7 @@ import path from "node:path";
 
 import { getMeta, readStoredBuffer } from "../attachment-store";
 import { loadWorkbook } from "../spreadsheet";
+import { buildPptPreview, type PptPreview } from "./pptx-theme";
 import { type GeneratedFile, generateAndSave } from "./save";
 import type { DocFormat, DocumentSpec, SheetSpec, TableSpec } from "./types";
 
@@ -202,13 +203,18 @@ function specFromLoaded(loaded: Loaded, target: DocFormat, title?: string): Docu
   return { format: target, title: docTitle || loaded.name || undefined, blocks };
 }
 
-/** 执行一次转换，返回落盘后的文件信息 */
+/** 执行一次转换，返回落盘后的文件信息（pptx 目标附带网页预览载荷） */
 export async function convertDocument(
   input: ConvertInput,
-): Promise<{ ok: true; file: GeneratedFile; from: string } | ConvertError> {
+): Promise<{ ok: true; file: GeneratedFile; from: string; ppt?: PptPreview } | ConvertError> {
   const { loaded, error } = await loadSource(input);
   if (!loaded) return { ok: false, error: error ?? "来源读取失败" };
   const spec = specFromLoaded(loaded, input.target, input.title);
   const file = await generateAndSave(spec, { filename: input.filename });
-  return { ok: true, file, from: loaded.name };
+  return {
+    ok: true,
+    file,
+    from: loaded.name,
+    ...(input.target === "pptx" ? { ppt: buildPptPreview(spec) } : {}),
+  };
 }

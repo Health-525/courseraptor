@@ -395,6 +395,140 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   /* 刷新后恢复的番茄钟卡片：不在 .turn 里，间距自己对齐一轮对话 */
   .pomo-restore { margin: 0 0 40px; }
 
+  /* PPT 预览卡：pptx 成品在对话里排成一条缩影幻灯片横带，点击任意一页
+     进全屏翻页。与成品课件同构（版式同源自 core/document/pptx-theme）：
+     logo 纸色徽章贯穿每一页、封面/章节页朱砂整版浅字、内容页暖纸底。
+     组织方式：.pt-* 是共享的结构/主题样式（缩影与全屏同一套），.k-cover /
+     .k-section / .k-content 是三种版式的骨架，.pptslide 与 .pptv-stage
+     只覆盖各自的尺寸档——改主题色一处生效、两档不漂移。 */
+  .pptcard { margin: 4px 0 9px; border: 1px solid var(--rule-2);
+             border-top: 2px solid var(--accent); background: var(--card);
+             box-shadow: var(--shadow-sm); }
+  .ppt-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+              border-bottom: 1px dashed var(--rule); }
+  .ppt-mark { flex: none; color: var(--accent); font-size: 14px; }
+  .ppt-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+              white-space: nowrap; font-family: var(--kai); font-size: 15px;
+              letter-spacing: .04em; }
+  .ppt-meta { flex: none; font-family: var(--mono); font-size: 12px;
+              color: var(--ink-3); }
+  .pptstrip { display: flex; gap: 10px; padding: 12px 14px; overflow-x: auto;
+              scroll-snap-type: x proximity; }
+
+  /* ── 朱砂印章：圆形裁切 logo + 描边圈、整章旋转 -7°（课表导出同款，签名 motif） ── */
+  .pt-seal { position: absolute; display: flex; align-items: center; justify-content: center;
+             border: 2px solid var(--accent); border-radius: 50%; background: var(--card); }
+  .pt-seal img { width: 80%; height: 80%; border-radius: 50%; display: block; }
+  /* 页脚落款小圆 logo（课表 color 风格右下落款同款） */
+  .pt-logo { position: absolute; border-radius: 50%; overflow: hidden; }
+  .pt-logo img { width: 100%; height: 100%; border-radius: 50%; display: block; }
+  .pt-kick { position: absolute; font-family: var(--mono); color: var(--ink-3);
+             letter-spacing: .2em; white-space: nowrap; }
+
+  /* ── 幻灯片内部元素：共享主题（缩影/全屏同源） ── */
+  .pt-title { display: block; font-weight: 700; line-height: 1.25;
+              overflow: hidden; }
+  .pt-sub { display: block; color: var(--ink-2); font-style: italic;
+            margin-top: 4px; white-space: nowrap; overflow: hidden;
+            text-overflow: ellipsis; }
+  .pt-list { display: block; color: var(--ink-2); line-height: 1.6; }
+  .pt-li { display: block; overflow: hidden; white-space: nowrap;
+           text-overflow: ellipsis; }
+  .pt-li.more { color: var(--ink-3); }
+  .pt-table { width: 100%; border-collapse: collapse; table-layout: fixed;
+              line-height: 1.4; }
+  .pt-table td { border: 1px solid var(--rule); padding: 1px 2.5px;
+                 overflow: hidden; white-space: nowrap; }
+  .pt-table tr.pt-th td { background: var(--accent-deep); color: var(--card); }
+  .pt-table tr:not(.pt-th):nth-child(odd) td { background: var(--paper-deep); }
+  .pt-table td.pt-more { text-align: center; color: var(--ink-3); }
+  .pt-maintitle { font-weight: 700; text-align: center; line-height: 1.3;
+                  overflow: hidden; font-family: var(--kai); }
+  .pt-author { color: var(--ink-2); }
+
+  /* ── 三种版式骨架（封面/章节/内容，两种尺寸档共用） ── */
+  .k-cover, .k-section, .k-content { display: flex; flex-direction: column; }
+  /* 封面：暖纸底印章页头（classic 课表页头同款）；章节页：朱砂整版浅字 */
+  .k-cover { align-items: center; justify-content: center; }
+  .k-section { justify-content: center; }
+
+  /* ── 缩影档：176px 宽、16:9，与成品三种版式一一对应 ── */
+  .pptslide { flex: none; width: 176px; aspect-ratio: 16 / 9; position: relative;
+              overflow: hidden; border: 1px solid var(--rule-2); border-radius: 4px;
+              background: var(--card); cursor: pointer; scroll-snap-align: start;
+              padding: 10px 10px; gap: 4px; }
+  .pptslide:hover, .pptslide:focus-visible { border-color: var(--accent); }
+  .pptslide.k-cover { padding: 12px 12px 10px; gap: 6px; }
+  .pptslide.k-cover .pt-seal { left: 11px; top: 10px; width: 25px; height: 25px;
+                               transform: rotate(-7deg); }
+  .pptslide.k-cover .pt-kick { left: 42px; top: 16px; font-size: 4.5px; }
+  .pptslide.k-cover .pt-maintitle { font-size: 12px; color: var(--ink);
+                                    font-weight: 400; }
+  .pptslide.k-cover .pt-author { font-size: 6.5px; }
+  .pptslide.k-cover .pt-logo { right: 8px; bottom: 7px; width: 12px; height: 12px; }
+  .pptslide.k-section { background: var(--accent); border-color: var(--accent-deep);
+                        padding: 12px; }
+  .pptslide.k-section .pt-sectitle { font-size: 10px; font-weight: 700;
+                                     color: var(--paper); line-height: 1.35;
+                                     overflow: hidden; }
+  .pptslide.k-section .pt-seal { right: 7px; bottom: 7px; width: 17px; height: 17px;
+                                 border-color: var(--paper); background: var(--accent);
+                                 transform: rotate(-7deg); }
+  .pptslide .pt-title { font-size: 8.5px; }
+  .pptslide .pt-sub { font-size: 6px; }
+  .pptslide .pt-list { margin: 3px 0 0; font-size: 6px; }
+  .pptslide .pt-table { margin-top: 3px; font-size: 5px; }
+  .pptslide.k-content .pt-logo { right: 7px; bottom: 6px; width: 13px; height: 13px; }
+
+  /* 全屏查看器：暗纸压片 + 大幅幻灯片 + 底部翻页条；键盘 ←/→/Esc 与触屏滑动同效 */
+  .pptview { position: fixed; inset: 0; z-index: 70; background: rgba(37, 34, 28, 0.72);
+             display: flex; align-items: center; justify-content: center; }
+  .pptv-stage { width: min(94vw, calc((100dvh - 118px) * 16 / 9));
+                aspect-ratio: 16 / 9; background: var(--card); border-radius: 6px;
+                overflow: hidden; position: relative;
+                box-shadow: 0 24px 72px rgba(0, 0, 0, 0.4); }
+  .pptv-stage.k-cover { padding: 46px 52px 36px; gap: 14px; }
+  .pptv-stage.k-cover .pt-seal { left: 44px; top: 38px; width: 62px; height: 62px;
+                                 border-width: 3px; transform: rotate(-7deg); }
+  .pptv-stage.k-cover .pt-kick { left: 118px; top: 56px; font-size: 11px;
+                                 letter-spacing: .28em; }
+  .pptv-stage.k-cover .pt-maintitle { font-size: 36px; color: var(--ink);
+                                      font-weight: 400; }
+  .pptv-stage.k-cover .pt-author { font-size: 15px; }
+  .pptv-stage.k-cover .pt-logo { right: 22px; bottom: 18px; width: 26px; height: 26px; }
+  .pptv-stage.k-section { background: var(--accent); padding: 0 60px; }
+  .pptv-stage.k-section .pt-sectitle { font-size: 32px; font-weight: 700;
+                                       color: var(--paper); }
+  .pptv-stage.k-section .pt-seal { right: 24px; bottom: 24px; width: 44px; height: 44px;
+                                   border-width: 3px; border-color: var(--paper);
+                                   background: var(--accent); transform: rotate(-7deg); }
+  .pptv-stage.k-content { padding: 34px 44px 0; }
+  .pptv-stage .pt-title { font-size: 26px; }
+  .pptv-stage .pt-sub { font-size: 14px; margin-top: 10px; }
+  .pptv-stage .pt-list { margin: 24px 0 0; font-size: 16px; color: var(--ink);
+                         line-height: 2.05; }
+  .pptv-stage .pt-li { white-space: normal; overflow: visible; }
+  .pptv-stage .pt-li::before { content: "▪"; color: var(--accent);
+                               margin-right: 9px; font-size: 13px; }
+  .pptv-stage .pt-table { margin-top: 18px; font-size: 14px; line-height: 1.5; }
+  .pptv-stage .pt-table td { padding: 6px 10px; white-space: normal; }
+  .pptv-stage.k-content .pt-logo { right: 22px; bottom: 16px; width: 26px; height: 26px; }
+  .pptv-bar { position: absolute; bottom: 20px; left: 0; right: 0; display: flex;
+              align-items: center; justify-content: center; gap: 12px; }
+  .pptv-nav, .pptv-close, .pptview a.tbtn { background: var(--card);
+                                            border: 1px solid transparent;
+                                            color: var(--ink); border-radius: 5px;
+                                            min-height: 36px; min-width: 36px;
+                                            padding: 4px 16px; font-size: 15px;
+                                            line-height: 1; cursor: pointer;
+                                            text-decoration: none; font-family: inherit; }
+  .pptview a.tbtn { font-size: 13px; display: inline-flex; align-items: center; }
+  .pptv-nav:hover, .pptv-close:hover, .pptview a.tbtn:hover { background: #fff; }
+  .pptv-nav:disabled { opacity: 0.35; cursor: default; background: var(--card); }
+  .pptv-count { font-family: var(--mono); font-size: 13px; color: var(--paper);
+                min-width: 64px; text-align: center; }
+  .pptv-close { position: absolute; top: 16px; right: 18px; padding: 4px 12px; }
+
   /* 思考过程：独立建模成草稿卡片。与工具卡片同族但更轻（虚线框、无底色），
      内容用楷体灰字小一号——正文是系统黑体 15px，这里是 --kai 13px，两级层次
      一眼可分；长思考限高内部滚，不把屏幕撑满。 */

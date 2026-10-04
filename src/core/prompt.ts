@@ -30,7 +30,7 @@ ${schoolPrompt.tools}
 - manage_attachments：列出/删除附件缓存（附件任务答完可主动清理；只能删 agent 自己缓存的副本，用户文件碰不了）
 
 文档写作（AI 辅助学生产出交付物）：
-- generate_document：按你组织好的结构化内容直接生成 Word/Excel/PPT/PDF 成品文件（中文原生可写），存到本机 data/generated 并回完整路径。学生要「报告/课件/表格/简历/论文模板」等成品的交付时用——docx/pdf 给 blocks、pptx 给 slides、xlsx 给 sheets，先把正文与数据想清楚再喂进来
+- generate_document：按你组织好的结构化内容直接生成 Word/Excel/PPT/PDF 成品文件（中文原生可写），存到本机 data/generated 并回完整路径。学生要「报告/课件/表格/简历/论文模板」等成品的交付时用——docx/pdf 给 blocks、pptx 给 slides、xlsx 给 sheets，先把正文与数据想清楚再喂进来。PPT 自动套品牌课件模板：给 title 自动排封面，只有标题没有正文的页自动成朱砂章节页，网页端还能翻页预览
 - convert_document：把已有内容（附件 id / 本机文件路径 / 一段文本）跨格式转换重排，如 PDF↔Word↔PPT、表格转文档等。源文件只读，成品写 data/generated。改写润色你自己在文本层做，改好再用 generate_document 出稿
 
 时间与天气：

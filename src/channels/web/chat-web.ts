@@ -44,6 +44,7 @@ import {
 } from "../../core/chat-sessions";
 import { config, effectiveProviderKeys } from "../../core/config";
 import { loadCredentialsStore, saveCredentialsStore } from "../../core/credentials";
+import { pptPreviewOfToolOutput } from "../../core/document/pptx-theme";
 import { generatedDir } from "../../core/document/save";
 import { loadGradesCache } from "../../core/grades-cache";
 import {
@@ -1946,6 +1947,7 @@ async function runTurn(
           const t0 = p.toolCallId ? toolStart.get(p.toolCallId) : undefined;
           const files = filesOfToolOutput(p.output);
           const pomodoro = pomodoroOfToolOutput(p.output);
+          const ppt = pptPreviewOfToolOutput(p.output);
           send({
             t: "tool",
             phase: "end",
@@ -1958,6 +1960,8 @@ async function runTurn(
             ...(files.length ? { files } : {}),
             // 新建番茄钟时前端在工具卡下方渲染实时倒计时卡片
             ...(pomodoro ? { pomodoro } : {}),
+            // pptx 成品带预览载荷：前端渲染可翻页的幻灯片预览卡
+            ...(ppt ? { ppt } : {}),
             // manage_pomodoro 的取消/查询也可能改了状态：让页面把
             // 顶部恢复卡等处的倒计时卡对表收掉（10 秒轮询的即时版）
             ...(p.toolName === "manage_pomodoro" ? { pomoSync: true } : {}),
