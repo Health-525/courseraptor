@@ -2,7 +2,7 @@
 name: njtech-jwgl
 description: >-
   南京工业大学（NJTech）正方教务系统适配器。当同学要查课表、成绩、GPA、考试、实验成绩、
-  学籍信息、已选/可重修课程、教务处通知，或查选课状态/搜课/盯课余量时使用。
+  学籍信息、已选/可重修课程、教务处通知，或查选课状态/搜课/余量监控时使用。
   它封装了 CourseRaptor 项目里的 src/adapters/njtech 教务协议层，提供可无头调用的命令行入口，
   也可驱动交互式 raptor agent。仅适用于 njtech.edu.cn 域名。
 license: ISC
@@ -95,7 +95,7 @@ agent 已内置 31 个工具，其中 NJTech 教务相关工具的名称与语�
 | 选课状态 | `selection-status` | `xk.inspectXk` |
 | 搜课/余量 | `search-courses` | `xk.searchCourses` |
 | 教学班明细 | `search-classes` | `xk.searchCourses` + `xk.fetchJxbList` |
-| 盯课（监控） | `watch` | `xk.searchCourses` 轮询 |
+| 余量监控 | `watch` | `xk.searchCourses` 轮询 |
 
 协议细节、限流、模块覆盖与域名清单见 `references/protocol.md`；完整工具/能力清单见
 `references/capabilities.md`。
@@ -104,10 +104,9 @@ agent 已内置 31 个工具，其中 NJTech 教务相关工具的名称与语�
 
 - **限流**：传输层有全局令牌桶（默认 3 RPS / 突发 8）。`RAPTOR_MAX_RPS` 只允许下调，
   严禁调高。不要并发或高频刷教务系统。
-- **真实写操作需显式确认**：`grab_course` / `grab_plan`（抢课）、`drop_course`（退课）会
-  **真实提交选课/退课请求**。本脚本**不提供**这些命令——它们只应通过交互式 agent，且
-  必须在用户明确点名目标、二次确认后才可调用，绝不批量退课。
-- **盯课 ≠ 抢课**：本技能的 `watch` 命令**只监控余量、不提交**。需要真正抢课请走路径 B。
+- **真实写操作不进本脚本**：任何会真实提交选课/退课请求的工具都不由本脚本提供——
+  只应通过交互式 agent，且必须在用户明确点名目标、二次确认后才可调用，绝不批量操作。
+- **`watch` 只观察不提交**：本技能的 `watch` 命令只监控余量变化，绝不提交任何请求。
 - **隐私**：学籍敏感字段（证件号/银行卡/考生号）返回时自动打码；不要向用户回显完整明文。
   本地 `credentials.enc` / `session.json` / `memory.json` 等切勿分享。
 - **「拿不到」≠「没有」**：网络错误/会话失效必须如实上报，绝不能当作「课表为空 / 无成绩」。

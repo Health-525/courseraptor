@@ -12,7 +12,6 @@
 | `DEEPSEEK_BASE_URL` | 可选，自定义模型服务地址；对话内容会发往这个服务 |
 | `RAPTOR_WEB_PORT` | 正式网页首选端口，默认 3210，占用后自动选择空闲端口 |
 | `RAPTOR_TUI_INLINE` | `1` 使用终端行内模式；默认全屏卡片模式 |
-| `RAPTOR_ENABLE_GRAB` | 默认关闭；`1` 启用盯课和真实选课提交工具 |
 | `RAPTOR_DISABLE_CAPTCHA_OCR` | `1` 停用通知附件下载时的本地验证码识别 |
 | `RAPTOR_MAX_RPS` | 请求频率上限，1-3 的整数（默认 3，只允许下调，启动时校验）；尊重学校服务容量 |
 | `RAPTOR_BURST` | 限速令牌桶突发容量，1-64 的整数（默认 8，启动时校验） |
