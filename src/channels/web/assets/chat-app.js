@@ -593,10 +593,8 @@ function pptLogo() {
 function pptSlideInner(box, s, big) {
   if (s.kind === "cover") {
     box.appendChild(pptSeal());
-    box.appendChild(el2("pt-kick", "COURSERAPTOR · 课件"));
     box.appendChild(el2("pt-maintitle", s.title));
     if (s.author) box.appendChild(el2("pt-author", s.author));
-    box.appendChild(pptLogo());
     return;
   }
   if (s.kind === "section") {
@@ -607,16 +605,29 @@ function pptSlideInner(box, s, big) {
   box.appendChild(el2("pt-title", s.title));
   if (s.subtitle) box.appendChild(el2("pt-sub", s.subtitle));
   if (s.bullets && s.bullets.length) {
-    const ul = el("pt-list");
-    const cap = big ? 12 : 5;
-    s.bullets.slice(0, cap).forEach((b) => ul.appendChild(el2("pt-li", b)));
-    const more = (s.bulletCut || 0) + Math.max(0, s.bullets.length - cap);
-    if (more > 0) {
-      const li = el2("pt-li", "+ " + more + " 条");
-      li.classList.add("more");
-      ul.appendChild(li);
+    /* 与成品同一条规则：≤6 条且无表格 → 数字圆圈视觉行，否则紧凑列表 */
+    if (!s.table && s.bullets.length <= 6) {
+      const rows = el("pt-rows");
+      s.bullets.forEach((b, i) => {
+        const row = el("pt-row");
+        row.appendChild(el2("pt-num", String(i + 1)));
+        row.appendChild(el2("pt-li", b));
+        rows.appendChild(row);
+      });
+      if (s.bulletCut) rows.appendChild(el2("pt-li more", "+ " + s.bulletCut + " 条"));
+      box.appendChild(rows);
+    } else {
+      const ul = el("pt-list");
+      const cap = big ? 12 : 5;
+      s.bullets.slice(0, cap).forEach((b) => ul.appendChild(el2("pt-li", b)));
+      const more = (s.bulletCut || 0) + Math.max(0, s.bullets.length - cap);
+      if (more > 0) {
+        const li = el2("pt-li", "+ " + more + " 条");
+        li.classList.add("more");
+        ul.appendChild(li);
+      }
+      box.appendChild(ul);
     }
-    box.appendChild(ul);
   } else if (s.table) {
     const tb = el("pt-table");
     const rows = [];
