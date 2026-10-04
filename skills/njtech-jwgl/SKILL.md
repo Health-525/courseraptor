@@ -2,7 +2,7 @@
 name: njtech-jwgl
 description: >-
   南京工业大学（NJTech）正方教务系统适配器。当同学要查课表、成绩、GPA、考试、实验成绩、
-  学籍信息、已选/可重修课程、教务处通知，或查选课状态/搜课/盯课余量时使用。
+  学籍信息、已选/可重修课程、教务处通知，或查选课状态/搜课/余量监控时使用。
   它封装了 CourseRaptor 项目里的 src/adapters/njtech 教务协议层，提供可无头调用的命令行入口，
   也可驱动交互式 raptor agent。仅适用于 njtech.edu.cn 域名。
 license: ISC
@@ -95,7 +95,7 @@ agent 已内置 31 个工具，其中 NJTech 教务相关工具的名称与语�
 | 选课状态 | `selection-status` | `xk.inspectXk` |
 | 搜课/余量 | `search-courses` | `xk.searchCourses` |
 | 教学班明细 | `search-classes` | `xk.searchCourses` + `xk.fetchJxbList` |
-| 盯课（监控） | `watch` | `xk.searchCourses` 轮询 |
+| 余量监控 | `watch` | `xk.searchCourses` 轮询 |
 
 协议细节、限流、模块覆盖与域名清单见 `references/protocol.md`；完整工具/能力清单见
 `references/capabilities.md`。
