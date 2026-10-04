@@ -180,6 +180,60 @@ test("SSE 流式回传文本与工具状态，历史逐轮累积", async () => {
   assert.match(String(r2.events.at(-1)?.t), /end/);
 });
 
+test("open_panel 工具结果事件携带 panel 字段：网页端据此推出对应面板", async () => {
+  // 对话里说「打开课表」：agent 调 open_panel，SSE tool 事件带 panel=schedule
+  setChatAgent({
+    stream() {
+      async function* gen() {
+        yield {
+          type: "tool-call",
+          toolCallId: "op1",
+          toolName: "open_panel",
+          input: { panel: "schedule" },
+        };
+        yield {
+          type: "tool-result",
+          toolCallId: "op1",
+          toolName: "open_panel",
+          output: "已请网页端推出「课表」面板",
+        };
+        yield { type: "text-delta", text: "已为你打开课表" };
+        yield { type: "finish" };
+      }
+      return Promise.resolve({ fullStream: gen() });
+    },
+  });
+  const url = (await startChatWeb())!;
+  const r1 = await post(url, { message: "打开课表" });
+  const end1 = r1.events.find((e) => e.t === "tool" && e.phase === "end");
+  assert.equal(end1?.panel, "schedule", "open_panel 结果事件应带 panel=schedule");
+
+  // 白名单外的面板 id（schema 已拦，服务端兜底再滤一次）不透传
+  setChatAgent({
+    stream() {
+      async function* gen() {
+        yield {
+          type: "tool-call",
+          toolCallId: "op2",
+          toolName: "open_panel",
+          input: { panel: "javascript:alert(1)" },
+        };
+        yield {
+          type: "tool-result",
+          toolCallId: "op2",
+          toolName: "open_panel",
+          output: "ok",
+        };
+        yield { type: "finish" };
+      }
+      return Promise.resolve({ fullStream: gen() });
+    },
+  });
+  const r2 = await post(url, { message: "打开怪东西" });
+  const end2 = r2.events.find((e) => e.t === "tool" && e.phase === "end");
+  assert.equal(end2?.panel, undefined, "白名单外的面板 id 不得透出到前端");
+});
+
 test("空消息返回 400", async () => {
   const url = (await startChatWeb())!;
   const res = await wfetch(`${url}/api/chat`, {

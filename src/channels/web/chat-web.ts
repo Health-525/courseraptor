@@ -97,6 +97,7 @@ import { scheduleSvgToPng } from "../../core/schedule-png";
 import { renderTermScheduleSVG, renderWeekScheduleSVG } from "../../core/schedule-svg";
 import { listSchoolOptions, school, selectSchool } from "../../core/school";
 import { maybeAutoTitle } from "../../core/session-titles";
+import { PANEL_IDS } from "../../core/tools/panel";
 import {
   addReminder,
   clearReminders,
@@ -620,6 +621,14 @@ async function serveGeneratedFile(rawName: string, res: http.ServerResponse): Pr
  */
 /** 工具因凭证未配置而失败的口径：命中时 SSE 事件带 panel=settings，网页端自动推出设置面板 */
 const NEED_SETUP_RE = /尚未配置|请先配置/;
+
+/** open_panel 参数里的面板 id：白名单内才透传（schema 已拦异常值，这里再滤一次，
+ *  防止畸形输入直达前端 hash/抽屉）；带上后网页端自动推出对应面板 */
+function openPanelIdOf(name: string | undefined, input: unknown): string | undefined {
+  if (name !== "open_panel") return undefined;
+  const id = (input as { panel?: unknown } | null | undefined)?.panel;
+  return typeof id === "string" && (PANEL_IDS as readonly string[]).includes(id) ? id : undefined;
+}
 
 function filesOfToolOutput(output: unknown): Array<{ name: string; size: number }> {
   if (typeof output !== "object" || output == null || Array.isArray(output)) return [];
@@ -1948,6 +1957,8 @@ async function runTurn(
           const files = filesOfToolOutput(p.output);
           const pomodoro = pomodoroOfToolOutput(p.output);
           const ppt = pptPreviewOfToolOutput(p.output);
+          // open_panel：模型点名的面板随事件带给前端自动推出（同 NEED_SETUP 的 panel 通道）
+          const openPanel = openPanelIdOf(p.toolName, t0?.input);
           send({
             t: "tool",
             phase: "end",
@@ -1965,6 +1976,7 @@ async function runTurn(
             // manage_pomodoro 的取消/查询也可能改了状态：让页面把
             // 顶部恢复卡等处的倒计时卡对表收掉（10 秒轮询的即时版）
             ...(p.toolName === "manage_pomodoro" ? { pomoSync: true } : {}),
+            ...(openPanel ? { panel: openPanel } : {}),
           });
           break;
         }

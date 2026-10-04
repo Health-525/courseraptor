@@ -303,9 +303,7 @@ test("媒体去重：重复 logo 合并为一份，且 rels 不悬空（PowerPoi
   }
   // 内容页母版（slideLayout）的落款 logo 仍在位——母版级图片挂在 layout 的
   // rels 上，去重误伤它会让全部内容页一起掉图
-  const layoutRelsNames = names.filter((n) =>
-    /^ppt\/slideLayouts\/_rels\/.+\.rels$/.test(n),
-  );
+  const layoutRelsNames = names.filter((n) => /^ppt\/slideLayouts\/_rels\/.+\.rels$/.test(n));
   const withMedia = await Promise.all(
     layoutRelsNames.map(async (n) => await zip.files[n].async("string")),
   );
