@@ -1,23 +1,25 @@
 /**
  * 文档写作工具：generate_document / convert_document
+ *
+ * PPT 已拆出去：课件的生成走 ppt.ts（ppt_preview/ppt_save 写代码排版），
+ * 这里只管 Word/Excel/PDF 的 blocks/sheets 直出与跨格式转换。
  */
 
 import { tool } from "ai";
 import { z } from "zod";
 import { convertDocument } from "../document/convert";
-import { buildPptPreview } from "../document/pptx-theme";
 import { generateAndSave } from "../document/save";
 import type { DocumentSpec } from "../document/types";
 
 export const documentTools = {
-  /** 生成文档（Word/Excel/PPT/PDF 成品文件） */
+  /** 生成文档（Word/Excel/PDF 成品文件；PPT 用 ppt_save 写代码构建） */
   generate_document: tool({
     description:
-      "AI 辅助写作：按结构化内容直接产出成品文件，支持 Word(docx)/Excel(xlsx)/PPT(pptx)/PDF 四种格式，中文原生可写。学生要「一份报告 / 课件 / 表格 / 简历模板」等交付物时用。落盘到本机 data/generated 并返回完整路径。docx/pdf 用 blocks（标题/正文/列表/表格/分页），pptx 用 slides（或给 blocks 自动转分页），xlsx 用 sheets。pptx 自动套品牌课件模板（给 title 排封面、纯标题页排成章节页），网页端可翻页预览。内容要自己组织好（可先引用教务数据或改写润色后的文本再喂进来）。",
+      "AI 辅助写作：按结构化内容直接产出成品文件，支持 Word(docx)/Excel(xlsx)/PDF 三种格式，中文原生可写。学生要「一份报告 / 表格 / 简历模板」等交付物时用。落盘到本机 data/generated 并返回完整路径。docx/pdf 用 blocks（标题/正文/列表/表格/分页），xlsx 用 sheets。PPT 课件不在这里——用 ppt_save 写构建代码生成（见其说明）。",
     inputSchema: z.object({
-      format: z.enum(["docx", "xlsx", "pptx", "pdf"]).describe("目标文件格式"),
-      title: z.string().optional().describe("文档主标题（Word/PDF 顶部、PPT 封面）"),
-      author: z.string().optional().describe("作者/署名（PPT 封面、可选）"),
+      format: z.enum(["docx", "xlsx", "pdf"]).describe("目标文件格式"),
+      title: z.string().optional().describe("文档主标题（Word/PDF 顶部）"),
+      author: z.string().optional().describe("作者/署名（可选）"),
       filename: z.string().optional().describe("成品文件名，可不带扩展名，同名自动加(2)"),
       blocks: z
         .array(
@@ -38,23 +40,6 @@ export const documentTools = {
         )
         .optional()
         .describe("Word/PDF 的正文块序列（按顺序排版）"),
-      slides: z
-        .array(
-          z.object({
-            title: z.string(),
-            subtitle: z.string().optional(),
-            bullets: z.array(z.string()).optional(),
-            notes: z.string().optional().describe("演讲者备注"),
-            table: z
-              .object({
-                headers: z.array(z.string()).optional(),
-                rows: z.array(z.array(z.string())),
-              })
-              .optional(),
-          }),
-        )
-        .optional()
-        .describe("PPT 幻灯片（不给则由 blocks 自动按标题分页）"),
       sheets: z
         .array(
           z.object({
@@ -72,12 +57,10 @@ export const documentTools = {
         ...(input.title ? { title: input.title } : {}),
         ...(input.author ? { author: input.author } : {}),
         ...(input.blocks ? { blocks: input.blocks as DocumentSpec["blocks"] } : {}),
-        ...(input.slides ? { slides: input.slides as DocumentSpec["slides"] } : {}),
         ...(input.sheets ? { sheets: input.sheets as DocumentSpec["sheets"] } : {}),
       };
-      const hasContent =
-        spec.blocks?.length || spec.slides?.length || spec.sheets?.length || spec.title;
-      if (!hasContent) return { error: "内容为空：至少提供 title + blocks / slides / sheets 之一" };
+      const hasContent = spec.blocks?.length || spec.sheets?.length || spec.title;
+      if (!hasContent) return { error: "内容为空：至少提供 title + blocks / sheets 之一" };
       try {
         const file = await generateAndSave(spec, { filename: input.filename });
         return {
@@ -86,8 +69,6 @@ export const documentTools = {
           filename: file.filename,
           path: file.filePath,
           bytes: file.bytes,
-          // pptx 附带预览载荷：网页端据此渲染可翻页的幻灯片预览卡
-          ...(file.format === "pptx" ? { ppt: buildPptPreview(spec) } : {}),
           note: `已生成 ${file.format.toUpperCase()}，保存于本机 ${file.filePath}`,
         };
       } catch (e) {
