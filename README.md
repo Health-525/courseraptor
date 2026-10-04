@@ -256,6 +256,8 @@ npm run njtech -- search-courses 高等数学
 
 **🦖 CourseRaptor** · 让迅猛龙替你守教务 · [ISC 许可证](LICENSE)
 
+觉得好用？[点个 ⭐ Star](https://github.com/Health-525/courseraptor) 让更多同学看到它；遇到问题或有想法，欢迎开 [issue](https://github.com/Health-525/courseraptor/issues/new/choose) 或到 [Discussions](https://github.com/Health-525/courseraptor/discussions) 聊聊。
+
 [⬆ 回到顶部](#-courseraptor) · [English Version](README.en.md)
 
 </div>
