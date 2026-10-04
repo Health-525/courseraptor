@@ -94,6 +94,7 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 │   ├── adapters/
 │   │   ├── njtech/       # NJTECH implementation: login, schedule, grades,
 │   │   │                 # exams, course selection, notices + school tools
+│   │   ├── hebau/        # HEBAU implementation: CAS SSO + Zhengfang URP
 │   │   └── custom/       # Other schools (manual timetable mode)
 │   └── channels/web/     # Web UI: chat, hall, /today, /todos, /knowledge
 └── local/                # Entrypoints: cli (TUI), qq (bot bridge), demo
