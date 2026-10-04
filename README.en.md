@@ -13,7 +13,7 @@
 [简体中文](README.md) · **English**
 
 [![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
-[![ISC License](https://img.shields.io/badge/License-ISC-8f2b21)](LICENSE)
+[![MIT License](https://img.shields.io/badge/License-MIT-8f2b21)](LICENSE)
 [![Node 24+](https://img.shields.io/badge/Node.js-24%2B-8f2b21?logo=nodedotjs&logoColor=white)](https://nodejs.org/en/download)
 [![GitHubDaily](https://img.shields.io/badge/GitHubDaily-Featured-1DA1F2?logo=x&logoColor=white)](https://x.com/github_daily/status/2105560876132757969)
 [![Indie Dev List](https://img.shields.io/badge/China_Indie_Dev_List-Featured-9B59B6)](https://github.com/1c7/chinese-independent-developer/blob/master/.github/pages/README-Programmer-Edition.md)
@@ -126,7 +126,7 @@ Other schools work through the manual timetable mode (paste or upload a timetabl
 
 ## Build with us
 
-Beyond the student tool, the repo is a working reference for local-first agents — every pattern below ships in daily use, backed by tests, free to lift under the ISC license:
+Beyond the student tool, the repo is a working reference for local-first agents — every pattern below ships in daily use, backed by tests, free to lift under the MIT license:
 
 - **Agent loop**: Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI` driving 30+ tools across multi-turn loops — [`src/core/agent.ts`](src/core/agent.ts)
 - **Ports & adapters**: the `SchoolAdapter` port (`src/core/school.ts`) keeps the kernel free of any school import; Zhengfang-new and CAS+URP differences never leak past an adapter — [`src/adapters/`](src/adapters/)
@@ -147,4 +147,4 @@ npm test
 
 Found it useful? A star, a reproducible issue, or a concrete student use case helps the project improve. Built something of your own on these patterns? Share it in [Discussions](https://github.com/Health-525/courseraptor/discussions).
 
-Released under the [ISC License](LICENSE). No official affiliation with or endorsement by Nanjing Tech University.
+Released under the [MIT License](LICENSE). No official affiliation with or endorsement by Nanjing Tech University.
