@@ -21,7 +21,7 @@ Vercel AI SDK v7 · `SchoolAdapter` 端口-适配器架构 · 三端入口 · �
 
 **[简体中文](README.md) · [English](README.en.md)**
 
-**[✨ 核心特性](#-核心特性) · [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程) · [🖥️ 界面预览](#️-界面预览) · [🚀 快速开始](#-快速开始) · [🏫 学校支持](#-学校支持) · [🔒 隐私与安全](#-隐私与安全) · [🧩 项目架构](#-项目架构) · [📚 文档](#-文档) · [❓ 常见问题](#-常见问题)**
+**[✨ 核心特性](#-核心特性) · [🖥️ 界面预览](#️-界面预览) · [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程) · [🚀 快速开始](#-快速开始) · [🏫 学校支持](#-学校支持) · [🔒 隐私与安全](#-隐私与安全) · [🧩 项目架构](#-项目架构) · [📚 文档](#-文档) · [❓ 常见问题](#-常见问题)**
 
 </div>
 
@@ -52,6 +52,24 @@ Agent 共装备 **30+ 个工具**。完整参数表、耗时、环境变量与�
 
 ---
 
+## 🖥️ 界面预览
+
+> 截图均为虚构示例数据（演示模式），不代表真实教务信息。
+
+**终端卡片 TUI** —— 敲 `raptor` 直接开聊，启动首屏即见今日课表、一周待办、临近考试与最新通知：
+
+<p align="center"><img src="docs/screenshots/tui.png" width="800" alt="终端 TUI 首屏：今日课表、待办、考试与通知速览（虚构示例数据）"></p>
+
+**网页对话** —— 浏览器打开 `http://localhost:3210` 即聊，思考过程与工具调用全程可见：
+
+<p align="center"><img src="docs/screenshots/gui.png" width="800" alt="网页对话：思考卡片、工具调用与课表回复（虚构示例数据）"></p>
+
+**动态演示** —— 从欢迎页、快捷提问到一句话发起查询的完整流程（虚构示例数据）：
+
+<p align="center"><img src="docs/screenshots/gui-demo.gif" width="800" alt="网页端动态演示：快捷提问与一句话查询全流程（虚构示例数据）"></p>
+
+---
+
 ## 🧰 给开发者：一套可整体搬走的本地 Agent 工程
 
 > 在找「Vercel AI SDK 的生产级完整例子」，或者「Agent 怎么接一堆外部系统而不失控」？这个仓库是一份答案：三端入口跑在真实用户的日常使用里，每个设计都有源码可查、有测试兜底，ISC 许可随便拆走复用。
@@ -68,24 +86,6 @@ Agent 共装备 **30+ 个工具**。完整参数表、耗时、环境变量与�
 | 工程化底盘 | TypeScript `strict` + node:test（覆盖率门槛只升不降）+ Biome + 双 OS 矩阵 CI | [`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
 
 **适配器飞轮已经转过一圈**：河北农业大学适配器由外部贡献者 [@gzxb001-sketch](https://github.com/gzxb001-sketch) 按[适配指南](docs/adapter-guide.md)独立完成并合入（PR [#204](https://github.com/Health-525/courseraptor/pull/204)），他就是这所学校的署名维护者。你的学校还没人适配？照着[指南](docs/adapter-guide.md)写一个——正方系学校有完整参考实现可抄，PR 合并后上方学校表里写你的名字。
-
----
-
-## 🖥️ 界面预览
-
-> 截图均为虚构示例数据（演示模式），不代表真实教务信息。
-
-**终端卡片 TUI** —— 敲 `raptor` 直接开聊，启动首屏即见今日课表、一周待办、临近考试与最新通知：
-
-<p align="center"><img src="docs/screenshots/tui.png" width="800" alt="终端 TUI 首屏：今日课表、待办、考试与通知速览（虚构示例数据）"></p>
-
-**网页对话** —— 浏览器打开 `http://localhost:3210` 即聊，思考过程与工具调用全程可见：
-
-<p align="center"><img src="docs/screenshots/gui.png" width="800" alt="网页对话：思考卡片、工具调用与课表回复（虚构示例数据）"></p>
-
-**动态演示** —— 从欢迎页、快捷提问到一句话发起查询的完整流程（虚构示例数据）：
-
-<p align="center"><img src="docs/screenshots/gui-demo.gif" width="800" alt="网页端动态演示：快捷提问与一句话查询全流程（虚构示例数据）"></p>
 
 ---
 
