@@ -179,7 +179,7 @@ npm run qq
 | 变量 | 说明 | 必填 |
 |------|------|------|
 | `DEEPSEEK_API_KEY` | DeepSeek API Key（或启动后对话里输入 `/key sk-你的Key` 配置，加密保存、立即生效） | 是 |
-| `JWGL_USERNAME` / `JWGL_PASSWORD` | 教务系统学号 / 密码（留空则首次启动引导录入并 AES-256-GCM 加密保存，引导可回车跳过、跳过后在网页「功能大厅 → 设置 → 教务账号」里补填） | 否 |
+| `JWGL_USERNAME` / `JWGL_PASSWORD` | 教务系统学号 / 密码（留空则启动后在网页「功能大厅 → 设置 → 教务账号」里填写，AES-256-GCM 加密保存本机） | 否 |
 | `RAPTOR_MODEL` | 模型，默认 `deepseek-flash`（V4.1-Flash），可选 `deepseek-v4-pro` 等；网页设置里选过的型号加密保存并优先于此项 | 否 |
 | `RAPTOR_TUI_INLINE` | 设 `1` 让终端默认走行内渲染，等价对话里的 `/inline` | 否 |
 | `RAPTOR_WEB_PORT` | 网页版端口，默认 `3210`（被占用时自动选空闲端口） | 否 |

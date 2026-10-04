@@ -2,12 +2,12 @@
 
 [返回首页](../README.md) · [同学使用指南](student-guide.md)
 
-首次使用建议直接运行 `npm start`，按引导加密保存凭证。需要手动配置时，复制 `.env.example` 为 `.env`；不要覆盖已有文件，也不要把真实 Key 或密码写进聊天。
+首次使用直接运行 `npm start` 进入界面，教务账号与 API Key 在网页「设置」里加密保存。需要手动配置时，复制 `.env.example` 为 `.env`；不要覆盖已有文件，也不要把真实 Key 或密码写进聊天。
 
 | 配置项 | 默认 / 用途 |
 |---|---|
-| `DEEPSEEK_API_KEY` | 正式对话需要；可通过首次引导或无参数 `/key` 配置 |
-| `JWGL_USERNAME` / `JWGL_PASSWORD` | 本人的教务凭证；留空时按启动引导配置 |
+| `DEEPSEEK_API_KEY` | 正式对话需要；可在网页「设置 → AI 模型」里填写，或对话里输入无参数 `/key` 配置 |
+| `JWGL_USERNAME` / `JWGL_PASSWORD` | 本人的教务凭证；留空时在网页「设置 → 教务账号」里填写 |
 | `RAPTOR_MODEL` | 源码默认 `deepseek-flash`（V4.1-Flash）；官方已停用 `deepseek-chat` / `deepseek-reasoner` 别名、退役 `deepseek-v4-flash` 系列，本地存有旧型号时启动自动迁移到当前默认。网页「设置」里选过的型号会加密记在本机并优先于本项。须确认自己的服务账户支持所选模型 |
 | `DEEPSEEK_BASE_URL` | 可选，自定义模型服务地址；对话内容会发往这个服务 |
 | `RAPTOR_WEB_PORT` | 正式网页首选端口，默认 3210，占用后自动选择空闲端口 |
@@ -50,7 +50,7 @@ npm run demo:live   # 等价于 npm run demo -- --live
 
 ## 凭证优先级
 
-- 教务账号：`.env` / 进程环境里的 `JWGL_*` 优先，其次本机 `credentials.enc`，最后首次引导。
+- 教务账号：`.env` / 进程环境里的 `JWGL_*` 优先，其次本机 `credentials.enc`（网页「设置」保存的加密值）。
 - API Key：通过 `/key` 明确设置的加密覆盖值优先，其次环境变量，再其次加密存储中的旧值。
 - 加密存储依赖当前机器和系统用户信息，不是系统密码保险库；不能防御同机同用户运行的恶意程序。
 

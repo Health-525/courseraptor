@@ -74,10 +74,10 @@ test("切学校教务账号跟着切：旧校存回名下、新校空则清空�
   // ① njtech 下保存教务账号 → 入 njtech 槽位
   const save = await wfetch(`${await base()}/api/settings`, {
     method: "POST",
-    body: JSON.stringify({ jwglUsername: "202321144057", jwglPassword: "fake-pass-1" }),
+    body: JSON.stringify({ jwglUsername: "202311112222", jwglPassword: "fake-pass-1" }),
   });
   assert.equal(save.status, 200);
-  assert.equal(loadCredentialsStore()?.jwglAccounts?.njtech?.username, "202321144057");
+  assert.equal(loadCredentialsStore()?.jwglAccounts?.njtech?.username, "202311112222");
 
   // ② 切到河北农大：没有该校账号 → 当前账号清空，提示填写；南工大账号留在槽里不删
   const r = await wfetch(`${await base()}/api/settings`, {
@@ -94,7 +94,7 @@ test("切学校教务账号跟着切：旧校存回名下、新校空则清空�
   assert.equal(d.status.jwgl.username, "");
   const store1 = loadCredentialsStore();
   assert.equal(store1?.username, "");
-  assert.equal(store1?.jwglAccounts?.njtech?.username, "202321144057", "旧校账号必须还在槽里");
+  assert.equal(store1?.jwglAccounts?.njtech?.username, "202311112222", "旧校账号必须还在槽里");
 
   // ③ 切回 njtech：自动恢复南工大账号，不用重填
   const back = await wfetch(`${await base()}/api/settings`, {
@@ -107,7 +107,7 @@ test("切学校教务账号跟着切：旧校存回名下、新校空则清空�
     /已载入本校保存的教务账号（学号 2023\*\*\*\*）/,
   );
   assert.equal(bd.status.jwgl.configured, true);
-  assert.equal(bd.status.jwgl.username, "202321144057");
+  assert.equal(bd.status.jwgl.username, "202311112222");
 
   // ④ 两校各存各的：hebau 存自己的账号后互切，各用各的
   await wfetch(`${await base()}/api/settings`, {
@@ -121,14 +121,14 @@ test("切学校教务账号跟着切：旧校存回名下、新校空则清空�
   assert.equal(resave.status, 200);
   const store2 = loadCredentialsStore();
   assert.equal(store2?.jwglAccounts?.hebau?.username, "202501010203");
-  assert.equal(store2?.jwglAccounts?.njtech?.username, "202321144057");
+  assert.equal(store2?.jwglAccounts?.njtech?.username, "202311112222");
   const toN = await (
     await wfetch(`${await base()}/api/settings`, {
       method: "POST",
       body: JSON.stringify({ schoolId: "njtech" }),
     })
   ).json();
-  assert.equal(toN.status.jwgl.username, "202321144057");
+  assert.equal(toN.status.jwgl.username, "202311112222");
   const toH = await (
     await wfetch(`${await base()}/api/settings`, {
       method: "POST",

@@ -210,8 +210,10 @@ test("技能打包：export-schedule 独立包结构 + 自包含可运行", asyn
 
   let fetchErr = "未开始";
   let served = false;
-  for (let i = 0; i < 40 && !served; i++) {
-    await new Promise((r) => setTimeout(r, 150));
+  // 轮询预算 20s：coverage 档的 ubuntu CI 冷启动（node + 1.4MB bundle + 出图）
+  // 实测可超 6s，旧窗口 40×150ms 会在服务刚起时耗尽（#218 CI 偶发红）
+  for (let i = 0; i < 80 && !served; i++) {
+    await new Promise((r) => setTimeout(r, 250));
     try {
       const res = await fetch(`http://127.0.0.1:${port}/${produced[0]}`);
       if (res.ok) {
