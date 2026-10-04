@@ -18,7 +18,7 @@ import { config } from "../../src/core/config";
 import { loadCredentialsStore, saveCredentialsStore } from "../../src/core/credentials";
 import { flushCapturedSession } from "../../src/core/memory/shortterm";
 import { ensureModelAvailable } from "../../src/core/models";
-import { ensureCredentials, runDeepSeekKeySetup } from "../../src/core/onboarding";
+import { runDeepSeekKeySetup } from "../../src/core/onboarding";
 import { school } from "../../src/core/school";
 import {
   checkForUpdate,
@@ -29,6 +29,7 @@ import {
 import { runUpdateCommand } from "../../src/core/updater";
 import { pingUsage } from "../../src/core/usage-ping";
 import { SLASH_COMMANDS } from "./tui/slash-menu";
+import { schoolConfigured } from "./tui/welcome";
 
 // 更新检查先发出，与凭证加载/agent 构建并行跑，后面收结果
 const updatePromise = checkForUpdate();
@@ -36,31 +37,9 @@ const updatePromise = checkForUpdate();
 // 匿名使用情况上报（随机设备号+版本，24h 一次，失败静默，RAPTOR_NO_TELEMETRY=1 可关）
 void pingUsage();
 
-// 教务凭证缺失时引导录入（.env > credentials.enc 加密文件 > 首次引导）。
-// 引导可回车跳过：不配教务账号也能进入应用，之后在网页设置里补填。
-const needsJwglSetup = !(config.jwglUsername && config.jwglPassword);
-const jwglSetup = await ensureCredentials();
-if (needsJwglSetup && jwglSetup === "configured") {
-  console.log(
-    "💡 下次打开 Raptor：直接双击安装包中的 start.bat，它会自动启动 CourseRaptor；查询教务信息时会自动登录，不必重新输入学号和密码。",
-  );
-  console.log("   如需更换账号，请删除安装目录中的 credentials.enc 后重新启动。\n");
-} else if (needsJwglSetup) {
-  console.log("💡 教务账号暂未配置：聊天、待办、通知、天气等功能不受影响。");
-  console.log("   需要查课表/成绩时，在网页对话窗口右上角「设置 → 教务账号」里补填即可。\n");
-} else if (config.credentialsSource === "encrypted") {
-  console.log("🔐 已读取本机加密保存的教务账号；下次双击 start.bat 即可再次打开 Raptor。\n");
-}
-
-// 对话依赖 DeepSeek API Key。首次缺失时立刻在终端完成安全配置，而非让新用户
-// 进入界面后再自行发现 /key 命令；取消或格式错误时仍保留 /key 作为重试入口。
-if (!config.deepseekApiKey) {
-  console.log("🦖 首次使用：第 2 步，共 2 步——配置 DeepSeek API Key（用于对话）");
-  const keySetup = await runDeepSeekKeySetup();
-  if (keySetup !== "saved") {
-    console.log("⚠️ API Key 尚未配置完成。进入后随时输入无参数 /key 可重新设置。\n");
-  }
-}
+// 教务账号与模型 API Key 不再在终端做首次引导（用户 2026-10-04 指示「新手引导
+// 不要了，直接进界面」）：启动零提问，未配置的凭证都在网页「设置」里补填；
+// 终端侧重试入口仍是 /key 命令。
 
 const updateInfo: UpdateInfo | null = await updatePromise;
 if (updateInfo) {
@@ -117,7 +96,13 @@ setChatAgent(agent);
 setChatAgentRefresher(async () => {
   setChatAgent(await createRaptorAgent());
 });
-startChatWeb().catch(() => {});
+startChatWeb()
+  .then((url) => {
+    // 未选学校时不再有终端引导与提示信息，只报网页地址；
+    // 教务账号与模型 Key 都在网页「设置」里配
+    if (url && !schoolConfigured()) console.log(`💬 网页对话：${url}`);
+  })
+  .catch(() => {});
 
 // 待办到期提醒：每小时扫描「距到期 ≤ 7 天」的未完成待办（每天最多一次，
 // 桌面通知 + QQ 推送）。QQ 桥在线时进程在 TUI 退出后仍存活，提醒也随之持续

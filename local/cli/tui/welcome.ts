@@ -3,6 +3,8 @@
  * 注入实时教务数据。补丁每次重绘都读 globalThis.__raptorWelcome，所以这里
  * 分阶段拉、逐段刷新：最新通知（无需登录）→ 今日课表（登录）。
  * 任何一段失败只降级那一段的文案，不影响其他段和正常对话。
+ * 未选学校（教务账号与导入课表都没有）时只留栏目题头与网页地址，
+ * 不显示、也不拉取任何教务信息（用户 2026-10-04 指示）。
  */
 
 import { startChatWeb } from "../../../src/channels/web/chat-web";
@@ -30,32 +32,46 @@ function todayWeekday(): number {
 const panel = {
   week: undefined as number | undefined,
   webUrl: null as string | null,
+  /** 未选学校：栏目只留题头，内容一律不显示，面板只补网页地址 */
+  blank: false,
   scheduleLines: [dim("  正在登录教务系统…")],
   todoLines: [dim("  正在获取…")],
   examLines: [dim("  正在获取…")],
   newsLines: [dim("  正在获取…")],
 };
 
+/** 「已选学校」= 配了教务账号，或自定义学校已导入课表；两者都没有时不拉任何教务信息 */
+export function schoolConfigured(): boolean {
+  return Boolean((config.jwglUsername && config.jwglPassword) || loadScheduleCache());
+}
+
 function render() {
   const lines: string[] = [];
   const now = new Date();
   const date = `${now.getMonth() + 1}月${now.getDate()}日 ${school().terms.weekdayName(todayWeekday())}`;
-  lines.push(
-    `欢迎使用 CourseRaptor 🦖 · ${date}${panel.week ? ` · 第${panel.week}周` : ""}`,
-    "",
-    header("今日课表"),
-    ...panel.scheduleLines,
-    "",
-    header("一周内待办"),
-    ...panel.todoLines,
-    "",
-    header("临近考试"),
-    ...panel.examLines,
-    "",
-    header("最新通知"),
-    ...panel.newsLines,
-    ...(panel.webUrl ? ["", `💬 网页对话：${panel.webUrl} ${dim("（浏览器打开即聊）")}`] : []),
-  );
+  lines.push(`欢迎使用 CourseRaptor 🦖 · ${date}${panel.week ? ` · 第${panel.week}周` : ""}`, "");
+  if (panel.blank) {
+    for (const t of ["今日课表", "一周内待办", "临近考试", "最新通知"]) lines.push(header(t), "");
+  } else {
+    lines.push(
+      header("今日课表"),
+      ...panel.scheduleLines,
+      "",
+      header("一周内待办"),
+      ...panel.todoLines,
+      "",
+      header("临近考试"),
+      ...panel.examLines,
+      "",
+      header("最新通知"),
+      ...panel.newsLines,
+    );
+  }
+  if (panel.webUrl) {
+    // 非空面板的新闻段后没有收尾空行，这里补上；空面板各段自带尾空行
+    if (!panel.blank) lines.push("");
+    lines.push(`💬 网页对话：${panel.webUrl} ${dim("（浏览器打开即聊）")}`);
+  }
   // Star 引导带完整 https 前缀，终端才能把 URL 识别成可点击链接
   lines.push(
     "",
@@ -71,9 +87,13 @@ export function startWelcomeBootstrap(): void {
 }
 
 async function bootstrap() {
+  // 未选学校（教务账号与导入课表都没有）：栏目题头保留、里面不显示任何信息，
+  // 也不再发起教务/通知请求——只把网页地址补进面板，配置都在网页「设置」里做
+  panel.blank = !schoolConfigured();
   render();
-  void refreshNews(); // 通知不依赖教务登录，并行先刷
   void refreshWebUrl(); // 网页版地址随本地服务起好后补进面板
+  if (panel.blank) return;
+  void refreshNews(); // 通知不依赖教务登录，并行先刷
   refreshTodos(); // 待办是本地数据，同步读
   refreshExams(); // 考试是本地缓存，同步读
   await refreshSchedule();
