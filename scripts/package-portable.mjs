@@ -116,9 +116,19 @@ export function buildPortable({ keep = false } = {}) {
   execSync("npm ci --omit=dev --no-audit --no-fund", { cwd: appDir, stdio: "inherit" });
 
   // ── 3) 下载并解压内置 Node 运行时到 runtime/ ──
+  // 直连 nodejs.org 的长连接经常半路被掐（维护者网络实测连续两次 curl 35/56
+  // 号错误），--retry 不带断点会把整个 34MB 重来。RAPTOR_RUNTIME_ZIP 指向
+  // 本机已下好的运行时 zip（建议放 downloads/，gitignored）即跳过下载；
+  // zip 由调用方用 curl -C - 断点续传等方式自行下完整。
   const dl = path.join(work, "node-runtime.zip");
-  console.log(`下载 Node 运行时 ${NODE_VER} ...`);
-  execSync(`curl -L --fail --retry 3 -o "${dl}" "${RUNTIME_ZIP_URL}"`, { stdio: "inherit" });
+  const cachedZip = process.env.RAPTOR_RUNTIME_ZIP;
+  if (cachedZip && existsSync(cachedZip) && statSync(cachedZip).size > 0) {
+    console.log(`使用本地缓存的 Node 运行时：${cachedZip}`);
+    copyFileSync(cachedZip, dl);
+  } else {
+    console.log(`下载 Node 运行时 ${NODE_VER} ...`);
+    execSync(`curl -L --fail --retry 3 -o "${dl}" "${RUNTIME_ZIP_URL}"`, { stdio: "inherit" });
+  }
   // PowerShell 一律走临时 .ps1 + -File：拼成一行塞进 -Command 会经过 cmd.exe 的转义，
   // Windows 路径里的 \t、\r 等会被吃掉，属于随机炸的写法。
   const unzipPs1 = path.join(work, "unzip-runtime.ps1");
