@@ -491,6 +491,28 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .pptslide .pt-row { gap: 5px; }
   .pptslide .pt-row .pt-li { font-size: 6.5px; color: var(--ink-2); }
 
+  /* ── 自由版式页（代码工具 blank 页）：缩影与全屏共用容器查询单位（cqw），
+     字号/线宽随幻灯片宽度等比缩放（1pt = 1/72 英寸，画布宽 10 英寸 →
+     size/7.2 cqw），坐标由 JS 按画布 10 × 5.625 归一成百分比 ── */
+  .pptslide, .pptv-stage { container-type: inline-size; }
+  .pptslide.k-free { padding: 0; }
+  .pptv-stage.k-free { padding: 0; }
+  .pt-el { position: absolute; }
+  .pt-el.pt-text { display: flex; flex-direction: column; overflow: hidden;
+                   line-height: 1.35; }
+  .pt-el.pt-text.kai { font-family: var(--kai); }
+  .pt-el.pt-text.nowrap { white-space: nowrap; text-overflow: ellipsis; }
+  .pt-el.pt-title { font-weight: 700; }
+  .pt-el.pt-shape { overflow: hidden; }
+  .pt-el.pt-shape.round { border-radius: 50%; }
+  .pt-el.pt-logo-el { border-radius: 50%; overflow: hidden; }
+  .pt-el.pt-logo-el img { width: 100%; height: 100%; border-radius: 50%;
+                          display: block; }
+  .pt-el.pt-elemcut { right: 2.5%; bottom: 2.5%; font-family: var(--mono);
+                      font-size: max(6px, 1.1cqw); color: var(--ink-3); }
+  .pptslide.k-free .pt-logo { right: 7px; bottom: 6px; width: 13px; height: 13px; }
+  .pptv-stage.k-free .pt-logo { right: 22px; bottom: 16px; width: 26px; height: 26px; }
+
   /* 全屏查看器：暗纸压片 + 大幅幻灯片 + 底部翻页条；键盘 ←/→/Esc 与触屏滑动同效 */
   .pptview { position: fixed; inset: 0; z-index: 70; background: rgba(37, 34, 28, 0.72);
              display: flex; align-items: center; justify-content: center; }

@@ -118,16 +118,31 @@ export async function generateAndSave(
   opts?: { filename?: string },
 ): Promise<GeneratedFile> {
   const { buffer } = await renderDocument(spec);
+  return saveGenerated(buffer, spec.format, {
+    filename: opts?.filename,
+    baseName: suggestBaseName(spec),
+  });
+}
+
+/**
+ * 已渲染好的成品字节落盘 data/generated（ppt 代码工具等非 DocumentSpec 产物）。
+ * 命名/同名加 (2)/登记流水与 generateAndSave 同一套语义。
+ */
+export async function saveGenerated(
+  buffer: Buffer,
+  format: DocFormat,
+  opts?: { filename?: string; baseName?: string },
+): Promise<GeneratedFile> {
   const dir = generatedDir();
   await fsp.mkdir(dir, { recursive: true });
-  const ext = FORMAT_EXT[spec.format];
+  const ext = FORMAT_EXT[format];
   const given = opts?.filename?.trim();
-  const baseRaw = given ? stripExt(given) : suggestBaseName(spec);
+  const baseRaw = given ? stripExt(given) : (opts?.baseName ?? "document");
   const base = sanitizeFileBase(baseRaw);
   const filePath = uniquePath(dir, base, ext);
   await fsp.writeFile(filePath, buffer);
   const file: GeneratedFile = {
-    format: spec.format,
+    format,
     filename: path.basename(filePath),
     filePath,
     bytes: buffer.length,

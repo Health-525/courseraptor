@@ -1362,28 +1362,26 @@ test("GET /api/models?provider= 支持切换前预览（不落缓存、不要求
   assert.equal(s.models[0]?.id, "deepseek-flash", "预览不污染已保存供应商的缓存桶");
 });
 
-test("真实对话链路：generate_document 产 pptx 时 SSE 带 ppt 预览与下载行", async () => {
-  // 用真实的 generate_document execute 产出工具结果（而非手造形状），
-  // 桩 agent 只负责把它按 tool-result 事件吐回——验证「用户真说一句话 →
-  // 工具执行 → SSE 透传 ppt 载荷 + files」全链路。
+test("真实对话链路：ppt_save 产 pptx 时 SSE 带 ppt 预览与下载行", async () => {
+  // 用真实的 ppt_save execute 产出工具结果（而非手造形状），桩 agent 只负责
+  // 把它按 tool-result 事件吐回——验证「用户真说一句话 → 工具执行 → SSE 透传
+  // ppt 载荷 + files」全链路。
   const { coreTools } = await import("../src/core/tools");
   const realOutput = await (
-    coreTools.generate_document as unknown as { execute: (i: unknown) => Promise<any> }
+    coreTools.ppt_save as unknown as { execute: (i: unknown) => Promise<any> }
   ).execute({
-    format: "pptx",
-    title: "链路课件",
-    slides: [{ title: "要点", bullets: ["一", "二"] }],
+    code: 'pptx.cover({ title: "链路课件" }); pptx.bullets({ title: "要点", points: ["一", "二"] });',
   });
   assert.equal(realOutput.ok, true, `工具执行应成功，实为 ${JSON.stringify(realOutput)}`);
 
   setChatAgent({
     stream() {
       async function* gen() {
-        yield { type: "tool-call", toolCallId: "p1", toolName: "generate_document" };
+        yield { type: "tool-call", toolCallId: "p1", toolName: "ppt_save" };
         yield {
           type: "tool-result",
           toolCallId: "p1",
-          toolName: "generate_document",
+          toolName: "ppt_save",
           output: realOutput,
         };
         yield { type: "text-delta", text: "做好了" };

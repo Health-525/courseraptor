@@ -102,8 +102,9 @@ function collectLogs(sandboxObj: Record<string, unknown>): string[] {
   }
 }
 
-/** 明显越界的写法先静态拦一道（挡不住有心逃逸，但能挡住顺手一写） */
-const BANNED: Array<[RegExp, string]> = [
+/** 明显越界的写法先静态拦一道（挡不住有心逃逸，但能挡住顺手一写）。
+ *  导出供 ppt-program.ts 共用同一份黑名单（两个沙箱同一套边界语义）。 */
+export const BANNED: Array<[RegExp, string]> = [
   [/\brequire\b/, "require"],
   [/\bprocess\b/, "process"],
   [/\bchild_process\b/, "child_process"],

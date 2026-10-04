@@ -48,10 +48,21 @@
 
 | 工具 | 说明 | 典型耗时 |
 |------|------|----------|
-| `generate_document` | 按结构化内容直接生成 **Word / Excel / PPT / PDF** 成品文件，中文原生可写（PDF 自动嵌入系统中文字体）。docx·pdf 给 `blocks`（标题/正文/列表/表格/分页）、pptx 给 `slides`、xlsx 给 `sheets`。PPT 自动套**品牌课件模板**（logo 徽章贯穿每页、封面/章节页朱砂整版、内容页暖纸底，与课表导出同源配色），网页端内嵌可翻页预览。成品写进本机 `data/generated/`，返回完整路径；QQ 里会自动把文件回传给你 | ~1-3s |
+| `generate_document` | 按结构化内容直接生成 **Word / Excel / PDF** 成品文件，中文原生可写（PDF 自动嵌入系统中文字体）。docx·pdf 给 `blocks`（标题/正文/列表/表格/分页）、xlsx 给 `sheets`。成品写进本机 `data/generated/`，返回完整路径；QQ 里会自动把文件回传给你。PPT 课件不走这里——见下方 PPT 工具 | ~1-3s |
 | `convert_document` | 跨格式转换重排：把已有内容（`fetch_attachment` 读入的附件 id、或本机文件路径、或一段文本）转成 Word/Excel/PPT/PDF。源文件**只读不动**，成品写 `data/generated/` | ~1-3s |
 
 > 改写润色（换词、调结构）由模型在文本层完成，改好后交给 `generate_document` 出稿；`convert_document` 专注跨格式搬运与排版。
+
+---
+
+## 📊 PPT 课件工具（2 个，写代码排版）
+
+模型不填幻灯片参数，而是写 JS 构建代码（跑在零宿主对象的录音式沙箱里），自动套**品牌课件模板**「纸墨朱砂」（logo 印章贯穿每页、封面/章节页朱砂整版、内容页暖纸底，与课表导出同源配色），网页端内嵌可翻页预览。
+
+| 工具 | 说明 | 典型耗时 |
+|------|------|----------|
+| `ppt_preview` | 干跑构建代码（不落盘）：逐页摘要（封面/章节/要点/表格/自由）+ 越界/超限警告，写完先自检 | <1s |
+| `ppt_save` | 渲染成 .pptx 落盘 `data/generated/` 并返回路径 + 翻页预览载荷。沙箱 API：`pptx.cover()/section()/bullets()/table()` 四种品牌版式一键成页；`pptx.blank()` 自由版式页上 `s.text()/s.shape()/s.logo()` 任意定位（时间线、对比栏等特殊版式）；`pptx.theme` 品牌色板、`pptx.W/H` 画布常量。变量/循环/条件随意写 | ~1-2s |
 
 ---
 

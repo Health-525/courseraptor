@@ -590,7 +590,92 @@ function pptLogo() {
   return logo;
 }
 
+/* 自由版式页（代码工具 blank 页）：元素按画布 10 × 5.625 英寸归一成百分比
+   绝对定位，字号/线宽用容器查询单位 cqw 随幻灯片宽度等比缩放——缩影条与
+   全屏查看器共用这一份代码，与成品 pptx 的坐标语义一致 */
+const PPT_CANVAS_W = 10;
+const PPT_CANVAS_H = 5.625;
+function pptFreeInner(box, s) {
+  if (s.title) {
+    /* 成品里 blank 页标题固定排在 0.55/0.4、宽 8.9、字号按长度 28/36 */
+    const t = el("pt-el pt-text pt-title");
+    t.textContent = s.title;
+    t.style.left = (0.55 / PPT_CANVAS_W) * 100 + "%";
+    t.style.top = (0.4 / PPT_CANVAS_H) * 100 + "%";
+    t.style.width = (8.9 / PPT_CANVAS_W) * 100 + "%";
+    t.style.height = (0.85 / PPT_CANVAS_H) * 100 + "%";
+    t.style.fontSize = (s.title.length > 16 ? 28 : 36) / 7.2 + "cqw";
+    t.style.fontWeight = "700";
+    t.style.justifyContent = "flex-end";
+    box.appendChild(t);
+  }
+  (s.elements || []).forEach((e) => {
+    const pct = {
+      left: (e.x / PPT_CANVAS_W) * 100 + "%",
+      top: (e.y / PPT_CANVAS_H) * 100 + "%",
+      width: (e.w / PPT_CANVAS_W) * 100 + "%",
+      height: (e.h / PPT_CANVAS_H) * 100 + "%",
+    };
+    if (e.kind === "text") {
+      const d = el("pt-el pt-text");
+      d.textContent = e.text;
+      Object.assign(d.style, pct);
+      d.style.fontSize = ((e.size || 14) / 7.2).toFixed(2) + "cqw";
+      if (e.color) d.style.color = "#" + e.color;
+      if (e.bold) d.style.fontWeight = "700";
+      if (e.align) d.style.textAlign = e.align;
+      if (e.valign)
+        d.style.justifyContent =
+          e.valign === "middle" ? "center" : e.valign === "bottom" ? "flex-end" : "flex-start";
+      if (e.font === "kai") d.classList.add("kai");
+      if (e.wrap === false) d.classList.add("nowrap");
+      box.appendChild(d);
+    } else if (e.kind === "logo") {
+      const d = el("pt-el pt-logo-el");
+      Object.assign(d.style, pct);
+      const img = document.createElement("img");
+      img.src = "/logo.png";
+      img.alt = "";
+      img.draggable = false;
+      d.appendChild(img);
+      box.appendChild(d);
+    } else if (e.kind === "line") {
+      const d = el("pt-el pt-shape");
+      d.style.left = pct.left;
+      d.style.top = pct.top;
+      d.style.width = pct.width;
+      d.style.background = "#" + (e.line || "E1DCCF");
+      const t = e.lineW || 1;
+      /* 高度用 % 保持几何比例，minHeight 兜住细线可见性（横线 h≈0） */
+      d.style.height = pct.height;
+      d.style.minHeight = (t / 7.2).toFixed(2) + "cqw";
+      box.appendChild(d);
+    } else {
+      const d = el("pt-el pt-shape" + (e.kind === "ellipse" ? " round" : ""));
+      Object.assign(d.style, pct);
+      if (e.fill) d.style.background = "#" + e.fill;
+      if (e.line) {
+        const t = e.lineW || 1;
+        d.style.border = (t / 7.2).toFixed(2) + "cqw solid #" + e.line;
+      }
+      if (e.rotate) d.style.rotate = e.rotate + "deg";
+      box.appendChild(d);
+    }
+  });
+  if (s.elemCut) {
+    const cut = el("pt-el pt-elemcut");
+    cut.textContent = "+ " + s.elemCut + " 元素";
+    box.appendChild(cut);
+  }
+  /* free 页成品带内容页母版（页脚品牌字+页码+落款 logo），预览同步落款 */
+  box.appendChild(pptLogo());
+}
+
 function pptSlideInner(box, s, big) {
+  if (s.kind === "free") {
+    pptFreeInner(box, s);
+    return;
+  }
   if (s.kind === "cover") {
     box.appendChild(pptSeal());
     box.appendChild(el2("pt-maintitle", s.title));

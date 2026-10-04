@@ -30,8 +30,12 @@ ${schoolPrompt.tools}
 - manage_attachments：列出/删除附件缓存（附件任务答完可主动清理；只能删 agent 自己缓存的副本，用户文件碰不了）
 
 文档写作（AI 辅助学生产出交付物）：
-- generate_document：按你组织好的结构化内容直接生成 Word/Excel/PPT/PDF 成品文件（中文原生可写），存到本机 data/generated 并回完整路径。学生要「报告/课件/表格/简历/论文模板」等成品的交付时用——docx/pdf 给 blocks、pptx 给 slides、xlsx 给 sheets，先把正文与数据想清楚再喂进来。PPT 自动套品牌课件模板：给 title 自动排封面，只有标题没有正文的页自动成朱砂章节页，网页端还能翻页预览
+- generate_document：按你组织好的结构化内容直接生成 Word/Excel/PDF 成品文件（中文原生可写），存到本机 data/generated 并回完整路径。学生要「报告/表格/简历/论文模板」等成品交付时用——docx/pdf 给 blocks、xlsx 给 sheets，先把正文与数据想清楚再喂进来
 - convert_document：把已有内容（附件 id / 本机文件路径 / 一段文本）跨格式转换重排，如 PDF↔Word↔PPT、表格转文档等。源文件只读，成品写 data/generated。改写润色你自己在文本层做，改好再用 generate_document 出稿
+
+PPT 课件（写代码排版，不是填参数；工具说明里有完整 API 与示例）：
+- ppt_preview：干跑你写的构建代码（不落盘），看逐页摘要与越界/超限警告——写完先自检，有 warnings 先改
+- ppt_save：确认后渲染成 .pptx 落盘，网页端可翻页预览。常规课件 pptx.cover()+bullets()/table() 一把梭；时间线/对比栏等特殊版式用 pptx.blank() 自由排。PPT 不要用 generate_document（它已不产出课件）
 
 时间与天气：
 - get_time：查当前日期时间/星期/教学周/时区换算。你没有内置时钟，训练数据里的「今天」必然过时——任何时间判断（今天几号、周几、第几周、明天/下周几号、距今多久、是否过期）都必须先调它拿真实时间

@@ -8,7 +8,7 @@
  *    对」，是「字节里对」；
  * 3. 预览载荷：与版式计划同源（封面在前、截断有上限），形状校验闸拒绝
  *    畸形输入（chat-web 透传前的同一道闸）；
- * 4. 工具接线：generate_document / convert_document 的 pptx 结果带 ppt 载荷。
+ * 4. 工具接线：ppt_save（代码工具）/ convert_document 的 pptx 结果带 ppt 载荷。
  */
 
 import assert from "node:assert/strict";
@@ -206,6 +206,26 @@ test("pptPreviewOfToolOutput：合法载荷放行、畸形载荷拒绝", () => {
   assert.deepEqual(good.slides[1].bullets, ["一"], "非字符串要点应被滤掉");
   assert.equal(good.slides[1].table?.rows.length, 1);
 
+  // free 页（代码工具 blank 页）：标题可缺省，元素逐个校验
+  const free = pptPreviewOfToolOutput({
+    ppt: {
+      count: 1,
+      slides: [
+        {
+          kind: "free",
+          elements: [
+            { kind: "text", x: 0.5, y: 1, w: 4, h: 0.5, text: "自由行", size: 18, bold: true },
+            { kind: "rect", x: 0, y: 0, w: 10, h: 0.1, fill: "AD392C" },
+            { kind: "logo", x: 9, y: 5, w: 0.5, h: 0.5 },
+          ],
+        },
+      ],
+    },
+  });
+  assert.ok(free, "合法 free 页应过闸");
+  assert.equal(free!.slides[0].elements!.length, 3);
+  assert.equal(pptPreviewOfToolOutput({ ppt: { count: 1, slides: [{ kind: "free" }] } })?.slides[0].elements, undefined, "无元素的 free 页也合法");
+
   // count 小于实际页数：以实际为准（防模型漏报页数骗过前端计数器）
   const under = pptPreviewOfToolOutput({
     ppt: {
@@ -228,14 +248,12 @@ test("pptPreviewOfToolOutput：合法载荷放行、畸形载荷拒绝", () => {
   assert.equal(fat?.slides.length, PREVIEW_SLIDE_CAP);
 });
 
-test("工具接线：generate_document / convert_document 的 pptx 带 ppt 载荷", async () => {
+test("工具接线：ppt_save 的 pptx 带 ppt 载荷，generate_document 不再产出课件", async () => {
   const { coreTools } = await import("../src/core/tools");
-  const gen = (coreTools.generate_document as unknown as { execute: (i: unknown) => Promise<any> })
+  const save = (coreTools.ppt_save as unknown as { execute: (i: unknown) => Promise<any> })
     .execute;
-  const g = await gen({
-    format: "pptx",
-    title: "工具层课件",
-    slides: [{ title: "章节" }, { title: "要点", bullets: ["一", "二"] }],
+  const g = await save({
+    code: 'pptx.cover({ title: "工具层课件" }); pptx.section("章节"); pptx.bullets({ title: "要点", points: ["一", "二"] });',
   });
   assert.equal(g.ok, true, `生成应成功，实为 ${JSON.stringify(g)}`);
   assert.ok(g.ppt, "pptx 结果应带预览载荷");
@@ -243,6 +261,8 @@ test("工具接线：generate_document / convert_document 的 pptx 带 ppt 载�
   assert.equal(g.ppt.slides[0].kind, "cover");
   assert.ok(fs.existsSync(g.path));
 
+  const gen = (coreTools.generate_document as unknown as { execute: (i: unknown) => Promise<any> })
+    .execute;
   const gDocx = await gen({
     format: "docx",
     title: "不是课件",
