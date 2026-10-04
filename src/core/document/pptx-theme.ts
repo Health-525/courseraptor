@@ -375,9 +375,7 @@ export function pptPreviewOfToolOutput(output: unknown): PptPreview | null {
         slide.table = {
           ...(Array.isArray(t.headers)
             ? {
-                headers: t.headers
-                  .filter((h): h is string => typeof h === "string")
-                  .slice(0, 8),
+                headers: t.headers.filter((h): h is string => typeof h === "string").slice(0, 8),
               }
             : {}),
           rows,
@@ -831,8 +829,7 @@ function addBlankSlide(
         ...(e.wrap === false ? { wrap: false } : {}),
       });
     } else if (e.kind === "logo") {
-      if (logo)
-        slide.addImage({ data: logo, x: e.x, y: e.y, w: e.w, h: e.h, rounding: true });
+      if (logo) slide.addImage({ data: logo, x: e.x, y: e.y, w: e.w, h: e.h, rounding: true });
     } else if (e.kind === "line") {
       slide.addShape("line", {
         x: e.x,
@@ -847,9 +844,7 @@ function addBlankSlide(
         y: e.y,
         w: e.w,
         h: e.h,
-        ...(e.fill
-          ? { fill: { color: e.fill } }
-          : { fill: { type: "none" } }),
+        ...(e.fill ? { fill: { color: e.fill } } : { fill: { type: "none" } }),
         ...(e.line || (!e.fill && e.kind === "rect")
           ? {
               line: {

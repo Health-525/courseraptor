@@ -491,10 +491,11 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .pptslide .pt-row { gap: 5px; }
   .pptslide .pt-row .pt-li { font-size: 6.5px; color: var(--ink-2); }
 
-  /* ── 自由版式页（代码工具 blank 页）：缩影与全屏共用容器查询单位（cqw），
-     字号/线宽随幻灯片宽度等比缩放（1pt = 1/72 英寸，画布宽 10 英寸 →
-     size/7.2 cqw），坐标由 JS 按画布 10 × 5.625 归一成百分比 ── */
-  .pptslide, .pptv-stage { container-type: inline-size; }
+  /* ── 自由版式页（代码工具 blank 页）：缩影与全屏共用同一套元素定位，
+     坐标由 JS 按画布 10 × 5.625 归一成百分比；字号/线宽也由 JS 按容器
+     实际宽度算 px（chat-app.js 的 pptFitFreePx），不用容器查询单位——
+     cqw/container-type 在部分内嵌浏览器不可用，且 container-type 会让
+     宽度回退（旧引擎不认 dvh 时）的舞台整块塌缩 ── */
   .pptslide.k-free { padding: 0; }
   .pptv-stage.k-free { padding: 0; }
   .pt-el { position: absolute; }
@@ -509,14 +510,15 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .pt-el.pt-logo-el img { width: 100%; height: 100%; border-radius: 50%;
                           display: block; }
   .pt-el.pt-elemcut { right: 2.5%; bottom: 2.5%; font-family: var(--mono);
-                      font-size: max(6px, 1.1cqw); color: var(--ink-3); }
+                      color: var(--ink-3); }
   .pptslide.k-free .pt-logo { right: 7px; bottom: 6px; width: 13px; height: 13px; }
   .pptv-stage.k-free .pt-logo { right: 22px; bottom: 16px; width: 26px; height: 26px; }
 
   /* 全屏查看器：暗纸压片 + 大幅幻灯片 + 底部翻页条；键盘 ←/→/Esc 与触屏滑动同效 */
   .pptview { position: fixed; inset: 0; z-index: 70; background: rgba(37, 34, 28, 0.72);
              display: flex; align-items: center; justify-content: center; }
-  .pptv-stage { width: min(94vw, calc((100dvh - 118px) * 16 / 9));
+  .pptv-stage { width: 94vw; /* 旧引擎不认 min+dvh 的整行回退（同页 100vh→100dvh 约定） */
+                width: min(94vw, calc((100dvh - 118px) * 16 / 9));
                 aspect-ratio: 16 / 9; background: var(--card); border-radius: 6px;
                 overflow: hidden; position: relative;
                 box-shadow: 0 24px 72px rgba(0, 0, 0, 0.4); }

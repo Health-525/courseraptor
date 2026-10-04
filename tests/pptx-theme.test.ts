@@ -224,7 +224,11 @@ test("pptPreviewOfToolOutput：合法载荷放行、畸形载荷拒绝", () => {
   });
   assert.ok(free, "合法 free 页应过闸");
   assert.equal(free!.slides[0].elements!.length, 3);
-  assert.equal(pptPreviewOfToolOutput({ ppt: { count: 1, slides: [{ kind: "free" }] } })?.slides[0].elements, undefined, "无元素的 free 页也合法");
+  assert.equal(
+    pptPreviewOfToolOutput({ ppt: { count: 1, slides: [{ kind: "free" }] } })?.slides[0].elements,
+    undefined,
+    "无元素的 free 页也合法",
+  );
 
   // count 小于实际页数：以实际为准（防模型漏报页数骗过前端计数器）
   const under = pptPreviewOfToolOutput({
@@ -250,8 +254,7 @@ test("pptPreviewOfToolOutput：合法载荷放行、畸形载荷拒绝", () => {
 
 test("工具接线：ppt_save 的 pptx 带 ppt 载荷，generate_document 不再产出课件", async () => {
   const { coreTools } = await import("../src/core/tools");
-  const save = (coreTools.ppt_save as unknown as { execute: (i: unknown) => Promise<any> })
-    .execute;
+  const save = (coreTools.ppt_save as unknown as { execute: (i: unknown) => Promise<any> }).execute;
   const g = await save({
     code: 'pptx.cover({ title: "工具层课件" }); pptx.section("章节"); pptx.bullets({ title: "要点", points: ["一", "二"] });',
   });

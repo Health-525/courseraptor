@@ -22,15 +22,10 @@ process.env.RAPTOR_DATA_DIR = tmpData;
 
 const require = createRequire(import.meta.url);
 
+import { PPT_LIMITS, runPptCode, validateProgram } from "../src/core/document/ppt-program";
 import {
-  PPT_LIMITS,
-  runPptCode,
-  validateProgram,
-  type PptProgram,
-} from "../src/core/document/ppt-program";
-import {
-  PREVIEW_ELEM_CAP,
   buildProgramPreview,
+  PREVIEW_ELEM_CAP,
   pptPreviewOfToolOutput,
   renderPptxProgram,
 } from "../src/core/document/pptx-theme";
@@ -55,7 +50,11 @@ test("runPptCode：循环/变量/主题色录成 op 程序", () => {
     assert.equal(ops[2].notes, "讲 极限");
   } else assert.fail("第 3 页应为 bullets");
   if (ops[4].op === "table") {
-    assert.deepEqual(ops[4].rows, [["e", "2.718"]], "数字单元格应归一为字符串（渲染层同款 String 化）");
+    assert.deepEqual(
+      ops[4].rows,
+      [["e", "2.718"]],
+      "数字单元格应归一为字符串（渲染层同款 String 化）",
+    );
     assert.deepEqual(ops[4].headers, ["式", "值"]);
   } else assert.fail("第 5 页应为 table");
 });
@@ -83,7 +82,10 @@ test("runPptCode：blank 自由页元素、主题色名解析、W/H 常量", () 
   assert.equal(dot.fill, "AD392C");
   assert.equal(line.kind, "line");
   assert.equal(logo.kind, "logo");
-  assert.ok(r.logs?.some((l) => l.includes("10x5.625")), "console.log 应取回");
+  assert.ok(
+    r.logs?.some((l) => l.includes("10x5.625")),
+    "console.log 应取回",
+  );
 });
 
 test("runPptCode：BANNED 黑名单与空代码", () => {
@@ -100,7 +102,10 @@ test("runPptCode：上限 warnings + 越界裁回", () => {
   `);
   assert.equal(fat.ok, true);
   assert.equal(fat.program!.ops.length, PPT_LIMITS.slides, "页数应封顶");
-  assert.ok(fat.warnings?.some((w) => w.includes("页数超过")), "应有页数超限警告");
+  assert.ok(
+    fat.warnings?.some((w) => w.includes("页数超过")),
+    "应有页数超限警告",
+  );
 
   const manyBullets = runPptCode(
     `pptx.bullets({ title: "多", points: Array.from({length: ${PPT_LIMITS.bullets + 5}}, (_, i) => "点" + i) })`,
@@ -109,9 +114,7 @@ test("runPptCode：上限 warnings + 越界裁回", () => {
   if (manyBullets.program!.ops[0].op === "bullets")
     assert.equal(manyBullets.program!.ops[0].points.length, PPT_LIMITS.bullets);
 
-  const out = runPptCode(
-    'const s = pptx.blank(); s.text("越界", { x: 9.5, y: 5.5, w: 3, h: 1 });',
-  );
+  const out = runPptCode('const s = pptx.blank(); s.text("越界", { x: 9.5, y: 5.5, w: 3, h: 1 });');
   assert.equal(out.ok, true);
   const el = (out.program!.ops[0].op === "blank" ? out.program!.ops[0].elements[0] : null) as any;
   assert.equal(el.x + el.w, 10, "右边越界应裁回画布右缘");
@@ -128,18 +131,16 @@ test("runPptCode：参数错误抛中文消息，且保留报错前已录页", (
   assert.match(r.error!, /points 必须是字符串数组/);
   assert.equal(r.program?.ops.length, 1, "报错前的封面应保留（供 preview 定位）");
 
-  const color = runPptCode('const s = pptx.blank(); s.text("x", { x:0, y:0, w:1, h:0.5, color: "红色" });');
+  const color = runPptCode(
+    'const s = pptx.blank(); s.text("x", { x:0, y:0, w:1, h:0.5, color: "红色" });',
+  );
   assert.equal(color.ok, false);
   assert.match(color.error!, /颜色不合法/);
 });
 
 test("validateProgram：宿主 zod 拒绝篡改/畸形 op（纵深防御）", () => {
   assert.equal(validateProgram({ ops: [{ op: "hack" }] }).ok, false);
-  assert.equal(
-    validateProgram({ ops: [{ op: "cover", title: "" }] }).ok,
-    false,
-    "空标题不行",
-  );
+  assert.equal(validateProgram({ ops: [{ op: "cover", title: "" }] }).ok, false, "空标题不行");
   assert.equal(
     validateProgram({
       ops: [{ op: "blank", elements: [{ kind: "text", x: -1, y: 0, w: 1, h: 1, text: "x" }] }],
@@ -149,7 +150,12 @@ test("validateProgram：宿主 zod 拒绝篡改/畸形 op（纵深防御）", ()
   );
   assert.equal(
     validateProgram({
-      ops: [{ op: "blank", elements: [{ kind: "text", x: 0, y: 0, w: 1, h: 1, text: "x", color: "XYZ" }] }],
+      ops: [
+        {
+          op: "blank",
+          elements: [{ kind: "text", x: 0, y: 0, w: 1, h: 1, text: "x", color: "XYZ" }],
+        },
+      ],
     }).ok,
     false,
     "非十六进制颜色不行",
@@ -167,7 +173,10 @@ test("renderPptxProgram：品牌与自由页元素写进 XML 字节", async () =
   `);
   assert.equal(r.ok, true, r.error ?? "runPptCode 应成功");
   const buf = await renderPptxProgram(r.program!);
-  assert.ok(buf.length > 4 && buf.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])), "pptx 应是 zip");
+  assert.ok(
+    buf.length > 4 && buf.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04])),
+    "pptx 应是 zip",
+  );
 
   const JSZip = require("jszip");
   const zip = await JSZip.loadAsync(buf);
@@ -189,7 +198,9 @@ test("renderPptxProgram：品牌与自由页元素写进 XML 字节", async () =
   assert.ok(all.includes("COURSERAPTOR") || slides.includes("COURSERAPTOR"), "母版页脚品牌字");
   assert.ok(slides.includes("a:line") || slides.includes("line"), "line 形状应写入");
   const notes = await Promise.all(
-    names.filter((n) => /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(n)).map((n) => zip.files[n].async("string")),
+    names
+      .filter((n) => /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(n))
+      .map((n) => zip.files[n].async("string")),
   );
   assert.match(notes.join("\n"), /备注甲/);
   // 媒体去重：封面印章 + 内容页母版落款同一份 logo 合并
@@ -239,11 +250,9 @@ test("buildProgramPreview：free 页元素镜像 + 截断上限 + 校验闸", ()
 
 test("工具接线：ppt_preview 干跑不落盘、ppt_save 落盘带 ppt 载荷", async () => {
   const { coreTools } = await import("../src/core/tools");
-  const preview = (
-    coreTools.ppt_preview as unknown as { execute: (i: unknown) => Promise<any> }
-  ).execute;
-  const save = (coreTools.ppt_save as unknown as { execute: (i: unknown) => Promise<any> })
+  const preview = (coreTools.ppt_preview as unknown as { execute: (i: unknown) => Promise<any> })
     .execute;
+  const save = (coreTools.ppt_save as unknown as { execute: (i: unknown) => Promise<any> }).execute;
   const code = `
     pptx.cover({ title: "工具层课件", author: "测试" });
     pptx.bullets({ title: "要点", points: ["一", "二"] });
@@ -257,10 +266,7 @@ test("工具接线：ppt_preview 干跑不落盘、ppt_save 落盘带 ppt 载荷
   assert.equal(p.pages[0], "1. [封面] 工具层课件");
   assert.equal(p.pages[2], "3. [自由] （1 元素）");
   const genDir = path.join(tmpData, "generated");
-  assert.ok(
-    !fs.existsSync(genDir) || fs.readdirSync(genDir).length === 0,
-    "干跑不应落盘",
-  );
+  assert.ok(!fs.existsSync(genDir) || fs.readdirSync(genDir).length === 0, "干跑不应落盘");
 
   const g = await save({ code, filename: "代码课件" });
   assert.equal(g.ok, true, JSON.stringify(g));
