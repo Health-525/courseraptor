@@ -6,7 +6,9 @@
 
 ### Less time navigating academic portals. More time for student life.
 
-**An open-source conversational academic agent — currently fully adapted for Nanjing Tech University (NJTECH), usable at other schools via manual timetable import.**
+**An open-source conversational academic agent — fully adapted for Nanjing Tech University (NJTECH), usable at other schools via manual timetable import.**
+
+**Also a production-grade local-first Agent engineering reference**: Vercel AI SDK v7 · ports-and-adapters `SchoolAdapter` architecture · three entrances, one kernel · everything auditable.
 
 [简体中文](README.md) · **English**
 
@@ -21,6 +23,8 @@
 </div>
 
 CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Ask in the terminal, the browser, or QQ — three entrances sharing one agent kernel and one memory store. Everything runs on your own machine: credentials are AES-256-GCM encrypted on disk, there is no telemetry, and it talks to your own model API key — DeepSeek by default, with 10 more built-in Chinese providers (Qwen, Zhipu GLM, Kimi, Doubao, Hunyuan, MiniMax, Step, ERNIE, Spark, SiliconFlow) plus custom OpenAI-compatible endpoints.
+
+If you are building agents yourself, the repo doubles as a reference implementation: how a `ToolLoopAgent` loop organizes 30+ tools, how external systems sit behind a ports-and-adapters boundary (a new school is one self-contained directory, zero kernel changes), and how a multi-provider model layer is assembled from a plain-data registry. See [Build with us](#build-with-us) below.
 
 > ⚠️ **The online academic-system integration supports Nanjing Tech University only.** This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project. The [Chinese README](README.md) is the authoritative, fully detailed version.
 
@@ -122,7 +126,16 @@ Other schools work through the manual timetable mode (paste or upload a timetabl
 
 ## Build with us
 
-TypeScript, Vercel AI SDK, a multi-provider model layer (DeepSeek default + OpenAI-compatible providers), and a Node HTTP browser interface. School adapters live in `src/adapters/` behind the `SchoolAdapter` port (`src/core/school.ts`), generic tools in `src/core/tools/`, and the production/demo shared view in `src/channels/web/`.
+Beyond the student tool, the repo is a working reference for local-first agents — every pattern below ships in daily use, backed by tests, free to lift under the ISC license:
+
+- **Agent loop**: Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI` driving 30+ tools across multi-turn loops — [`src/core/agent.ts`](src/core/agent.ts)
+- **Ports & adapters**: the `SchoolAdapter` port (`src/core/school.ts`) keeps the kernel free of any school import; Zhengfang-new and CAS+URP differences never leak past an adapter — [`src/adapters/`](src/adapters/)
+- **Multi-provider model layer**: a plain-data provider registry plus one model factory; 11 Chinese providers + custom OpenAI-compatible endpoints, keys encrypted independently and hot-swapped — [`src/core/providers.ts`](src/core/providers.ts)
+- **Two-tier memory**: cross-restart session continuity plus self-maintained long-term facts, local JSON only — [`src/core/memory/`](src/core/memory/)
+- **Local-first security**: AES-256-GCM credentials bound to the machine fingerprint, loopback-only web with Origin/CSRF checks, network-less sandboxed JS — [`src/core/credentials.ts`](src/core/credentials.ts)
+- **Engineering floor**: TypeScript `strict`, node:test with a coverage floor, Biome, dual-OS CI — [`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+
+**The adapter flywheel has already turned once**: the Hebei Agricultural University adapter was written and merged by an outside contributor ([PR #204](https://github.com/Health-525/courseraptor/pull/204)), who is now that school's credited maintainer. Your school missing? Follow the [adapter guide](docs/adapter-guide.md) (Chinese) — Zhengfang-based systems have a full reference implementation to copy from.
 
 ```bash
 npm run typecheck
@@ -130,8 +143,8 @@ npm run lint
 npm test
 ```
 
-[Contributing](CONTRIBUTING.md) · [Roadmap](docs/roadmap.md) · [Capabilities](docs/capabilities.md) · [Student guide](docs/student-guide.md)
+[Contributing](CONTRIBUTING.md) · [Adapter guide](docs/adapter-guide.md) · [Roadmap](docs/roadmap.md) · [Capabilities](docs/capabilities.md) · [Student guide](docs/student-guide.md)
 
-Found it useful? A star, a reproducible issue, or a concrete student use case helps the project improve.
+Found it useful? A star, a reproducible issue, or a concrete student use case helps the project improve. Built something of your own on these patterns? Share it in [Discussions](https://github.com/Health-525/courseraptor/discussions).
 
 Released under the [ISC License](LICENSE). No official affiliation with or endorsement by Nanjing Tech University.
