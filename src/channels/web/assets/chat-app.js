@@ -1061,7 +1061,7 @@ document.getElementById("openDrawerM").addEventListener("click", openDrawer);
 document.getElementById("drawerBackdrop").addEventListener("click", closeDrawer);
 
 /* ── 功能大厅：右侧 push 抽屉。宫格是主页，各面板按需取数；
-    对话过程中 agent 调到对应工具（TOOL_PANEL）时自动推出该面板。 ── */
+    对话里说「打开××」时 agent 调 open_panel / open_settings，面板自动推出。 ── */
 /* 宫格图标：与工具卡齿轮同一族的 1.8px 描线 SVG（24 viewBox）。
     emoji 是彩色卡通，在墨色纸面上跳戏——单一朱砂让整套界面更像一份竖排卷宗 */
 const HALL_ICONS = {
@@ -2635,8 +2635,8 @@ refreshHallBadge();
 setInterval(refreshHallBadge, 5 * 60 * 1000);
 
 /* 工具名 → 功能大厅面板：仅做「开着就刷新、没开就作废缓存」的刷新映射。
-   自动推出只允许显式意图（open_settings）与服务端点名的阻塞场景（ev.panel），
-   数据查询工具绝不自动推——用户点开才看。 */
+   自动推出只允许显式意图（open_settings 与经 ev.panel 透传的 open_panel）
+   与服务端点名的阻塞场景，数据查询工具绝不自动推——用户点开才看。 */
 const TOOL_PANEL = {
   get_schedule: "schedule",
   export_calendar: "schedule",
@@ -4559,7 +4559,8 @@ async function send(text) {
               if (hallPanel === panel && document.body.classList.contains("hall-open"))
                 renderHall();
             }
-            /* 工具因凭证未配置失败等服务端点名要设置：自动推出（本轮手动关过则不打扰） */
+            /* 服务端点名要推出的面板：open_panel（用户显式说「打开××」）与
+               凭证未配置要点名的设置。自动推出（本轮手动关过则不打扰） */
             if (ev.panel && !hallAutoMuted) openHall(ev.panel, { focus: false });
           }
         } else if (ev.t === "card") {
