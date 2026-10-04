@@ -106,7 +106,7 @@ npm link           # 注册全局命令（一次即可，任意目录可用）
 raptor             # 启动；项目内也可 npm run dev
 ```
 
-常用脚本：`npm run doctor`（环境自检）· `npm test`（node:test，带覆盖率门槛）· `npm run typecheck && npm run lint`（类型 + Biome 检查）。
+常用脚本：`npm run doctor`（环境自检）· `npm test`（node:test）· `npm run test:coverage`（同测试，带覆盖率门槛）· `npm run typecheck && npm run lint`（类型 + Biome 检查）。
 
 ### 方式三：无头命令行（自动化 / 二次封装，不消耗 token）
 
@@ -195,6 +195,7 @@ npm run njtech -- search-courses 高等数学
 │   ├── core/           # 学校无关内核：agent/记忆/日历/文档/附件/知识库等 + 通用工具
 │   ├── adapters/       # 学校适配层：core/school.ts 定义的 SchoolAdapter 端口
 │   │   ├── njtech/     # 南京工业大学实现（登录/课表/成绩/考试/选课/通知 + 教务工具）
+│   │   ├── hebau/      # 河北农业大学实现（CAS 统一认证 + 正方 URP，差异见能力文档）
 │   │   └── custom/     # 其他学校（手动课表模式）
 │   └── channels/       # 输出渠道：web（网页版）
 └── local/              # 本地版入口：cli（终端 TUI）、qq（机器人）、demo（离线演示）
@@ -253,7 +254,7 @@ npm run njtech -- search-courses 高等数学
 
 <div align="center">
 
-**🦖 CourseRaptor** · 让迅猛龙替你守教务
+**🦖 CourseRaptor** · 让迅猛龙替你守教务 · [ISC 许可证](LICENSE)
 
 [⬆ 回到顶部](#-courseraptor) · [English Version](README.en.md)
 
