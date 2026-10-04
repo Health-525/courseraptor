@@ -1,6 +1,6 @@
 # 参与 CourseRaptor
 
-欢迎帮助完善面向南京工业大学学生的教务助手。可以从[反馈问题](https://github.com/Health-525/courseraptor/issues/new?template=bug_report.yml)、[提出学生场景](https://github.com/Health-525/courseraptor/issues/new?template=feature_request.yml)、改进文档或修复错误开始。
+两类贡献都欢迎：**正在用它查教务的同学**——[反馈问题](https://github.com/Health-525/courseraptor/issues/new?template=bug_report.yml)、[提出学生场景](https://github.com/Health-525/courseraptor/issues/new?template=feature_request.yml)；**正在写 Agent 的开发者**——把仓库当[工程样例](README.md#-给开发者一套可整体搬走的本地-agent-工程)参考，修 bug、改文档，或为自己的学校写一个适配器（合入后你就是该校的署名维护者，见[学校适配指南](docs/adapter-guide.md)）。
 
 交流时请遵守[社区约定](CODE_OF_CONDUCT.md)；用法讨论可前往 [Discussions](https://github.com/Health-525/courseraptor/discussions)。
 

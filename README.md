@@ -7,6 +7,9 @@
 **大学教务对话式 Agent**
 课表 · 成绩 · 考试 · 学籍 · 教务通知 · 待办 · 知识库 · 记忆，一句话搞定。
 
+**也是一套可整体搬走的本地 Agent 工程样例**
+Vercel AI SDK v7 · `SchoolAdapter` 端口-适配器架构 · 三端入口 · 本地优先。
+
 [![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
 [![下载最新版](https://img.shields.io/github/v/release/Health-525/courseraptor?label=%E4%B8%8B%E8%BD%BD%E6%9C%80%E6%96%B0%E7%89%88&color=orange)](https://github.com/Health-525/courseraptor/releases/latest)
 [![License: ISC](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
@@ -18,7 +21,7 @@
 
 **[简体中文](README.md) · [English](README.en.md)**
 
-**[✨ 核心特性](#-核心特性) · [🖥️ 界面预览](#️-界面预览) · [🚀 快速开始](#-快速开始) · [🏫 学校支持](#-学校支持) · [🔒 隐私与安全](#-隐私与安全) · [🧩 项目架构](#-项目架构) · [📚 文档](#-文档) · [❓ 常见问题](#-常见问题)**
+**[✨ 核心特性](#-核心特性) · [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程) · [🖥️ 界面预览](#️-界面预览) · [🚀 快速开始](#-快速开始) · [🏫 学校支持](#-学校支持) · [🔒 隐私与安全](#-隐私与安全) · [🧩 项目架构](#-项目架构) · [📚 文档](#-文档) · [❓ 常见问题](#-常见问题)**
 
 </div>
 
@@ -26,7 +29,9 @@
 
 把散落在教务系统各处的信息收进一句对话：问「这周课表」「我的 GPA」「最近的考试」「通识学分还缺哪几类」，agent 自动登录教务、抓取、结构化后回答。**终端敲 `raptor`、浏览器开 `localhost:3210`、QQ 里 @机器人**——三个入口共用同一个 Agent 内核与同一份记忆。
 
-一切都在你自己的电脑上运行：凭证 AES-256-GCM 加密落盘、无遥测上报、教务数据不经第三方；接的是你自己的模型 API Key——默认 DeepSeek，也内置**通义千问、智谱 GLM、Kimi、豆包、混元、MiniMax、阶跃、文心、讯飞、硅基流动**等 11 家国内厂商，外加自定义 OpenAI 兼容端点，按量计费、用量透明。目前对南京工业大学做了全量适配，**其他学校开箱可用「手动课表」模式**；对开发者，这也是一套「Vercel AI SDK + 端口适配器架构」的本地 Agent 完整工程样例。
+一切都在你自己的电脑上运行：凭证 AES-256-GCM 加密落盘、无遥测上报、教务数据不经第三方；接的是你自己的模型 API Key——默认 DeepSeek，也内置**通义千问、智谱 GLM、Kimi、豆包、混元、MiniMax、阶跃、文心、讯飞、硅基流动**等 11 家国内厂商，外加自定义 OpenAI 兼容端点，按量计费、用量透明。目前对南京工业大学做了全量适配，**其他学校开箱可用「手动课表」模式**。
+
+正在写 Agent 的人，可以直接把它当参考实现读：`ToolLoopAgent` 多轮工具循环怎么组织 30+ 工具、外部系统怎么用端口-适配器隔离（新增一所学校 = 新增一个自包含目录，内核零改动）、11 家厂商的模型层怎么用纯数据注册表装配——见下方 [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程) 一节。
 
 ---
 
@@ -44,6 +49,25 @@ Agent 共装备 **30+ 个工具**。完整参数表、耗时、环境变量与�
 - **三端入口** —— 终端 TUI（首屏即今日课表、待办、考试、通知速览）、本地网页「功能大厅」（九大面板、会话管理、文件上传）、QQ 官方机器人（白名单制、零封号）
 - **多厂商模型** —— 11 家国内厂商 + 自定义 OpenAI 兼容端点任选：每家 Key 独立加密保存、切换不丢，型号列表实时拉取，网页端下拉即切
 - **更多** —— 番茄钟、天气与穿衣建议、自动更新；另有无头 CLI 可脚本化直查教务，不经模型、不耗 token
+
+---
+
+## 🧰 给开发者：一套可整体搬走的本地 Agent 工程
+
+> 在找「Vercel AI SDK 的生产级完整例子」，或者「Agent 怎么接一堆外部系统而不失控」？这个仓库是一份答案：三端入口跑在真实用户的日常使用里，每个设计都有源码可查、有测试兜底，ISC 许可随便拆走复用。
+
+| 你要解决的问题 | 这里的做法 | 源码 |
+|---|---|---|
+| Agent 主循环 | Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI`：30+ 工具的多轮循环，思考与工具调用全程透出 | [`src/core/agent.ts`](src/core/agent.ts) |
+| 给 Agent 接外部系统 | `SchoolAdapter` 端口 + 每校一个自包含适配器目录；内核永不反向依赖实现，正方新版 / CAS+URP 的差异全部被适配器吃掉 | [`src/core/school.ts`](src/core/school.ts) · [`src/adapters/`](src/adapters/) |
+| 多模型厂商接入 | 供应商注册表纯数据 + 模型工厂统一装配：11 家国内厂商 + 自定义 OpenAI 兼容端点，Key 独立加密、运行时热切 | [`src/core/providers.ts`](src/core/providers.ts) · [`src/core/models.ts`](src/core/models.ts) |
+| 工具层设计 | 30+ 工具的参数与返回契约，覆盖教务、文档、日历、记忆四域，可渐进式挂载 | [`src/core/tools/`](src/core/tools/) |
+| 两层记忆 | 会话跨重启续聊 + 长期事实自主维护，全部本地 JSON、无数据库 | [`src/core/memory/`](src/core/memory/) |
+| 多入口单内核 | 终端 TUI / 本地网页 / QQ 机器人共享同一内核与记忆；另有无头 CLI 不经 LLM、零 token | [`src/channels/`](src/channels/) · [`local/`](local/) · [`skills/njtech-jwgl/`](skills/njtech-jwgl/) |
+| 本地优先安全 | 凭证 AES-256-GCM 绑定本机指纹；Web 仅回环监听 + Host/Origin/CSRF 校验；沙箱 JS 无网络无磁盘 | [`src/core/credentials.ts`](src/core/credentials.ts) · [`src/core/sandbox-js.ts`](src/core/sandbox-js.ts) |
+| 工程化底盘 | TypeScript `strict` + node:test（覆盖率门槛只升不降）+ Biome + 双 OS 矩阵 CI | [`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
+
+**适配器飞轮已经转过一圈**：河北农业大学适配器由外部贡献者 [@gzxb001-sketch](https://github.com/gzxb001-sketch) 按[适配指南](docs/adapter-guide.md)独立完成并合入（PR [#204](https://github.com/Health-525/courseraptor/pull/204)），他就是这所学校的署名维护者。你的学校还没人适配？照着[指南](docs/adapter-guide.md)写一个——正方系学校有完整参考实现可抄，PR 合并后上方学校表里写你的名字。
 
 ---
 
@@ -254,7 +278,7 @@ npm run njtech -- search-courses 高等数学
 
 **🦖 CourseRaptor** · 让迅猛龙替你守教务 · [ISC 许可证](LICENSE)
 
-觉得好用？[点个 ⭐ Star](https://github.com/Health-525/courseraptor) 让更多同学看到它；遇到问题或有想法，欢迎开 [issue](https://github.com/Health-525/courseraptor/issues/new/choose) 或到 [Discussions](https://github.com/Health-525/courseraptor/discussions) 聊聊。
+觉得好用？[点个 ⭐ Star](https://github.com/Health-525/courseraptor) 让更多同学看到它。写 Agent 的朋友参考这套工程做自己的项目时，也欢迎来 [Discussions](https://github.com/Health-525/courseraptor/discussions) 留个项目链接。遇到问题或有想法，欢迎开 [issue](https://github.com/Health-525/courseraptor/issues/new/choose) 聊聊。
 
 [⬆ 回到顶部](#-courseraptor) · [English Version](README.en.md)
 

@@ -1,7 +1,7 @@
 {
   "name": "courseraptor",
   "version": "0.3.1",
-  "description": "面向南京工业大学学生的开源教务助手：课表、成绩、学业概览、考试和通知，一句话查询",
+  "description": "开源本地教务 Agent：对话直查课表、成绩、考试、通知；也是 Vercel AI SDK + 端口-适配器架构的本地 Agent 工程样例",
   "scripts": {
     "dev": "tsx local/cli/index.ts",
     "start": "tsx local/cli/index.ts",
