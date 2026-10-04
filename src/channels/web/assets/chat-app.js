@@ -565,6 +565,222 @@ function pomoCard(tl, p) {
   pomoTick();
   scroll(false);
 }
+
+/* ── PPT 预览卡：pptx 成品在对话里的缩影幻灯片条，点击进全屏翻页 ──
+   载荷来自 generate_document / convert_document 的 ppt 字段（chat-web
+   校验后透传）；DOM 结构与全屏查看器共用一个构建函数，与成品课件同构：
+   朱砂印章贯穿每页、封面暖纸底印章页头、章节页朱砂整版。 */
+function pptSeal() {
+  const seal = el("pt-seal");
+  const img = document.createElement("img");
+  img.src = "/logo.png";
+  img.alt = "";
+  img.draggable = false;
+  seal.appendChild(img);
+  return seal;
+}
+
+function pptLogo() {
+  const logo = el("pt-logo");
+  const img = document.createElement("img");
+  img.src = "/logo.png";
+  img.alt = "";
+  img.draggable = false;
+  logo.appendChild(img);
+  return logo;
+}
+
+function pptSlideInner(box, s, big) {
+  if (s.kind === "cover") {
+    box.appendChild(pptSeal());
+    box.appendChild(el2("pt-kick", "COURSERAPTOR · 课件"));
+    box.appendChild(el2("pt-maintitle", s.title));
+    if (s.author) box.appendChild(el2("pt-author", s.author));
+    box.appendChild(pptLogo());
+    return;
+  }
+  if (s.kind === "section") {
+    box.appendChild(el2("pt-sectitle", s.title));
+    box.appendChild(pptSeal());
+    return;
+  }
+  box.appendChild(el2("pt-title", s.title));
+  if (s.subtitle) box.appendChild(el2("pt-sub", s.subtitle));
+  if (s.bullets && s.bullets.length) {
+    const ul = el("pt-list");
+    const cap = big ? 12 : 5;
+    s.bullets.slice(0, cap).forEach((b) => ul.appendChild(el2("pt-li", b)));
+    const more = (s.bulletCut || 0) + Math.max(0, s.bullets.length - cap);
+    if (more > 0) {
+      const li = el2("pt-li", "+ " + more + " 条");
+      li.classList.add("more");
+      ul.appendChild(li);
+    }
+    box.appendChild(ul);
+  } else if (s.table) {
+    const tb = el("pt-table");
+    const rows = [];
+    if (s.table.headers && s.table.headers.length)
+      rows.push({ cells: s.table.headers, head: true });
+    const cap = big ? 8 : 3;
+    s.table.rows.slice(0, cap).forEach((r) => rows.push({ cells: r, head: false }));
+    const rc = (s.table.rowCut || 0) + Math.max(0, s.table.rows.length - cap);
+    const cols = rows.length ? rows[0].cells.length : 1;
+    rows.forEach((row) => {
+      const tr = document.createElement("tr");
+      if (row.head) tr.className = "pt-th";
+      row.cells.forEach((c) => {
+        const td = document.createElement("td");
+        td.textContent = String(c == null ? "" : c);
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    if (rc > 0) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = cols;
+      td.className = "pt-more";
+      td.textContent = "+ " + rc + " 行";
+      tr.appendChild(td);
+      tb.appendChild(tr);
+    }
+    box.appendChild(tb);
+  }
+  box.appendChild(pptLogo());
+}
+
+function pptCard(tl, ppt, files) {
+  if (!ppt || !ppt.slides || !ppt.slides.length) return;
+  const card = el("pptcard");
+  const head = el("ppt-head");
+  head.appendChild(el2("ppt-mark", "▦"));
+  const cover = ppt.slides[0];
+  const dl = files && files[0];
+  const name =
+    (cover && cover.kind === "cover" && cover.title) || (dl && dl.name) || "PPT";
+  head.appendChild(el2("ppt-name", name));
+  head.appendChild(
+    el2(
+      "ppt-meta",
+      ppt.count + " 页" + (ppt.slides.length < ppt.count ? " · 前 " + ppt.slides.length + " 页" : ""),
+    ),
+  );
+  if (dl) {
+    const a = document.createElement("a");
+    a.className = "tbtn";
+    a.href = "/files/" + encodeURIComponent(dl.name);
+    a.setAttribute("download", dl.name);
+    a.textContent = "下载";
+    head.appendChild(a);
+  }
+  card.appendChild(head);
+  const strip = el("pptstrip");
+  ppt.slides.forEach((s, i) => {
+    const sl = el("pptslide k-" + s.kind);
+    pptSlideInner(sl, s, false);
+    sl.addEventListener("click", () => pptView(ppt, i, files));
+    strip.appendChild(sl);
+  });
+  card.appendChild(strip);
+  tl.appendChild(card);
+  scroll(false);
+}
+
+/* 全屏查看器：键盘 ←/→/Esc、触屏滑动、点底栏翻页，点暗处关闭 */
+function pptView(ppt, index, files) {
+  const old = document.querySelector(".pptview");
+  if (old) old.remove();
+  const total = ppt.slides.length;
+  let i = Math.max(0, Math.min(index, total - 1));
+  const dl = files && files[0];
+
+  const ov = el("pptview");
+  const stage = el("pptv-stage");
+  const bar = el("pptv-bar");
+  const prev = document.createElement("button");
+  prev.type = "button";
+  prev.className = "pptv-nav";
+  prev.textContent = "‹";
+  const counter = el2("pptv-count", "");
+  const next = document.createElement("button");
+  next.type = "button";
+  next.className = "pptv-nav";
+  next.textContent = "›";
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "pptv-close";
+  close.textContent = "✕";
+
+  function render() {
+    stage.className = "pptv-stage k-" + ppt.slides[i].kind;
+    while (stage.firstChild) stage.removeChild(stage.firstChild);
+    pptSlideInner(stage, ppt.slides[i], true);
+    counter.textContent = i + 1 + " / " + (ppt.count || total);
+    prev.disabled = i === 0;
+    next.disabled = i === total - 1;
+  }
+  function go(d) {
+    const j = i + d;
+    if (j < 0 || j >= total) return;
+    i = j;
+    render();
+  }
+  function onKey(e) {
+    if (e.key === "Escape") shut();
+    else if (e.key === "ArrowLeft") go(-1);
+    else if (e.key === "ArrowRight") go(1);
+  }
+  function shut() {
+    document.removeEventListener("keydown", onKey);
+    ov.remove();
+  }
+
+  bar.appendChild(prev);
+  bar.appendChild(counter);
+  bar.appendChild(next);
+  if (dl) {
+    const a = document.createElement("a");
+    a.className = "tbtn";
+    a.href = "/files/" + encodeURIComponent(dl.name);
+    a.setAttribute("download", dl.name);
+    a.textContent = "下载";
+    bar.appendChild(a);
+  }
+  prev.addEventListener("click", (e) => {
+    e.stopPropagation();
+    go(-1);
+  });
+  next.addEventListener("click", (e) => {
+    e.stopPropagation();
+    go(1);
+  });
+  close.addEventListener("click", shut);
+  ov.addEventListener("click", (e) => {
+    if (e.target === ov) shut();
+  });
+  /* 触屏左右滑动翻页（passive：只观察不拦截滚动） */
+  let sx = null;
+  ov.addEventListener(
+    "touchstart",
+    (e) => {
+      sx = e.touches[0].clientX;
+    },
+    { passive: true },
+  );
+  ov.addEventListener("touchend", (e) => {
+    if (sx == null) return;
+    const dx = e.changedTouches[0].clientX - sx;
+    if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
+    sx = null;
+  });
+  document.addEventListener("keydown", onKey);
+  ov.appendChild(stage);
+  ov.appendChild(close);
+  ov.appendChild(bar);
+  render();
+  document.body.appendChild(ov);
+}
 /* 到点收尾：翻朱砂底 + 提示音 + 标题闪灯（切回页面自动复位）+ 一键接龙 */
 function pomoFinish(card) {
   if (card.dataset.finished) return;
@@ -4549,6 +4765,8 @@ async function send(text) {
             toolDone(shell, ev, ev.phase === "end");
             if (ev.files && ev.files.length) fileRows(shell.tl, ev.files);
             if (ev.pomodoro) pomoCard(shell.tl, ev.pomodoro);
+            /* pptx 成品：下载行之外再出一张可翻页的幻灯片预览卡 */
+            if (ev.ppt) pptCard(shell.tl, ev.ppt, ev.files);
             /* 对话里取消了番茄钟：立即对表收掉页面其他位置的倒计时卡 */
             if (ev.pomoSync) pomoSync();
             /* 工具改了数据（加待办、起番茄钟……）：面板开着就刷新，没开着就作废缓存。

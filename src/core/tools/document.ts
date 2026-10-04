@@ -5,6 +5,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { convertDocument } from "../document/convert";
+import { buildPptPreview } from "../document/pptx-theme";
 import { generateAndSave } from "../document/save";
 import type { DocumentSpec } from "../document/types";
 
@@ -12,7 +13,7 @@ export const documentTools = {
   /** 生成文档（Word/Excel/PPT/PDF 成品文件） */
   generate_document: tool({
     description:
-      "AI 辅助写作：按结构化内容直接产出成品文件，支持 Word(docx)/Excel(xlsx)/PPT(pptx)/PDF 四种格式，中文原生可写。学生要「一份报告 / 课件 / 表格 / 简历模板」等交付物时用。落盘到本机 data/generated 并返回完整路径。docx/pdf 用 blocks（标题/正文/列表/表格/分页），pptx 用 slides（或给 blocks 自动转分页），xlsx 用 sheets。内容要自己组织好（可先引用教务数据或改写润色后的文本再喂进来）。",
+      "AI 辅助写作：按结构化内容直接产出成品文件，支持 Word(docx)/Excel(xlsx)/PPT(pptx)/PDF 四种格式，中文原生可写。学生要「一份报告 / 课件 / 表格 / 简历模板」等交付物时用。落盘到本机 data/generated 并返回完整路径。docx/pdf 用 blocks（标题/正文/列表/表格/分页），pptx 用 slides（或给 blocks 自动转分页），xlsx 用 sheets。pptx 自动套品牌课件模板（给 title 排封面、纯标题页排成章节页），网页端可翻页预览。内容要自己组织好（可先引用教务数据或改写润色后的文本再喂进来）。",
     inputSchema: z.object({
       format: z.enum(["docx", "xlsx", "pptx", "pdf"]).describe("目标文件格式"),
       title: z.string().optional().describe("文档主标题（Word/PDF 顶部、PPT 封面）"),
@@ -85,6 +86,8 @@ export const documentTools = {
           filename: file.filename,
           path: file.filePath,
           bytes: file.bytes,
+          // pptx 附带预览载荷：网页端据此渲染可翻页的幻灯片预览卡
+          ...(file.format === "pptx" ? { ppt: buildPptPreview(spec) } : {}),
           note: `已生成 ${file.format.toUpperCase()}，保存于本机 ${file.filePath}`,
         };
       } catch (e) {
@@ -115,6 +118,7 @@ export const documentTools = {
         filename: r.file.filename,
         path: r.file.filePath,
         bytes: r.file.bytes,
+        ...(r.ppt ? { ppt: r.ppt } : {}),
         note: `已从「${r.from}」转换为 ${r.file.format.toUpperCase()}：${r.file.filePath}`,
       };
     },

@@ -1361,3 +1361,53 @@ test("GET /api/models?provider= 支持切换前预览（不落缓存、不要求
   const s = (await (await fetch(`${url}/api/settings`)).json()) as { models: { id: string }[] };
   assert.equal(s.models[0]?.id, "deepseek-flash", "预览不污染已保存供应商的缓存桶");
 });
+
+test("真实对话链路：generate_document 产 pptx 时 SSE 带 ppt 预览与下载行", async () => {
+  // 用真实的 generate_document execute 产出工具结果（而非手造形状），
+  // 桩 agent 只负责把它按 tool-result 事件吐回——验证「用户真说一句话 →
+  // 工具执行 → SSE 透传 ppt 载荷 + files」全链路。
+  const { coreTools } = await import("../src/core/tools");
+  const realOutput = await (
+    coreTools.generate_document as unknown as { execute: (i: unknown) => Promise<any> }
+  ).execute({
+    format: "pptx",
+    title: "链路课件",
+    slides: [{ title: "要点", bullets: ["一", "二"] }],
+  });
+  assert.equal(realOutput.ok, true, `工具执行应成功，实为 ${JSON.stringify(realOutput)}`);
+
+  setChatAgent({
+    stream() {
+      async function* gen() {
+        yield { type: "tool-call", toolCallId: "p1", toolName: "generate_document" };
+        yield {
+          type: "tool-result",
+          toolCallId: "p1",
+          toolName: "generate_document",
+          output: realOutput,
+        };
+        yield { type: "text-delta", text: "做好了" };
+        yield { type: "finish" };
+      }
+      return Promise.resolve({ fullStream: gen() });
+    },
+  });
+
+  const url = (await startChatWeb())!;
+  const r = await post(url, { message: "帮我做一份复习课件" });
+  assert.equal(r.status, 200);
+  const toolEnd = r.events.find((e) => e.t === "tool" && e.phase === "end") as Record<
+    string,
+    unknown
+  >;
+  assert.ok(toolEnd, "应有工具结束事件");
+  // 下载行：文件名来自真实落盘产物
+  const files = toolEnd.files as Array<{ name: string }> | undefined;
+  assert.ok(files?.length, "SSE 应带 files 下载行");
+  assert.match(String(files![0].name), /链路课件.*\.pptx/);
+  // 预览载荷：封面在前、count 与工具输出一致
+  const ppt = toolEnd.ppt as { count: number; slides: Array<{ kind: string }> } | undefined;
+  assert.ok(ppt, "SSE 应带 ppt 预览载荷");
+  assert.equal(ppt!.count, 2);
+  assert.equal(ppt!.slides[0].kind, "cover");
+});

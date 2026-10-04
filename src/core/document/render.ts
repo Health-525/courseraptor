@@ -12,7 +12,8 @@
 
 import { createRequire } from "node:module";
 import { resolveCjkFont, resolveCjkFontFamily } from "./font";
-import type { DocBlock, DocumentSpec, SheetSpec, SlideSpec, TableSpec } from "./types";
+import { renderPptxThemed } from "./pptx-theme";
+import type { DocBlock, DocumentSpec, SheetSpec, TableSpec } from "./types";
 
 const require = createRequire(import.meta.url);
 const requireAny = require as unknown as (id: string) => any;
@@ -201,120 +202,9 @@ function safeSheetName(name: string, used: Set<string>): string {
 }
 
 // ── pptx ──────────────────────────────────────────────────────
-export async function renderPptx(spec: DocumentSpec): Promise<Buffer> {
-  const PptxGenJS = requireAny("pptxgenjs");
-  const Ctor = PptxGenJS.default ?? PptxGenJS;
-  const pptx = new Ctor();
-  pptx.layout = "LAYOUT_16x9";
-
-  if (spec.title) {
-    const cover = pptx.addSlide();
-    cover.addText(spec.title, {
-      x: 0.8,
-      y: 3.0,
-      w: 8.4,
-      h: 1.5,
-      fontSize: 40,
-      bold: true,
-      align: "center",
-      fontFace: CJK_FONT,
-      color: "222222",
-    });
-    if (spec.author)
-      cover.addText(spec.author, {
-        x: 0.8,
-        y: 4.6,
-        w: 8.4,
-        h: 0.6,
-        fontSize: 18,
-        align: "center",
-        fontFace: CJK_FONT,
-        color: "888888",
-      });
-  }
-
-  const slides: SlideSpec[] = spec.slides ?? slidesFromBlocks(spec);
-  for (const s of slides) {
-    const slide = pptx.addSlide();
-    slide.addText(s.title, {
-      x: 0.5,
-      y: 0.4,
-      w: 9,
-      h: 0.9,
-      fontSize: 28,
-      bold: true,
-      fontFace: CJK_FONT,
-      color: "1a1a1a",
-    });
-    let y = 1.6;
-    if (s.subtitle) {
-      slide.addText(s.subtitle, {
-        x: 0.6,
-        y,
-        w: 8.8,
-        h: 0.5,
-        fontSize: 16,
-        italic: true,
-        fontFace: CJK_FONT,
-        color: "666666",
-      });
-      y += 0.6;
-    }
-    if (s.bullets?.length) {
-      slide.addText(
-        s.bullets.map((t) => ({ text: t, options: { bullet: { code: "2022" }, color: "333333" } })),
-        {
-          x: 0.7,
-          y,
-          w: 8.6,
-          h: 5.0 - (y - 1.6),
-          fontSize: 18,
-          valign: "top",
-          fontFace: CJK_FONT,
-          lineSpacingMultiple: 1.4,
-        },
-      );
-    }
-    if (s.table) {
-      const rows = (s.table.headers ? [s.table.headers, ...s.table.rows] : s.table.rows).map((r) =>
-        r.map((c) => ({ text: String(c ?? ""), options: { fontFace: CJK_FONT, fontSize: 14 } })),
-      );
-      slide.addTable(rows, {
-        x: 0.6,
-        y: 1.8,
-        w: 8.8,
-        border: { pt: 0.5, color: "bbbbbb" },
-        fontFace: CJK_FONT,
-      });
-    }
-    if (s.notes) slide.addNotes(s.notes);
-  }
-
-  if (!spec.title && slides.length === 0) {
-    pptx.addSlide().addText("(空)", { x: 1, y: 3, w: 8, h: 1, fontFace: CJK_FONT });
-  }
-  const out = await pptx.write({ outputType: "nodebuffer" });
-  return Buffer.isBuffer(out) ? out : Buffer.from(out as any);
-}
-
-function slidesFromBlocks(spec: DocumentSpec): SlideSpec[] {
-  const slides: SlideSpec[] = [];
-  // 组装期间 bullets 由构造保证存在；接口类型保持可选（展示方可空）
-  let cur: (SlideSpec & { bullets: string[] }) | null = null;
-  for (const b of spec.blocks ?? []) {
-    if (b.type === "heading" && (b.level ?? 1) <= 2) {
-      if (cur) slides.push(cur);
-      cur = { title: b.text, bullets: [] };
-    } else if (cur) {
-      if (b.type === "paragraph") cur.bullets.push(b.text);
-      else if (b.type === "list")
-        cur.bullets.push(...b.items.map((it, i) => (b.ordered ? `${i + 1}. ${it}` : it)));
-      else if (b.type === "table") cur.table = b.table;
-    }
-  }
-  if (cur) slides.push(cur);
-  return slides;
-}
+// 实现在 pptx-theme.ts（品牌「纸墨朱砂」课件模板 + 网页预览共用版式计划），
+// 这里保留原导出名作为稳定入口。
+export { renderPptxThemed as renderPptx };
 
 // ── pdf ───────────────────────────────────────────────────────
 export async function renderPdf(spec: DocumentSpec): Promise<Buffer> {
@@ -450,7 +340,7 @@ export async function renderDocument(
     case "xlsx":
       return { buffer: renderXlsx(spec), baseName };
     case "pptx":
-      return { buffer: await renderPptx(spec), baseName };
+      return { buffer: await renderPptxThemed(spec), baseName };
     case "pdf":
       return { buffer: await renderPdf(spec), baseName };
     default:
