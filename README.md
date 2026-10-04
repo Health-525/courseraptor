@@ -32,7 +32,7 @@
 
 ## ✨ 核心特性
 
-Agent 共装备 **36 个工具**（默认装载 32 个：4 个抢课工具属真实写操作，默认关闭，需 `RAPTOR_ENABLE_GRAB=1` 显式开启，且对话中须本人二次确认）。完整参数表、耗时、环境变量与教务模块覆盖见 [📖 能力文档](docs/capabilities.md)。
+Agent 共装备 **30+ 个工具**。完整参数表、耗时、环境变量与教务模块覆盖见 [📖 能力文档](docs/capabilities.md)。
 
 - **教务全量查询** —— 课表、成绩与 GPA（重修取最高、通识六类统计）、考试、学籍、已选/重修/实验成绩，一句话直查；学期交界自动探测候选学期，不靠日历猜
 - **选课分析（只读）** —— 搜课搜班看余量；多门课自动查各教学班明细，与已选课程做时间冲突检测，覆盖单双周与部分周重叠
@@ -122,8 +122,6 @@ npm run njtech -- search-courses 高等数学
 12 个子命令：`schedule` · `grades` · `exams` · `lab-grades` · `news` · `student-info` · `enrolled-courses` · `retake-courses` · `selection-status` · `search-courses` · `search-classes` · `watch`。协议细节与安全红线见 [SKILL.md](skills/njtech-jwgl/SKILL.md) 与其 `references/`。
 
 另附 [`skills/export-schedule/`](skills/export-schedule/) 独立技能包：把课表渲染成图片供下载，适配各平台聊天里直接发图看课表的场景。
-
-> 抢课 / 退课属真实写操作，**不进无头 CLI**，仅交互式 `raptor` 可用且需本人二次确认。
 
 <details>
 <summary><b>💻 系统要求</b>（点开查看）</summary>

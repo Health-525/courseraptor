@@ -37,7 +37,7 @@ CourseRaptor brings timetables, grades, exams, academic announcements, and calen
 | Can I turn this material into a document? | Local document/table reading and Word, Excel, PowerPoint, and PDF generation with cross-format conversion |
 | My school is not NJTECH | Manual timetable mode: paste timetable text or upload Excel/CSV/PDF/Word/TXT, and the AI parses it into a structured timetable |
 
-The agent ships **36 tools** (32 loaded by default — the four course-grabbing tools are real write operations, disabled unless `RAPTOR_ENABLE_GRAB=1`, and always require in-chat confirmation). See [capabilities](docs/capabilities.md) for the full table. A headless CLI ([`skills/njtech-jwgl/`](skills/njtech-jwgl/SKILL.md)) exposes the same academic queries for scripting without touching the LLM.
+The agent ships **30+ tools**. See [capabilities](docs/capabilities.md) for the full table. A headless CLI ([`skills/njtech-jwgl/`](skills/njtech-jwgl/SKILL.md)) exposes the same academic queries for scripting without touching the LLM.
 
 Both screenshots below use fictional demo data.
 
