@@ -4,7 +4,7 @@
  * 版式与品牌既有导出物同构（课表图 classic 页头是参照系）：
  * - 签名 motif：朱砂印章（圆形裁切 logo + 描边圈、整章旋转 -7°）——
  *   封面页头一枚大印，章节页右下浅圈印，内容页页脚小圆 logo 落款，每页在场；
- * - 封面：暖纸底 + 印章页头 + mono 眉批 + 右上日期戳 + 楷体大标题；
+ * - 封面：朱砂整版 + 居中大印章 + 楷体大标题浅字（官方三明治「深」端）；
  * - 章节页：朱砂整版浅字（只有标题没有正文的页自动成为章节页）；
  * - 内容页：暖纸浅底、墨色标题、朱砂深底表头表格，页脚细线 + 页码；
  * - 不用「AI 味」装饰：无标题下划线、无满宽色带/侧边条，分组靠留白与对齐；
@@ -78,9 +78,9 @@ export function slidesFromBlocks(spec: DocumentSpec): SlideSpec[] {
 }
 
 function bulletsBodySize(n: number): number {
-  if (n <= 5) return 18;
-  if (n <= 8) return 16;
-  if (n <= 11) return 14;
+  if (n <= 6) return 16;
+  if (n <= 9) return 15;
+  if (n <= 12) return 14;
   return 13;
 }
 
@@ -222,16 +222,17 @@ export function pptPreviewOfToolOutput(output: unknown): PptPreview | null {
 }
 
 // ── pptx 渲染 ─────────────────────────────────────────────────
+/** 字号按官方规范（10" 画布）：封面 44/40/34/28、内容页标题 36/28 */
 function coverTitleSize(title: string): number {
   const n = title.length;
-  if (n <= 12) return 40;
-  if (n <= 20) return 34;
-  if (n <= 28) return 28;
-  return 24;
+  if (n <= 10) return 44;
+  if (n <= 16) return 40;
+  if (n <= 24) return 34;
+  return 28;
 }
 
 function contentTitleSize(title: string): number {
-  return title.length > 16 ? 22 : 27;
+  return title.length > 16 ? 28 : 36;
 }
 
 function zhDate(d = new Date()): string {
@@ -275,11 +276,6 @@ function addSeal(
     rounding: true,
     ...rot,
   });
-}
-
-/** 页脚落款小圆 logo（课表导出 color 风格的右下角落款同款） */
-function addCreditLogo(slide: any, x: number, y: number, size: number, logo: string): void {
-  slide.addImage({ data: logo, x, y, w: size, h: size, rounding: true });
 }
 
 /**
@@ -376,47 +372,26 @@ export async function renderPptxThemed(spec: DocumentSpec): Promise<Buffer> {
       align: "right",
     },
   });
-  // 封面母版：暖纸底（classic 课表页头的印章+楷体题同款语境）
+  // 封面母版：朱砂整版（官方三明治结构的「深」端）
   pptx.defineSlideMaster({
     title: "PPT_COVER",
-    background: { color: PPT_THEME.paper },
+    background: { color: PPT_THEME.accent },
   });
 
   for (const s of planPptSlides(spec)) {
     if (s.kind === "cover") {
-      // classic 课表页头同款构图：左上朱砂印章 + mono 眉批 + 右上日期戳，
-      // 楷体大标题居中偏下，页脚右下小圆 logo 落款
+      // 官方规范的「深色封面」端：朱砂整版 + 居中大印章 + 楷体大标题浅字
       const slide = pptx.addSlide({ masterName: "PPT_COVER" });
-      slide.background = { color: PPT_THEME.paper };
-      if (logo) addSeal(slide, 0.94, 0.86, 0.62, logo, PPT_THEME.accent, PPT_THEME.paper);
-      slide.addText("COURSERAPTOR · 课件", {
-        x: 1.44,
-        y: 0.66,
-        w: 4.5,
-        h: 0.3,
-        fontSize: 10.5,
-        charSpacing: 3,
-        color: PPT_THEME.ink3,
-        fontFace: FONT,
-      });
-      slide.addText(zhDate(), {
-        x: 6.9,
-        y: 0.66,
-        w: 2.55,
-        h: 0.3,
-        fontSize: 10,
-        color: PPT_THEME.ink3,
-        align: "right",
-        fontFace: FONT,
-      });
+      slide.background = { color: PPT_THEME.accent };
+      if (logo) addSeal(slide, 5, 1.08, 1.24, logo, PPT_THEME.onAccent, PPT_THEME.accent);
       slide.addText(s.title, {
         x: 0.7,
-        y: 2.0,
+        y: 2.15,
         w: 8.6,
-        h: 1.5,
+        h: 1.45,
         fontSize: coverTitleSize(s.title),
         bold: true,
-        color: PPT_THEME.ink,
+        color: PPT_THEME.onAccent,
         align: "center",
         valign: "bottom",
         fontFace: FONT_KAI,
@@ -424,16 +399,25 @@ export async function renderPptxThemed(spec: DocumentSpec): Promise<Buffer> {
       if (s.author) {
         slide.addText(s.author, {
           x: 0.8,
-          y: 3.62,
+          y: 3.72,
           w: 8.4,
           h: 0.4,
           fontSize: 15,
-          color: PPT_THEME.ink2,
+          color: PPT_THEME.onAccentDim,
           align: "center",
           fontFace: FONT,
         });
       }
-      if (logo) addCreditLogo(slide, 9.18, 5.12, 0.26, logo);
+      slide.addText(zhDate(), {
+        x: 0.8,
+        y: 4.2,
+        w: 8.4,
+        h: 0.3,
+        fontSize: 10.5,
+        color: PPT_THEME.onAccentDim,
+        align: "center",
+        fontFace: FONT,
+      });
       if (s.notes) slide.addNotes(s.notes);
       continue;
     }
@@ -446,7 +430,7 @@ export async function renderPptxThemed(spec: DocumentSpec): Promise<Buffer> {
         y: 2.15,
         w: 8.1,
         h: 1.4,
-        fontSize: s.title.length > 14 ? 26 : 30,
+        fontSize: s.title.length > 14 ? 28 : 34,
         bold: true,
         color: PPT_THEME.onAccent,
         valign: "middle",
@@ -462,9 +446,9 @@ export async function renderPptxThemed(spec: DocumentSpec): Promise<Buffer> {
     slide.background = { color: PPT_THEME.paper };
     slide.addText(s.title, {
       x: 0.55,
-      y: 0.42,
+      y: 0.4,
       w: 8.9,
-      h: 0.75,
+      h: 0.85,
       fontSize: contentTitleSize(s.title),
       bold: true,
       color: PPT_THEME.ink,
@@ -472,44 +456,81 @@ export async function renderPptxThemed(spec: DocumentSpec): Promise<Buffer> {
       fontFace: FONT,
       margin: 0,
     });
-    let y = 1.5;
+    let y = 1.75;
     if (s.subtitle) {
       slide.addText(s.subtitle, {
         x: 0.55,
-        y: 1.26,
+        y: 1.34,
         w: 8.9,
-        h: 0.34,
+        h: 0.36,
         fontSize: 13.5,
         italic: true,
         color: PPT_THEME.ink2,
         fontFace: FONT,
         margin: 0,
       });
-      y = 1.74;
+      y = 1.98;
     }
     if (s.bullets?.length) {
-      // 项目符号按规范精修：小方块 + 12pt 悬挂缩进 + 段后距，不用行距撑开；
-      // 要点与表格同页时给要点限高，表格接在其后，避免两者叠压
-      const h = s.table ? Math.min(2.2, 5.15 - y) : 5.15 - y;
-      slide.addText(
-        s.bullets.map((t) => ({
-          text: t,
-          options: { bullet: { code: "25AA", indent: 12 }, breakLine: true },
-        })),
-        {
-          x: 0.6,
-          y,
-          w: 8.8,
-          h,
-          fontSize: s.bodySize,
-          color: PPT_THEME.ink,
-          valign: "top",
-          fontFace: FONT,
-          paraSpaceAfter: 8,
-          margin: 0,
-        },
-      );
-      if (s.table) y += h + 0.1;
+      // 官方规范「每页要有视觉元素」：要点 ≤6 且无表格时排成数字圆圈行
+      // （朱砂圆 + 白色序号 + 行文字），否则回退紧凑列表
+      if (!s.table && s.bullets.length <= 6) {
+        const n = s.bullets.length;
+        const step = n <= 4 ? 0.82 : 0.66;
+        const top = Math.max(y, (y + 5.05 - n * step + 0.5) / 2);
+        s.bullets.forEach((t, i) => {
+          const cy = top + i * step;
+          slide.addText(String(i + 1), {
+            shape: "ellipse",
+            x: 0.62,
+            y: cy,
+            w: 0.36,
+            h: 0.36,
+            fill: { color: PPT_THEME.accent },
+            color: "FFFFFF",
+            bold: true,
+            fontSize: 13,
+            align: "center",
+            valign: "middle",
+            fontFace: FONT,
+            margin: 0,
+          });
+          slide.addText(t, {
+            x: 1.18,
+            y: cy - 0.09,
+            w: 8.2,
+            h: 0.54,
+            fontSize: s.bodySize,
+            color: PPT_THEME.ink,
+            valign: "middle",
+            fontFace: FONT,
+            margin: 0,
+          });
+        });
+      } else {
+        // 项目符号按规范精修：小方块 + 12pt 悬挂缩进 + 段后距，不用行距撑开；
+        // 要点与表格同页时给要点限高，表格接在其后，避免两者叠压
+        const h = s.table ? Math.min(2.2, 5.15 - y) : 5.15 - y;
+        slide.addText(
+          s.bullets.map((t) => ({
+            text: t,
+            options: { bullet: { code: "25AA", indent: 12 }, breakLine: true },
+          })),
+          {
+            x: 0.6,
+            y,
+            w: 8.8,
+            h,
+            fontSize: s.bodySize,
+            color: PPT_THEME.ink,
+            valign: "top",
+            fontFace: FONT,
+            paraSpaceAfter: 8,
+            margin: 0,
+          },
+        );
+        if (s.table) y += h + 0.1;
+      }
     }
     if (s.table) {
       const headerRow = s.table.headers;

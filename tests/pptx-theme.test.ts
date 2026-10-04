@@ -88,7 +88,7 @@ test("planPptSlides：封面/章节页/内容页归类 + 字号自适应", () =>
     ["cover", "section", "content", "content", "content"],
   );
   assert.equal(plan[0].author, "小明");
-  assert.equal(plan[2].bodySize, 18, "2 条要点应给最大字号");
+  assert.equal(plan[2].bodySize, 16, "2 条要点应给最大字号");
   assert.equal(plan[3].bodySize, 13, "表格 1 行给表格档最大字号");
 
   const many = planPptSlides({
@@ -132,17 +132,20 @@ test("renderPptx：品牌样式在 XML 字节层可验证", async () => {
           ],
         },
       },
+      {
+        title: "复习清单",
+        bullets: ["一", "二", "三", "四", "五", "六", "七", "八"],
+      },
     ],
   });
   assert.ok(isZip(buf), "pptx 应是 zip");
   assert.ok(buf.length > 4000, "含品牌母版与配色，体积应明显大于朴素版");
 
   const xml = await pptxXml(buf);
-  // 封面（classic 课表页头构图）：印章 logo、mono 眉批、日期、楷体标题
+  // 封面（官方三明治深色端）：朱砂整版、居中大印章、楷体大标题、日期
   assert.match(xml.slides, /开题答辩/);
   assert.match(xml.slides, /李雷/);
   assert.match(xml.slides, /年\d+月\d+日/);
-  assert.match(xml.slides, /COURSERAPTOR · 课件/);
   assert.ok(xml.slides.includes("KaiTi"), "封面主标题应引用楷体");
   // 签名 motif：朱砂印章（椭圆描边圈 + 圆形裁切 logo + 整章旋转）
   assert.ok(xml.mediaCount >= 1, "logo 应作为媒体嵌入 pptx");
@@ -154,9 +157,10 @@ test("renderPptx：品牌样式在 XML 字节层可验证", async () => {
   assert.match(xml.slides, /效率提升/);
   assert.match(xml.slides, /方案对比/);
   assert.match(xml.slides, /2\.718/);
-  // 中文字体引用、方块项目符号、表格头朱砂深色填充、斑马纹
+  // 中文字体引用、两种要点形态（≤6 条数字圆圈行 / >6 条 ▪ 紧凑列表）、表头与斑马纹
   assert.ok(xml.all.includes("Microsoft YaHei"));
-  assert.ok(xml.all.toUpperCase().includes("25AA"), "要点用 ▪ 方块符号");
+  assert.ok(xml.all.toUpperCase().includes("25AA"), "超量要点回退 ▪ 列表");
+  assert.ok(xml.slides.includes("复"), "数字圆圈行与列表页正文都应落进 XML");
   assert.ok(xml.all.includes(PPT_THEME.accentDeep), "表格头应填朱砂深色");
   assert.ok(xml.all.includes(PPT_THEME.paperDeep), "表格斑马纹应有压深纸色");
   // 母版层：页脚品牌字 + 自动页码字段（logo 落款走媒体部件）
