@@ -37,18 +37,14 @@
 | `get_enrolled_courses` | 本学期已选教学班（含时间/地点/学分/性质） | `portal.fetchEnrolledClasses` | `enrolled-courses` |
 | `get_retake_courses` | 可重修课程（可关键词过滤） | `portal.fetchRetakeCourses` | `retake-courses` |
 
-## 五、选课与抢课（含真实写操作）
+## 五、选课（只读查询）
 
 | 工具 | 语义 | 底层 | 脚本命令 |
 |------|------|------|----------|
 | `check_selection_status` | 选课模块是否开放、xkkzId、各轮次状态、课程查询是否被「加密串」拦截 | `xk.inspectXk` | `selection-status` |
 | `search_courses` | 搜可选课程及余量 | `xk.searchCourses` | `search-courses` |
 | `search_classes` | 某门课下所有教学班明细（余量对比） | `xk.searchCourses` + `xk.fetchJxbList` | `search-classes` |
-| `watch_courses` | 限时监控余量变化（**只观察不提交**） | `xk.searchCourses` 轮询 | `watch`（脚本版只监控） |
-| `grab_course` | **真实提交选课**（抢课） | `xk.submitCourse` | 不提供（需 agent + 用户确认） |
-| `grab_plan` | **分类抢课计划**（每类一门即停） | `xk.submitCourse` | 不提供 |
 | `list_choosed_courses` | 本轮已选课程（选课维度） | `xk.fetchChoosedList` | — |
-| `drop_course` | **真实提交退课**（绝不批量） | `xk.quitCourse` | 不提供 |
 
 ## 调用约定（agent 视角）
 

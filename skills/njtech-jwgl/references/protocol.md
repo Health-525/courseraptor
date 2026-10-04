@@ -39,7 +39,7 @@
 
 ## 五、安全红线
 
-- **真实写操作**（`grab_course` / `grab_plan` / `drop_course`）会真实提交选课系统，**仅经交互式 agent、
+- **真实写操作类工具**会真实提交选课系统，**仅经交互式 agent、
   且用户明确点名目标并二次确认后才可调用**；绝不批量退课。技能脚本 `query.ts` 不提供这些命令。
 - **隐私**：学籍敏感字段（证件号/银行卡/考生号）返回即打码；本地 `credentials.enc` / `session.json` /
   `memory.json` / `qq-allowlist.json` 切勿分享。
