@@ -9,10 +9,10 @@
  * 数据来自 GET /api/knowledge（纯本地存储，不登录教务、不调模型），
  * 页面每 60 秒与切回标签页时自行刷新；视图选择经 URL hash 记忆。
  *
- * 视觉走工具风（参照 memos / 思源笔记：系统无衬线、信息优先、无装饰
- * 排版）——无楷体、无竖排、无旋转印章、无英文小标签、无大数字统计；
- * 日期直接用相对时间（今天 / 昨天 / N 天前）。朱砂只保留容器顶线与
- * 导图根节点等功能性用色。
+ * 视觉与布局复刻 usememos/memos（63k star，实测其线上 demo 的设计令牌）：
+ * 米白底 + 256px 侧栏 + 672px 主列居中，条目为独立白卡圆角细边、
+ * 分类是 memos 式「# 描边胶囊」、侧栏分类列表带 # 前缀与计数、
+ * 视图切换为文字下划线 tab。设计令牌见 :root 注释。
  * 演示模式：demo=true 时内嵌虚构数据（demoData），不发任何请求。
  */
 
@@ -39,24 +39,23 @@ export function knowledgePage(
 <link rel="icon" type="image/png" href="/logo.png">
 <title>知识库 · CourseRaptor</title>
 <style>
-  /* 与 today-page 同源的设计令牌：红头档案（编辑部排版风） */
+  /* 设计令牌：复刻 usememos/memos 的浅色主题（实测其线上 demo 的 oklch 值） */
   :root {
     color-scheme: light;
-    --paper: #F6F4ED;
-    --paper-deep: #F0EDE4;
-    --card: #FCFBF7;
-    --shade: #ECE8DD;
-    --ink: #25221C;
-    --ink-2: #5A554A;
-    /* 旧值 #898274 在纸底上仅 ~3.5:1，调深以满足 WCAG AA（小字 ≥4.5:1） */
-    --ink-3: #6E6656;
-    --rule: #E1DCCF;
-    --rule-2: #C9C1AF;
-    --accent: #AD392C;
-    --accent-deep: #852B22;
-    --accent-soft: #F3E3DE;
-    --shadow-sm: 0 8px 24px rgba(50, 42, 31, 0.055);
-    --sans: system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --paper: #FAF9F5;      /* memos --background */
+    --paper-deep: #F5F4EF; /* memos 侧栏底色 */
+    --card: #FFFFFF;       /* memos --card */
+    --shade: #EFEDE4;      /* memos --muted */
+    --ink: #3D3929;        /* memos --foreground */
+    --ink-2: #6B6752;
+    --ink-3: #8A8672;
+    --rule: #E9E7DC;
+    --rule-2: #E0DED1;     /* memos --border */
+    --accent: #316FC7;     /* memos --primary */
+    --accent-deep: #2B5FAB;
+    --accent-soft: #E7EEF7;
+    --shadow-sm: 0 0 0 0 rgba(0, 0, 0, 0);
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     --mono: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
   }
   * { box-sizing: border-box; }
@@ -74,102 +73,104 @@ export function knowledgePage(
   .tbtn:hover { border-color: var(--accent); color: var(--accent); background: var(--card); }
   .tbtn:active { transform: translateY(1px); }
 
-  /* ── 页头：工具风，无印章无英文小标签 ── */
-  .pagehead { display: flex; align-items: center; gap: 16px;
-              padding: 16px 28px; border-bottom: 1px solid var(--rule);
-              background: var(--paper-deep); }
+  /* ── 页头：memos 式 sticky 顶栏 ── */
+  .pagehead { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px;
+              padding: 14px 28px; border-bottom: 1px solid var(--rule);
+              background: var(--paper); }
   .ph-title { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 14px; }
-  .ph-title h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0; }
+  .ph-title h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: 0; }
   .ph-right { display: flex; align-items: center; gap: 10px; }
 
-  /* ── 正文：左栏分类导航 + 右栏内容卡 ── */
-  main { max-width: 1240px; margin: 0 auto; padding: 24px 22px 64px;
-         display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; align-items: start; }
+  /* ── memos 布局：侧栏通条 + 主列限宽居中 ── */
+  main { display: grid; grid-template-columns: 256px minmax(0, 1fr); align-items: stretch;
+         min-height: calc(100vh - 57px); }
 
-  .kn-rail { position: sticky; top: 22px; padding: 8px 4px; }
-  .kw-box { width: 100%; padding: 7px 10px; border: 1px solid var(--rule-2);
-            border-radius: 4px; background: var(--card); color: var(--ink); font-size: 14px;
+  .kn-rail { background: var(--paper-deep); border-right: 1px solid var(--rule);
+             padding: 20px 16px 32px; position: sticky; top: 57px; align-self: start;
+             max-height: calc(100vh - 57px); overflow-y: auto; }
+  .kw-box { width: 100%; padding: 7px 12px; border: 1px solid var(--rule-2);
+            border-radius: 8px; background: var(--card); color: var(--ink); font-size: 14px;
             font-family: inherit; }
   .kw-box:focus { outline: none; border-color: var(--accent); }
-  .kw-hint { margin: 5px 2px 0; font-family: var(--mono); font-size: 11px;
-             color: var(--ink-3); letter-spacing: .04em; }
+  .kw-hint { margin: 5px 2px 0; font-size: 11px; color: var(--ink-3); }
   .sort-row { display: flex; gap: 6px; margin-top: 12px; }
   .sort-btn { flex: 1; background: none; border: 1px solid var(--rule-2); padding: 4px 8px;
-              border-radius: 4px; color: var(--ink-2); font-size: 12px; cursor: pointer;
-              font-family: var(--mono); letter-spacing: .04em; }
+              border-radius: 6px; color: var(--ink-2); font-size: 12px; cursor: pointer;
+              font-family: inherit; }
   .sort-btn:hover { border-color: var(--accent); color: var(--accent); }
   .sort-btn.active { border-color: var(--accent); background: var(--accent-soft);
                      color: var(--accent-deep); }
-  .cat-nav { display: flex; flex-direction: column; gap: 4px; margin-top: 14px; }
-  .cat-btn { display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
-             background: none; border: 1px solid transparent; padding: 6px 8px; border-radius: 4px;
+  .cat-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 16px; }
+  /* memos 标签列表：# 前缀 + 右侧计数，hover 圆角底、激活蓝字 */
+  .cat-btn { display: flex; align-items: baseline; gap: 8px;
+             background: none; border: none; padding: 5px 10px; border-radius: 6px;
              color: var(--ink-2); font-size: 14px; cursor: pointer; font-family: inherit;
-             text-align: left; }
-  .cat-btn:hover { background: var(--card); color: var(--ink); }
-  .cat-btn.active { border-color: var(--rule-2); background: var(--card); color: var(--accent-deep); }
-  .cat-count { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
-  .rail-meta { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--rule-2);
-               font-family: var(--mono); font-size: 12px; line-height: 1.7; color: var(--ink-3); }
+             text-align: left; width: 100%; }
+  .cat-btn:hover { background: var(--shade); color: var(--ink); }
+  .cat-btn.active { background: var(--shade); color: var(--accent-deep); font-weight: 500; }
+  .cat-hash { color: var(--accent); font-weight: 400; flex: none; }
+  .cat-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cat-count { font-size: 12px; color: var(--ink-3); flex: none; }
+  .rail-meta { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--rule-2);
+               font-size: 12px; line-height: 1.7; color: var(--ink-3); }
   .rail-meta .tbtn { margin-top: 12px; min-height: 30px; padding: 3px 12px; font-size: 12px; }
 
-  .card { border: 1px solid var(--rule-2); border-top: 2px solid var(--accent);
-          background: var(--card); box-shadow: var(--shadow-sm); }
-  .card > h2 { display: flex; justify-content: space-between; align-items: center; gap: 10px;
-               margin: 0; padding: 10px 18px; border-bottom: 1px solid var(--rule);
-               font-family: var(--mono); font-size: 13px; font-weight: 600;
-               letter-spacing: .18em; color: var(--ink-2); }
-  .card > h2 .cnote { font-family: var(--mono); font-weight: 400; font-size: 12px;
-                      letter-spacing: .03em; color: var(--ink-3); }
-  .view-tabs { display: flex; gap: 6px; }
-  .vtab { background: none; border: 1px solid var(--rule-2); padding: 4px 12px;
-          border-radius: 4px; color: var(--ink-2); font-size: 12px; cursor: pointer;
-          font-family: var(--mono); letter-spacing: .04em;
-          transition: border-color .15s ease, color .15s ease, background .15s ease; }
-  .vtab:hover { border-color: var(--accent); color: var(--accent); }
-  .vtab.active { border-color: var(--accent); background: var(--accent-soft);
-                 color: var(--accent-deep); }
-  .cbody { padding: 14px 18px 16px; display: grid; gap: 10px; align-content: start; }
+  /* ── 主列：memos 式文字 tab + 独立白卡流 ── */
+  .kn-main { width: 100%; max-width: 672px; margin: 0 auto; padding: 20px 20px 64px; }
+  .view-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+              padding: 0 4px 10px; border-bottom: 1px solid var(--rule); margin-bottom: 16px; }
+  .view-tabs { display: flex; gap: 4px; }
+  .vtab { background: none; border: none; padding: 4px 10px 6px;
+          border-bottom: 2px solid transparent; color: var(--ink-2); font-size: 14px;
+          cursor: pointer; font-family: inherit; margin-bottom: -11px;
+          transition: color .15s ease, border-color .15s ease; }
+  .vtab:hover { color: var(--ink); }
+  .vtab.active { border-bottom-color: var(--accent); color: var(--ink); font-weight: 500; }
+  .cnote { font-size: 12px; color: var(--ink-3); }
+  .kn-flow { display: grid; gap: 12px; align-content: start; }
 
   .skel { color: var(--ink-3); font-size: 15px; padding: 8px 2px; }
-  .empty { margin: 0; padding: 24px 8px; border: 1px dashed var(--rule-2); text-align: center;
-           color: var(--ink-3); font-size: 14px; }
+  .empty { margin: 0; padding: 32px 8px; border: 1px dashed var(--rule-2); text-align: center;
+           border-radius: 8px; background: var(--card); color: var(--ink-3); font-size: 14px; }
 
-  /* 知识条目：标题行 + 正文，朴素卡片；长文默认折叠可展开 */
-  .k-entry { padding: 12px 14px; border: 1px solid var(--rule); background: var(--paper);
-             display: grid; gap: 0;
-             transition: border-color .15s ease, box-shadow .15s ease; }
-  .k-entry:hover { border-color: var(--rule-2); box-shadow: 0 2px 10px rgba(50, 42, 31, .07); }
-  .k-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-  .k-title { margin: 0; font-size: 15px; font-weight: 600;
+  /* 知识条目：memos 的 memo 卡——白底圆角细边，长文默认折叠可展开 */
+  .k-entry { padding: 14px 16px; border: 1px solid var(--rule-2); background: var(--card);
+             border-radius: 8px; display: grid; gap: 0;
+             transition: border-color .15s ease; }
+  .k-entry:hover { border-color: var(--ink-3); }
+  .k-head { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .k-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink);
              overflow-wrap: anywhere; }
-  /* 分类小胶囊徽章：长名省略号 + 悬停全名（memos 的 tag 形态） */
-  .k-cat { flex: none; max-width: 40%; padding: 1px 8px; background: var(--shade);
-           color: var(--ink-2); font-size: 12px; border-radius: 999px;
-           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .k-date { margin-left: auto; flex: none; font-family: var(--mono); font-size: 11px;
+  .k-date { margin-left: auto; flex: none; font-size: 12px;
             color: var(--ink-3); white-space: nowrap; }
   .k-del { background: none; border: none; padding: 2px 4px; color: var(--ink-3); flex: none;
-           font-family: var(--mono); font-size: 12px; cursor: pointer; }
+           font-size: 12px; cursor: pointer; }
   .k-del:hover { color: var(--accent); text-decoration: underline; }
-  .k-del.armed { color: var(--card); background: var(--accent); border-radius: 3px;
+  .k-del.armed { color: var(--card); background: var(--accent); border-radius: 4px;
                  padding: 2px 8px; }
-  .k-content { margin: 6px 0 0; font-size: 14px; line-height: 1.7; color: var(--ink-2);
-               white-space: pre-wrap; overflow-wrap: anywhere; }
-  /* 正文里的自动链接：朱砂深色 + 下划线区分正文，新标签打开 */
-  .k-content a { color: var(--accent-deep); text-decoration: underline;
+  .k-content { margin: 6px 0 0; font-size: 15px; line-height: 1.65; color: var(--ink);
+                white-space: pre-wrap; overflow-wrap: anywhere; }
+  /* memos tag 胶囊：描边圆角、蓝字，挂在正文之后 */
+  .k-tags { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .k-cat { display: inline-flex; align-items: baseline; padding: 1px 8px;
+           border: 1px solid var(--rule-2); border-radius: 999px; background: var(--card);
+           color: var(--accent); font-size: 12.5px; line-height: 1.6;
+           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .k-cat.none { color: var(--ink-3); }
+  /* 正文里的自动链接：主色 + 下划线，新标签打开 */
+  .k-content a { color: var(--accent); text-decoration: underline;
                  text-underline-offset: 2px; }
-  .k-content a:hover { color: var(--accent); }
+  .k-content a:hover { color: var(--accent-deep); }
   .k-content.clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
                      overflow: hidden; }
   .k-toggle { justify-self: start; background: none; border: none; padding: 3px 0;
-              color: var(--accent-deep); font-family: var(--mono); font-size: 12px;
-              cursor: pointer; }
+              color: var(--accent-deep); font-size: 12px; cursor: pointer; }
   .k-toggle:hover { text-decoration: underline; }
   mark { background: var(--accent-soft); color: var(--accent-deep); padding: 0 1px; }
   .k-more { justify-self: center; min-height: 32px; padding: 4px 16px; font-size: 12.5px; }
   /* 导图节点点击跳回条目后的落点脉冲提示 */
   @keyframes kf-flash { 0%, 55% { background: var(--accent-soft); }
-                        100% { background: var(--paper); } }
+                        100% { background: var(--card); } }
   .k-entry.flash { animation: kf-flash 1.8s ease both; }
 
   /* ── 时间线视图：按月分组 + 左缘时间轴 ── */
@@ -205,14 +206,17 @@ export function knowledgePage(
   .gn-hit:hover rect { stroke: var(--accent); stroke-width: 1.4; }
 
   @media (max-width: 720px) {
-    .pagehead { flex-wrap: wrap; padding: 14px 16px; gap: 10px 12px; }
+    .pagehead { flex-wrap: wrap; padding: 12px 16px; gap: 10px 12px; }
     .ph-right { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
     .ph-right .tbtn { flex: none; white-space: nowrap; }
-    main { display: block; padding: 22px 14px 56px; }
-    .kn-rail { position: static; padding: 0 0 18px; }
-    .cat-nav { flex-direction: row; flex-wrap: wrap; }
-    .cat-btn { border: 1px solid var(--rule-2); background: var(--card); }
+    main { display: block; min-height: 0; }
+    .kn-rail { position: static; max-height: none; overflow: visible;
+               border-right: none; border-bottom: 1px solid var(--rule); padding: 14px 16px 16px; }
+    .cat-nav { flex-direction: row; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+    .cat-btn { border: 1px solid var(--rule-2); background: var(--card); padding: 4px 10px; }
+    .cat-label { max-width: 9em; }
     .rail-meta { margin-top: 10px; padding-top: 10px; }
+    .kn-main { padding: 16px 14px 56px; }
   }
   /* 触屏：搜索框提到 16px 防 iOS 聚焦缩放；小字按钮放大到能点的尺寸 */
   @media (hover: none) {
@@ -231,7 +235,8 @@ export function knowledgePage(
     .cat-nav { flex-direction: row; flex-wrap: wrap; }
     .k-content.clamp { display: block; -webkit-line-clamp: unset; }
     main { display: block; max-width: none; padding: 0; }
-    .card { box-shadow: none; }
+    .kn-rail { display: none; }
+    .kn-main { padding: 0; max-width: none; }
     .graph-wrap { overflow: visible; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
@@ -262,16 +267,17 @@ export function knowledgePage(
     <div class="cat-nav" id="catNav"></div>
     <div class="rail-meta" id="knMeta"></div>
   </aside>
-  <section class="card" id="listCard" aria-label="知识条目">
-    <h2>
-      <span class="view-tabs" id="viewRow" role="group" aria-label="视图方式">
+  <section class="kn-main" aria-label="知识条目">
+    <div class="view-row">
+      <div class="view-tabs" id="viewRow" role="group" aria-label="视图方式">
         <button type="button" class="vtab active" data-view="list" aria-pressed="true">条目</button>
         <button type="button" class="vtab" data-view="graph" aria-pressed="false">导图</button>
         <button type="button" class="vtab" data-view="timeline" aria-pressed="false">时间线</button>
-      </span>
+      </div>
       <span class="cnote" id="listNote"></span>
-    </h2>
-    <div class="cbody"><p class="skel">…</p></div>
+    </div>
+    <div class="kn-flow" id="listBody"><p class="skel">…</p></div>
+  </section>
   </section>
 </main>
 <script>
@@ -413,15 +419,17 @@ function renderNav() {
   const nav = $("catNav");
   nav.textContent = "";
   nav.appendChild(catBtn("ALL", "全部", entries.length));
-  for (const [name, n] of cats) nav.appendChild(catBtn(name, name, n));
+  for (const [name, n] of cats) nav.appendChild(catBtn(name, name, n, true));
   const none = counts.get("") || 0;
   if (none) nav.appendChild(catBtn("NONE", "未分类", none));
 }
 
-function catBtn(key, label, count) {
-  const btn = el("button", "cat-btn" + (activeCat === key ? " active" : ""), label);
+function catBtn(key, label, count, isTag) {
+  const btn = el("button", "cat-btn" + (activeCat === key ? " active" : ""));
   btn.type = "button";
   btn.dataset.cat = key;
+  if (isTag) btn.appendChild(el("span", "cat-hash", "#"));
+  btn.appendChild(el("span", "cat-label", label));
   btn.appendChild(el("span", "cat-count", String(count)));
   btn.addEventListener("click", () => {
     activeCat = key;
@@ -463,9 +471,6 @@ function entryEl(item) {
   const title = el("h3", "k-title");
   appendMarked(title, item.title, keyword);
   head.appendChild(title);
-  const cat = el("span", "k-cat", item.category || "未分类");
-  if (item.category) cat.title = item.category;
-  head.appendChild(cat);
   head.appendChild(el("span", "k-date", fmtAgo(item.updatedAt)));
   if (!DEMO_DATA) {
     const del = el("button", "k-del", "删除");
@@ -504,6 +509,12 @@ function entryEl(item) {
   } else {
     card.appendChild(content);
   }
+  /* memos 形态：tag 胶囊挂在正文之后 */
+  const tags = el("div", "k-tags");
+  const cat = el("span", "k-cat" + (item.category ? "" : " none"), item.category || "未分类");
+  if (item.category) cat.title = item.category;
+  tags.appendChild(cat);
+  card.appendChild(tags);
   return card;
 }
 
@@ -519,7 +530,7 @@ function moreBtn(list, shown) {
 
 /* ── 视图一：条目列表 ── */
 function renderList() {
-  const body = $("listCard").querySelector(".cbody");
+  const body = $("listBody");
   const note = $("listNote");
   body.textContent = "";
   if (!entries.length) {
@@ -584,7 +595,7 @@ function focusEntry(id) {
   }
 }
 function renderGraph() {
-  const body = $("listCard").querySelector(".cbody");
+  const body = $("listBody");
   const note = $("listNote");
   body.textContent = "";
   if (!entries.length) {
@@ -690,7 +701,7 @@ function renderGraph() {
 
 /* ── 视图三：时间线（按月分组 + 左缘轴点） ── */
 function renderTimeline() {
-  const body = $("listCard").querySelector(".cbody");
+  const body = $("listBody");
   const note = $("listNote");
   body.textContent = "";
   if (!entries.length) {
@@ -757,7 +768,7 @@ function load() {
     .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then((d) => { entries = d.entries || []; renderNav(); renderRailMeta(); renderView(); })
     .catch(() => {
-      const body = $("listCard").querySelector(".cbody");
+      const body = $("listBody");
       body.textContent = "";
       body.appendChild(emptyEl("知识暂时取不出来，请稍候刷新。"));
     });
