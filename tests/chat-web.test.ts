@@ -583,7 +583,7 @@ test("知识库：页面直写与原地编辑（memos 式 POST/PATCH）", async 
     body: JSON.stringify({ title: "网页直写测试", content: "同名再记是覆盖不是堆积" }),
   });
   assert.equal(again.status, 201);
-  assert.equal((await again.json() as { updatedExisting: boolean }).updatedExisting, true);
+  assert.equal(((await again.json()) as { updatedExisting: boolean }).updatedExisting, true);
 
   // 列表可见
   const list = (await (await fetch(`${url}/api/knowledge`)).json()) as {
@@ -611,7 +611,10 @@ test("知识库：页面直写与原地编辑（memos 式 POST/PATCH）", async 
     body: JSON.stringify({ subject: "" }),
   });
   assert.equal(recompute.status, 200);
-  assert.equal(((await recompute.json()) as { entry: { category: string | null } }).entry.category, null);
+  assert.equal(
+    ((await recompute.json()) as { entry: { category: string | null } }).entry.category,
+    null,
+  );
 
   // 错误路径：空标题 400、未知 id 404、裸 fetch（无 token）403
   const bad = await wfetch(`${url}/api/knowledge`, {
