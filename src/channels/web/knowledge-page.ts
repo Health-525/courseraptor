@@ -2,16 +2,17 @@
  * 「知识库」独立页 — GET /knowledge 的页面本体
  *
  * 三种视图共一套筛选（搜索 / 分类 / 排序）：
- *  · 条目：纸质卡片列表（左侧竖排课程书签 + 长文折叠 + 两步删除）；
+ *  · 条目：朴素卡片列表（分类小胶囊徽章 + 长文折叠 + 两步删除）；
  *  · 导图：SVG 横向树（我的知识 → 课程分类 → 条目），点击节点跳回
  *    条目视图并高亮展开，每分类最多 12 个节点、超出折进「还有 N 条」；
  *  · 时间线：按月分组 + 左缘时间轴竖线，条目卡与列表视图同款。
  * 数据来自 GET /api/knowledge（纯本地存储，不登录教务、不调模型），
  * 页面每 60 秒与切回标签页时自行刷新；视图选择经 URL hash 记忆。
  *
- * 视觉与课表页 /today 同一套红头档案令牌（暖纸底 + 墨字 + 单一朱砂红）：
- * 页头下多一条楷体大字统计（条数 / 分类数 / 最近沉淀），当日更新的
- * 条目盖朱砂「新」章。
+ * 视觉走工具风（参照 memos / 思源笔记：系统无衬线、信息优先、无装饰
+ * 排版）——无楷体、无竖排、无旋转印章、无英文小标签、无大数字统计；
+ * 日期直接用相对时间（今天 / 昨天 / N 天前）。朱砂只保留容器顶线与
+ * 导图根节点等功能性用色。
  * 演示模式：demo=true 时内嵌虚构数据（demoData），不发任何请求。
  */
 
@@ -55,8 +56,6 @@ export function knowledgePage(
     --accent-deep: #852B22;
     --accent-soft: #F3E3DE;
     --shadow-sm: 0 8px 24px rgba(50, 42, 31, 0.055);
-    --serif: Georgia, "Times New Roman", "Songti SC", SimSun, serif;
-    --kai: "KaiTi", "STKaiti", "Kaiti SC", var(--serif);
     --sans: system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     --mono: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
   }
@@ -75,44 +74,20 @@ export function knowledgePage(
   .tbtn:hover { border-color: var(--accent); color: var(--accent); background: var(--card); }
   .tbtn:active { transform: translateY(1px); }
 
-  /* ── 页头（与课表页同款式） ── */
+  /* ── 页头：工具风，无印章无英文小标签 ── */
   .pagehead { display: flex; align-items: center; gap: 16px;
-              padding: 18px 28px; border-bottom: 1px solid var(--rule);
+              padding: 16px 28px; border-bottom: 1px solid var(--rule);
               background: var(--paper-deep); }
-  .pagehead .seal { flex: none; position: relative; width: 44px; height: 44px;
-                    transform: rotate(-7deg); }
-  .pagehead .seal::before { content: ""; position: absolute; inset: 0;
-                            border: 2px solid var(--accent); border-radius: 50%; opacity: .9; }
-  .pagehead .seal img { position: absolute; top: 5px; left: 5px; width: 34px; height: 34px;
-                        border-radius: 50%; object-fit: cover; }
   .ph-title { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 14px; }
-  .ph-title h1 { margin: 0; font-family: var(--kai); font-weight: 400;
-                 font-size: 24px; letter-spacing: 2px; }
-  .ph-title .ph-stamp { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
-                        letter-spacing: .1em; }
+  .ph-title h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: 0; }
   .ph-right { display: flex; align-items: center; gap: 10px; }
-
-  /* ── 统计条：楷体大字，纸上的账页头 ── */
-  .statstrip { max-width: 1240px; margin: 0 auto; padding: 26px 22px 0;
-               display: flex; gap: 44px; align-items: flex-end; flex-wrap: wrap; }
-  .stat { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-  .stat .num { font-family: var(--kai); font-weight: 400; font-size: 40px; line-height: 1;
-               color: var(--ink); }
-  .stat .num em { font-style: normal; font-family: var(--sans); font-size: 14px;
-                  color: var(--ink-2); margin-left: 6px; }
-  .stat .num.num-text { font-size: 26px; line-height: 1.2; padding-bottom: 3px; }
-  .stat .lbl { font-family: var(--mono); font-size: 11px; letter-spacing: .16em;
-               color: var(--ink-3); }
 
   /* ── 正文：左栏分类导航 + 右栏内容卡 ── */
   main { max-width: 1240px; margin: 0 auto; padding: 24px 22px 64px;
          display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 24px; align-items: start; }
 
   .kn-rail { position: sticky; top: 22px; padding: 8px 4px; }
-  .rail-kicker { margin: 0 0 6px; color: var(--accent-deep); font-family: var(--mono); font-size: 11px;
-                 letter-spacing: .18em; }
-  .rail-title { margin: 0; font-family: var(--kai); font-size: 30px; font-weight: 400; line-height: 1.25; }
-  .kw-box { width: 100%; margin-top: 16px; padding: 7px 10px; border: 1px solid var(--rule-2);
+  .kw-box { width: 100%; padding: 7px 10px; border: 1px solid var(--rule-2);
             border-radius: 4px; background: var(--card); color: var(--ink); font-size: 14px;
             font-family: inherit; }
   .kw-box:focus { outline: none; border-color: var(--accent); }
@@ -159,27 +134,18 @@ export function knowledgePage(
   .empty { margin: 0; padding: 24px 8px; border: 1px dashed var(--rule-2); text-align: center;
            color: var(--ink-3); font-size: 14px; }
 
-  /* 知识条目：左侧竖排课程书签 + 纸质卡身；长文默认折叠可展开。
-     悬停微浮起：提示这张纸可以读（长文可展开），也给长列表一点反馈手感 */
-  .k-entry { padding: 0; border: 1px solid var(--rule); background: var(--paper);
-             display: grid; grid-template-columns: 30px minmax(0, 1fr);
+  /* 知识条目：标题行 + 正文，朴素卡片；长文默认折叠可展开 */
+  .k-entry { padding: 12px 14px; border: 1px solid var(--rule); background: var(--paper);
+             display: grid; gap: 0;
              transition: border-color .15s ease, box-shadow .15s ease; }
   .k-entry:hover { border-color: var(--rule-2); box-shadow: 0 2px 10px rgba(50, 42, 31, .07); }
-  .k-spine { writing-mode: vertical-rl; text-orientation: mixed; overflow: hidden;
-             background: var(--accent-soft); color: var(--accent-deep);
-             font-family: var(--kai); font-size: 12px; letter-spacing: .28em;
-             display: flex; align-items: center; justify-content: center;
-             border-right: 1px solid var(--rule); padding: 8px 0; }
-  .k-spine.none { background: var(--shade); color: var(--ink-3); }
-  .k-body { padding: 11px 14px 12px; display: grid; gap: 0; min-width: 0; }
   .k-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-  .k-title { margin: 0; font-family: var(--kai); font-size: 17px; font-weight: 600;
+  .k-title { margin: 0; font-size: 15px; font-weight: 600;
              overflow-wrap: anywhere; }
-  /* 当日沉淀盖「新」章：细圆框朱砂小印 */
-  .k-fresh { flex: none; width: 20px; height: 20px; border: 1.5px solid var(--accent);
-             border-radius: 50%; color: var(--accent-deep); font-family: var(--kai);
-             font-size: 11.5px; line-height: 17px; text-align: center;
-             transform: rotate(-8deg); align-self: center; }
+  /* 分类小胶囊徽章：长名省略号 + 悬停全名（memos 的 tag 形态） */
+  .k-cat { flex: none; max-width: 40%; padding: 1px 8px; background: var(--shade);
+           color: var(--ink-2); font-size: 12px; border-radius: 999px;
+           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .k-date { margin-left: auto; flex: none; font-family: var(--mono); font-size: 11px;
             color: var(--ink-3); white-space: nowrap; }
   .k-del { background: none; border: none; padding: 2px 4px; color: var(--ink-3); flex: none;
@@ -211,7 +177,7 @@ export function knowledgePage(
   .tl-group::before { content: ""; position: absolute; left: 7px; top: 10px; bottom: 10px;
                       width: 1px; background: var(--rule-2); }
   .tl-head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 12px; }
-  .tl-head .tl-month { font-family: var(--kai); font-size: 20px; font-weight: 400; }
+  .tl-head .tl-month { font-size: 15px; font-weight: 600; }
   .tl-head .tl-count { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
   .tl-item { position: relative; }
   .tl-item::before { content: ""; position: absolute; left: -23px; top: 14px; width: 9px;
@@ -223,10 +189,10 @@ export function knowledgePage(
   .graph-wrap svg { flex: none; margin: 0 auto; display: block; }
   .graph-wrap text { dominant-baseline: middle; }
   .gn-root-r { fill: var(--accent); }
-  .gn-root-t { fill: var(--card); font-family: var(--kai); font-size: 17px; }
+  .gn-root-t { fill: var(--card); font-size: 14px; font-weight: 600; }
   .gn-cat-r { fill: var(--accent-soft); stroke: var(--rule-2); }
   .gn-cat-r.none { fill: var(--shade); }
-  .gn-cat-t { fill: var(--accent-deep); font-family: var(--kai); font-size: 14px; }
+  .gn-cat-t { fill: var(--accent-deep); font-size: 13px; font-weight: 600; }
   .gn-cat-t.none { fill: var(--ink-2); }
   .gn-item-r { fill: var(--card); stroke: var(--rule); }
   .gn-item-t { fill: var(--ink); font-family: var(--sans); font-size: 12.5px; }
@@ -240,16 +206,8 @@ export function knowledgePage(
 
   @media (max-width: 720px) {
     .pagehead { flex-wrap: wrap; padding: 14px 16px; gap: 10px 12px; }
-    .pagehead .seal { width: 38px; height: 38px; }
-    .pagehead .seal img { top: 4px; left: 4px; width: 30px; height: 30px; }
-    .ph-title h1 { font-size: 20px; }
-    /* 时钟独占一行、按钮换行排第二行且不折字（与 today 页同一修法） */
     .ph-right { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
-    .ph-clock { flex: 1 1 100%; }
     .ph-right .tbtn { flex: none; white-space: nowrap; }
-    .statstrip { padding: 16px 14px 0; gap: 26px; }
-    .stat .num { font-size: 30px; }
-    .stat .num.num-text { font-size: 19px; }
     main { display: block; padding: 22px 14px 56px; }
     .kn-rail { position: static; padding: 0 0 18px; }
     .cat-nav { flex-direction: row; flex-wrap: wrap; }
@@ -285,34 +243,16 @@ export function knowledgePage(
 </head>
 <body data-demo="${demo}">
 <header class="pagehead">
-  <span class="seal" aria-hidden="true"><img src="/logo.png" alt="" width="34" height="34"></span>
   <div class="ph-title">
     <h1>知识库</h1>
-    <span class="ph-stamp">COURSERAPTOR · KNOWLEDGE BASE</span>
   </div>
   <div class="ph-right">
     <a class="tbtn" href="/today">今日日程</a>
     <a class="tbtn" href="/">返回对话</a>
   </div>
 </header>
-<section class="statstrip" aria-label="知识库概览">
-  <div class="stat">
-    <div class="num"><span id="stTotal">—</span><em>条</em></div>
-    <div class="lbl">KNOWLEDGE ENTRIES</div>
-  </div>
-  <div class="stat">
-    <div class="num"><span id="stCats">—</span><em>类</em></div>
-    <div class="lbl">COURSE TAGS</div>
-  </div>
-  <div class="stat">
-    <div class="num num-text" id="stRecent">—</div>
-    <div class="lbl">LAST SAVED</div>
-  </div>
-</section>
 <main>
   <aside class="kn-rail" aria-label="知识分类">
-    <p class="rail-kicker">KNOWLEDGE BASE</p>
-    <h2 class="rail-title">我的知识</h2>
     <input class="kw-box" id="kwBox" type="search" enterkeyhint="search" placeholder="搜索标题 / 内容…" aria-label="搜索知识">
     <p class="kw-hint">按 / 聚焦 · Esc 清空</p>
     <div class="sort-row" id="sortRow" role="group" aria-label="排序方式">
@@ -358,17 +298,12 @@ function fmtDay(ts) {
   const d = new Date(ts);
   return (d.getMonth() + 1) + "月" + d.getDate() + "日";
 }
-function isToday(ts) {
-  const a = new Date(ts), b = new Date();
-  return a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-/* 「今天 / 昨天 / N 天前 / M月D日」：统计条的「最近沉淀」 */
+/* 相对时间：今天 / 昨天 / N 天前 / M月D日（工具产品的常规日期形态） */
 function fmtAgo(ts) {
   if (!ts) return "—";
-  if (isToday(ts)) return "今天";
   const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diff = Math.round((day(new Date()) - day(new Date(ts))) / 86400000);
+  if (diff <= 0) return "今天";
   if (diff === 1) return "昨天";
   if (diff < 30) return diff + " 天前";
   return fmtDay(ts);
@@ -454,7 +389,7 @@ function catCounts() {
     const key = e.category || "";
     m.set(key, (m.get(key) || 0) + 1);
   }
-  return { map: m, cats: [...m.keys()].filter(Boolean).length };
+  return m;
 }
 function filtered() {
   let list = entries;
@@ -471,18 +406,8 @@ function filtered() {
   return sorted;
 }
 
-/* ── 统计条 ── */
-function renderStats() {
-  const counts = catCounts();
-  let latest = 0;
-  for (const e of entries) if (e.updatedAt > latest) latest = e.updatedAt;
-  $("stTotal").textContent = String(entries.length);
-  $("stCats").textContent = String(counts.cats);
-  $("stRecent").textContent = fmtAgo(latest);
-}
-
 function renderNav() {
-  const counts = catCounts().map;
+  const counts = catCounts();
   const cats = [...counts.entries()].filter(([k]) => k)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh"));
   const nav = $("catNav");
@@ -534,19 +459,14 @@ function renderSort() {
 function entryEl(item) {
   const card = el("article", "k-entry");
   card.dataset.kid = item.id;
-  /* 左缘竖排书签：分类即书脊；超长取前四字，悬停给全名 */
-  const spine = el("span", "k-spine" + (item.category ? "" : " none"));
-  const catName = item.category || "未归档";
-  spine.textContent = catName.length > 5 ? catName.slice(0, 4) + "…" : catName;
-  spine.title = item.category ? "分类：" + item.category : "未分类条目";
-  card.appendChild(spine);
-  const bodyEl = el("div", "k-body");
   const head = el("div", "k-head");
   const title = el("h3", "k-title");
   appendMarked(title, item.title, keyword);
   head.appendChild(title);
-  if (isToday(item.updatedAt)) head.appendChild(el("span", "k-fresh", "新"));
-  head.appendChild(el("span", "k-date", fmtDay(item.updatedAt)));
+  const cat = el("span", "k-cat", item.category || "未分类");
+  if (item.category) cat.title = item.category;
+  head.appendChild(cat);
+  head.appendChild(el("span", "k-date", fmtAgo(item.updatedAt)));
   if (!DEMO_DATA) {
     const del = el("button", "k-del", "删除");
     del.type = "button";
@@ -557,13 +477,13 @@ function entryEl(item) {
     });
     head.appendChild(del);
   }
-  bodyEl.appendChild(head);
+  card.appendChild(head);
 
   const content = el("p", "k-content");
   appendRich(content, item.content, keyword);
   if (item.content.length > CLAMP_LEN) {
     if (!expandedIds.has(item.id)) content.classList.add("clamp");
-    bodyEl.appendChild(content);
+    card.appendChild(content);
     const toggle = el("button", "k-toggle", expandedIds.has(item.id) ? "收起" : "展开全文");
     toggle.type = "button";
     toggle.setAttribute("aria-expanded", expandedIds.has(item.id) ? "true" : "false");
@@ -580,11 +500,10 @@ function entryEl(item) {
         toggle.setAttribute("aria-expanded", "true");
       }
     });
-    bodyEl.appendChild(toggle);
+    card.appendChild(toggle);
   } else {
-    bodyEl.appendChild(content);
+    card.appendChild(content);
   }
-  card.appendChild(bodyEl);
   return card;
 }
 
@@ -833,10 +752,10 @@ function setView(v) {
 }
 
 function load() {
-  if (DEMO_DATA) { entries = DEMO_DATA; renderStats(); renderNav(); renderRailMeta(); renderView(); return; }
+  if (DEMO_DATA) { entries = DEMO_DATA; renderNav(); renderRailMeta(); renderView(); return; }
   fetch("/api/knowledge", { cache: "no-store" })
     .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-    .then((d) => { entries = d.entries || []; renderStats(); renderNav(); renderRailMeta(); renderView(); })
+    .then((d) => { entries = d.entries || []; renderNav(); renderRailMeta(); renderView(); })
     .catch(() => {
       const body = $("listCard").querySelector(".cbody");
       body.textContent = "";
