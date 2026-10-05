@@ -14,6 +14,7 @@
 
 import { tool } from "ai";
 import { z } from "zod";
+import { registeredSchool } from "../school";
 
 /** 可通过对话打开的面板 id（网页端 HALL_CARDS 的子集） */
 export const PANEL_IDS = [
@@ -56,9 +57,20 @@ export const panelTools = {
       "调完一句确认即可，不复述面板内容。注意：用户只是问数据（「这周有什么课」）时不要调本工具，" +
       "直接用查询工具在对话里回答；终端（TUI）/QQ 等没有网页面板的环境同样别调，直接给内容。",
     inputSchema: z.object({ panel: z.enum(PANEL_IDS).describe("要打开的面板 id") }),
-    execute: async ({ panel }) =>
-      `已请网页端推出「${PANEL_TITLES[panel]}」面板，简单确认一句即可，不必复述面板内容。` +
-      "若当前是终端或 QQ 等没有网页面板的环境，请改用对应查询工具直接在对话里给出内容，" +
-      "并提示可在浏览器打开网页版（npm start）查看面板。",
+    execute: async ({ panel }) => {
+      /* 教务通知门禁：本校没接入通知能力（如河北农大）时不推面板，如实劝退，
+       * 不谎称「已推出」——前端宫格本就不显示这张卡 */
+      if (panel === "news" && !registeredSchool()?.notices) {
+        return (
+          "本校尚未接入教务通知，没有推出面板。请直接告诉用户：你所在学校的教务通知暂未接入，" +
+          "建议去学校教务处官网查看，不要说面板已打开。"
+        );
+      }
+      return (
+        `已请网页端推出「${PANEL_TITLES[panel]}」面板，简单确认一句即可，不必复述面板内容。` +
+        "若当前是终端或 QQ 等没有网页面板的环境，请改用对应查询工具直接在对话里给出内容，" +
+        "并提示可在浏览器打开网页版（npm start）查看面板。"
+      );
+    },
   }),
 };
