@@ -4,7 +4,7 @@
  * 支持的技能（skills/<名>/ 为源码，package/ 为独立包门面）：
  * - njtech-jwgl      教务无头查询（默认，不带参数时打它，向后兼容）
  * - export-schedule  课表图片导出（读本地缓存渲染 PNG/SVG）
- * （skills/meta-learning/ 为纯提示词技能，无 scripts、无需打包，整目录拷走即用）
+ * - meta-learning    学习教练（纯提示词技能：无 scripts，SKILL.md + references 整拷）
  *
  * 产物（默认在 dist/ 下）：
  * - dist/skill/<名>/    可整目录拷进各 agent 工具技能目录的技能
@@ -212,6 +212,11 @@ const SKILL_DEFS = {
     resvg: { packages: ["@resvg/resvg-js", "@resvg/resvg-js-win32-x64-msvc"] },
     selfCheck: { args: ["--help"], expect: [/--mode/] },
   },
+  "meta-learning": {
+    // 纯提示词技能：无 scripts/bundle/.env，SKILL.md + README + references 整拷即技能本体
+    promptOnly: true,
+    references: true,
+  },
 };
 
 /** npm 安装到 prefix（不落 package.json）。优先 node 自带的 npm-cli.js 直跑，
@@ -281,30 +286,42 @@ export async function buildSkillPackage({
   const skillVarDocs = `// 技能版本：v${version}（来自 CourseRaptor 主项目）`;
 
   fs.rmSync(skillDir, { recursive: true, force: true });
-  fs.mkdirSync(path.join(skillDir, "scripts"), { recursive: true });
+  fs.mkdirSync(skillDir, { recursive: true });
+  if (!def.promptOnly) {
+    fs.mkdirSync(path.join(skillDir, "scripts"), { recursive: true });
+  }
 
-  // 1) 单文件 bundle
-  const esbuild = loadEsbuild();
-  await esbuild.build({
-    entryPoints: [path.join(skillSrc, def.entry)],
-    bundle: true,
-    platform: "node",
-    format: "esm",
-    target: ["node18"],
-    charset: "utf8",
-    minify: true,
-    banner: { js: banner(skillVarDocs) },
-    external: def.externals,
-    outfile: path.join(skillDir, "scripts", def.bundleName),
-  });
+  // 1) 单文件 bundle（纯提示词技能无脚本，跳过）
+  let bundlePath = null;
+  if (!def.promptOnly) {
+    const esbuild = loadEsbuild();
+    await esbuild.build({
+      entryPoints: [path.join(skillSrc, def.entry)],
+      bundle: true,
+      platform: "node",
+      format: "esm",
+      target: ["node18"],
+      charset: "utf8",
+      minify: true,
+      banner: { js: banner(skillVarDocs) },
+      external: def.externals,
+      outfile: path.join(skillDir, "scripts", def.bundleName),
+    });
+    bundlePath = path.join(skillDir, "scripts", def.bundleName);
+  }
 
-  // 2) 静态文件：门面三件套 + references/（有才拷）+ assets + 原生二进制
-  fs.copyFileSync(path.join(skillSrc, "package", "SKILL.md"), path.join(skillDir, "SKILL.md"));
-  fs.copyFileSync(path.join(skillSrc, "package", "README.md"), path.join(skillDir, "README.md"));
-  fs.copyFileSync(
-    path.join(skillSrc, "package", ".env.example"),
-    path.join(skillDir, ".env.example"),
-  );
+  // 2) 门面：纯提示词技能 SKILL.md/README 就在技能根；带脚本的走 package/ 三件套
+  if (def.promptOnly) {
+    fs.copyFileSync(path.join(skillSrc, "SKILL.md"), path.join(skillDir, "SKILL.md"));
+    fs.copyFileSync(path.join(skillSrc, "README.md"), path.join(skillDir, "README.md"));
+  } else {
+    fs.copyFileSync(path.join(skillSrc, "package", "SKILL.md"), path.join(skillDir, "SKILL.md"));
+    fs.copyFileSync(path.join(skillSrc, "package", "README.md"), path.join(skillDir, "README.md"));
+    fs.copyFileSync(
+      path.join(skillSrc, "package", ".env.example"),
+      path.join(skillDir, ".env.example"),
+    );
+  }
   if (def.references) {
     fs.mkdirSync(path.join(skillDir, "references"), { recursive: true });
     for (const file of fs.readdirSync(path.join(skillSrc, "references"))) {
@@ -329,10 +346,11 @@ export async function buildSkillPackage({
   const zipPath = path.join(dest, `${skill}-skill-v${version}.zip`);
   fs.writeFileSync(zipPath, zipEntries(entries));
 
-  const bundlePath = path.join(skillDir, "scripts", def.bundleName);
-  const bundle = fs.readFileSync(bundlePath, "utf8");
-  const leak = /(?:from|import\()\s*["']\.\.?\/(?!node:)/.exec(bundle);
-  if (leak) throw new Error(`bundle 里出现未解析的相对导入：${leak[0]}`);
+  if (bundlePath) {
+    const bundle = fs.readFileSync(bundlePath, "utf8");
+    const leak = /(?:from|import\()\s*["']\.\.?\/(?!node:)/.exec(bundle);
+    if (leak) throw new Error(`bundle 里出现未解析的相对导入：${leak[0]}`);
+  }
 
   return {
     skill,
@@ -340,7 +358,8 @@ export async function buildSkillPackage({
     skillDir,
     zipPath,
     files: entries.map((e) => e.name),
-    bundleBytes: fs.statSync(bundlePath).size,
+    bundleBytes: bundlePath ? fs.statSync(bundlePath).size : 0,
+    promptOnly: Boolean(def.promptOnly),
     selfCheck: def.selfCheck,
   };
 }
@@ -363,7 +382,13 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         `   技能目录：${r.skillDir}（拷进所用工具的技能目录即用，如 ~/.claude/skills/、~/.zcode/skills/、~/.workbuddy/skills/）`,
       );
       console.log(`   下载包：  ${r.zipPath}`);
-      console.log(`   文件数：  ${r.files.length}，bundle ${(r.bundleBytes / 1024).toFixed(0)} KB`);
+      console.log(
+        `   文件数：  ${r.files.length}${r.promptOnly ? "" : `，bundle ${(r.bundleBytes / 1024).toFixed(0)} KB`}`,
+      );
+      if (r.promptOnly) {
+        console.log("   形态：    纯提示词技能（SKILL.md + references，无脚本依赖），无需自检");
+        continue;
+      }
       console.log("   自检：");
       const script = path.join(r.skillDir, "scripts", path.basename(SKILL_DEFS[skill].bundleName));
       const run = spawnSync(process.execPath, [script, ...r.selfCheck.args], {

@@ -1,7 +1,7 @@
 /** scripts/package-skill.mjs 的类型声明（同 gateway/*.d.mts 惯例） */
 
 export interface SkillPackageResult {
-  /** 技能名（njtech-jwgl / export-schedule） */
+  /** 技能名（njtech-jwgl / export-schedule / meta-learning） */
   skill: string;
   version: string;
   /** 可整目录拷进 ~/.workbuddy/skills/ 的技能目录 */
@@ -10,9 +10,12 @@ export interface SkillPackageResult {
   zipPath: string;
   /** zip 内条目名清单 */
   files: string[];
+  /** 单文件 bundle 字节数（纯提示词技能为 0） */
   bundleBytes: number;
-  /** CLI 自检配置（打包完成后跑一次入口脚本验证可用） */
-  selfCheck: { args: string[]; expect: RegExp[] };
+  /** 纯提示词技能（无 scripts/bundle/.env，SKILL.md + references 整拷即用） */
+  promptOnly: boolean;
+  /** CLI 自检配置（纯提示词技能无脚本，为 undefined） */
+  selfCheck?: { args: string[]; expect: RegExp[] };
 }
 
 export function zipEntries(

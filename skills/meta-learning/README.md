@@ -49,7 +49,7 @@
 
 ## 🚀 快速开始
 
-1. **安装本 Skill** 到你的 AI 客户端
+1. **安装本 Skill** 到你的 AI 客户端（下载 [`meta-learning-skill` zip](https://github.com/Health-525/courseraptor/releases?q=meta-learning) 解压，整目录拷进 `~/.claude/skills/`、`~/.zcode/skills/`、`~/.workbuddy/skills/` 等技能目录）
 2. **上传学习材料**（讲义 / 课件 / 课本章节 / 笔记）或描述你想学的主题
 3. **告诉目标**：考试？应用？有多少时间？
 4. **跟随教练流程**：材料解析 → 深度教学 → 结构检验 → 刻意实践 → 总结追踪
