@@ -147,6 +147,8 @@ npm run njtech -- search-courses 高等数学
 
 另附 [`skills/export-schedule/`](skills/export-schedule/) 独立技能包：把课表渲染成图片供下载，适配各平台聊天里直接发图看课表的场景。
 
+另有 [`skills/meta-learning/`](skills/meta-learning/) 学习教练技能：认知科学驱动的元学习引擎（深度教学 / 知识结构诊断 / 考试型刻意练习编排），期末备考时上传讲义或课件即可使用——纯提示词技能，整目录拷进所用工具的技能目录（如 `~/.claude/skills/`、`~/.zcode/skills/`）即用，可配合 `njtech-jwgl` 的 `exams` 查考试安排倒排复习计划。
+
 <details>
 <summary><b>💻 系统要求</b>（点开查看）</summary>
 
