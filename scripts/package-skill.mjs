@@ -4,6 +4,7 @@
  * 支持的技能（skills/<名>/ 为源码，package/ 为独立包门面）：
  * - njtech-jwgl      教务无头查询（默认，不带参数时打它，向后兼容）
  * - export-schedule  课表图片导出（读本地缓存渲染 PNG/SVG）
+ * （skills/meta-learning/ 为纯提示词技能，无 scripts、无需打包，整目录拷走即用）
  *
  * 产物（默认在 dist/ 下）：
  * - dist/skill/<名>/    可整目录拷进各 agent 工具技能目录的技能

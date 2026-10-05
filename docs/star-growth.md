@@ -37,7 +37,7 @@
 >
 > **项目简介**：开源校园智能助手，把课表、成绩、考试、教务通知、待办、日历、知识库与记忆变成一句话对话。终端 TUI / 网页 / QQ 机器人三种入口，全本地运行，凭证 AES-256-GCM 加密落盘，无遥测。内置免账号离线演示（`npm run demo`，虚构数据）。
 >
-> **推荐理由**：面向真实校园场景的完整 AI Agent 工程样例：Vercel AI SDK v7 ToolLoopAgent + DeepSeek + 自研正方新版教务协议适配层，31 个工具、两层记忆、附件云解析与 .ics 日历导出。架构上 core / adapters / channels 三层解耦，正在征集更多学校的适配共建。
+> **推荐理由**：面向真实校园场景的完整 AI Agent 工程样例：Vercel AI SDK v7 ToolLoopAgent + DeepSeek + 自研正方新版教务协议适配层，32 个工具、两层记忆、附件云解析与 .ics 日历导出。架构上 core / adapters / channels 三层解耦，正在征集更多学校的适配共建。
 >
 > **适用人群**：南京工业大学在校学生；想学习本地 AI Agent 工程实现的开发者。
 >
