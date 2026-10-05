@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type R
 import logoHeader from './assets/logo-header.webp'
 import logoHero from './assets/logo-hero.webp'
 import screenshotHall from './assets/screenshot-hall.webp'
+import screenshotKnowledge from './assets/screenshot-knowledge.webp'
 import screenshotTui from './assets/screenshot-tui.webp'
 
 // 固定演示文本不接受外部输入，也不调用教务系统或模型服务。
@@ -59,8 +60,8 @@ function trackSpotlight(e: ReactMouseEvent<HTMLElement>) {
   el.style.setProperty('--my', `${e.clientY - rect.top}px`)
 }
 
-/* 社区统计数字：进入视口后缓动数上来；系统偏好减少动态或目标为 0 时直接显示 */
-function Stat({ value, label }: { value: number; label: string }) {
+/* 社区统计数字：进入视口后缓动数上来；系统偏好减少动态或目标为 0 时直接显示；suffix 用于 "30+" 这类后缀 */
+function Stat({ value, label, suffix = '' }: { value: number; label: string; suffix?: string }) {
   const [shown, setShown] = useState(() => {
     if (value === 0) return 0
     return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? value : 0
@@ -92,7 +93,7 @@ function Stat({ value, label }: { value: number; label: string }) {
 
   return (
     <div>
-      <dt ref={dtRef}>{shown}</dt>
+      <dt ref={dtRef}>{shown}{suffix}</dt>
       <dd>{label}</dd>
     </div>
   )
@@ -204,11 +205,12 @@ function App() {
         <section className="section wrap screen" id="features" aria-labelledby="features-title">
           <div className="section-head" data-reveal><div><p className="eyebrow">01 / LESS SEARCHING, MORE LIVING</p><h2 id="features-title">你说一句话，<br />小恐龙来办。</h2></div><p>不是又一个功能菜单，而是一位懂教务、会规划步骤、<br />记得住你的事的 Agent。</p></div>
           <div className="feature-grid" data-reveal="children">
-            <article className="feature feature-wide" onMouseMove={trackSpotlight}><span className="feature-number">01 — 对话即办事</span><h3>复合请求，<br />一次链式办完。</h3><p>自动理解意图、拆解步骤、调度 36 个内置工具——登录教务、查考试、导日历、设提醒一气呵成，不用自己拆成一次次查询与点击。</p><div className="prompt-pill"><span aria-hidden="true">›</span>“下周三有考试吗？加到手机日历，考前提醒我。”</div><span className="feature-symbol" aria-hidden="true">↗</span></article>
+            <article className="feature feature-wide" onMouseMove={trackSpotlight}><span className="feature-number">01 — 对话即办事</span><h3>复合请求，<br />一次链式办完。</h3><p>自动理解意图、拆解步骤、调度 30+ 个内置工具——登录教务、查考试、导日历、设提醒一气呵成，不用自己拆成一次次查询与点击。</p><div className="prompt-pill"><span aria-hidden="true">›</span>“下周三有考试吗？加到手机日历，考前提醒我。”</div><span className="feature-symbol" aria-hidden="true">↗</span></article>
             <article className="feature" onMouseMove={trackSpotlight}><span className="feature-number">02 — 思考与记忆</span><h3>过程看得见，<br />越用越懂你。</h3><p>思考过程与工具调用全程可见，可追问、可纠正；两层记忆跨重启续聊、自主沉淀事实，待办到期主动找人提醒。</p><div className="prompt-pill"><span aria-hidden="true">›</span>“上次聊的那个截止日期是哪天？”</div></article>
-            <article className="feature" onMouseMove={trackSpotlight}><span className="feature-number">03 — 三端随叫随到</span><h3>终端、网页、QQ，<br />同一份记忆。</h3><p>TUI、本地网页与 QQ 官方机器人共享同一 Agent 内核、36 个工具与记忆，在哪儿都能一句话办事。</p><div className="prompt-pill"><span aria-hidden="true">›</span>“在哪儿都能找到我。”</div></article>
+            <article className="feature" onMouseMove={trackSpotlight}><span className="feature-number">03 — 三端随叫随到</span><h3>终端、网页、QQ，<br />同一份记忆。</h3><p>TUI、本地网页与 QQ 官方机器人共享同一 Agent 内核、30+ 个工具与记忆，在哪儿都能一句话办事。</p><div className="prompt-pill"><span aria-hidden="true">›</span>“在哪儿都能找到我。”</div></article>
             <article className="feature" onMouseMove={trackSpotlight}><span className="feature-number">04 — 通知替你读</span><h3>长通知，<br />先读与你有关的。</h3><p>按年级自动标注相关度，附件 Excel 结构化筛选，长文分页续读；关键日期藏在附件里也会被拎出来提醒你。</p><div className="prompt-pill"><span aria-hidden="true">›</span>“这条通知需要我做什么？”</div></article>
             <article className="feature" onMouseMove={trackSpotlight}><span className="feature-number">05 — 数据不出本机</span><h3>凭证加密，<br />隐私优先。</h3><p>教务账号与 API Key 以 AES-256-GCM 加密保存在本机，开源可审计；无需服务器，也不用向任何第三方交出密码。</p><div className="prompt-pill"><span aria-hidden="true">›</span>“Local-first · 开源可审计”</div></article>
+            <article className="feature" onMouseMove={trackSpotlight}><span className="feature-number">06 — 学习教练</span><h3>到期末，<br />换个教法。</h3><p>学习类对话自动切换教练模式（源自 meta-learning 认知科学方法论）：直觉先于形式、答错先给提示，备考按「模板→变式→整卷」编排——先查真实考试安排与历史成绩再定计划。</p><div className="prompt-pill"><span aria-hidden="true">›</span>“帮我复习高数，下周三考试。”</div></article>
           </div>
         </section>
         <section className="section capability-band screen" aria-label="全景能力清单">
@@ -217,7 +219,7 @@ function App() {
               <div className="capability-head" data-reveal>
                 <div>
                   <p className="eyebrow">FULL TOOLBELT / 全景能力</p>
-                  <h3>36 个内置工具，十类校园事务，一套内核全包。</h3>
+                  <h3>30+ 个内置工具，从教务到备考，一套内核全包。</h3>
                 </div>
                 <p className="capability-note">全部功能在真实教务环境验证可用 · <a href="https://github.com/Health-525/courseraptor/blob/main/docs/capabilities.md">完整清单与使用边界 ↗</a></p>
               </div>
@@ -225,9 +227,9 @@ function App() {
                 <div className="capability" onMouseMove={trackSpotlight}><span>教务查询 <em>×12</em></span><p>课表（自动叠加放假调休）、成绩与 GPA、考试安排、学籍打码、选课冲突只读对比、搜课与可重修。</p></div>
                 <div className="capability" onMouseMove={trackSpotlight}><span>通知情报 <em>×3</em></span><p>按年级标注相关度、正文全文、附件下载缓存＋Excel 结构化筛选＋长文分页续读。</p></div>
                 <div className="capability" onMouseMove={trackSpotlight}><span>文件与数据 <em>×4</em></span><p>本地文件读取、Excel 筛选查询、沙箱 JS 计算、附件缓存管理。</p></div>
-                <div className="capability" onMouseMove={trackSpotlight}><span>文档写作 <em>×2</em></span><p>Word / Excel / PPT / PDF 一句话生成，支持跨格式转换，网页直接下载。</p></div>
+                <div className="capability" onMouseMove={trackSpotlight}><span>文档与课件 <em>×4</em></span><p>Word / Excel / PDF 生成与跨格式互转；PPT 写代码排版，套品牌课件模板，网页里直接翻页预览。</p></div>
                 <div className="capability" onMouseMove={trackSpotlight}><span>时间日历天气 <em>×5</em></span><p>教学周时间、调休落盘、.ics 日历导出、日历发布订阅、天气与穿衣建议。</p></div>
-                <div className="capability" onMouseMove={trackSpotlight}><span>记忆与效率 <em>×4</em></span><p>两层记忆、待办双通道到期提醒、按课程归类的知识库、番茄钟。</p></div>
+                <div className="capability" onMouseMove={trackSpotlight}><span>记忆与效率 <em>×4</em></span><p>两层记忆、待办双通道到期提醒、按课表真实课程归类的知识库、番茄钟。</p></div>
               </div>
             </div>
           </div>
@@ -240,12 +242,13 @@ function App() {
         </div></section>
         <section className="section wrap product screen" aria-labelledby="product-title"><div className="section-head" data-reveal><div><p className="eyebrow">03 / ON YOUR OWN DESK</p><h2 id="product-title">三种打开方式，<br />同一个助手。</h2></div><p>终端 TUI、本地网页与 QQ 机器人共享同一内核与记忆。<br />正式模式支持下载日历和生成的文档。</p></div>
           <div className="figure-grid" data-reveal="children">
-            <figure><div className="window-bar"><span className="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>CourseRaptor · 功能大厅</span><span aria-hidden="true">↗</span></div><img src={screenshotHall} alt="CourseRaptor 网页版功能大厅：知识卡与功能卡" width="1600" height="881" loading="lazy" /><figcaption>网页版功能大厅（/hall），虚构演示数据。</figcaption></figure>
+            <figure><div className="window-bar"><span className="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>CourseRaptor · 对话与功能大厅</span><span aria-hidden="true">↗</span></div><img src={screenshotHall} alt="CourseRaptor 网页版：对话区与右侧功能大厅宫格（今日日程、课表、考试、待办、知识库等面板）" width="1600" height="881" loading="lazy" /><figcaption>对话 + 功能大厅：一句话把面板推出来，虚构演示数据。</figcaption></figure>
+            <figure><div className="window-bar"><span className="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>CourseRaptor · 知识库</span><span aria-hidden="true">↗</span></div><img src={screenshotKnowledge} alt="CourseRaptor 知识库独立页：条目、导图与时间线三视图，按课程归类" width="1600" height="881" loading="lazy" /><figcaption>知识库独立页（/knowledge）：对话里说的知识点自动沉淀，虚构演示数据。</figcaption></figure>
             <figure><div className="window-bar"><span className="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>CourseRaptor · 终端 TUI</span><span aria-hidden="true">↗</span></div><img src={screenshotTui} alt="CourseRaptor 终端 TUI 首屏：今日课表、待办、考试与通知速览" width="1600" height="881" loading="lazy" /><figcaption>终端 TUI 首屏（演示模式数据）。</figcaption></figure>
           </div>
         </section>
-        <section className="start-section screen" id="start" aria-labelledby="start-title"><div className="wrap start-grid"><div data-reveal><p className="eyebrow">04 / YOUR FIRST CONVERSATION</p><h2 id="start-title">五分钟，<br />认识小恐龙。</h2><p>先体验，再决定要不要配置。<br />演示无需教务账号、API Key，也不会调用 AI。</p><div className="actions"><a className="button primary" href="https://github.com/Health-525/courseraptor/releases/latest">下载最新版单文件 exe · 约 110MB <span aria-hidden="true">↓</span></a><a className="button ghost" href="https://github.com/Health-525/courseraptor/releases">绿色 zip · 全部版本 <span aria-hidden="true">↗</span></a></div><p className="small muted">exe 双击即用、内置 Node 运行时；升级把新版 exe 放进原文件夹再双击即可，账号与数据不动。</p></div><div className="setup" data-reveal><ol><li><span>1</span><div><h3>下载并启动</h3><p>最新版 <a href="https://github.com/Health-525/courseraptor/releases/latest">见 Releases 页↗</a>：单文件 exe 双击即用，或绿色 zip 解压后双击 start.bat。</p></div></li><li><span>2</span><div><h3>按引导完成配置</h3><p>录入教务账号与 DeepSeek API Key，AES-256-GCM 加密保存在本机；开发者可克隆源码，免账号先跑离线演示。</p><div className="codebox"><div><span className="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>Terminal</span><button type="button" id="copy-command" onClick={copyCommands}>{copied ? '✓ 已复制' : '复制命令'}</button></div><pre><code id="commands" ref={commandsRef}>{START_COMMANDS.map((cmd) => <span key={cmd}><span className="ps1" aria-hidden="true">$ </span>{cmd}{'\n'}</span>)}</code></pre></div><p id="copy-status" className="small" role="status">{copyStatus}</p></div></li><li><span>3</span><div><h3>打开终端显示的地址</h3><p>网页版默认 <code>http://localhost:3210</code>；终端、网页都能用，QQ 机器人可选开启。</p></div></li></ol><div className="next-step">准备正式使用？按引导配置教务账号与 DeepSeek API Key 即可开始对话，日常成本个位数人民币。<a href="https://github.com/Health-525/courseraptor/blob/main/docs/student-guide.md">阅读同学使用指南 ↗</a></div></div></div></section>
-        <section className="section wrap faq screen" aria-labelledby="faq-title"><div data-reveal><p className="eyebrow">BEFORE YOU START</p><h2 id="faq-title">先说清楚，<br />用起来更安心。</h2></div><div className="faq-list" data-reveal="children"><details><summary>这是学校官方产品吗？</summary><p>不是。CourseRaptor 是非官方开源项目，当前适配南京工业大学，适合在个人电脑上自用，没有学校官方隶属或背书。</p></details><details><summary>使用需要付费吗？数据会发到哪里？</summary><p>项目以 ISC 许可证开源，安装与使用免费。离线演示不调用 AI；正式对话会把提问与所需查询结果发送到你配置的模型服务（DeepSeek），日常成本约个位数人民币每月。教务凭证 AES-256-GCM 加密保存在你自己的电脑，请勿分享已使用的项目目录。</p></details><details><summary>手机能直接打开这个网页查教务吗？</summary><p>这个网站是项目介绍页，不是在线教务服务。正式助手运行在你的电脑上；可把生成的 .ics 日历文件导入手机，或自行配置公开的 GitHub / Gitee 订阅源。公开订阅可能暴露课程与地点，发布前需确认。</p></details><details><summary>会自动提醒我，或帮我自动选课吗？</summary><p>待办与关键日期支持桌面通知 + QQ 双通道主动提醒；考试、放假等日程可导出日历订阅。真实选课等写操作默认关闭，仅保留只读对比工具，具体行为与限制见能力说明。</p></details><details><summary>我是开发者，这个项目对我有什么用？</summary><p>它同时是一套跑在真实使用里的本地 Agent 工程样例：Vercel AI SDK v7 的 <code>ToolLoopAgent</code> 多轮工具循环、<code>SchoolAdapter</code> 端口-适配器架构（新增一所学校 = 新增一个自包含目录，内核零改动）、11 家厂商的模型注册表装配，以及本地优先的凭证加密与沙箱设计。模式可自由复用（ISC 许可），也欢迎<a href="https://github.com/Health-525/courseraptor/blob/main/docs/adapter-guide.md">为你的学校写一个适配器</a>，合入后你就是该校的署名维护者。</p></details><details><summary>安装遇到问题，去哪里反馈？</summary><p>先看同学使用指南与仓库 README 的部署说明。可复现错误请提交 <a href="https://github.com/Health-525/courseraptor/issues/new/choose">Issue</a>，使用想法可到 <a href="https://github.com/Health-525/courseraptor/discussions">Discussions</a> 交流。请勿上传学号、成绩单、密码、API Key 或完整日志。</p></details></div></section>
+        <section className="start-section screen" id="start" aria-labelledby="start-title"><div className="wrap start-grid"><div data-reveal><p className="eyebrow">04 / YOUR FIRST CONVERSATION</p><h2 id="start-title">五分钟，<br />认识小恐龙。</h2><p>先体验，再决定要不要配置。<br />演示无需教务账号、API Key，也不会调用 AI。</p><div className="actions"><a className="button primary" href="https://github.com/Health-525/courseraptor/releases/latest">下载最新版单文件 exe · 约 110MB <span aria-hidden="true">↓</span></a><a className="button ghost" href="https://github.com/Health-525/courseraptor/releases">绿色 zip · 全部版本 <span aria-hidden="true">↗</span></a></div><p className="small muted">exe 双击即用、内置 Node 运行时；升级把新版 exe 放进原文件夹再双击即可，账号与数据不动。</p></div><div className="setup" data-reveal><ol><li><span>1</span><div><h3>下载并启动</h3><p>最新版 <a href="https://github.com/Health-525/courseraptor/releases/latest">见 Releases 页↗</a>：单文件 exe 双击即用，或绿色 zip 解压后双击 start.bat。</p></div></li><li><span>2</span><div><h3>按引导完成配置</h3><p>录入教务账号与模型 API Key——默认 DeepSeek，也内置通义千问、Kimi、智谱 GLM 等 11 家国内厂商可选，每家 Key 独立加密保存、切换不丢；开发者可克隆源码，免账号先跑离线演示。</p><div className="codebox"><div><span className="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>Terminal</span><button type="button" id="copy-command" onClick={copyCommands}>{copied ? '✓ 已复制' : '复制命令'}</button></div><pre><code id="commands" ref={commandsRef}>{START_COMMANDS.map((cmd) => <span key={cmd}><span className="ps1" aria-hidden="true">$ </span>{cmd}{'\n'}</span>)}</code></pre></div><p id="copy-status" className="small" role="status">{copyStatus}</p></div></li><li><span>3</span><div><h3>打开终端显示的地址</h3><p>网页版默认 <code>http://localhost:3210</code>；终端、网页都能用，QQ 机器人可选开启。</p></div></li></ol><div className="next-step">准备正式使用？按引导配置教务账号与任一家厂商的模型 API Key 即可开始对话，日常成本个位数人民币；其他学校开箱可用「手动课表」模式，粘贴课表文字 AI 解析即可。<a href="https://github.com/Health-525/courseraptor/blob/main/docs/student-guide.md">阅读同学使用指南 ↗</a></div></div></div></section>
+        <section className="section wrap faq screen" aria-labelledby="faq-title"><div data-reveal><p className="eyebrow">BEFORE YOU START</p><h2 id="faq-title">先说清楚，<br />用起来更安心。</h2></div><div className="faq-list" data-reveal="children"><details><summary>这是学校官方产品吗？</summary><p>不是。CourseRaptor 是非官方开源项目，当前对南京工业大学做全量适配，适合在个人电脑上自用，没有学校官方隶属或背书；其他学校开箱可用「手动课表」模式（粘贴或上传课表，AI 解析成结构化课表）。</p></details><details><summary>使用需要付费吗？数据会发到哪里？</summary><p>项目以 MIT 许可证开源，安装与使用免费。离线演示不调用 AI；正式对话会把提问与所需查询结果发送到你配置的模型服务（默认 DeepSeek，可换通义千问、Kimi 等 11 家国内厂商），日常成本约个位数人民币每月。教务凭证 AES-256-GCM 加密保存在你自己的电脑，请勿分享已使用的项目目录。</p></details><details><summary>手机能直接打开这个网页查教务吗？</summary><p>这个网站是项目介绍页，不是在线教务服务。正式助手运行在你的电脑上；可把生成的 .ics 日历文件导入手机，或自行配置公开的 GitHub / Gitee 订阅源。公开订阅可能暴露课程与地点，发布前需确认。</p></details><details><summary>会自动提醒我，或帮我自动选课吗？</summary><p>待办与关键日期支持桌面通知 + QQ 双通道主动提醒；考试、放假等日程可导出日历订阅。真实选课等写操作默认关闭，仅保留只读对比工具，具体行为与限制见能力说明。</p></details><details><summary>我是开发者，这个项目对我有什么用？</summary><p>它同时是一套跑在真实使用里的本地 Agent 工程样例：Vercel AI SDK v7 的 <code>ToolLoopAgent</code> 多轮工具循环、<code>SchoolAdapter</code> 端口-适配器架构（新增一所学校 = 新增一个自包含目录，内核零改动）、11 家厂商的模型注册表装配，以及本地优先的凭证加密与沙箱设计。模式可自由复用（MIT 许可），也欢迎<a href="https://github.com/Health-525/courseraptor/blob/main/docs/adapter-guide.md">为你的学校写一个适配器</a>，合入后你就是该校的署名维护者。</p></details><details><summary>安装遇到问题，去哪里反馈？</summary><p>先看同学使用指南与仓库 README 的部署说明。可复现错误请提交 <a href="https://github.com/Health-525/courseraptor/issues/new/choose">Issue</a>，使用想法可到 <a href="https://github.com/Health-525/courseraptor/discussions">Discussions</a> 交流。请勿上传学号、成绩单、密码、API Key 或完整日志。</p></details></div></section>
         <section className="community wrap screen" aria-labelledby="community-title">
           <div className="community-inner" data-reveal="children">
             <div className="community-mascot">
@@ -257,19 +260,19 @@ function App() {
               <p className="eyebrow">BUILT IN THE OPEN</p>
               <h2 id="community-title">让更多同学，<br /><em>遇见小恐龙。</em></h2>
               <p>如果它帮你省下了一点时间，欢迎给个 Star，<br />也欢迎把真实需求带回来，一起让它更好用。</p>
-              <p className="small muted">开发者：工程模式可整体搬走做自己的 Agent（ISC 许可）；<br />也欢迎为你的学校写适配器，成为署名维护者。</p>
+              <p className="small muted">开发者：工程模式可整体搬走做自己的 Agent（MIT 许可）；<br />也欢迎为你的学校写适配器，成为署名维护者。</p>
               <dl className="community-stats">
-                <Stat value={36} label="内置工具" />
+                <Stat value={30} suffix="+" label="内置工具" />
                 <Stat value={3} label="终端 · 网页 · QQ" />
                 <Stat value={0} label="数据出本机" />
               </dl>
               <div className="actions"><a className="button primary" href="https://github.com/Health-525/courseraptor">去 GitHub 看看 <span aria-hidden="true">↗</span></a><a className="button ghost" href="https://github.com/Health-525/courseraptor/discussions">聊聊你的想法 <span aria-hidden="true">↗</span></a></div>
-              <a className="text-link" href="https://github.com/Health-525/courseraptor/blob/main/docs/roadmap.md">下一站：今日日程 · 截止提醒 · 变更提示 →</a>
+              <a className="text-link" href="https://github.com/Health-525/courseraptor/blob/main/docs/roadmap.md">下一站：培养方案核对 · 考试复习计划 · 配置向导 →</a>
             </div>
           </div>
         </section>
       </main>
-      <footer className="wrap footer"><a className="brand" href="#">CourseRaptor<span>🦖</span></a><span>Made for students. A reference for agent builders.</span><div><a href="https://github.com/Health-525/courseraptor/blob/main/LICENSE">ISC License</a><a href="https://github.com/Health-525/courseraptor/blob/main/SECURITY.md">安全说明</a><a href="https://github.com/Health-525/courseraptor/blob/main/README.en.md" lang="en">English docs ↗</a></div></footer>
+      <footer className="wrap footer"><a className="brand" href="#">CourseRaptor<span>🦖</span></a><span>Made for students. A reference for agent builders.</span><div><a href="https://github.com/Health-525/courseraptor/blob/main/LICENSE">MIT License</a><a href="https://github.com/Health-525/courseraptor/blob/main/SECURITY.md">安全说明</a><a href="https://github.com/Health-525/courseraptor/blob/main/README.en.md" lang="en">English docs ↗</a></div></footer>
     </>
   )
 }
