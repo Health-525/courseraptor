@@ -44,7 +44,7 @@ export function knowledgePage(
     color-scheme: light;
     --paper: #F6F4ED;
     --paper-deep: #F0EDE4;
-    --card: #FCFBF7;
+    --card: #FFFFFF;
     --shade: #ECE8DD;
     --ink: #25221C;
     --ink-2: #5A554A;
@@ -83,9 +83,11 @@ export function knowledgePage(
   .ph-title h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: 0; }
   .ph-right { display: flex; align-items: center; gap: 10px; }
 
-  /* ── flomo 布局：侧栏（标签 + 统计 + 热力图）+ 主列川流 ── */
-  main { display: grid; grid-template-columns: 248px minmax(0, 1fr); align-items: stretch;
-         min-height: calc(100vh - 55px); }
+  /* ── flomo 布局：侧栏（标签 + 统计 + 热力图）+ 主列川流 ──
+     侧栏 300px（标签/热力图有呼吸空间），主区底压深一档（paper-deep），
+     纯白卡在浅底上「浮」出来，视觉重心落在卡片流 */
+  main { display: grid; grid-template-columns: 300px minmax(0, 1fr); align-items: stretch;
+         min-height: calc(100vh - 55px); background: var(--paper-deep); }
 
   .kn-rail { background: var(--card); border-right: 1px solid var(--rule);
              padding: 18px 16px 28px; position: sticky; top: 55px; align-self: start;
@@ -130,7 +132,7 @@ export function knowledgePage(
   .rail-meta .tbtn { margin-top: 12px; min-height: 30px; padding: 3px 12px; font-size: 12px; }
 
   /* ── 主列 ── */
-  .kn-main { width: 100%; max-width: 648px; margin: 0 auto; padding: 18px 20px 64px; }
+  .kn-main { width: 100%; max-width: 860px; margin: 0 auto; padding: 20px 24px 64px; }
 
   /* 发布框：首行=标题，其余=正文 */
   .composer { border: 1px solid var(--rule-2); border-radius: 12px; background: var(--card);
