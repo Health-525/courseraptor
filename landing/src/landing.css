@@ -498,7 +498,7 @@ h2 { font-size: clamp(32px, 3.3vw, 46px); line-height: 1.35; letter-spacing: -0.
 
 .product { padding-block: 72px }
 
-.figure-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px }
+.figure-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px }
 
 .product figure {
   margin: 0;
@@ -527,6 +527,7 @@ h2 { font-size: clamp(32px, 3.3vw, 46px); line-height: 1.35; letter-spacing: -0.
 .lights i:nth-child(1) { background: #ff5f57 }
 .lights i:nth-child(2) { background: #febc2e }
 .lights i:nth-child(3) { background: #28c840 }
+.window-bar > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .product figure > img { width: 100%; height: auto; transition: transform 0.5s var(--ease-out) }
 .product figure:hover > img { transform: scale(1.015) }
 .product figcaption { font-size: 12px; padding: 14px 22px; color: var(--muted) }
@@ -719,6 +720,9 @@ details[open] summary::after { transform: rotate(45deg) }
   .try-grid, .start-grid, .faq { gap: 45px }
   .hero-note { max-width: 320px }
   .hero-desc { font-size: 16px }
+  /* 产品截图：三图降为两列，TUI 全宽压轴 */
+  .figure-grid { grid-template-columns: 1fr 1fr }
+  .figure-grid figure:nth-child(3) { grid-column: span 2 }
 }
 
 @media (max-width: 900px) {
@@ -762,6 +766,8 @@ details[open] summary::after { transform: rotate(45deg) }
   .feature-number { font-size: 11px; margin-bottom: 22px }
   .prompt-pill { font-size: 12px }
   .try-grid, .start-grid, .faq { grid-template-columns: 1fr; gap: 36px }
+  .figure-grid { grid-template-columns: 1fr }
+  .figure-grid figure:nth-child(3) { grid-column: auto }
   .try-section, .start-section { padding-block: 55px }
   .try-grid { width: calc(100% - 44px) }
   .conversation { box-shadow: 6px 8px 0 #dce5dc }
