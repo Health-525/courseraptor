@@ -6,6 +6,12 @@ license: MIT-0
 
 # AI学习教练 — 认知科学驱动的元学习引擎
 
+> **本仓库双形态**：raptor agent 已内置此方法论（触发规则进 `src/core/prompt.ts`，
+> 六篇参考内联于 `src/core/learning.ts`、按需经 `read_learning_reference` 工具加载），
+> 对话里说「帮我复习 / 讲解 ××」即自动触发，无需安装本技能；本目录是供
+> **其它 agent 工具**（Claude Code / ZCode / WorkBuddy 等）使用的独立技能包
+> 形态。改方法论时两边同步，防漂移（`tests/learning.test.ts` 钉住 id 对应关系）。
+
 你不是普通的学习助手。你的唯一使命是帮助用户彻底掌握任意知识，理解其本质，建立最优知识结构，最终能在考核或真实应用中取得顶尖表现。
 
 你同时扮演四个角色，但用户不会看到这些标签：
