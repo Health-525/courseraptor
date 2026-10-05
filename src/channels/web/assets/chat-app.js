@@ -1452,6 +1452,11 @@ const HALL_ICONS = {
     '<svg viewBox="0 0 24 24" aria-hidden="true">' +
     '<path d="m4 17 6-6-6-6"/>' +
     '<path d="M12 19h8"/></svg>',
+  usage:
+    '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+    '<rect x="3" y="12" width="4" height="8"/>' +
+    '<rect x="10" y="7" width="4" height="13"/>' +
+    '<rect x="17" y="3" width="4" height="17"/></svg>',
   settings: GEAR,
   account:
     '<svg viewBox="0 0 24 24" aria-hidden="true">' +
@@ -1484,6 +1489,9 @@ const HALL_CARDS = [
   /* 提示词模板与设置并列（2026-09-23）：原设置里的「常用问题」栏目拆出来
      成独立面板——它是内容管理，不是凭证配置，混在设置里连保存语义都变了味 */
   { id: "prompts", t: "提示词模板", d: "输入框上方「提示词」的自定义清单", group: "系统" },
+  /* 用量统计（2026-10-05）：每日 token 消耗的 GitHub 式热力图 + 各模型分布。
+     全平台功能（本地版记自己的 Key 用量、托管版同记并上报网关），非托管专属 */
+  { id: "usage", t: "用量统计", d: "每日 Token 消耗热力图与各模型用量", group: "系统" },
   /* 导入课表：不进宫格（入口在 设置 → 学校 与课表空态），深链 #hall=import 可达 */
   { id: "import", t: "导入课表", d: "粘贴或上传课表，AI 解析后手动确认", group: "系统", hidden: true },
   /* 我的账号：托管版专有（改本站登录密码），quota 探测成功后现身 */
@@ -1701,7 +1709,8 @@ function hallFullPage(panel) {
   if (panel === "schedule") return "/schedule";
   if (panel === "todos") return "/todos";
   if (panel === "knowledge") return "/knowledge";
-  if (panel === "pomodoro" || panel === "grades" || panel === "news") return "";
+  if (panel === "pomodoro" || panel === "grades" || panel === "news" || panel === "usage")
+    return "";
   return "/today";
 }
 function hallMore(panel) {
@@ -2454,6 +2463,193 @@ function buildNews() {
       return wrap;
     });
 }
+/* ── 用量统计面板：GitHub 式热力图（每日 token）+ 各模型分布 ── */
+
+/* token 数的中文缩写：1.23 亿 / 4.5 万 / 678 */
+function fmtTokens(n) {
+  n = Number(n) || 0;
+  if (n >= 1e8) return (n / 1e8).toFixed(2).replace(/\.?0+$/, "") + " 亿";
+  if (n >= 1e4) return (n / 1e4).toFixed(1).replace(/\.0$/, "") + " 万";
+  return String(Math.round(n));
+}
+
+/* 本机时区的 YYYY-MM-DD（数据键是北京时间切日；用户本机即北京时间） */
+function usageDateKey(d) {
+  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+}
+
+/* 热力图色阶：非零日按分位 25/50/75 升档（GitHub 同语义——非零即亮） */
+function usageLevels(dayTotals) {
+  const vals = Object.values(dayTotals)
+    .filter((v) => v > 0)
+    .sort((a, b) => a - b);
+  if (!vals.length) return (v) => (v > 0 ? 1 : 0);
+  const q = (p) => vals[Math.min(vals.length - 1, Math.floor(p * (vals.length - 1)))];
+  const t1 = q(0.25);
+  const t2 = q(0.5);
+  const t3 = q(0.75);
+  return (v) => (v <= 0 ? 0 : v <= t1 ? 1 : v <= t2 ? 2 : v <= t3 ? 3 : 4);
+}
+
+/* 一格：日期 + 用量 + 原生 title 悬停说明（无障碍名字同步给 aria-label） */
+function usageCell(date, total, levelOf, future) {
+  const cell = document.createElement("span");
+  cell.className = "uh-cell" + (future ? " future" : "");
+  if (future) {
+    cell.setAttribute("aria-hidden", "true");
+    return cell;
+  }
+  cell.dataset.l = String(levelOf(total));
+  cell.dataset.d = date;
+  const label = total > 0 ? total.toLocaleString("zh-CN") + " tokens" : "无用量";
+  cell.title = date + " · " + label;
+  cell.setAttribute("aria-label", date + " " + label);
+  return cell;
+}
+
+/* 53 周 × 7 行的热力图网格（左端行标签 + 顶部月份行 + 横向滚动，默认滚到今天） */
+function usageHeatmap(dayTotals) {
+  const box = el("usage-heat");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dowMon = (today.getDay() + 6) % 7; // 周一=0 … 周日=6
+  const endMonday = new Date(today);
+  endMonday.setDate(today.getDate() - dowMon);
+  const startMonday = new Date(endMonday);
+  startMonday.setDate(endMonday.getDate() - 52 * 7);
+  const levelOf = usageLevels(dayTotals);
+
+  const dayLabels = el("uh-days");
+  ["一", "", "", "四", "", "", "日"].forEach((t) => {
+    const s = document.createElement("span");
+    s.textContent = t;
+    dayLabels.appendChild(s);
+  });
+  box.appendChild(dayLabels);
+
+  const scroll = el("uh-scroll");
+  const inner = el("uh-inner");
+
+  const months = el("uh-months");
+  const grid = el("uh-grid");
+  let lastMonth = -1;
+  for (let c = 0; c <= 52; c++) {
+    const monday = new Date(startMonday);
+    monday.setDate(startMonday.getDate() + c * 7);
+    const m = monday.getMonth();
+    const mLabel = document.createElement("span");
+    if (m !== lastMonth) {
+      mLabel.textContent = m + 1 + "月";
+      lastMonth = m;
+    }
+    months.appendChild(mLabel);
+    for (let r = 0; r < 7; r++) {
+      const day = new Date(monday);
+      day.setDate(monday.getDate() + r);
+      const key = usageDateKey(day);
+      grid.appendChild(usageCell(key, dayTotals[key] || 0, levelOf, day > today));
+    }
+  }
+  inner.appendChild(months);
+  inner.appendChild(grid);
+
+  /* 图例：与格子同尺寸的四档色阶 + 「少/多」 */
+  const legend = el("uh-legend");
+  legend.appendChild(el2("", "少"));
+  for (let l = 0; l <= 4; l++) {
+    const sw = document.createElement("i");
+    sw.dataset.l = String(l);
+    legend.appendChild(sw);
+  }
+  legend.appendChild(el2("", "多"));
+  inner.appendChild(legend);
+
+  scroll.appendChild(inner);
+  box.appendChild(scroll);
+  /* 打开即看今天：默认滚到最右（今天所在的最后一列） */
+  requestAnimationFrame(() => {
+    scroll.scrollLeft = scroll.scrollWidth;
+  });
+  return box;
+}
+
+/* 各模型用量分布：模型名 + 输入/输出明细 + 总量占比条 */
+function usageModelList(models) {
+  const box = el("usage-models");
+  const sum = models.reduce((acc, m) => acc + (m.total || 0), 0);
+  models.forEach((m) => {
+    const row = el("um-row");
+    const head = el("um-head");
+    const name = document.createElement("b");
+    name.textContent = m.model;
+    head.appendChild(name);
+    const num = el2("um-num", fmtTokens(m.total) + (sum > 0 ? " · " + Math.round((m.total / sum) * 100) + "%" : ""));
+    head.appendChild(num);
+    row.appendChild(head);
+    const meta = el2("um-meta", "输入 " + fmtTokens(m.in) + " · 输出 " + fmtTokens(m.out));
+    row.appendChild(meta);
+    const bar = el("um-bar");
+    const fill = document.createElement("i");
+    fill.style.width = (sum > 0 ? Math.max(2, (m.total / sum) * 100) : 0) + "%";
+    bar.appendChild(fill);
+    row.appendChild(bar);
+    box.appendChild(row);
+  });
+  return box;
+}
+
+function buildUsage() {
+  return fetch("/api/usage")
+    .then((r) => r.json())
+    .then((d) => {
+      const wrap = el("");
+      const days = d.days || {};
+      const models = d.models || [];
+      const totals = d.totals || { today: 0, week: 0, month: 0, year: 0 };
+      const dayTotals = {};
+      Object.keys(days).forEach((k) => {
+        dayTotals[k] = days[k].total || 0;
+      });
+      if (!Object.keys(dayTotals).length) {
+        wrap.appendChild(
+          hallEmpty(
+            "▦",
+            "还没有 Token 用量",
+            "和 AI 对话后，这里会以 GitHub 式热力图展示每日消耗与各模型用量。",
+          ),
+        );
+        return wrap;
+      }
+      /* 摘要：今日 / 近 7 天 / 近 30 天 / 近一年 */
+      const kpi = el("usage-kpi");
+      [
+        ["今日", totals.today],
+        ["近 7 天", totals.week],
+        ["近 30 天", totals.month],
+        ["近一年", totals.year],
+      ].forEach(([label, v]) => {
+        const cell = el("uk");
+        cell.appendChild(el2("uk-v", fmtTokens(v)));
+        cell.appendChild(el2("uk-l", label));
+        kpi.appendChild(cell);
+      });
+      wrap.appendChild(kpi);
+      wrap.appendChild(usageHeatmap(dayTotals));
+      if (models.length) {
+        const sec = el("hall-sec");
+        sec.appendChild(el2("", "各模型用量"));
+        sec.appendChild(el2("", "近一年累计"));
+        wrap.appendChild(sec);
+        wrap.appendChild(usageModelList(models));
+      }
+      if (HALL_DEMO)
+        wrap.appendChild(hallNote("演示数据：虚构一年的用量；正式运行后这里是你自己的真实消耗。"));
+      wrap.appendChild(
+        hallNote("统计口径：每轮对话的全部模型调用（含工具循环），按北京时间切日。"),
+      );
+      return wrap;
+    });
+}
 const HALL_PANELS = {
   today: () => briefOf().then(buildToday),
   schedule: () => briefOf().then(buildSchedule),
@@ -2463,6 +2659,7 @@ const HALL_PANELS = {
   todos: () => briefOf().then((b) => buildTodoList(b.todos)),
   knowledge: () => briefOf().then(buildKnowledge),
   pomodoro: buildPomodoro,
+  usage: buildUsage,
 };
 
 /* 大厅焦点归还：记住抽屉外的打开者，关闭时还回去（键盘用户不丢位置） */

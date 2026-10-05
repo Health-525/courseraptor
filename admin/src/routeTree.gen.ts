@@ -26,6 +26,7 @@ import { Route as AuthenticatedReleaseIndexRouteImport } from './routes/_authent
 import { Route as AuthenticatedResetsIndexRouteImport } from './routes/_authenticated/resets/index'
 import { Route as AuthenticatedSecurityIndexRouteImport } from './routes/_authenticated/security/index'
 import { Route as AuthenticatedSiteIndexRouteImport } from './routes/_authenticated/site/index'
+import { Route as AuthenticatedTokenUsageIndexRouteImport } from './routes/_authenticated/token-usage/index'
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -118,6 +119,12 @@ const AuthenticatedSiteIndexRoute = AuthenticatedSiteIndexRouteImport.update({
   path: '/site/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTokenUsageIndexRoute =
+  AuthenticatedTokenUsageIndexRouteImport.update({
+    id: '/token-usage/',
+    path: '/token-usage/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedUsersIndexRoute = AuthenticatedUsersIndexRouteImport.update({
   id: '/users/',
   path: '/users/',
@@ -141,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/resets/': typeof AuthenticatedResetsIndexRoute
   '/security/': typeof AuthenticatedSecurityIndexRoute
   '/site/': typeof AuthenticatedSiteIndexRoute
+  '/token-usage/': typeof AuthenticatedTokenUsageIndexRoute
   '/users/': typeof AuthenticatedUsersIndexRoute
 }
 export interface FileRoutesByTo {
@@ -160,6 +168,7 @@ export interface FileRoutesByTo {
   '/resets': typeof AuthenticatedResetsIndexRoute
   '/security': typeof AuthenticatedSecurityIndexRoute
   '/site': typeof AuthenticatedSiteIndexRoute
+  '/token-usage': typeof AuthenticatedTokenUsageIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
 }
 export interface FileRoutesById {
@@ -181,6 +190,7 @@ export interface FileRoutesById {
   '/_authenticated/resets/': typeof AuthenticatedResetsIndexRoute
   '/_authenticated/security/': typeof AuthenticatedSecurityIndexRoute
   '/_authenticated/site/': typeof AuthenticatedSiteIndexRoute
+  '/_authenticated/token-usage/': typeof AuthenticatedTokenUsageIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
 }
 export interface FileRouteTypes {
@@ -202,6 +212,7 @@ export interface FileRouteTypes {
     | '/resets/'
     | '/security/'
     | '/site/'
+    | '/token-usage/'
     | '/users/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -221,6 +232,7 @@ export interface FileRouteTypes {
     | '/resets'
     | '/security'
     | '/site'
+    | '/token-usage'
     | '/users'
   id:
     | '__root__'
@@ -241,6 +253,7 @@ export interface FileRouteTypes {
     | '/_authenticated/resets/'
     | '/_authenticated/security/'
     | '/_authenticated/site/'
+    | '/_authenticated/token-usage/'
     | '/_authenticated/users/'
   fileRoutesById: FileRoutesById
 }
@@ -375,6 +388,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSiteIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/token-usage/': {
+      id: '/_authenticated/token-usage/'
+      path: '/token-usage'
+      fullPath: '/token-usage/'
+      preLoaderRoute: typeof AuthenticatedTokenUsageIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/users/': {
       id: '/_authenticated/users/'
       path: '/users'
@@ -396,6 +416,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedResetsIndexRoute: typeof AuthenticatedResetsIndexRoute
   AuthenticatedSecurityIndexRoute: typeof AuthenticatedSecurityIndexRoute
   AuthenticatedSiteIndexRoute: typeof AuthenticatedSiteIndexRoute
+  AuthenticatedTokenUsageIndexRoute: typeof AuthenticatedTokenUsageIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
 }
 
@@ -410,6 +431,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedResetsIndexRoute: AuthenticatedResetsIndexRoute,
   AuthenticatedSecurityIndexRoute: AuthenticatedSecurityIndexRoute,
   AuthenticatedSiteIndexRoute: AuthenticatedSiteIndexRoute,
+  AuthenticatedTokenUsageIndexRoute: AuthenticatedTokenUsageIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
 }
 

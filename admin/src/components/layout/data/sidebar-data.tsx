@@ -1,4 +1,5 @@
 import {
+  Coins,
   Gauge,
   KeyRound,
   MonitorSmartphone,
@@ -94,6 +95,11 @@ export const sidebarData: SidebarData = {
     {
       title: '系统',
       items: [
+        {
+          title: 'Token 用量',
+          url: '/token-usage',
+          icon: Coins,
+        },
         {
           title: '本地版监控',
           url: '/local-usage',

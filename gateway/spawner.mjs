@@ -9,7 +9,7 @@
  */
 
 import { spawn } from "node:child_process";
-import { randomInt } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -71,6 +71,8 @@ export function buildInstanceEnv(
     providerId = "",
     providerSiteKey = "",
     siteModel = "",
+    reportUrl = "",
+    reportToken = "",
   },
 ) {
   const env = {};
@@ -102,6 +104,13 @@ export function buildInstanceEnv(
   // 站点默认型号（site.json，管理台「站点默认模型」）：实例内优先级在同学
   // 自选之后（config.ts），只兜底从没选过型号的同学，不动任何人的选择。
   if (siteModel) env.RAPTOR_SITE_MODEL = siteModel;
+  // Token 用量上报：实例把每次 LLM 调用的 usage 报回网关内部端点（管理台
+  // 「Token 用量」页的数据源）。令牌是 per-instance 随机值——泄露面只有
+  // 「给本实例自己的统计注水」，拿不到网关任何其他凭据。
+  if (reportUrl && reportToken) {
+    env.RAPTOR_USAGE_REPORT_URL = reportUrl;
+    env.RAPTOR_USAGE_REPORT_TOKEN = reportToken;
+  }
   return env;
 }
 
@@ -119,6 +128,8 @@ export function createSpawner({
   getProviderSiteKey = null,
   /** 每次拉起时问一次：站点默认模型 {provider, model}（site.json，管理台配置；可缺省） */
   getSiteDefault = null,
+  /** Token 用量上报端点（http://127.0.0.1:<网关端口>/internal/usage-report） */
+  reportBaseUrl = "",
   maxConcurrent = 4,
   idleMinutes = 30,
   reapIntervalMs = 60_000,
@@ -242,6 +253,8 @@ export function createSpawner({
     const credFile = path.join(userDataDir(userId), "credentials.enc");
     mkdirSync(dataDir, { recursive: true });
     const port = pickPort();
+    // per-instance 上报令牌：网关侧存 instance 对象里，上报端点据此反查 userId
+    const reportToken = randomBytes(24).toString("hex");
     const env = buildInstanceEnv(process.env, {
       port,
       dataDir,
@@ -252,6 +265,8 @@ export function createSpawner({
       providerId,
       providerSiteKey,
       siteModel,
+      reportUrl: reportBaseUrl,
+      reportToken,
     });
 
     const child = spawn(nodeExec, ["--import", tsxUrl, "gateway/headless/entry.ts"], {
@@ -270,6 +285,7 @@ export function createSpawner({
       stopping: false,
       recentLogs: [],
       rawStdout: "",
+      reportToken,
     };
     instances.set(userId, instance);
 
@@ -430,6 +446,19 @@ export function createSpawner({
         lastRequestAt: it.lastRequestAt,
         restarts: it.restarts,
       }));
+    },
+
+    /**
+     * Token 用量上报的令牌解析：返回持有该令牌的实例的 userId，无效返回 null。
+     * 令牌随实例生命周期（回收后即失效，重启实例换新值）。
+     */
+    resolveReportToken(token) {
+      const value = String(token ?? "");
+      if (!value) return null;
+      for (const instance of instances.values()) {
+        if (instance.reportToken && instance.reportToken === value) return instance.userId;
+      }
+      return null;
     },
 
     /** 空闲回收 + 供 /health 展示 */

@@ -1107,10 +1107,66 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                transition: border-color .15s ease, box-shadow .15s ease; }
   .hall-item:hover, .hall-item:focus-within { border-color: var(--rule-2);
                                               box-shadow: 0 2px 10px rgba(50, 42, 31, .07); }
-  /* 面板内容淡入：切换/刷新时给 0.16s 过渡（reduced-motion 下全局已禁用） */
-  .hall-dyn-in { animation: hallFade .16s ease; }
-  @keyframes hallFade { from { opacity: .2; } to { opacity: 1; } }
-  .hall-item .ht { font-size: 14px; font-weight: 600; line-height: 1.5;
+   /* 面板内容淡入：切换/刷新时给 0.16s 过渡（reduced-motion 下全局已禁用） */
+   .hall-dyn-in { animation: hallFade .16s ease; }
+   @keyframes hallFade { from { opacity: .2; } to { opacity: 1; } }
+
+   /* ── 用量统计面板：摘要四格 + GitHub 式热力图 + 模型分布 ── */
+   .usage-kpi { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 2px 0 14px; }
+   .usage-kpi .uk { border: 1px solid var(--rule); background: var(--card);
+                    padding: 8px 10px; border-radius: 4px; min-width: 0; }
+   .usage-kpi .uk-v { font-family: var(--mono); font-size: 14px; color: var(--ink);
+                      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+   .usage-kpi .uk-l { font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+                      margin-top: 2px; letter-spacing: .06em; }
+   /* 热力图：左侧星期标签 + 横向滚动的一年格子；格子 11px 是 GitHub 同款密度 */
+   .usage-heat { display: flex; gap: 5px; align-items: flex-start; }
+   .uh-days { flex: none; display: grid; grid-template-rows: repeat(7, 11px);
+              gap: 3px; margin-top: 15px;
+              font-family: var(--mono); font-size: 9px; color: var(--ink-3); }
+   .uh-days span { height: 11px; display: flex; align-items: center; }
+   .uh-scroll { flex: 1; min-width: 0; overflow-x: auto; padding-bottom: 4px;
+                scrollbar-width: thin; scrollbar-color: var(--rule-2) transparent; }
+   .uh-inner { display: inline-flex; flex-direction: column; gap: 3px; min-width: max-content; }
+   .uh-months { display: grid; grid-auto-flow: column; grid-auto-columns: 11px; gap: 3px;
+                height: 12px; font-family: var(--mono); font-size: 9px; color: var(--ink-3); }
+   .uh-months span { overflow: visible; white-space: nowrap; }
+   .uh-grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 11px);
+              grid-auto-columns: 11px; gap: 3px; }
+   .uh-cell { width: 11px; height: 11px; border-radius: 2px;
+              background: var(--paper-deep); border: 1px solid rgba(93, 84, 66, .12);
+              box-sizing: border-box; }
+   .uh-cell.future { visibility: hidden; }
+   /* 色阶：纸灰 → 朱砂四档（与 /knowledge 页热力图同一套朱砂过渡） */
+   .uh-cell[data-l="1"] { background: #EDD3CC; border-color: transparent; }
+   .uh-cell[data-l="2"] { background: #D89D8F; border-color: transparent; }
+   .uh-cell[data-l="3"] { background: #C5664F; border-color: transparent; }
+   .uh-cell[data-l="4"] { background: var(--accent); border-color: var(--accent-deep); }
+   .uh-cell:not(.future):hover { outline: 1.5px solid var(--ink-3); outline-offset: 1px; }
+   /* 图例：少→多 四档小方 + 等宽小字，右对齐到月份行下 */
+   .uh-legend { display: flex; align-items: center; gap: 4px; align-self: flex-end;
+                font-family: var(--mono); font-size: 9px; color: var(--ink-3); margin-top: 2px; }
+   .uh-legend i { width: 11px; height: 11px; border-radius: 2px;
+                  background: var(--paper-deep); border: 1px solid rgba(93, 84, 66, .12);
+                  box-sizing: border-box; }
+   .uh-legend i[data-l="1"] { background: #EDD3CC; border-color: transparent; }
+   .uh-legend i[data-l="2"] { background: #D89D8F; border-color: transparent; }
+   .uh-legend i[data-l="3"] { background: #C5664F; border-color: transparent; }
+   .uh-legend i[data-l="4"] { background: var(--accent); border-color: var(--accent-deep); }
+   /* 各模型分布：名称 + 总量占比一行，输入/输出明细等宽小字，占比条复用朱砂 */
+   .usage-models { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+   .um-row { display: flex; flex-direction: column; gap: 4px; }
+   .um-head { display: flex; align-items: baseline; gap: 8px; }
+   .um-head b { flex: 1; min-width: 0; font-family: var(--mono); font-size: 12px;
+                font-weight: 600; color: var(--ink-2); overflow-wrap: anywhere; }
+   .um-num { flex: none; font-family: var(--mono); font-size: 12px; color: var(--accent-deep); }
+   .um-meta { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+   .um-bar { height: 5px; border-radius: 3px; background: var(--paper-deep); overflow: hidden; }
+   .um-bar i { display: block; height: 100%; border-radius: 3px;
+               background: var(--accent); opacity: .85; }
+   /* 窄屏：摘要四格保持一排，热力图横向滚动（同桌面语义） */
+
+   .hall-item .ht { font-size: 14px; font-weight: 600; line-height: 1.5;
                    overflow-wrap: anywhere; }
   .hall-item .hm { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
                    margin-top: 2px; line-height: 1.6; overflow-wrap: anywhere; }

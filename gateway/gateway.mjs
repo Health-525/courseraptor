@@ -22,6 +22,7 @@ import { createGatewayServer } from "./app.mjs";
 import { createLocalUsageStore } from "./local-usage.mjs";
 import { createRegistry } from "./registry.mjs";
 import { createSpawner } from "./spawner.mjs";
+import { createTokenUsageStore } from "./token-usage.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const env = process.env;
@@ -73,6 +74,8 @@ const spawner = createSpawner({
     registry
       .getSiteSettings()
       .then((s) => ({ provider: s.defaultProvider || "", model: s.defaultModel || "" })),
+  // 实例 Token 用量上报端点（回环直达网关自己；令牌 spawner 每实例现生成）
+  reportBaseUrl: `http://127.0.0.1:${port}/internal/usage-report`,
   maxConcurrent: Number(env.GATEWAY_MAX_CONCURRENT) || 4,
   idleMinutes: Number(env.GATEWAY_IDLE_MINUTES) || 30,
 });
@@ -93,6 +96,8 @@ const server = createGatewayServer({
   envDeepseekKeySet: Boolean(env.GATEWAY_DEEPSEEK_KEY),
   // 本地版（安装包/TUI）匿名使用统计：POST /api/local-usage 收，管理台看
   localUsage: createLocalUsageStore({ stateDir }),
+  // 同学实例的 Token 用量账本：POST /internal/usage-report 收，管理台「Token 用量」看
+  tokenUsage: createTokenUsageStore({ stateDir }),
 });
 
 // 连接保活拉长到 72s：跨公网 RTT 大、且前端有分钟级轮询，

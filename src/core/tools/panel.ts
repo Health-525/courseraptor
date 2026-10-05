@@ -26,6 +26,7 @@ export const PANEL_IDS = [
   "knowledge",
   "pomodoro",
   "prompts",
+  "usage",
   "settings",
 ] as const;
 
@@ -39,6 +40,7 @@ const PANEL_TITLES: Record<(typeof PANEL_IDS)[number], string> = {
   knowledge: "知识库",
   pomodoro: "番茄钟",
   prompts: "提示词模板",
+  usage: "用量统计",
   settings: "设置",
 };
 
@@ -47,9 +49,10 @@ export const panelTools = {
   open_panel: tool({
     description:
       "用户明确想打开某个功能面板时调用，说法不限——「打开课表」「看看考试」「展开待办」" +
-      "「我要看成绩」「切到知识库」「看下今天安排」都算。panel 取值：today 今日日程 / " +
+      "「我要看成绩」「切到知识库」「看下今天安排」「看看用量」都算。panel 取值：today 今日日程 / " +
       "schedule 课表 / exams 考试 / grades 成绩 / news 教务通知 / todos 待办 / knowledge 知识库 / " +
-      "pomodoro 番茄钟 / prompts 提示词模板 / settings 设置。网页端会自动从右侧推出对应面板，" +
+      "pomodoro 番茄钟 / prompts 提示词模板 / usage 用量统计（每日 token 热力图）/ settings 设置。" +
+      "网页端会自动从右侧推出对应面板，" +
       "调完一句确认即可，不复述面板内容。注意：用户只是问数据（「这周有什么课」）时不要调本工具，" +
       "直接用查询工具在对话里回答；终端（TUI）/QQ 等没有网页面板的环境同样别调，直接给内容。",
     inputSchema: z.object({ panel: z.enum(PANEL_IDS).describe("要打开的面板 id") }),

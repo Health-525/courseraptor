@@ -17,4 +17,6 @@ export function createGatewayServer(options: {
   envDeepseekKeySet?: boolean;
   /** 本地版匿名使用统计（缺省时 POST /api/local-usage 回 501） */
   localUsage?: import("./local-usage.mjs").LocalUsageStore | null;
+  /** 实例 Token 用量账本（缺省时 POST /internal/usage-report 回 501） */
+  tokenUsage?: import("./token-usage.mjs").TokenUsageStore | null;
 }): Server;

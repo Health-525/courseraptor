@@ -161,6 +161,46 @@ export async function localUsageGet() {
   return res.data
 }
 
+// ── Token 用量统计（实例上报的每日消耗聚合）─────────────────────
+
+export type TokenUsageDay = {
+  date: string
+  in: number
+  out: number
+  total: number
+}
+
+export type TokenUsageStats = {
+  range: string
+  from: string
+  to: string
+  total: { in: number; out: number; total: number }
+  days: TokenUsageDay[]
+  byUser: Array<{
+    id: string
+    username: string
+    in: number
+    out: number
+    total: number
+  }>
+  byModel: Array<{ model: string; in: number; out: number; total: number }>
+  facets: {
+    users: Array<{ id: string; username: string }>
+    models: string[]
+  }
+}
+
+export async function tokenUsageGet(
+  range: string,
+  user: string,
+  model: string
+) {
+  const res = await api.get<TokenUsageStats>('/token-usage', {
+    params: { range, user, model },
+  })
+  return res.data
+}
+
 export type Bootstrap = {
   overview: Overview
   users: AdminUser[]
