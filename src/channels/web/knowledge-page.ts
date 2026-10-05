@@ -2,10 +2,14 @@
  * 「知识库」独立页 — GET /knowledge 的页面本体
  *
  * 三种视图共一套筛选（搜索 / 分类 / 排序）：
- *  · 条目：朴素卡片列表（分类小胶囊徽章 + 长文折叠 + 两步删除）；
+ *  · 条目：memos 式卡片流（分类描边胶囊 + 长文折叠 + 两步删除 + 原地编辑）；
  *  · 导图：SVG 横向树（我的知识 → 课程分类 → 条目），点击节点跳回
  *    条目视图并高亮展开，每分类最多 12 个节点、超出折进「还有 N 条」；
+ *  · 日历：memos 月历 + 每日条目数，点击某天列出当日条目；
  *  · 时间线：按月分组 + 左缘时间轴竖线，条目卡与列表视图同款。
+ * 发布框（memos 核心交互）：主列顶部直接记知识——首行=标题、其余=
+ * 正文，分类可留空自动归课表课程，Ctrl+Enter 记下；POST /api/knowledge。
+ * 编辑：卡片原地变表单（PATCH /api/knowledge/:id），编辑中暂停自动刷新。
  * 数据来自 GET /api/knowledge（纯本地存储，不登录教务、不调模型），
  * 页面每 60 秒与切回标签页时自行刷新；视图选择经 URL hash 记忆。
  *
@@ -128,6 +132,76 @@ export function knowledgePage(
   .vtab.active { border-bottom-color: var(--accent); color: var(--ink); font-weight: 500; }
   .cnote { font-size: 12px; color: var(--ink-3); }
   .kn-flow { display: grid; gap: 12px; align-content: start; }
+
+  /* ── memos 发布框：主列顶部的直写框 ── */
+  .composer { border: 1px solid var(--rule-2); border-radius: 8px; background: var(--card);
+              padding: 4px 12px 10px; margin-bottom: 12px; }
+  .composer:focus-within { border-color: var(--accent); }
+  .cp-text { width: 100%; min-height: 64px; border: none; outline: none; resize: vertical;
+             background: transparent; color: var(--ink); font-size: 15px; line-height: 1.65;
+             font-family: inherit; padding: 8px 0 4px; }
+  .cp-text::placeholder { color: var(--ink-3); }
+  .cp-row { display: flex; align-items: center; gap: 8px; }
+  .cp-subject { flex: 1; min-width: 0; border: 1px solid var(--rule-2); border-radius: 6px;
+                background: var(--paper); color: var(--ink); font-size: 13px; padding: 5px 10px;
+                font-family: inherit; }
+  .cp-subject:focus { outline: none; border-color: var(--accent); }
+  .cp-send { flex: none; border: none; border-radius: 6px; background: var(--accent);
+             color: #fff; font-size: 14px; font-weight: 500; padding: 6px 18px;
+             cursor: pointer; font-family: inherit; }
+  .cp-send:hover { background: var(--accent-deep); }
+  .cp-send:disabled { opacity: .5; cursor: default; }
+  .cp-note { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-3); }
+  .cp-note.ok { color: var(--accent-deep); }
+  .cp-note.err { color: #B4451F; }
+
+  /* ── 条目编辑态：卡片原地变表单（memos 点开编辑） ── */
+  .k-edit { display: grid; gap: 8px; }
+  .k-edit input, .k-edit textarea { border: 1px solid var(--rule-2); border-radius: 6px;
+                                    background: var(--paper); color: var(--ink); font-size: 14px;
+                                    padding: 6px 10px; font-family: inherit; width: 100%; }
+  .k-edit input:focus, .k-edit textarea:focus { outline: none; border-color: var(--accent); }
+  .k-edit-title { font-weight: 600; }
+  .k-edit-content { min-height: 96px; resize: vertical; line-height: 1.65; }
+  .k-edit-row { display: flex; align-items: center; gap: 8px; }
+  .k-edit-subject { flex: 1; }
+  .k-save { border: none; border-radius: 6px; background: var(--accent); color: #fff;
+            font-size: 13px; font-weight: 500; padding: 6px 16px; cursor: pointer;
+            font-family: inherit; }
+  .k-save:hover { background: var(--accent-deep); }
+  .k-cancel { background: none; border: 1px solid var(--rule-2); border-radius: 6px;
+              color: var(--ink-2); font-size: 13px; padding: 5px 14px; cursor: pointer;
+              font-family: inherit; }
+  .k-cancel:hover { border-color: var(--ink-3); color: var(--ink); }
+  .k-edit .cp-note { margin: 0; }
+
+  /* ── 日历视图：memos 月历 + 每日条目数 ── */
+  .cal-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .cal-nav h3 { margin: 0; font-size: 15px; font-weight: 600; flex: 1; }
+  .cal-arrow { background: none; border: 1px solid var(--rule-2); border-radius: 6px;
+               color: var(--ink-2); width: 30px; height: 30px; font-size: 15px;
+               cursor: pointer; font-family: inherit; line-height: 1; }
+  .cal-arrow:hover { border-color: var(--accent); color: var(--accent); }
+  .cal-board { border: 1px solid var(--rule-2); border-radius: 8px; background: var(--card);
+               padding: 10px; margin-bottom: 14px; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+  .cal-dow { text-align: center; font-size: 11.5px; color: var(--ink-3); padding: 4px 0 8px; }
+  .cal-day { position: relative; min-height: 44px; border: none; background: none;
+             border-radius: 6px; color: var(--ink); font-size: 13px; cursor: pointer;
+             font-family: inherit; padding: 6px 4px 4px; text-align: left;
+             display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .cal-day:hover { background: var(--shade); }
+  .cal-day.blank { cursor: default; }
+  .cal-day.blank:hover { background: none; }
+  .cal-day.today .cal-num { background: var(--accent); color: #fff; }
+  .cal-day.sel { background: var(--accent-soft); }
+  .cal-num { width: 24px; height: 24px; display: inline-flex; align-items: center;
+             justify-content: center; border-radius: 999px; font-weight: 500; }
+  .cal-count { font-size: 11px; color: var(--accent-deep); background: var(--accent-soft);
+               border-radius: 999px; padding: 0 7px; line-height: 1.6; }
+  .cal-list-head { display: flex; align-items: baseline; gap: 10px; margin: 2px 0 10px; }
+  .cal-list-head h4 { margin: 0; font-size: 14px; font-weight: 600; }
+  .cal-list-head .cnote { font-size: 12px; color: var(--ink-3); }
 
   .skel { color: var(--ink-3); font-size: 15px; padding: 8px 2px; }
   .empty { margin: 0; padding: 32px 8px; border: 1px dashed var(--rule-2); text-align: center;
@@ -272,10 +346,24 @@ export function knowledgePage(
       <div class="view-tabs" id="viewRow" role="group" aria-label="视图方式">
         <button type="button" class="vtab active" data-view="list" aria-pressed="true">条目</button>
         <button type="button" class="vtab" data-view="graph" aria-pressed="false">导图</button>
+        <button type="button" class="vtab" data-view="calendar" aria-pressed="false">日历</button>
         <button type="button" class="vtab" data-view="timeline" aria-pressed="false">时间线</button>
       </div>
       <span class="cnote" id="listNote"></span>
     </div>
+${
+  demo
+    ? ""
+    : `    <div class="composer" id="composer">
+      <textarea class="cp-text" id="cpText" rows="3" placeholder="记点什么…（首行作为标题，其余为正文；Ctrl+Enter 记下）" aria-label="记录新知识"></textarea>
+      <div class="cp-row">
+        <input class="cp-subject" id="cpSubject" type="text" placeholder="分类（可选，留空自动归课表课程）" aria-label="知识分类">
+        <button type="button" class="cp-send" id="cpSend">记下</button>
+      </div>
+      <p class="cp-note" id="cpNote" hidden></p>
+    </div>
+`
+}
     <div class="kn-flow" id="listBody"><p class="skel">…</p></div>
   </section>
   </section>
@@ -290,8 +378,11 @@ let entries = [];
 let activeCat = "ALL"; // "ALL" | "NONE"（未分类）| 具体课程名
 let keyword = "";
 let sortMode = "updated"; // "updated" | "title"
-let viewMode = "list"; // "list" | "graph" | "timeline"（经 URL hash 记忆）
+let viewMode = "list"; // "list" | "graph" | "calendar" | "timeline"（经 URL hash 记忆）
 let visibleCount = BATCH;
+let editingId = null; // 条目编辑态：有值时自动刷新暂停，不打断输入
+let calAnchor = null; // 日历视图的月份锚（Date），null 为本月
+let calDay = null;    // 日历视图选中的日期（"YYYY-M-D"），null 未选
 const expandedIds = new Set();
 
 function el(tag, cls, text) {
@@ -467,6 +558,7 @@ function renderSort() {
 function entryEl(item) {
   const card = el("article", "k-entry");
   card.dataset.kid = item.id;
+  if (editingId === item.id) return editEl(card, item);
   const head = el("div", "k-head");
   const title = el("h3", "k-title");
   appendMarked(title, item.title, keyword);
@@ -481,6 +573,13 @@ function entryEl(item) {
       });
     });
     head.appendChild(del);
+    const edit = el("button", "k-del", "编辑");
+    edit.type = "button";
+    edit.addEventListener("click", () => {
+      editingId = item.id;
+      renderView();
+    });
+    head.appendChild(edit);
   }
   card.appendChild(head);
 
@@ -521,6 +620,114 @@ function entryEl(item) {
 function emptyEl(text) {
   return el("p", "empty", text);
 }
+/* 空库引导：有发布框时引导直写，演示模式引导回对话页 */
+function emptyNewEl() {
+  return emptyEl(DEMO_DATA
+    ? "知识库还是空的。在对话页分享你学到的知识点（或说「记住：……」），我会自动记进知识库并按课程归类。"
+    : "知识库还是空的。在上方直接记一条（首行作标题），或在对话里说「记住：……」我来记下并按课程归类。");
+}
+
+/* 条目编辑态：卡片原地变表单，保存走 PATCH，分类留空即自动归课表课程 */
+function editEl(card, item) {
+  const form = el("div", "k-edit");
+  const title = el("input", "k-edit-title");
+  title.type = "text";
+  title.value = item.title;
+  const content = el("textarea", "k-edit-content");
+  content.value = item.content;
+  const subject = el("input", "k-edit-subject");
+  subject.type = "text";
+  subject.value = item.category || "";
+  subject.placeholder = "分类（留空自动归课表课程）";
+  const note = el("p", "cp-note");
+  note.hidden = true;
+  const save = el("button", "k-save", "保存");
+  save.type = "button";
+  const cancel = el("button", "k-cancel", "取消");
+  cancel.type = "button";
+  cancel.addEventListener("click", () => { editingId = null; renderView(); });
+  const fail = (msg) => {
+    save.disabled = false;
+    note.hidden = false;
+    note.className = "cp-note err";
+    note.textContent = msg;
+  };
+  save.addEventListener("click", () => {
+    save.disabled = true;
+    fetch("/api/knowledge/" + item.id, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title: title.value, content: content.value, subject: subject.value }),
+    })
+      .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+      .then(({ ok, d }) => {
+        if (!ok) { fail(d.error || "保存失败"); return; }
+        editingId = null;
+        load();
+      })
+      .catch(() => fail("网络错误，稍后再试"));
+  });
+  for (const field of [title, content, subject]) {
+    field.addEventListener("keydown", (ev) => {
+      if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") save.click();
+    });
+  }
+  const row = el("div", "k-edit-row");
+  row.appendChild(subject);
+  row.appendChild(save);
+  row.appendChild(cancel);
+  form.appendChild(title);
+  form.appendChild(content);
+  form.appendChild(row);
+  form.appendChild(note);
+  card.appendChild(form);
+  return card;
+}
+
+/* memos 发布框：首行=标题、其余=正文，Ctrl+Enter 记下 */
+function bindComposer() {
+  const box = $("composer");
+  if (!box) return;
+  const text = $("cpText");
+  const subject = $("cpSubject");
+  const send = $("cpSend");
+  const note = $("cpNote");
+  const flash = (msg, ok) => {
+    note.hidden = false;
+    note.className = "cp-note" + (ok ? " ok" : " err");
+    note.textContent = msg;
+    if (ok) setTimeout(() => { note.hidden = true; }, 2600);
+  };
+  const submit = () => {
+    const raw = text.value.trim();
+    if (!raw) { flash("先写点什么再记下", false); return; }
+    const lines = raw.split("\\n");
+    const title = lines[0].trim().slice(0, 80);
+    const content = lines.slice(1).join("\\n").trim();
+    if (!title) { flash("首行是标题，不能为空", false); return; }
+    send.disabled = true;
+    fetch("/api/knowledge", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ title, content: content || title, subject: subject.value.trim() }),
+    })
+      .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+      .then(({ ok, d }) => {
+        send.disabled = false;
+        if (!ok) { flash(d.error || "保存失败", false); return; }
+        text.value = "";
+        subject.value = "";
+        flash(d.updatedExisting ? "已有同名知识，已更新" : "已记下", true);
+        visibleCount = BATCH;
+        load();
+      })
+      .catch(() => { send.disabled = false; flash("网络错误，稍后再试", false); });
+  };
+  send.addEventListener("click", submit);
+  text.addEventListener("keydown", (ev) => {
+    if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") submit();
+  });
+}
 function moreBtn(list, shown) {
   const more = el("button", "tbtn k-more", "显示更多（还有 " + (list.length - shown.length) + " 条）");
   more.type = "button";
@@ -535,7 +742,7 @@ function renderList() {
   body.textContent = "";
   if (!entries.length) {
     note.textContent = "";
-    body.appendChild(emptyEl("知识库还是空的。在对话页分享你学到的知识点（或说「记住：……」），我会自动记进知识库并按课程归类。"));
+    body.appendChild(emptyNewEl());
     return;
   }
   const list = filtered();
@@ -600,7 +807,7 @@ function renderGraph() {
   body.textContent = "";
   if (!entries.length) {
     note.textContent = "";
-    body.appendChild(emptyEl("知识库还是空的。在对话页分享你学到的知识点（或说「记住：……」），我会自动记进知识库并按课程归类。"));
+    body.appendChild(emptyNewEl());
     return;
   }
   const list = filtered();
@@ -706,7 +913,7 @@ function renderTimeline() {
   body.textContent = "";
   if (!entries.length) {
     note.textContent = "";
-    body.appendChild(emptyEl("知识库还是空的。在对话页分享你学到的知识点（或说「记住：……」），我会自动记进知识库并按课程归类。"));
+    body.appendChild(emptyNewEl());
     return;
   }
   const list = filtered().sort((a, b) => b.updatedAt - a.updatedAt);
@@ -741,9 +948,85 @@ function renderTimeline() {
   if (list.length > shown.length) body.appendChild(moreBtn(list, shown));
 }
 
+/* ── 视图四：日历（memos 月历 + 每日条目数，点击某天列出当日条目） ── */
+function dayKey(d) {
+  return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+}
+function renderCalendar() {
+  const body = $("listBody");
+  const note = $("listNote");
+  body.textContent = "";
+  if (!entries.length) {
+    note.textContent = "";
+    body.appendChild(emptyNewEl());
+    return;
+  }
+  const list = filtered();
+  note.textContent = list.length + " 条";
+  if (!list.length) {
+    body.appendChild(emptyEl("没有匹配的知识条目，换个关键词或分类试试。"));
+    return;
+  }
+  const byDay = new Map();
+  for (const e of list) {
+    const k = dayKey(new Date(e.updatedAt));
+    byDay.set(k, (byDay.get(k) || 0) + 1);
+  }
+  const now = new Date();
+  const anchor = calAnchor ?? new Date(now.getFullYear(), now.getMonth(), 1);
+  const y = anchor.getFullYear();
+  const m = anchor.getMonth();
+  const board = el("div", "cal-board");
+  const nav = el("div", "cal-nav");
+  const prev = el("button", "cal-arrow", "‹");
+  prev.type = "button";
+  prev.setAttribute("aria-label", "上个月");
+  prev.addEventListener("click", () => { calAnchor = new Date(y, m - 1, 1); renderView(); });
+  const next = el("button", "cal-arrow", "›");
+  next.type = "button";
+  next.setAttribute("aria-label", "下个月");
+  next.addEventListener("click", () => { calAnchor = new Date(y, m + 1, 1); renderView(); });
+  nav.appendChild(prev);
+  nav.appendChild(el("h3", null, y + " 年 " + (m + 1) + " 月"));
+  nav.appendChild(next);
+  const grid = el("div", "cal-grid");
+  for (const w of ["日", "一", "二", "三", "四", "五", "六"]) grid.appendChild(el("div", "cal-dow", w));
+  const first = new Date(y, m, 1);
+  const days = new Date(y, m + 1, 0).getDate();
+  for (let i = 0; i < first.getDay(); i++) grid.appendChild(el("div", "cal-day blank"));
+  for (let d = 1; d <= days; d++) {
+    const key = y + "-" + (m + 1) + "-" + d;
+    const n = byDay.get(key) || 0;
+    const btn = el("button", "cal-day" +
+      (key === dayKey(now) ? " today" : "") + (calDay === key ? " sel" : ""));
+    btn.type = "button";
+    btn.appendChild(el("span", "cal-num", String(d)));
+    if (n) btn.appendChild(el("span", "cal-count", String(n)));
+    btn.setAttribute("aria-label", (m + 1) + "月" + d + "日" + (n ? "，" + n + " 条知识" : ""));
+    btn.addEventListener("click", () => { calDay = calDay === key ? null : key; renderView(); });
+    grid.appendChild(btn);
+  }
+  board.appendChild(nav);
+  board.appendChild(grid);
+  body.appendChild(board);
+  if (!calDay) {
+    body.appendChild(emptyEl("点一个日期看当天的知识。"));
+    return;
+  }
+  const dayList = list.filter((e) => dayKey(new Date(e.updatedAt)) === calDay);
+  const parts = calDay.split("-");
+  const head = el("div", "cal-list-head");
+  head.appendChild(el("h4", null, Number(parts[1]) + " 月 " + Number(parts[2]) + " 日"));
+  head.appendChild(el("span", "cnote", dayList.length + " 条"));
+  body.appendChild(head);
+  if (!dayList.length) body.appendChild(emptyEl("这天没有知识条目。"));
+  for (const item of dayList) body.appendChild(entryEl(item));
+}
+
 /* ── 视图切换：tab 状态 + URL hash 记忆 ── */
 function renderView() {
   if (viewMode === "graph") renderGraph();
+  else if (viewMode === "calendar") renderCalendar();
   else if (viewMode === "timeline") renderTimeline();
   else renderList();
 }
@@ -753,6 +1036,9 @@ function applyView() {
     btn.classList.toggle("active", on);
     btn.setAttribute("aria-pressed", on ? "true" : "false");
   }
+  /* 发布框只在条目视图出现（memos 的发布框也只在主时间线） */
+  const cp = $("composer");
+  if (cp) cp.style.display = viewMode === "list" ? "" : "none";
   renderView();
 }
 function setView(v) {
@@ -764,6 +1050,8 @@ function setView(v) {
 
 function load() {
   if (DEMO_DATA) { entries = DEMO_DATA; renderNav(); renderRailMeta(); renderView(); return; }
+  /* 编辑中的表单不重渲（60 秒自动刷新不能吃掉输入框里的字） */
+  if (editingId) return;
   fetch("/api/knowledge", { cache: "no-store" })
     .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
     .then((d) => { entries = d.entries || []; renderNav(); renderRailMeta(); renderView(); })
@@ -807,7 +1095,7 @@ $("viewRow").addEventListener("click", (ev) => {
 });
 window.addEventListener("hashchange", () => {
   const h = location.hash.replace("#", "");
-  const v = h === "graph" || h === "timeline" ? h : "list";
+  const v = h === "graph" || h === "calendar" || h === "timeline" ? h : "list";
   if (v !== viewMode) { viewMode = v; applyView(); }
 });
 // / 快捷聚焦搜索（正在输入时忽略）
@@ -819,7 +1107,8 @@ document.addEventListener("keydown", (ev) => {
   $("kwBox").focus();
 });
 const initHash = location.hash.replace("#", "");
-if (initHash === "graph" || initHash === "timeline") viewMode = initHash;
+if (initHash === "graph" || initHash === "calendar" || initHash === "timeline") viewMode = initHash;
+bindComposer();
 load();
 if (!DEMO_DATA) {
   setInterval(load, 60000);

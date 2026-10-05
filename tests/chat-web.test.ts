@@ -560,6 +560,82 @@ test("知识库：页面可打开、接口可列表删除、数据概览与导�
   assert.equal(miss.status, 404);
 });
 
+test("知识库：页面直写与原地编辑（memos 式 POST/PATCH）", async () => {
+  const url = (await startChatWeb())!;
+
+  // 发布框直写：201、标题/正文/来源落库、同名不堆积（updatedExisting）
+  const post = await wfetch(`${url}/api/knowledge`, {
+    method: "POST",
+    body: JSON.stringify({ title: "网页直写测试", content: "首行是标题\n这是正文" }),
+  });
+  assert.equal(post.status, 201);
+  const created = (await post.json()) as {
+    entry: { id: string; title: string; content: string; source?: string };
+    updatedExisting: boolean;
+  };
+  assert.equal(created.entry.title, "网页直写测试");
+  assert.equal(created.entry.content.includes("这是正文"), true);
+  assert.equal(created.entry.source, "网页");
+  assert.equal(created.updatedExisting, false);
+
+  const again = await wfetch(`${url}/api/knowledge`, {
+    method: "POST",
+    body: JSON.stringify({ title: "网页直写测试", content: "同名再记是覆盖不是堆积" }),
+  });
+  assert.equal(again.status, 201);
+  assert.equal((await again.json() as { updatedExisting: boolean }).updatedExisting, true);
+
+  // 列表可见
+  const list = (await (await fetch(`${url}/api/knowledge`)).json()) as {
+    entries: Array<{ id: string }>;
+  };
+  assert.ok(list.entries.some((e) => e.id === created.entry.id));
+
+  // 原地编辑：改标题/正文/分类
+  const patch = await wfetch(`${url}/api/knowledge/${created.entry.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      title: "网页直写测试（改）",
+      content: "正文也改了",
+      subject: "自定义分类X",
+    }),
+  });
+  assert.equal(patch.status, 200);
+  const updated = (await patch.json()) as { entry: { title: string; category: string | null } };
+  assert.equal(updated.entry.title, "网页直写测试（改）");
+  assert.equal(updated.entry.category, "自定义分类X");
+
+  // 空 subject = 重算归属（对不上课程保持未分类）
+  const recompute = await wfetch(`${url}/api/knowledge/${created.entry.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ subject: "" }),
+  });
+  assert.equal(recompute.status, 200);
+  assert.equal(((await recompute.json()) as { entry: { category: string | null } }).entry.category, null);
+
+  // 错误路径：空标题 400、未知 id 404、裸 fetch（无 token）403
+  const bad = await wfetch(`${url}/api/knowledge`, {
+    method: "POST",
+    body: JSON.stringify({ title: "", content: "x" }),
+  });
+  assert.equal(bad.status, 400);
+  const ghost = await wfetch(`${url}/api/knowledge/0000nope`, {
+    method: "PATCH",
+    body: JSON.stringify({ title: "x" }),
+  });
+  assert.equal(ghost.status, 404);
+  const noToken = await fetch(`${url}/api/knowledge`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ title: "无令牌", content: "x" }),
+  });
+  assert.equal(noToken.status, 403, "写请求缺 CSRF token 必须被入口拦截");
+
+  // 清理
+  const cleanup = await wfetch(`${url}/api/knowledge/${created.entry.id}`, { method: "DELETE" });
+  assert.equal(cleanup.status, 200);
+});
+
 test("工具事件带 id/参数/结果预览（独立工具卡片的数据源）", async () => {
   setChatAgent({
     stream() {
