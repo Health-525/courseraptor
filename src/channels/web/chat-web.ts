@@ -48,10 +48,12 @@ import { pptPreviewOfToolOutput } from "../../core/document/pptx-theme";
 import { generatedDir } from "../../core/document/save";
 import { loadGradesCache } from "../../core/grades-cache";
 import {
+  addKnowledge,
   clearKnowledge,
   deleteKnowledge,
   knowledgeStats,
   listKnowledge,
+  updateKnowledge,
 } from "../../core/knowledge";
 import { recordManualTermStart } from "../../core/manual-terms";
 import { loadUserGrade } from "../../core/memory/longterm";
@@ -1669,6 +1671,28 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       }
       return;
     }
+    if (url === "/api/knowledge") {
+      // 知识库发布框：页面直写（分类自动归课表课程，subject 可选指定）
+      try {
+        const body = (await jsonBody(req, 65_536)) as {
+          title?: unknown;
+          content?: unknown;
+          subject?: unknown;
+        };
+        const result = addKnowledge({
+          title: typeof body.title === "string" ? body.title : "",
+          content: typeof body.content === "string" ? body.content : "",
+          ...(typeof body.subject === "string" && body.subject.trim()
+            ? { subject: body.subject }
+            : {}),
+          source: "网页",
+        });
+        json(res, { entry: result.entry, updatedExisting: result.updatedExisting }, 201);
+      } catch (error) {
+        json(res, { error: error instanceof Error ? error.message : "保存知识失败" }, 400);
+      }
+      return;
+    }
     if (url === "/api/pomodoro/cancel") {
       // 倒计时卡片上的「取消」按钮直调这里：不打扰 agent 那轮对话
       try {
@@ -1766,6 +1790,31 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   if (req.method === "DELETE" && url.startsWith("/api/reminders/")) {
     const ok = deleteReminder(url.slice("/api/reminders/".length));
     json(res, ok ? { ok: true } : { error: "提醒不存在" }, ok ? 200 : 404);
+    return;
+  }
+  if (req.method === "PATCH" && url.startsWith("/api/knowledge/")) {
+    const id = url.slice("/api/knowledge/".length);
+    try {
+      const body = (await jsonBody(req, 65_536)) as {
+        title?: unknown;
+        content?: unknown;
+        subject?: unknown;
+      };
+      const entry = updateKnowledge(id, {
+        ...(body.title !== undefined
+          ? { title: typeof body.title === "string" ? body.title : "" }
+          : {}),
+        ...(body.content !== undefined
+          ? { content: typeof body.content === "string" ? body.content : "" }
+          : {}),
+        ...(body.subject !== undefined
+          ? { subject: typeof body.subject === "string" ? body.subject : "" }
+          : {}),
+      });
+      json(res, entry ? { entry } : { error: "知识条目不存在" }, entry ? 200 : 404);
+    } catch (error) {
+      json(res, { error: error instanceof Error ? error.message : "更新知识失败" }, 400);
+    }
     return;
   }
   if (req.method === "DELETE" && url.startsWith("/api/knowledge/")) {
