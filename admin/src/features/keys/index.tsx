@@ -104,7 +104,7 @@ export function KeysPage() {
             </div>
 
             {unavailable && (
-              <p className='text-destructive text-sm'>
+              <p className='text-sm text-destructive'>
                 {keys?.error}（版本发布与密钥管理都依赖更新后台）
               </p>
             )}
@@ -128,7 +128,7 @@ export function KeysPage() {
                       <TableRow>
                         <TableCell
                           colSpan={5}
-                          className='text-muted-foreground py-8 text-center'
+                          className='py-8 text-center text-muted-foreground'
                         >
                           还没有面板密钥
                         </TableCell>
@@ -144,10 +144,10 @@ export function KeysPage() {
                             <Badge variant='secondary'>面板密钥</Badge>
                           )}
                         </TableCell>
-                        <TableCell className='text-muted-foreground text-xs'>
+                        <TableCell className='text-xs text-muted-foreground'>
                           {fmtDateTime(k.createdAt)}
                         </TableCell>
-                        <TableCell className='text-muted-foreground text-xs'>
+                        <TableCell className='text-xs text-muted-foreground'>
                           {k.lastUsedAt
                             ? fmtDateTime(k.lastUsedAt)
                             : '从未使用'}
@@ -157,7 +157,7 @@ export function KeysPage() {
                             <Button
                               variant='ghost'
                               size='icon'
-                              className='text-destructive size-8'
+                              className='size-8 text-destructive'
                               aria-label='删除密钥'
                               onClick={() =>
                                 setDeleting({ id: k.id, name: k.name })
@@ -173,7 +173,7 @@ export function KeysPage() {
                 </Table>
               </div>
             )}
-            <p className='text-muted-foreground text-xs'>
+            <p className='text-xs text-muted-foreground'>
               主密钥来自服务器环境变量
               UPDATE_ADMIN_TOKEN，始终可用且不能在这里删除；面板密钥删除后立即失效。明文只在创建时展示一次。
             </p>

@@ -9,14 +9,14 @@ export function RecentSales() {
   return (
     <div className='space-y-6'>
       {entries.length === 0 && (
-        <p className='text-muted-foreground text-sm'>还没有管理操作记录</p>
+        <p className='text-sm text-muted-foreground'>还没有管理操作记录</p>
       )}
       {entries.map((entry) => (
         <div
           key={`${entry.at}-${entry.text}`}
           className='flex items-center gap-4'
         >
-          <div className='bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold'>
+          <div className='flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary'>
             管
           </div>
           <div className='flex flex-1 flex-wrap items-center justify-between gap-1'>
@@ -24,7 +24,7 @@ export function RecentSales() {
               <p className='truncate text-sm leading-none font-medium'>
                 {entry.text}
               </p>
-              <p className='text-muted-foreground text-sm'>
+              <p className='text-sm text-muted-foreground'>
                 {new Date(entry.at).toLocaleString('zh-CN', {
                   month: '2-digit',
                   day: '2-digit',
@@ -36,10 +36,10 @@ export function RecentSales() {
           </div>
         </div>
       ))}
-      <div className='text-muted-foreground text-sm'>
+      <div className='text-sm text-muted-foreground'>
         <Link
           to='/log'
-          className='hover:text-primary underline underline-offset-4'
+          className='underline underline-offset-4 hover:text-primary'
         >
           查看全部操作日志
         </Link>

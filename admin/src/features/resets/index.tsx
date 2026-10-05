@@ -118,7 +118,7 @@ export function ResetsPage() {
                       <TableRow>
                         <TableCell
                           colSpan={3}
-                          className='text-muted-foreground py-8 text-center'
+                          className='py-8 text-center text-muted-foreground'
                         >
                           没有待审批的申请
                         </TableCell>
@@ -129,7 +129,7 @@ export function ResetsPage() {
                         <TableCell className='font-mono font-semibold'>
                           {r.username}
                         </TableCell>
-                        <TableCell className='text-muted-foreground text-xs'>
+                        <TableCell className='text-xs text-muted-foreground'>
                           {fmtDateTime(r.requestedAt)}
                         </TableCell>
                         <TableCell>
@@ -186,7 +186,7 @@ export function ResetsPage() {
                       <TableRow>
                         <TableCell
                           colSpan={4}
-                          className='text-muted-foreground py-8 text-center'
+                          className='py-8 text-center text-muted-foreground'
                         >
                           暂无有效重置码
                         </TableCell>
@@ -202,7 +202,7 @@ export function ResetsPage() {
                           <TableCell className='font-mono font-bold'>
                             {c.code}
                           </TableCell>
-                          <TableCell className='text-muted-foreground text-xs'>
+                          <TableCell className='text-xs text-muted-foreground'>
                             {expired ? (
                               <span className='text-destructive'>已过期</span>
                             ) : (
@@ -224,7 +224,7 @@ export function ResetsPage() {
                                 <Button
                                   variant='ghost'
                                   size='icon'
-                                  className='text-destructive size-8'
+                                  className='size-8 text-destructive'
                                   aria-label='作废重置码'
                                   onClick={() => setRevoking(c)}
                                 >

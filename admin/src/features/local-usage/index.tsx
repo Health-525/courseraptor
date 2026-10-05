@@ -37,7 +37,7 @@ function KpiCard({
       <CardHeader>
         <CardDescription>{title}</CardDescription>
         <CardTitle className='text-2xl tabular-nums'>{value}</CardTitle>
-        {sub && <p className='text-muted-foreground text-xs'>{sub}</p>}
+        {sub && <p className='text-xs text-muted-foreground'>{sub}</p>}
       </CardHeader>
     </Card>
   )
@@ -94,7 +94,7 @@ export function LocalUsagePage() {
         )}
         {isError && (
           <Card>
-            <CardContent className='text-muted-foreground py-10 text-center text-sm'>
+            <CardContent className='py-10 text-center text-sm text-muted-foreground'>
               读取失败：{(error as Error)?.message ?? '未知错误'}
             </CardContent>
           </Card>
@@ -125,7 +125,7 @@ export function LocalUsagePage() {
                     {data.lastPingAt ? fmtRelative(data.lastPingAt) : '—'}
                   </CardDescription>
                 </div>
-                <div className='text-muted-foreground flex items-center gap-1.5 text-xs'>
+                <div className='flex items-center gap-1.5 text-xs text-muted-foreground'>
                   <MonitorSmartphone className='h-3.5 w-3.5' />
                   {data.platforms
                     .map((p) => `${p.name} ×${p.count}`)
@@ -134,7 +134,7 @@ export function LocalUsagePage() {
               </CardHeader>
               <CardContent>
                 {data.total === 0 ? (
-                  <div className='text-muted-foreground flex h-32 items-center justify-center text-sm'>
+                  <div className='flex h-32 items-center justify-center text-sm text-muted-foreground'>
                     还没有本地版上报——发一版带统计的新安装包后，这里开始计数
                   </div>
                 ) : (
@@ -170,7 +170,7 @@ export function LocalUsagePage() {
                         <TableRow>
                           <TableCell
                             colSpan={6}
-                            className='text-muted-foreground py-8 text-center'
+                            className='py-8 text-center text-muted-foreground'
                           >
                             暂无记录
                           </TableCell>
@@ -185,10 +185,10 @@ export function LocalUsagePage() {
                           <TableCell className='text-muted-foreground'>
                             {c.platform}
                           </TableCell>
-                          <TableCell className='text-muted-foreground text-xs whitespace-nowrap'>
+                          <TableCell className='text-xs whitespace-nowrap text-muted-foreground'>
                             {fmtDateTime(c.firstSeen)}
                           </TableCell>
-                          <TableCell className='text-muted-foreground text-xs whitespace-nowrap'>
+                          <TableCell className='text-xs whitespace-nowrap text-muted-foreground'>
                             {fmtDateTime(c.lastSeen)}
                           </TableCell>
                           <TableCell className='text-right tabular-nums'>

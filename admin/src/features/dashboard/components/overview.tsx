@@ -16,7 +16,7 @@ export function Overview() {
 
   if (rows.length === 0) {
     return (
-      <div className='text-muted-foreground flex h-[350px] items-center justify-center text-sm'>
+      <div className='flex h-[350px] items-center justify-center text-sm text-muted-foreground'>
         今天还没有同学用站点额度对话
       </div>
     )
@@ -33,6 +33,7 @@ export function Overview() {
           axisLine={false}
         />
         <YAxis
+          direction='ltr'
           stroke='#888888'
           fontSize={12}
           tickLine={false}

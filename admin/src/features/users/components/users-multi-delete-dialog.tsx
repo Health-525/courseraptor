@@ -70,19 +70,26 @@ export function UsersMultiDeleteDialog({
     <ConfirmDialog
       open={open}
       onOpenChange={onOpenChange}
-      handleConfirm={handleDelete}
+      form='users-multi-delete-form'
       disabled={value.trim() !== CONFIRM_WORD || remove.isPending}
       title={
         <span className='text-destructive'>
           <AlertTriangle
-            className='stroke-destructive me-1 inline-block'
+            className='me-1 inline-block stroke-destructive'
             size={18}
           />{' '}
           删除 {selectedRows.length} 个用户
         </span>
       }
       desc={
-        <div className='space-y-4'>
+        <form
+          id='users-multi-delete-form'
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleDelete()
+          }}
+          className='space-y-4'
+        >
           <p className='mb-2'>
             确定删除选中的 {selectedRows.length} 个用户吗？
             <br />
@@ -95,6 +102,7 @@ export function UsersMultiDeleteDialog({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder={`输入 ${CONFIRM_WORD} 确认`}
+              autoFocus
             />
           </Label>
 
@@ -102,7 +110,7 @@ export function UsersMultiDeleteDialog({
             <AlertTitle>警告</AlertTitle>
             <AlertDescription>此操作不可恢复，请谨慎执行。</AlertDescription>
           </Alert>
-        </div>
+        </form>
       }
       confirmText='删除'
       destructive

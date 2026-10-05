@@ -100,10 +100,10 @@ function SetupView() {
   if (!setup) {
     return (
       <div className='space-y-3'>
-        <p className='text-muted-foreground text-sm'>
+        <p className='text-sm text-muted-foreground'>
           启用后登录管理台需要「管理密码 + 手机验证器动态码」，并附 10
           枚一次性恢复码。手机与恢复码全丢时，需要 SSH 上服务器执行
-          <code className='bg-muted mx-1 rounded px-1.5 py-0.5 font-mono text-xs'>
+          <code className='mx-1 rounded bg-muted px-1.5 py-0.5 font-mono text-xs'>
             admin.mjs totp off
           </code>
           才能恢复仅密码登录。
@@ -121,21 +121,21 @@ function SetupView() {
 
   return (
     <div className='space-y-4'>
-      <ol className='text-muted-foreground list-decimal space-y-1 ps-5 text-sm'>
+      <ol className='list-decimal space-y-1 ps-5 text-sm text-muted-foreground'>
         <li>
           用手机验证器（Google / Microsoft Authenticator 等）扫下面的二维码
         </li>
         <li>输入验证器当前显示的 6 位数字完成绑定</li>
       </ol>
-      <div className='dark:border-border flex justify-center rounded-lg border bg-white p-4 [&>svg]:size-52'>
+      <div className='flex justify-center rounded-lg border bg-white p-4 dark:border-border [&>svg]:size-52'>
         <div dangerouslySetInnerHTML={{ __html: setup.qrSvg }} />
       </div>
       <div className='space-y-1.5'>
-        <p className='text-muted-foreground text-xs'>
+        <p className='text-xs text-muted-foreground'>
           扫不了码？在验证器里选择「输入密钥」，粘贴：
         </p>
         <div className='flex gap-2'>
-          <code className='bg-muted min-w-0 flex-1 truncate rounded px-2 py-1.5 font-mono text-sm'>
+          <code className='min-w-0 flex-1 truncate rounded bg-muted px-2 py-1.5 font-mono text-sm'>
             {grouped}
           </code>
           <Button
@@ -165,7 +165,7 @@ function SetupView() {
           验证并启用
         </Button>
       </div>
-      {error && <p className='text-destructive text-sm'>{error}</p>}
+      {error && <p className='text-sm text-destructive'>{error}</p>}
     </div>
   )
 }
@@ -265,8 +265,8 @@ function EnabledView() {
           关闭两步验证
         </Button>
       </div>
-      {error && <p className='text-destructive text-sm'>{error}</p>}
-      <p className='text-muted-foreground text-xs'>
+      {error && <p className='text-sm text-destructive'>{error}</p>}
+      <p className='text-xs text-muted-foreground'>
         高危操作需再验一次动态码；关闭后所有管理会话立即注销。SSH
         兜底：admin.mjs totp off。
       </p>
@@ -303,7 +303,7 @@ function RecoveryCodes({
           {codes.map((c) => (
             <code
               key={c}
-              className='bg-muted rounded px-2 py-1.5 tracking-wider'
+              className='rounded bg-muted px-2 py-1.5 tracking-wider'
             >
               {c}
             </code>

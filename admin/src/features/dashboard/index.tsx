@@ -29,25 +29,25 @@ export function Dashboard() {
       title: '注册同学',
       value: String(o?.users ?? '—'),
       sub: disabledCount > 0 ? `${disabledCount} 个已停用` : '全部正常',
-      icon: <UsersRound className='text-muted-foreground h-4 w-4' />,
+      icon: <UsersRound className='h-4 w-4 text-muted-foreground' />,
     },
     {
       title: '在线实例',
       value: `${o?.online ?? 0}/${o?.capacity ?? '—'}`,
       sub: '并发上限即此分母',
-      icon: <KeyRound className='text-muted-foreground h-4 w-4' />,
+      icon: <KeyRound className='h-4 w-4 text-muted-foreground' />,
     },
     {
       title: '可用邀请码',
       value: String(o?.invitesLeft ?? '—'),
       sub: `${data?.invites.length ?? 0} 个全量记录`,
-      icon: <Ticket className='text-muted-foreground h-4 w-4' />,
+      icon: <Ticket className='h-4 w-4 text-muted-foreground' />,
     },
     {
       title: '今日对话轮数',
       value: String(o?.turnsToday ?? '—'),
       sub: `站点额度账${o?.ownTurnsToday ? ` · 自有 ${o.ownTurnsToday} 轮` : ''}`,
-      icon: <BadgeDollarSign className='text-muted-foreground h-4 w-4' />,
+      icon: <BadgeDollarSign className='h-4 w-4 text-muted-foreground' />,
     },
   ]
 
@@ -55,12 +55,10 @@ export function Dashboard() {
     <>
       {/* ===== Top Heading ===== */}
       <Header>
-        <Search />
-        <div className='ms-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ConfigDrawer />
-          <ProfileDropdown />
-        </div>
+        <Search className='me-auto' />
+        <ThemeSwitch />
+        <ConfigDrawer />
+        <ProfileDropdown />
       </Header>
 
       {/* ===== Main ===== */}
@@ -101,7 +99,7 @@ export function Dashboard() {
                     <div className='text-2xl font-bold tabular-nums'>
                       {isLoading ? '…' : kpi.value}
                     </div>
-                    <p className='text-muted-foreground text-xs'>{kpi.sub}</p>
+                    <p className='text-xs text-muted-foreground'>{kpi.sub}</p>
                   </CardContent>
                 </Card>
               ))}
@@ -125,7 +123,7 @@ export function Dashboard() {
                     管理动作实时记录，全部见{' '}
                     <Link
                       to='/log'
-                      className='hover:text-primary underline underline-offset-4'
+                      className='underline underline-offset-4 hover:text-primary'
                     >
                       操作日志
                     </Link>

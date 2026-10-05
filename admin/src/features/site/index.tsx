@@ -91,12 +91,12 @@ function SiteDefaultModelCard({
               {providers.find((p) => p.id === current.provider)?.label ??
                 current.provider}
             </Badge>
-            <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-xs'>
+            <code className='rounded bg-muted px-1.5 py-0.5 font-mono text-xs'>
               {current.model}
             </code>
           </p>
         ) : (
-          <p className='text-muted-foreground text-sm'>
+          <p className='text-sm text-muted-foreground'>
             未设置——没自选过的同学用系统默认（DeepSeek · deepseek-flash）
           </p>
         )}
@@ -151,7 +151,7 @@ function SiteDefaultModelCard({
           )}
         </div>
         {modelsQuery.data?.error && (
-          <p className='text-muted-foreground text-xs'>
+          <p className='text-xs text-muted-foreground'>
             {modelsQuery.data.error}
           </p>
         )}
@@ -238,7 +238,7 @@ export function SitePage() {
       {site?.deepseekKeySet ? (
         <>
           （面板{' '}
-          <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-xs'>
+          <code className='rounded bg-muted px-1.5 py-0.5 font-mono text-xs'>
             {site.deepseekKeyMasked}
           </code>
           ）
@@ -295,15 +295,15 @@ export function SitePage() {
                     </div>
                     <div className='flex shrink-0 items-center gap-2'>
                       {p.keySet ? (
-                        <code className='bg-muted rounded px-1.5 py-0.5 font-mono text-xs'>
+                        <code className='rounded bg-muted px-1.5 py-0.5 font-mono text-xs'>
                           {p.keyMasked}
                         </code>
                       ) : p.envFallback ? (
-                        <span className='text-muted-foreground text-xs'>
+                        <span className='text-xs text-muted-foreground'>
                           回退 env
                         </span>
                       ) : (
-                        <span className='text-muted-foreground text-xs'>
+                        <span className='text-xs text-muted-foreground'>
                           未设置
                         </span>
                       )}
@@ -354,7 +354,7 @@ export function SitePage() {
                 保存
               </Button>
             </div>
-            <p className='text-muted-foreground text-xs'>
+            <p className='text-xs text-muted-foreground'>
               在线实例下次拉起时切换；同学保存自己的 Key
               后优先用自己的，不消耗站点额度。
             </p>
@@ -387,7 +387,7 @@ export function SitePage() {
             ) : (
               <div className='grid gap-3 sm:grid-cols-2'>
                 <div className='flex items-center justify-between gap-4 rounded-md border px-4 py-3'>
-                  <span className='text-muted-foreground text-sm'>
+                  <span className='text-sm text-muted-foreground'>
                     站点默认限额
                   </span>
                   <span className='font-semibold tabular-nums'>
@@ -395,7 +395,7 @@ export function SitePage() {
                   </span>
                 </div>
                 <div className='flex items-center justify-between gap-4 rounded-md border px-4 py-3'>
-                  <span className='text-muted-foreground text-sm'>
+                  <span className='text-sm text-muted-foreground'>
                     今日站点账
                   </span>
                   <span className='font-semibold tabular-nums'>
@@ -403,7 +403,7 @@ export function SitePage() {
                   </span>
                 </div>
                 <div className='flex items-center justify-between gap-4 rounded-md border px-4 py-3'>
-                  <span className='text-muted-foreground text-sm'>
+                  <span className='text-sm text-muted-foreground'>
                     今日自有账
                   </span>
                   <span className='font-semibold tabular-nums'>
@@ -411,7 +411,7 @@ export function SitePage() {
                   </span>
                 </div>
                 <div className='flex items-center justify-between gap-4 rounded-md border px-4 py-3'>
-                  <span className='text-muted-foreground text-sm'>
+                  <span className='text-sm text-muted-foreground'>
                     Key 模式分布
                   </span>
                   <span className='flex items-center gap-1.5'>

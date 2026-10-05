@@ -47,7 +47,6 @@ export function ConfigDrawer() {
           size='icon'
           variant='ghost'
           aria-label='Open theme settings'
-          aria-describedby='config-drawer-description'
           className='rounded-full'
         >
           <Settings aria-hidden='true' />
@@ -56,7 +55,7 @@ export function ConfigDrawer() {
       <SheetContent className='flex flex-col'>
         <SheetHeader className='pb-0 text-start'>
           <SheetTitle>Theme Settings</SheetTitle>
-          <SheetDescription id='config-drawer-description'>
+          <SheetDescription>
             Adjust the appearance and layout to suit your preferences.
           </SheetDescription>
         </SheetHeader>
@@ -84,27 +83,32 @@ function SectionTitle({
   title,
   showReset = false,
   onReset,
+  resetAriaLabel,
   className,
 }: {
   title: string
   showReset?: boolean
   onReset?: () => void
+  /** Shown on the small per-section reset (RotateCcw) for accessibility and tests. */
+  resetAriaLabel?: string
   className?: string
 }) {
   return (
     <div
       className={cn(
-        'text-muted-foreground mb-2 flex items-center gap-2 text-sm font-semibold',
+        'mb-2 flex items-center gap-2 text-sm font-semibold text-muted-foreground',
         className
       )}
     >
       {title}
       {showReset && onReset && (
         <Button
+          type='button'
           size='icon'
           variant='secondary'
           className='size-4 rounded-full'
           onClick={onReset}
+          aria-label={resetAriaLabel}
         >
           <RotateCcw className='size-3' />
         </Button>
@@ -133,8 +137,8 @@ function RadioGroupItem({
     >
       <div
         className={cn(
-          'ring-border relative rounded-[6px] ring-[1px]',
-          'group-data-[state=checked]:ring-primary group-data-[state=checked]:shadow-2xl',
+          'relative rounded-[6px] ring-[1px] ring-border',
+          'group-data-[state=checked]:shadow-2xl group-data-[state=checked]:ring-primary',
           'group-focus-visible:ring-2'
         )}
         role='img'
@@ -143,7 +147,7 @@ function RadioGroupItem({
       >
         <CircleCheck
           className={cn(
-            'fill-primary size-6 stroke-white',
+            'size-6 fill-primary stroke-white',
             'group-data-[state=unchecked]:hidden',
             'absolute top-0 right-0 translate-x-1/2 -translate-y-1/2'
           )}
@@ -152,7 +156,7 @@ function RadioGroupItem({
         <item.icon
           className={cn(
             !isTheme &&
-              'stroke-primary fill-primary group-data-[state=unchecked]:stroke-muted-foreground group-data-[state=unchecked]:fill-muted-foreground'
+              'fill-primary stroke-primary group-data-[state=unchecked]:fill-muted-foreground group-data-[state=unchecked]:stroke-muted-foreground'
           )}
           aria-hidden='true'
         />
@@ -176,6 +180,7 @@ function ThemeConfig() {
         title='Theme'
         showReset={theme !== defaultTheme}
         onReset={() => setTheme(defaultTheme)}
+        resetAriaLabel='Reset theme preference to default'
       />
       <Radio
         value={theme}
@@ -219,6 +224,7 @@ function SidebarConfig() {
         title='Sidebar'
         showReset={defaultVariant !== variant}
         onReset={() => setVariant(defaultVariant)}
+        resetAriaLabel='Reset sidebar style to default'
       />
       <Radio
         value={variant}
@@ -269,6 +275,7 @@ function LayoutConfig() {
           setOpen(true)
           setCollapsible(defaultCollapsible)
         }}
+        resetAriaLabel='Reset layout options to default'
       />
       <Radio
         value={radioState}
@@ -319,6 +326,7 @@ function DirConfig() {
         title='Direction'
         showReset={defaultDir !== dir}
         onReset={() => setDir(defaultDir)}
+        resetAriaLabel='Reset text direction to default'
       />
       <Radio
         value={dir}

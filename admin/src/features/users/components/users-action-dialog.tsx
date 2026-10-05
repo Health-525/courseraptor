@@ -199,7 +199,7 @@ export function UsersActionDialog({
                         {...field}
                       />
                     </FormControl>
-                    <FormDescription className='text-muted-foreground col-span-4 col-start-3'>
+                    <FormDescription className='col-span-4 col-start-3 text-muted-foreground'>
                       站点默认 {siteDefault} 轮/人/日；填 0 表示跟随站点默认。
                     </FormDescription>
                     <FormMessage className='col-span-4 col-start-3' />

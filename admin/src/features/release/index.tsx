@@ -208,7 +208,7 @@ export function ReleasePage() {
                 <span className='min-w-0 flex-1 truncate font-mono'>
                   {file.name}
                 </span>
-                <span className='text-muted-foreground shrink-0 text-xs'>
+                <span className='shrink-0 text-xs text-muted-foreground'>
                   {fmtBytes(file.size)}
                 </span>
                 {!uploading && (
@@ -227,16 +227,16 @@ export function ReleasePage() {
 
             {uploading && (
               <div className='space-y-1.5'>
-                <div className='text-muted-foreground flex justify-between text-xs'>
+                <div className='flex justify-between text-xs text-muted-foreground'>
                   <span>{progress.phase}</span>
                   <span>
                     {fmtBytes(progress.loaded)} /{' '}
                     {fmtBytes(progress.total || progress.loaded)}
                   </span>
                 </div>
-                <div className='bg-secondary h-2 overflow-hidden rounded-full'>
+                <div className='h-2 overflow-hidden rounded-full bg-secondary'>
                   <div
-                    className='bg-primary h-full transition-all'
+                    className='h-full bg-primary transition-all'
                     style={{
                       width: `${progress.total ? Math.min(100, (progress.loaded / progress.total) * 100) : 0}%`,
                     }}
@@ -266,7 +266,7 @@ export function ReleasePage() {
                 <Upload />
                 发布新版本
               </Button>
-              <p className='text-muted-foreground text-xs'>
+              <p className='text-xs text-muted-foreground'>
                 发布后学生端下次启动 raptor
                 时提示更新；版本号需大于当前分发版本才会触发更新。
               </p>
@@ -288,11 +288,11 @@ export function ReleasePage() {
                     : ''}
               </CardDescription>
             </div>
-            <div className='text-muted-foreground text-xs'>
+            <div className='text-xs text-muted-foreground'>
               {updOverview?.data?.current ? (
                 <span>
                   当前分发{' '}
-                  <code className='text-foreground font-mono font-semibold'>
+                  <code className='font-mono font-semibold text-foreground'>
                     v{updOverview.data.current.version}
                   </code>{' '}
                   · {fmtDateTime(updOverview.data.current.publishedAt)}
@@ -314,7 +314,7 @@ export function ReleasePage() {
             {updOverview && !updOverview.unavailable && (
               <div className='space-y-2'>
                 {(updVersions?.data?.versions ?? []).length === 0 && (
-                  <p className='text-muted-foreground py-6 text-center text-sm'>
+                  <p className='py-6 text-center text-sm text-muted-foreground'>
                     还没有发布过版本
                   </p>
                 )}
@@ -331,10 +331,10 @@ export function ReleasePage() {
                     ) : v.rolledBackAt ? (
                       <Badge variant='secondary'>已回滚</Badge>
                     ) : null}
-                    <span className='text-muted-foreground min-w-0 flex-1 truncate text-xs'>
+                    <span className='min-w-0 flex-1 truncate text-xs text-muted-foreground'>
                       {v.notes || '（无说明）'}
                     </span>
-                    <span className='text-muted-foreground shrink-0 text-xs'>
+                    <span className='shrink-0 text-xs text-muted-foreground'>
                       {fmtDateTime(v.publishedAt)} · {fmtBytes(v.sizeBytes)}
                     </span>
                     {!v.isCurrent && (
