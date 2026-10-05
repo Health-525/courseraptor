@@ -1,11 +1,14 @@
 /**
  * 「知识库」独立页 — GET /knowledge 的页面本体
  *
- * 形态照 flomo（浮墨笔记）做减法：左侧栏（标签列表 + 统计 + 热力图）
- * + 主列（发布框 + 按日分组的无标题卡片流）。无导图/日历/时间线等多
- * 视图，无排序切换——只有一条按更新时间倒序的川流；卡片首行是加粗
+ * 形态照 flomo（浮墨笔记）做减法：左侧栏（搜索 + 标签列表 + 纯排版统计 +
+ * 热力图）+ 主列（发布框 + 按日分组的无标题卡片流）。无导图/日历/时间线
+ * 等多视图，无排序切换——只有一条按更新时间倒序的川流；卡片首行是加粗
  * 标题（flomo 的「首行即标题」），底部一行：#标签 · 相对时间 · 操作。
- * 配色保留项目自己的红头档案令牌（暖纸底 + 墨字 + 单一朱砂红）。
+ * 视觉为红头档案 × flomo 的融合：页头与 /today 同源三件套（印章+楷体
+ * h1+mono 戳记，sticky 毛玻璃）；内容区零装饰（无楷体/竖排/旋转/英文
+ * 标签，防「AI 味」四判据）；卡片靠柔和阴影浮起、hover 微升；发布框
+ * 常态灰底无边框、聚焦升白；热力图空格子近透明，只亮有记录的日子。
  *
  * 发布框（flomo 核心交互）：首行=标题、其余=正文，分类可留空自动归
  * 课表课程，Ctrl+Enter 记下；POST /api/knowledge。编辑：卡片原地变
@@ -39,7 +42,7 @@ export function knowledgePage(
 <title>知识库 · CourseRaptor</title>
 <style>
   /* 红头档案令牌：暖纸底 + 墨字 + 单一朱砂红（与 /today 等页同源）；
-     热力图四档色阶也取自朱砂 */
+     阴影与衬线/等宽字体也是同源令牌；热力图四档色阶取自朱砂 */
   :root {
     color-scheme: light;
     --paper: #F6F4ED;
@@ -55,11 +58,17 @@ export function knowledgePage(
     --accent: #AD392C;
     --accent-deep: #852B22;
     --accent-soft: #F3E3DE;
-    --heat-0: #ECE8DD;
+    --heat-0: rgba(50, 42, 31, 0.055);
     --heat-1: #EDD3CC;
     --heat-2: #D89D8F;
     --heat-3: #AD392C;
+    --shadow-sm: 0 8px 24px rgba(50, 42, 31, 0.055);
+    --shadow-md: 0 10px 28px rgba(50, 42, 31, 0.09);
+    --serif: Georgia, "Times New Roman", "Songti SC", SimSun, serif;
+    --kai: "KaiTi", "STKaiti", "Kaiti SC", var(--serif);
     --sans: system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --mono: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+    --head-h: 64px;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--paper); color: var(--ink);
@@ -75,105 +84,142 @@ export function knowledgePage(
   .tbtn:hover { border-color: var(--accent); color: var(--accent); background: var(--card); }
   .tbtn:active { transform: translateY(1px); }
 
-  /* ── 页头 ── */
+  /* ── 页头：与 /today /todos 同源的红头档案三件套（印章+楷体 h1+mono 戳记），
+     sticky 半透明纸底 + 柔和模糊，滚动时内容从页头下穿过去 ── */
   .pagehead { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px;
-              padding: 13px 28px; border-bottom: 1px solid var(--rule);
-              background: var(--paper); }
+              padding: 10px 28px; height: var(--head-h); border-bottom: 1px solid var(--rule);
+              background: rgba(246, 244, 237, 0.92);
+              -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  .pagehead .seal { flex: none; position: relative; width: 44px; height: 44px;
+                    transform: rotate(-7deg); }
+  .pagehead .seal::before { content: ""; position: absolute; inset: 0;
+                            border: 2px solid var(--accent); border-radius: 50%; opacity: .9; }
+  .pagehead .seal img { position: absolute; top: 5px; left: 5px; width: 34px; height: 34px;
+                        border-radius: 50%; object-fit: cover; }
   .ph-title { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 14px; }
-  .ph-title h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: 0; }
+  .ph-title h1 { margin: 0; font-family: var(--kai); font-weight: 400;
+                 font-size: 24px; letter-spacing: 2px; }
+  .ph-title .ph-stamp { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
+                        letter-spacing: .1em; white-space: nowrap; }
   .ph-right { display: flex; align-items: center; gap: 10px; }
 
   /* ── flomo 布局：侧栏（标签 + 统计 + 热力图）+ 主列川流 ──
      侧栏 300px（标签/热力图有呼吸空间），主区底压深一档（paper-deep），
      纯白卡在浅底上「浮」出来，视觉重心落在卡片流 */
   main { display: grid; grid-template-columns: 300px minmax(0, 1fr); align-items: stretch;
-         min-height: calc(100vh - 55px); background: var(--paper-deep); }
+         min-height: calc(100vh - var(--head-h)); background: var(--paper-deep); }
 
   .kn-rail { background: var(--card); border-right: 1px solid var(--rule);
-             padding: 18px 16px 28px; position: sticky; top: 55px; align-self: start;
-             max-height: calc(100vh - 55px); overflow-y: auto; }
-  .kw-box { width: 100%; padding: 7px 12px; border: 1px solid var(--rule-2);
-            border-radius: 8px; background: var(--paper); color: var(--ink); font-size: 14px;
-            font-family: inherit; }
-  .kw-box:focus { outline: none; border-color: var(--accent); }
-  .kw-hint { margin: 5px 2px 0; font-size: 11px; color: var(--ink-3); }
-  .rail-sec { margin: 0 0 6px; font-size: 12px; color: var(--ink-3);
-              letter-spacing: .06em; }
-  .cat-nav { display: flex; flex-direction: column; gap: 1px; margin-top: 8px; }
+             padding: 20px 18px 28px; position: sticky; top: var(--head-h); align-self: start;
+             max-height: calc(100vh - var(--head-h)); overflow-y: auto; }
+  .kw-box { width: 100%; min-height: 42px; padding: 8px 14px; border: 1px solid transparent;
+            border-radius: 10px; background: var(--shade); color: var(--ink); font-size: 14px;
+            font-family: inherit; transition: background .15s ease, border-color .15s ease,
+            box-shadow .15s ease; }
+  .kw-box:focus { outline: none; background: var(--card); border-color: var(--accent);
+                  box-shadow: 0 0 0 3px var(--accent-soft); }
+  .kw-hint { margin: 6px 2px 0; font-size: 11px; color: var(--ink-3); }
+  .rail-sec { margin: 18px 0 4px; font-size: 12px; color: var(--ink-2); font-weight: 500;
+              letter-spacing: .12em; display: flex; align-items: center; gap: 10px; }
+  .rail-sec::after { content: ""; flex: 1; border-bottom: 1px solid var(--rule); }
+  .cat-nav { display: flex; flex-direction: column; gap: 1px; margin-top: 6px; }
   .cat-btn { display: flex; align-items: baseline; gap: 7px;
-             background: none; border: none; padding: 4px 10px; border-radius: 6px;
+             background: none; border: none; padding: 6px 10px; border-radius: 8px;
              color: var(--ink-2); font-size: 14px; cursor: pointer; font-family: inherit;
-             text-align: left; width: 100%; }
+             text-align: left; width: 100%; position: relative;
+             transition: background .12s ease, color .12s ease; }
   .cat-btn:hover { background: var(--shade); color: var(--ink); }
   .cat-btn.active { background: var(--shade); color: var(--accent-deep); font-weight: 500; }
-  .cat-hash { color: var(--accent); flex: none; }
+  .cat-btn.active::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px;
+                            width: 2.5px; border-radius: 2px; background: var(--accent); }
+  .cat-hash { color: var(--accent); flex: none; font-family: var(--mono); font-size: 13px; }
   .cat-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .cat-count { font-size: 12px; color: var(--ink-3); flex: none; }
+  .cat-count { font-size: 12px; color: var(--ink-3); flex: none;
+               font-variant-numeric: tabular-nums; font-family: var(--mono); }
 
-  /* 侧栏统计卡：flomo 的 MEMO/标签计数 */
-  .stat-card { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
-  .stat-cell { background: var(--paper); border: 1px solid var(--rule); border-radius: 8px;
-               padding: 8px 12px; display: flex; align-items: baseline; gap: 6px; }
-  .stat-cell .n { font-size: 20px; font-weight: 600; line-height: 1.1; }
+  /* 侧栏统计：纯排版无边框（flomo 式），衬线大数字 + 小标签 */
+  .stat-card { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px;
+               padding: 12px 10px 14px; border-bottom: 1px solid var(--rule); }
+  .stat-cell { display: flex; align-items: baseline; gap: 7px; padding: 2px 2px; }
+  .stat-cell .n { font-size: 26px; font-weight: 600; line-height: 1.1; font-family: var(--serif);
+                  font-variant-numeric: tabular-nums; color: var(--ink); }
   .stat-cell .l { font-size: 11.5px; color: var(--ink-3); }
 
-  /* 侧栏热力图：近 N 周每日条目数（朱砂四档） */
-  .heatmap { margin-top: 16px; }
+  /* 侧栏热力图：近 N 周每日条目数；无数据的格子近透明（纸面针孔），
+     只让有记录的日子亮起来，避免一大片灰黄噪音 */
+  .heatmap { margin-top: 14px; }
   .heat-grid { display: grid; grid-template-columns: repeat(${HEAT_WEEKS}, 1fr);
                gap: 3px; }
-  .heat-cell { aspect-ratio: 1; border-radius: 2px; background: var(--heat-0); }
+  .heat-cell { aspect-ratio: 1; border-radius: 3px; background: var(--heat-0);
+               transition: transform .1s ease; }
+  .heat-cell:hover { transform: scale(1.25); }
   .heat-cell.h1 { background: var(--heat-1); }
   .heat-cell.h2 { background: var(--heat-2); }
   .heat-cell.h3 { background: var(--heat-3); }
   .heat-cell.blank { background: transparent; }
-  .heat-note { margin: 6px 1px 0; font-size: 11.5px; color: var(--ink-3); }
-  .rail-meta { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--rule-2);
-               font-size: 12px; line-height: 1.7; color: var(--ink-3); }
+  .heat-note { margin: 7px 1px 0; font-size: 11.5px; color: var(--ink-3); }
+  .rail-meta { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--rule);
+               font-size: 12px; line-height: 1.7; color: var(--ink-3); font-family: var(--mono); }
   .rail-meta .tbtn { margin-top: 12px; min-height: 30px; padding: 3px 12px; font-size: 12px; }
 
   /* ── 主列 ── */
-  .kn-main { width: 100%; max-width: 860px; margin: 0 auto; padding: 20px 24px 64px; }
+  .kn-main { width: 100%; max-width: 860px; margin: 0 auto; padding: 22px 24px 64px; }
 
-  /* 发布框：首行=标题，其余=正文 */
-  .composer { border: 1px solid var(--rule-2); border-radius: 12px; background: var(--card);
-              padding: 4px 14px 10px; margin-bottom: 14px; }
-  .composer:focus-within { border-color: var(--accent); }
-  .cp-text { width: 100%; min-height: 64px; border: none; outline: none; resize: vertical;
+  /* 发布框：flomo 式灰底无边框的「随手记」，聚焦才升白浮起 */
+  .composer { border: 1px solid transparent; border-radius: 14px; background: var(--shade);
+              padding: 6px 16px 12px; margin-bottom: 18px;
+              transition: background .18s ease, border-color .18s ease, box-shadow .18s ease; }
+  .composer:focus-within { background: var(--card); border-color: var(--rule-2);
+                           box-shadow: var(--shadow-sm); }
+  .cp-text { width: 100%; min-height: 68px; border: none; outline: none; resize: vertical;
              background: transparent; color: var(--ink); font-size: 15px; line-height: 1.65;
-             font-family: inherit; padding: 8px 0 4px; }
+             font-family: inherit; padding: 10px 0 6px; }
   .cp-text::placeholder { color: var(--ink-3); }
   .cp-row { display: flex; align-items: center; gap: 8px; }
-  .cp-subject { flex: 1; min-width: 0; border: none; border-radius: 8px;
-                background: var(--shade); color: var(--ink); font-size: 13px; padding: 6px 12px;
-                font-family: inherit; }
-  .cp-subject:focus { outline: none; box-shadow: 0 0 0 1.5px var(--accent); }
+  .cp-subject { flex: 1; min-width: 0; border: 1px solid transparent; border-radius: 8px;
+                background: rgba(255, 255, 255, 0.55); color: var(--ink); font-size: 13px;
+                padding: 6px 12px; font-family: inherit;
+                transition: background .15s ease, box-shadow .15s ease; }
+  .cp-subject:focus { outline: none; background: var(--card);
+                      box-shadow: 0 0 0 1.5px var(--accent); }
   .cp-send { flex: none; border: none; border-radius: 8px; background: var(--accent);
-             color: #FCFBF7; font-size: 14px; font-weight: 500; padding: 6px 18px;
-             cursor: pointer; font-family: inherit; }
-  .cp-send:hover { background: var(--accent-deep); }
-  .cp-send:disabled { opacity: .5; cursor: default; }
+             color: #FCFBF7; font-size: 14px; font-weight: 500; padding: 7px 20px;
+             cursor: pointer; font-family: inherit;
+             transition: background .15s ease, box-shadow .15s ease; }
+  .cp-send:hover { background: var(--accent-deep); box-shadow: 0 2px 10px rgba(173, 57, 44, 0.28); }
+  .cp-send:active { transform: translateY(1px); }
+  .cp-send:disabled { opacity: .5; cursor: default; box-shadow: none; }
+  .cp-note { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-3); }
+  .cp-note.ok { color: var(--accent-deep); }
+  .cp-note.err { color: var(--accent-deep); }
   .cp-note { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-3); }
   .cp-note.ok { color: var(--accent-deep); }
   .cp-note.err { color: var(--accent-deep); }
 
   .skel { color: var(--ink-3); font-size: 15px; padding: 8px 2px; }
-  .empty { margin: 0; padding: 28px 8px; border: 1px dashed var(--rule-2); text-align: center;
-           border-radius: 12px; background: var(--card); color: var(--ink-3); font-size: 14px; }
+  .empty { margin: 0; padding: 32px 20px; border: 1.5px dashed var(--rule-2); text-align: center;
+           border-radius: 12px; background: var(--card); color: var(--ink-3); font-size: 14px;
+           line-height: 1.8; }
 
-  /* 按日分组头 */
-  .day-head { display: flex; align-items: baseline; gap: 10px; margin: 18px 2px 8px;
-              font-size: 13px; color: var(--ink-3); }
-  .day-head .day-count { font-size: 11.5px; }
+  /* 按日分组头：时间锚点 + 引导细线 + mono 计数 */
+  .day-head { display: flex; align-items: baseline; gap: 10px; margin: 22px 2px 10px;
+              font-size: 14px; color: var(--ink); font-weight: 500; }
+  .day-head::after { content: ""; flex: 1; border-bottom: 1px solid var(--rule);
+                     transform: translateY(-3px); }
+  .day-head .day-count { font-size: 12px; color: var(--ink-3); font-weight: 400;
+                         font-family: var(--mono); font-variant-numeric: tabular-nums; }
   .day-head:first-child { margin-top: 0; }
 
-  /* 知识卡：无标题卡（首行粗体即标题），底部 #标签 + 时间 + 操作 */
-  .k-entry { padding: 12px 16px 10px; border: 1px solid var(--rule); background: var(--card);
-             border-radius: 12px; display: grid; gap: 0; margin-bottom: 10px;
-             transition: border-color .15s ease; }
-  .k-entry:hover { border-color: var(--rule-2); }
+  /* 知识卡：无标题卡（首行粗体即标题），柔和阴影 + hover 浮起 */
+  .k-entry { padding: 14px 18px 12px; border: 1px solid var(--rule); background: var(--card);
+             border-radius: 12px; display: grid; gap: 0; margin-bottom: 12px;
+             box-shadow: var(--shadow-sm);
+             transition: border-color .15s ease, box-shadow .18s ease, transform .18s ease; }
+  .k-entry:hover { border-color: var(--rule-2); box-shadow: var(--shadow-md);
+                   transform: translateY(-1px); }
   .k-text { margin: 0; font-size: 15px; line-height: 1.7; color: var(--ink);
             white-space: pre-wrap; overflow-wrap: anywhere; }
-  .k-text strong { font-weight: 600; }
+  .k-text strong { font-weight: 600; font-size: 15.5px; }
   .k-text a { color: var(--accent-deep); text-decoration: underline;
               text-underline-offset: 2px; }
   .k-text a:hover { color: var(--accent); }
@@ -190,50 +236,62 @@ export function knowledgePage(
            max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .k-tag:hover { color: var(--accent); text-decoration: underline; }
   .k-tag.none { color: var(--ink-3); }
-  .k-date { flex: none; color: var(--ink-3); white-space: nowrap; }
-  .k-ops { margin-left: auto; display: flex; gap: 2px; }
+  .k-date { flex: none; color: var(--ink-3); white-space: nowrap; font-family: var(--mono);
+            font-size: 12px; }
+  .k-ops { margin-left: auto; display: flex; gap: 2px; opacity: 0;
+           transition: opacity .15s ease; }
+  .k-entry:hover .k-ops, .k-ops:focus-within { opacity: 1; }
   .k-del { background: none; border: none; padding: 2px 4px; color: var(--ink-3); flex: none;
            font-size: 12px; cursor: pointer; }
   .k-del:hover { color: var(--accent); text-decoration: underline; }
   .k-del.armed { color: #FCFBF7; background: var(--accent); border-radius: 4px;
                  padding: 2px 8px; }
-  .k-more { display: block; margin: 10px auto 0; min-height: 32px; padding: 4px 16px;
-            font-size: 12.5px; }
+  .k-more { display: block; margin: 14px auto 0; min-height: 36px; padding: 6px 22px;
+            font-size: 13px; border-radius: 999px; background: var(--card); }
+  .k-more:hover { background: var(--card); box-shadow: var(--shadow-sm); }
 
   /* ── 条目编辑态：卡片原地变表单 ── */
   .k-edit { display: grid; gap: 8px; }
-  .k-edit input, .k-edit textarea { border: none; border-radius: 8px;
-                                    background: var(--paper); color: var(--ink); font-size: 14px;
-                                    padding: 6px 12px; font-family: inherit; width: 100%; }
-  .k-edit input:focus, .k-edit textarea:focus { outline: none; box-shadow: 0 0 0 1.5px var(--accent); }
+  .k-edit input, .k-edit textarea { border: 1px solid transparent; border-radius: 8px;
+                                    background: var(--shade); color: var(--ink); font-size: 14px;
+                                    padding: 7px 12px; font-family: inherit; width: 100%; }
+  .k-edit input:focus, .k-edit textarea:focus { outline: none; background: var(--card);
+                                                box-shadow: 0 0 0 1.5px var(--accent); }
   .k-edit-title { font-weight: 600; }
   .k-edit-content { min-height: 96px; resize: vertical; line-height: 1.65; }
   .k-edit-row { display: flex; align-items: center; gap: 8px; }
   .k-edit-subject { flex: 1; }
   .k-save { border: none; border-radius: 8px; background: var(--accent); color: #FCFBF7;
-            font-size: 13px; font-weight: 500; padding: 6px 16px; cursor: pointer;
+            font-size: 13px; font-weight: 500; padding: 7px 18px; cursor: pointer;
             font-family: inherit; }
   .k-save:hover { background: var(--accent-deep); }
   .k-cancel { background: none; border: 1px solid var(--rule-2); border-radius: 8px;
-              color: var(--ink-2); font-size: 13px; padding: 5px 14px; cursor: pointer;
+              color: var(--ink-2); font-size: 13px; padding: 6px 14px; cursor: pointer;
               font-family: inherit; }
   .k-cancel:hover { border-color: var(--ink-3); color: var(--ink); }
   .k-edit .cp-note { margin: 0; }
 
   @media (max-width: 720px) {
-    .pagehead { flex-wrap: wrap; padding: 12px 16px; gap: 10px 12px; }
+    .pagehead { flex-wrap: wrap; height: auto; padding: 12px 16px; gap: 10px 12px;
+                background: rgba(246, 244, 237, 0.96); }
+    .pagehead .seal { width: 38px; height: 38px; }
+    .pagehead .seal img { top: 4px; left: 4px; width: 30px; height: 30px; }
+    .ph-title h1 { font-size: 20px; }
+    .ph-title .ph-stamp { display: none; }
     .ph-right { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
     .ph-right .tbtn { flex: none; white-space: nowrap; }
     main { display: block; min-height: 0; }
     .kn-rail { position: static; max-height: none; overflow: visible;
                border-right: none; border-bottom: 1px solid var(--rule); padding: 14px 16px 16px; }
-    .cat-nav { flex-direction: row; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .cat-nav { flex-direction: row; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
     .cat-btn { border: 1px solid var(--rule-2); background: var(--paper); padding: 4px 10px; }
+    .cat-btn.active::before { display: none; }
     .cat-label { max-width: 9em; }
     .rail-meta { margin-top: 10px; padding-top: 10px; }
-    .kn-main { padding: 14px 14px 56px; }
+    .kn-main { padding: 16px 14px 56px; }
   }
-  /* 触屏：搜索框提到 16px 防 iOS 聚焦缩放；小字按钮放大到能点的尺寸 */
+  /* 触屏：搜索框提到 16px 防 iOS 聚焦缩放；小字按钮放大到能点的尺寸；
+     操作按钮触屏没有 hover，常显 */
   @media (hover: none) {
     .kw-box { font-size: 16px; }
     .cat-btn { min-height: 38px; }
@@ -241,6 +299,7 @@ export function knowledgePage(
     .k-toggle { min-height: 34px; padding: 8px 0; }
     .k-more { min-height: 38px; }
     .k-tag { min-height: 34px; }
+    .k-ops { opacity: 1; }
   }
   @media print {
     body { background: #fff; }
@@ -250,6 +309,7 @@ export function knowledgePage(
     main { display: block; max-width: none; padding: 0; }
     .kn-rail { display: none; }
     .kn-main { padding: 0; max-width: none; }
+    .k-entry { box-shadow: none; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -259,8 +319,10 @@ export function knowledgePage(
 </head>
 <body data-demo="${demo}">
 <header class="pagehead">
+  <span class="seal" aria-hidden="true"><img src="/logo.png" alt="" width="34" height="34"></span>
   <div class="ph-title">
     <h1>知识库</h1>
+    <span class="ph-stamp">COURSERAPTOR · KNOWLEDGE</span>
   </div>
   <div class="ph-right">
     <a class="tbtn" href="/today">今日日程</a>
