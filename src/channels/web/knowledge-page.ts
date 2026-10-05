@@ -1,33 +1,28 @@
 /**
  * 「知识库」独立页 — GET /knowledge 的页面本体
  *
- * 三种视图共一套筛选（搜索 / 分类 / 排序）：
- *  · 条目：memos 式卡片流（分类描边胶囊 + 长文折叠 + 两步删除 + 原地编辑）；
- *  · 导图：SVG 横向树（我的知识 → 课程分类 → 条目），点击节点跳回
- *    条目视图并高亮展开，每分类最多 12 个节点、超出折进「还有 N 条」；
- *  · 日历：memos 月历 + 每日条目数，点击某天列出当日条目；
- *  · 时间线：按月分组 + 左缘时间轴竖线，条目卡与列表视图同款。
- * 发布框（memos 核心交互）：主列顶部直接记知识——首行=标题、其余=
- * 正文，分类可留空自动归课表课程，Ctrl+Enter 记下；POST /api/knowledge。
- * 编辑：卡片原地变表单（PATCH /api/knowledge/:id），编辑中暂停自动刷新。
- * 数据来自 GET /api/knowledge（纯本地存储，不登录教务、不调模型），
- * 页面每 60 秒与切回标签页时自行刷新；视图选择经 URL hash 记忆。
+ * 形态照 flomo（浮墨笔记）做减法：左侧栏（标签列表 + 统计 + 热力图）
+ * + 主列（发布框 + 按日分组的无标题卡片流）。无导图/日历/时间线等多
+ * 视图，无排序切换——只有一条按更新时间倒序的川流；卡片首行是加粗
+ * 标题（flomo 的「首行即标题」），底部一行：#标签 · 相对时间 · 操作。
+ * 配色保留项目自己的红头档案令牌（暖纸底 + 墨字 + 单一朱砂红）。
  *
- * 视觉与布局复刻 usememos/memos（63k star，实测其线上 demo 的设计令牌）：
- * 米白底 + 256px 侧栏 + 672px 主列居中，条目为独立白卡圆角细边、
- * 分类是 memos 式「# 描边胶囊」、侧栏分类列表带 # 前缀与计数、
- * 视图切换为文字下划线 tab。设计令牌见 :root 注释。
+ * 发布框（flomo 核心交互）：首行=标题、其余=正文，分类可留空自动归
+ * 课表课程，Ctrl+Enter 记下；POST /api/knowledge。编辑：卡片原地变
+ * 表单（PATCH /api/knowledge/:id），编辑中暂停自动刷新。
+ * 数据来自 GET /api/knowledge（纯本地存储，不登录教务、不调模型），
+ * 页面每 60 秒与切回标签页时自行刷新。
  * 演示模式：demo=true 时内嵌虚构数据（demoData），不发任何请求。
  */
 
 import type { KnowledgeEntry } from "../../core/knowledge";
 
-/** 正文超过该长度视为长文，默认折叠、展开收起由用户决定 */
+/** 长文默认折叠的字符数（标题+正文合计），展开收起由用户决定 */
 const CLAMP_LEN = 160;
 /** 首屏渲染条数，超出部分「显示更多」分批追加 */
 const BATCH = 50;
-/** 导图里每个分类最多渲染的条目节点数，超出折进「还有 N 条」 */
-const GRAPH_MAX = 12;
+/** 侧栏热力图的周数（列数，每列 7 天） */
+const HEAT_WEEKS = 16;
 
 export function knowledgePage(
   options: { demo?: boolean; demoData?: KnowledgeEntry[] } = {},
@@ -43,241 +38,185 @@ export function knowledgePage(
 <link rel="icon" type="image/png" href="/logo.png">
 <title>知识库 · CourseRaptor</title>
 <style>
-  /* 设计令牌：复刻 usememos/memos 的浅色主题（实测其线上 demo 的 oklch 值） */
+  /* 红头档案令牌：暖纸底 + 墨字 + 单一朱砂红（与 /today 等页同源）；
+     热力图四档色阶也取自朱砂 */
   :root {
     color-scheme: light;
-    --paper: #FAF9F5;      /* memos --background */
-    --paper-deep: #F5F4EF; /* memos 侧栏底色 */
-    --card: #FFFFFF;       /* memos --card */
-    --shade: #EFEDE4;      /* memos --muted */
-    --ink: #3D3929;        /* memos --foreground */
-    --ink-2: #6B6752;
-    --ink-3: #8A8672;
-    --rule: #E9E7DC;
-    --rule-2: #E0DED1;     /* memos --border */
-    --accent: #316FC7;     /* memos --primary */
-    --accent-deep: #2B5FAB;
-    --accent-soft: #E7EEF7;
-    --shadow-sm: 0 0 0 0 rgba(0, 0, 0, 0);
-    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-    --mono: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+    --paper: #F6F4ED;
+    --paper-deep: #F0EDE4;
+    --card: #FCFBF7;
+    --shade: #ECE8DD;
+    --ink: #25221C;
+    --ink-2: #5A554A;
+    /* 旧值 #898274 在纸底上仅 ~3.5:1，调深以满足 WCAG AA（小字 ≥4.5:1） */
+    --ink-3: #6E6656;
+    --rule: #E1DCCF;
+    --rule-2: #C9C1AF;
+    --accent: #AD392C;
+    --accent-deep: #852B22;
+    --accent-soft: #F3E3DE;
+    --heat-0: #ECE8DD;
+    --heat-1: #EDD3CC;
+    --heat-2: #D89D8F;
+    --heat-3: #AD392C;
+    --sans: system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--paper); color: var(--ink);
          font-family: var(--sans); font-size: 16px; line-height: 1.7;
          -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
   ::selection { background: var(--accent-soft); }
-  a { color: inherit; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .tbtn { background: none; border: 1px solid var(--rule-2); color: var(--ink-2);
-          min-height: 38px; font-size: 14px; padding: 7px 14px; border-radius: 4px;
+          min-height: 36px; font-size: 14px; padding: 6px 14px; border-radius: 8px;
           cursor: pointer; text-decoration: none; display: inline-flex;
           align-items: center; font-family: inherit;
           transition: border-color .15s ease, color .15s ease, background .15s ease; }
   .tbtn:hover { border-color: var(--accent); color: var(--accent); background: var(--card); }
   .tbtn:active { transform: translateY(1px); }
 
-  /* ── 页头：memos 式 sticky 顶栏 ── */
+  /* ── 页头 ── */
   .pagehead { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px;
-              padding: 14px 28px; border-bottom: 1px solid var(--rule);
+              padding: 13px 28px; border-bottom: 1px solid var(--rule);
               background: var(--paper); }
   .ph-title { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 14px; }
   .ph-title h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: 0; }
   .ph-right { display: flex; align-items: center; gap: 10px; }
 
-  /* ── memos 布局：侧栏通条 + 主列限宽居中 ── */
-  main { display: grid; grid-template-columns: 256px minmax(0, 1fr); align-items: stretch;
-         min-height: calc(100vh - 57px); }
+  /* ── flomo 布局：侧栏（标签 + 统计 + 热力图）+ 主列川流 ── */
+  main { display: grid; grid-template-columns: 248px minmax(0, 1fr); align-items: stretch;
+         min-height: calc(100vh - 55px); }
 
-  .kn-rail { background: var(--paper-deep); border-right: 1px solid var(--rule);
-             padding: 20px 16px 32px; position: sticky; top: 57px; align-self: start;
-             max-height: calc(100vh - 57px); overflow-y: auto; }
+  .kn-rail { background: var(--card); border-right: 1px solid var(--rule);
+             padding: 18px 16px 28px; position: sticky; top: 55px; align-self: start;
+             max-height: calc(100vh - 55px); overflow-y: auto; }
   .kw-box { width: 100%; padding: 7px 12px; border: 1px solid var(--rule-2);
-            border-radius: 8px; background: var(--card); color: var(--ink); font-size: 14px;
+            border-radius: 8px; background: var(--paper); color: var(--ink); font-size: 14px;
             font-family: inherit; }
   .kw-box:focus { outline: none; border-color: var(--accent); }
   .kw-hint { margin: 5px 2px 0; font-size: 11px; color: var(--ink-3); }
-  .sort-row { display: flex; gap: 6px; margin-top: 12px; }
-  .sort-btn { flex: 1; background: none; border: 1px solid var(--rule-2); padding: 4px 8px;
-              border-radius: 6px; color: var(--ink-2); font-size: 12px; cursor: pointer;
-              font-family: inherit; }
-  .sort-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .sort-btn.active { border-color: var(--accent); background: var(--accent-soft);
-                     color: var(--accent-deep); }
-  .cat-nav { display: flex; flex-direction: column; gap: 2px; margin-top: 16px; }
-  /* memos 标签列表：# 前缀 + 右侧计数，hover 圆角底、激活蓝字 */
-  .cat-btn { display: flex; align-items: baseline; gap: 8px;
-             background: none; border: none; padding: 5px 10px; border-radius: 6px;
+  .rail-sec { margin: 0 0 6px; font-size: 12px; color: var(--ink-3);
+              letter-spacing: .06em; }
+  .cat-nav { display: flex; flex-direction: column; gap: 1px; margin-top: 8px; }
+  .cat-btn { display: flex; align-items: baseline; gap: 7px;
+             background: none; border: none; padding: 4px 10px; border-radius: 6px;
              color: var(--ink-2); font-size: 14px; cursor: pointer; font-family: inherit;
              text-align: left; width: 100%; }
   .cat-btn:hover { background: var(--shade); color: var(--ink); }
   .cat-btn.active { background: var(--shade); color: var(--accent-deep); font-weight: 500; }
-  .cat-hash { color: var(--accent); font-weight: 400; flex: none; }
+  .cat-hash { color: var(--accent); flex: none; }
   .cat-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cat-count { font-size: 12px; color: var(--ink-3); flex: none; }
+
+  /* 侧栏统计卡：flomo 的 MEMO/标签计数 */
+  .stat-card { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+  .stat-cell { background: var(--paper); border: 1px solid var(--rule); border-radius: 8px;
+               padding: 8px 12px; display: flex; align-items: baseline; gap: 6px; }
+  .stat-cell .n { font-size: 20px; font-weight: 600; line-height: 1.1; }
+  .stat-cell .l { font-size: 11.5px; color: var(--ink-3); }
+
+  /* 侧栏热力图：近 N 周每日条目数（朱砂四档） */
+  .heatmap { margin-top: 16px; }
+  .heat-grid { display: grid; grid-template-columns: repeat(${HEAT_WEEKS}, 1fr);
+               gap: 3px; }
+  .heat-cell { aspect-ratio: 1; border-radius: 2px; background: var(--heat-0); }
+  .heat-cell.h1 { background: var(--heat-1); }
+  .heat-cell.h2 { background: var(--heat-2); }
+  .heat-cell.h3 { background: var(--heat-3); }
+  .heat-cell.blank { background: transparent; }
+  .heat-note { margin: 6px 1px 0; font-size: 11.5px; color: var(--ink-3); }
   .rail-meta { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--rule-2);
                font-size: 12px; line-height: 1.7; color: var(--ink-3); }
   .rail-meta .tbtn { margin-top: 12px; min-height: 30px; padding: 3px 12px; font-size: 12px; }
 
-  /* ── 主列：memos 式文字 tab + 独立白卡流 ── */
-  .kn-main { width: 100%; max-width: 672px; margin: 0 auto; padding: 20px 20px 64px; }
-  .view-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
-              padding: 0 4px 10px; border-bottom: 1px solid var(--rule); margin-bottom: 16px; }
-  .view-tabs { display: flex; gap: 4px; }
-  .vtab { background: none; border: none; padding: 4px 10px 6px;
-          border-bottom: 2px solid transparent; color: var(--ink-2); font-size: 14px;
-          cursor: pointer; font-family: inherit; margin-bottom: -11px;
-          transition: color .15s ease, border-color .15s ease; }
-  .vtab:hover { color: var(--ink); }
-  .vtab.active { border-bottom-color: var(--accent); color: var(--ink); font-weight: 500; }
-  .cnote { font-size: 12px; color: var(--ink-3); }
-  .kn-flow { display: grid; gap: 12px; align-content: start; }
+  /* ── 主列 ── */
+  .kn-main { width: 100%; max-width: 648px; margin: 0 auto; padding: 18px 20px 64px; }
 
-  /* ── memos 发布框：主列顶部的直写框 ── */
-  .composer { border: 1px solid var(--rule-2); border-radius: 8px; background: var(--card);
-              padding: 4px 12px 10px; margin-bottom: 12px; }
+  /* 发布框：首行=标题，其余=正文 */
+  .composer { border: 1px solid var(--rule-2); border-radius: 12px; background: var(--card);
+              padding: 4px 14px 10px; margin-bottom: 14px; }
   .composer:focus-within { border-color: var(--accent); }
   .cp-text { width: 100%; min-height: 64px; border: none; outline: none; resize: vertical;
              background: transparent; color: var(--ink); font-size: 15px; line-height: 1.65;
              font-family: inherit; padding: 8px 0 4px; }
   .cp-text::placeholder { color: var(--ink-3); }
   .cp-row { display: flex; align-items: center; gap: 8px; }
-  .cp-subject { flex: 1; min-width: 0; border: 1px solid var(--rule-2); border-radius: 6px;
-                background: var(--paper); color: var(--ink); font-size: 13px; padding: 5px 10px;
+  .cp-subject { flex: 1; min-width: 0; border: none; border-radius: 8px;
+                background: var(--shade); color: var(--ink); font-size: 13px; padding: 6px 12px;
                 font-family: inherit; }
-  .cp-subject:focus { outline: none; border-color: var(--accent); }
-  .cp-send { flex: none; border: none; border-radius: 6px; background: var(--accent);
-             color: #fff; font-size: 14px; font-weight: 500; padding: 6px 18px;
+  .cp-subject:focus { outline: none; box-shadow: 0 0 0 1.5px var(--accent); }
+  .cp-send { flex: none; border: none; border-radius: 8px; background: var(--accent);
+             color: #FCFBF7; font-size: 14px; font-weight: 500; padding: 6px 18px;
              cursor: pointer; font-family: inherit; }
   .cp-send:hover { background: var(--accent-deep); }
   .cp-send:disabled { opacity: .5; cursor: default; }
   .cp-note { margin: 6px 0 0; font-size: 12.5px; color: var(--ink-3); }
   .cp-note.ok { color: var(--accent-deep); }
-  .cp-note.err { color: #B4451F; }
+  .cp-note.err { color: var(--accent-deep); }
 
-  /* ── 条目编辑态：卡片原地变表单（memos 点开编辑） ── */
+  .skel { color: var(--ink-3); font-size: 15px; padding: 8px 2px; }
+  .empty { margin: 0; padding: 28px 8px; border: 1px dashed var(--rule-2); text-align: center;
+           border-radius: 12px; background: var(--card); color: var(--ink-3); font-size: 14px; }
+
+  /* 按日分组头 */
+  .day-head { display: flex; align-items: baseline; gap: 10px; margin: 18px 2px 8px;
+              font-size: 13px; color: var(--ink-3); }
+  .day-head .day-count { font-size: 11.5px; }
+  .day-head:first-child { margin-top: 0; }
+
+  /* 知识卡：无标题卡（首行粗体即标题），底部 #标签 + 时间 + 操作 */
+  .k-entry { padding: 12px 16px 10px; border: 1px solid var(--rule); background: var(--card);
+             border-radius: 12px; display: grid; gap: 0; margin-bottom: 10px;
+             transition: border-color .15s ease; }
+  .k-entry:hover { border-color: var(--rule-2); }
+  .k-text { margin: 0; font-size: 15px; line-height: 1.7; color: var(--ink);
+            white-space: pre-wrap; overflow-wrap: anywhere; }
+  .k-text strong { font-weight: 600; }
+  .k-text a { color: var(--accent-deep); text-decoration: underline;
+              text-underline-offset: 2px; }
+  .k-text a:hover { color: var(--accent); }
+  .k-text.clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
+                  overflow: hidden; }
+  .k-toggle { justify-self: start; background: none; border: none; padding: 2px 0;
+              color: var(--ink-3); font-size: 12px; cursor: pointer; margin-top: 4px; }
+  .k-toggle:hover { color: var(--accent); text-decoration: underline; }
+  mark { background: var(--accent-soft); color: var(--accent-deep); padding: 0 1px; }
+  .k-foot { display: flex; align-items: baseline; gap: 12px; margin-top: 6px;
+            font-size: 12.5px; }
+  .k-tag { background: none; border: none; padding: 0; color: var(--accent-deep);
+           cursor: pointer; font-family: inherit; font-size: 12.5px;
+           max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .k-tag:hover { color: var(--accent); text-decoration: underline; }
+  .k-tag.none { color: var(--ink-3); }
+  .k-date { flex: none; color: var(--ink-3); white-space: nowrap; }
+  .k-ops { margin-left: auto; display: flex; gap: 2px; }
+  .k-del { background: none; border: none; padding: 2px 4px; color: var(--ink-3); flex: none;
+           font-size: 12px; cursor: pointer; }
+  .k-del:hover { color: var(--accent); text-decoration: underline; }
+  .k-del.armed { color: #FCFBF7; background: var(--accent); border-radius: 4px;
+                 padding: 2px 8px; }
+  .k-more { display: block; margin: 10px auto 0; min-height: 32px; padding: 4px 16px;
+            font-size: 12.5px; }
+
+  /* ── 条目编辑态：卡片原地变表单 ── */
   .k-edit { display: grid; gap: 8px; }
-  .k-edit input, .k-edit textarea { border: 1px solid var(--rule-2); border-radius: 6px;
+  .k-edit input, .k-edit textarea { border: none; border-radius: 8px;
                                     background: var(--paper); color: var(--ink); font-size: 14px;
-                                    padding: 6px 10px; font-family: inherit; width: 100%; }
-  .k-edit input:focus, .k-edit textarea:focus { outline: none; border-color: var(--accent); }
+                                    padding: 6px 12px; font-family: inherit; width: 100%; }
+  .k-edit input:focus, .k-edit textarea:focus { outline: none; box-shadow: 0 0 0 1.5px var(--accent); }
   .k-edit-title { font-weight: 600; }
   .k-edit-content { min-height: 96px; resize: vertical; line-height: 1.65; }
   .k-edit-row { display: flex; align-items: center; gap: 8px; }
   .k-edit-subject { flex: 1; }
-  .k-save { border: none; border-radius: 6px; background: var(--accent); color: #fff;
+  .k-save { border: none; border-radius: 8px; background: var(--accent); color: #FCFBF7;
             font-size: 13px; font-weight: 500; padding: 6px 16px; cursor: pointer;
             font-family: inherit; }
   .k-save:hover { background: var(--accent-deep); }
-  .k-cancel { background: none; border: 1px solid var(--rule-2); border-radius: 6px;
+  .k-cancel { background: none; border: 1px solid var(--rule-2); border-radius: 8px;
               color: var(--ink-2); font-size: 13px; padding: 5px 14px; cursor: pointer;
               font-family: inherit; }
   .k-cancel:hover { border-color: var(--ink-3); color: var(--ink); }
   .k-edit .cp-note { margin: 0; }
-
-  /* ── 日历视图：memos 月历 + 每日条目数 ── */
-  .cal-nav { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-  .cal-nav h3 { margin: 0; font-size: 15px; font-weight: 600; flex: 1; }
-  .cal-arrow { background: none; border: 1px solid var(--rule-2); border-radius: 6px;
-               color: var(--ink-2); width: 30px; height: 30px; font-size: 15px;
-               cursor: pointer; font-family: inherit; line-height: 1; }
-  .cal-arrow:hover { border-color: var(--accent); color: var(--accent); }
-  .cal-board { border: 1px solid var(--rule-2); border-radius: 8px; background: var(--card);
-               padding: 10px; margin-bottom: 14px; }
-  .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
-  .cal-dow { text-align: center; font-size: 11.5px; color: var(--ink-3); padding: 4px 0 8px; }
-  .cal-day { position: relative; min-height: 44px; border: none; background: none;
-             border-radius: 6px; color: var(--ink); font-size: 13px; cursor: pointer;
-             font-family: inherit; padding: 6px 4px 4px; text-align: left;
-             display: flex; flex-direction: column; align-items: center; gap: 4px; }
-  .cal-day:hover { background: var(--shade); }
-  .cal-day.blank { cursor: default; }
-  .cal-day.blank:hover { background: none; }
-  .cal-day.today .cal-num { background: var(--accent); color: #fff; }
-  .cal-day.sel { background: var(--accent-soft); }
-  .cal-num { width: 24px; height: 24px; display: inline-flex; align-items: center;
-             justify-content: center; border-radius: 999px; font-weight: 500; }
-  .cal-count { font-size: 11px; color: var(--accent-deep); background: var(--accent-soft);
-               border-radius: 999px; padding: 0 7px; line-height: 1.6; }
-  .cal-list-head { display: flex; align-items: baseline; gap: 10px; margin: 2px 0 10px; }
-  .cal-list-head h4 { margin: 0; font-size: 14px; font-weight: 600; }
-  .cal-list-head .cnote { font-size: 12px; color: var(--ink-3); }
-
-  .skel { color: var(--ink-3); font-size: 15px; padding: 8px 2px; }
-  .empty { margin: 0; padding: 32px 8px; border: 1px dashed var(--rule-2); text-align: center;
-           border-radius: 8px; background: var(--card); color: var(--ink-3); font-size: 14px; }
-
-  /* 知识条目：memos 的 memo 卡——白底圆角细边，长文默认折叠可展开 */
-  .k-entry { padding: 14px 16px; border: 1px solid var(--rule-2); background: var(--card);
-             border-radius: 8px; display: grid; gap: 0;
-             transition: border-color .15s ease; }
-  .k-entry:hover { border-color: var(--ink-3); }
-  .k-head { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-  .k-title { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink);
-             overflow-wrap: anywhere; }
-  .k-date { margin-left: auto; flex: none; font-size: 12px;
-            color: var(--ink-3); white-space: nowrap; }
-  .k-del { background: none; border: none; padding: 2px 4px; color: var(--ink-3); flex: none;
-           font-size: 12px; cursor: pointer; }
-  .k-del:hover { color: var(--accent); text-decoration: underline; }
-  .k-del.armed { color: var(--card); background: var(--accent); border-radius: 4px;
-                 padding: 2px 8px; }
-  .k-content { margin: 6px 0 0; font-size: 15px; line-height: 1.65; color: var(--ink);
-                white-space: pre-wrap; overflow-wrap: anywhere; }
-  /* memos tag 胶囊：描边圆角、蓝字，挂在正文之后 */
-  .k-tags { margin-top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
-  .k-cat { display: inline-flex; align-items: baseline; padding: 1px 8px;
-           border: 1px solid var(--rule-2); border-radius: 999px; background: var(--card);
-           color: var(--accent); font-size: 12.5px; line-height: 1.6;
-           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .k-cat.none { color: var(--ink-3); }
-  /* 正文里的自动链接：主色 + 下划线，新标签打开 */
-  .k-content a { color: var(--accent); text-decoration: underline;
-                 text-underline-offset: 2px; }
-  .k-content a:hover { color: var(--accent-deep); }
-  .k-content.clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
-                     overflow: hidden; }
-  .k-toggle { justify-self: start; background: none; border: none; padding: 3px 0;
-              color: var(--accent-deep); font-size: 12px; cursor: pointer; }
-  .k-toggle:hover { text-decoration: underline; }
-  mark { background: var(--accent-soft); color: var(--accent-deep); padding: 0 1px; }
-  .k-more { justify-self: center; min-height: 32px; padding: 4px 16px; font-size: 12.5px; }
-  /* 导图节点点击跳回条目后的落点脉冲提示 */
-  @keyframes kf-flash { 0%, 55% { background: var(--accent-soft); }
-                        100% { background: var(--card); } }
-  .k-entry.flash { animation: kf-flash 1.8s ease both; }
-
-  /* ── 时间线视图：按月分组 + 左缘时间轴 ── */
-  .tl-group { position: relative; padding-left: 26px; margin: 2px 0 4px; }
-  .tl-group::before { content: ""; position: absolute; left: 7px; top: 10px; bottom: 10px;
-                      width: 1px; background: var(--rule-2); }
-  .tl-head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 12px; }
-  .tl-head .tl-month { font-size: 15px; font-weight: 600; }
-  .tl-head .tl-count { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
-  .tl-item { position: relative; }
-  .tl-item::before { content: ""; position: absolute; left: -23px; top: 14px; width: 9px;
-                     height: 9px; border-radius: 50%; border: 2px solid var(--accent);
-                     background: var(--paper); }
-
-  /* ── 导图视图：SVG 横向树，窄屏横向滚动 ── */
-  .graph-wrap { display: flex; overflow: auto; padding: 12px 2px 4px; }
-  .graph-wrap svg { flex: none; margin: 0 auto; display: block; }
-  .graph-wrap text { dominant-baseline: middle; }
-  .gn-root-r { fill: var(--accent); }
-  .gn-root-t { fill: var(--card); font-size: 14px; font-weight: 600; }
-  .gn-cat-r { fill: var(--accent-soft); stroke: var(--rule-2); }
-  .gn-cat-r.none { fill: var(--shade); }
-  .gn-cat-t { fill: var(--accent-deep); font-size: 13px; font-weight: 600; }
-  .gn-cat-t.none { fill: var(--ink-2); }
-  .gn-item-r { fill: var(--card); stroke: var(--rule); }
-  .gn-item-t { fill: var(--ink); font-family: var(--sans); font-size: 12.5px; }
-  .gn-more-r { fill: none; stroke: var(--rule-2); stroke-dasharray: 4 3; }
-  .gn-more-t { fill: var(--ink-3); font-family: var(--mono); font-size: 11.5px; }
-  .gn-link { fill: none; stroke: var(--accent); stroke-width: 1.4; opacity: .5; }
-  .gn-link2 { fill: none; stroke: var(--rule-2); stroke-width: 1; }
-  .gn-hit { cursor: pointer; }
-  .gn-hit:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .gn-hit:hover rect { stroke: var(--accent); stroke-width: 1.4; }
 
   @media (max-width: 720px) {
     .pagehead { flex-wrap: wrap; padding: 12px 16px; gap: 10px 12px; }
@@ -286,37 +225,33 @@ export function knowledgePage(
     main { display: block; min-height: 0; }
     .kn-rail { position: static; max-height: none; overflow: visible;
                border-right: none; border-bottom: 1px solid var(--rule); padding: 14px 16px 16px; }
-    .cat-nav { flex-direction: row; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
-    .cat-btn { border: 1px solid var(--rule-2); background: var(--card); padding: 4px 10px; }
+    .cat-nav { flex-direction: row; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+    .cat-btn { border: 1px solid var(--rule-2); background: var(--paper); padding: 4px 10px; }
     .cat-label { max-width: 9em; }
     .rail-meta { margin-top: 10px; padding-top: 10px; }
-    .kn-main { padding: 16px 14px 56px; }
+    .kn-main { padding: 14px 14px 56px; }
   }
   /* 触屏：搜索框提到 16px 防 iOS 聚焦缩放；小字按钮放大到能点的尺寸 */
   @media (hover: none) {
     .kw-box { font-size: 16px; }
-    .sort-btn { min-height: 38px; }
-    .vtab { min-height: 38px; }
-    .cat-btn { min-height: 40px; }
-    .k-del { min-height: 36px; padding: 6px 12px; }
-    .k-toggle { min-height: 36px; padding: 8px 0; }
+    .cat-btn { min-height: 38px; }
+    .k-del { min-height: 34px; padding: 6px 12px; }
+    .k-toggle { min-height: 34px; padding: 8px 0; }
     .k-more { min-height: 38px; }
+    .k-tag { min-height: 34px; }
   }
   @media print {
     body { background: #fff; }
-    .ph-right, .kw-box, .kw-hint, .sort-row, .view-tabs, .rail-meta,
+    .ph-right, .kw-box, .kw-hint, .rail-meta, .composer,
     .k-del, .k-toggle, .k-more { display: none !important; }
-    .cat-nav { flex-direction: row; flex-wrap: wrap; }
-    .k-content.clamp { display: block; -webkit-line-clamp: unset; }
+    .k-text.clamp { display: block; -webkit-line-clamp: unset; }
     main { display: block; max-width: none; padding: 0; }
     .kn-rail { display: none; }
     .kn-main { padding: 0; max-width: none; }
-    .graph-wrap { overflow: visible; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
-    @media (prefers-reduced-motion: reduce) {
+  @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
-    .k-entry.flash { animation: none; background: var(--accent-soft); }
   }
 </style>
 </head>
@@ -332,25 +267,15 @@ export function knowledgePage(
 </header>
 <main>
   <aside class="kn-rail" aria-label="知识分类">
-    <input class="kw-box" id="kwBox" type="search" enterkeyhint="search" placeholder="搜索标题 / 内容…" aria-label="搜索知识">
+    <input class="kw-box" id="kwBox" type="search" enterkeyhint="search" placeholder="搜索知识…" aria-label="搜索知识">
     <p class="kw-hint">按 / 聚焦 · Esc 清空</p>
-    <div class="sort-row" id="sortRow" role="group" aria-label="排序方式">
-      <button type="button" class="sort-btn active" data-sort="updated">最近更新</button>
-      <button type="button" class="sort-btn" data-sort="title">按标题</button>
-    </div>
+    <p class="rail-sec">标签</p>
     <div class="cat-nav" id="catNav"></div>
+    <div class="stat-card" id="statCard"></div>
+    <div class="heatmap" id="heatmap"></div>
     <div class="rail-meta" id="knMeta"></div>
   </aside>
-  <section class="kn-main" aria-label="知识条目">
-    <div class="view-row">
-      <div class="view-tabs" id="viewRow" role="group" aria-label="视图方式">
-        <button type="button" class="vtab active" data-view="list" aria-pressed="true">条目</button>
-        <button type="button" class="vtab" data-view="graph" aria-pressed="false">导图</button>
-        <button type="button" class="vtab" data-view="calendar" aria-pressed="false">日历</button>
-        <button type="button" class="vtab" data-view="timeline" aria-pressed="false">时间线</button>
-      </div>
-      <span class="cnote" id="listNote"></span>
-    </div>
+  <section class="kn-main" aria-label="知识川流">
 ${
   demo
     ? ""
@@ -366,23 +291,18 @@ ${
 }
     <div class="kn-flow" id="listBody"><p class="skel">…</p></div>
   </section>
-  </section>
 </main>
 <script>
 const CLAMP_LEN = ${CLAMP_LEN};
 const BATCH = ${BATCH};
-const GRAPH_MAX = ${GRAPH_MAX};
+const HEAT_WEEKS = ${HEAT_WEEKS};
 ${demo && demoData ? `const DEMO_DATA = ${JSON.stringify(demoData)};` : "const DEMO_DATA = null;"}
 const $ = (id) => document.getElementById(id);
 let entries = [];
 let activeCat = "ALL"; // "ALL" | "NONE"（未分类）| 具体课程名
 let keyword = "";
-let sortMode = "updated"; // "updated" | "title"
-let viewMode = "list"; // "list" | "graph" | "calendar" | "timeline"（经 URL hash 记忆）
 let visibleCount = BATCH;
 let editingId = null; // 条目编辑态：有值时自动刷新暂停，不打断输入
-let calAnchor = null; // 日历视图的月份锚（Date），null 为本月
-let calDay = null;    // 日历视图选中的日期（"YYYY-M-D"），null 未选
 const expandedIds = new Set();
 
 function el(tag, cls, text) {
@@ -395,7 +315,10 @@ function fmtDay(ts) {
   const d = new Date(ts);
   return (d.getMonth() + 1) + "月" + d.getDate() + "日";
 }
-/* 相对时间：今天 / 昨天 / N 天前 / M月D日（工具产品的常规日期形态） */
+function dayKey(d) {
+  return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+}
+/* 相对时间：今天 / 昨天 / N 天前 / M月D日（flomo 式时间显示） */
 function fmtAgo(ts) {
   if (!ts) return "—";
   const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
@@ -421,8 +344,7 @@ function appendMarked(parent, text, kw) {
   parent.appendChild(document.createTextNode(text.slice(i)));
 }
 /* 正文里的长链接自动识别成可点链接（新标签打开）：先按 URL 切片，
-   链接段整段成 <a>、纯文本段再走命中高亮；与大厅知识面板同一套口径。
-   URL 字符走 RFC 3986 白名单，紧跟其后的中文天然终止匹配 */
+   链接段整段成 <a>、纯文本段再走命中高亮；与大厅知识面板同一套口径 */
 const URL_RE =
   /(https?:\\/\\/[A-Za-z0-9._~:\\/?#\\[\\]@!$&'()*+,;=%-]+|www\\.[A-Za-z0-9._~:\\/?#\\[\\]@!$&'()*+,;=%-]+)/gi;
 function appendRich(parent, text, kw) {
@@ -457,29 +379,6 @@ function armDelete(btn, onConfirm) {
   }, 3000);
 }
 
-/* ── 导图工具：SVG 节点全走 createElementNS + textContent，不拼 HTML ── */
-const SVG_NS = "http://www.w3.org/2000/svg";
-function svgEl(tag, attrs) {
-  const n = document.createElementNS(SVG_NS, tag);
-  for (const k in attrs) n.setAttribute(k, attrs[k]);
-  return n;
-}
-/* 中文按 13px、ASCII 按 7px 估宽，超宽截断加省略号 */
-function dispLen(s) {
-  let w = 0;
-  for (const ch of s) w += ch.charCodeAt(0) > 0xFF ? 13 : 7;
-  return w;
-}
-function ellipsize(s, maxW) {
-  if (dispLen(s) <= maxW) return s;
-  let out = "";
-  for (const ch of s) {
-    if (dispLen(out + ch + "…") > maxW) return out + "…";
-    out += ch;
-  }
-  return out;
-}
-
 function catCounts() {
   const m = new Map();
   for (const e of entries) {
@@ -488,6 +387,7 @@ function catCounts() {
   }
   return m;
 }
+/* 川流：恒按更新时间倒序（flomo 只有一条时间流，没有排序切换） */
 function filtered() {
   let list = entries;
   if (activeCat === "NONE") list = list.filter((e) => !e.category);
@@ -497,10 +397,7 @@ function filtered() {
     list = list.filter((e) =>
       (e.title + "\\n" + e.content + "\\n" + (e.category || "未分类")).toLowerCase().includes(kw));
   }
-  const sorted = [...list];
-  if (sortMode === "title") sorted.sort((a, b) => a.title.localeCompare(b.title, "zh"));
-  else sorted.sort((a, b) => b.updatedAt - a.updatedAt);
-  return sorted;
+  return [...list].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 function renderNav() {
@@ -526,13 +423,61 @@ function catBtn(key, label, count, isTag) {
     activeCat = key;
     visibleCount = BATCH;
     renderNav();
-    renderView();
+    renderList();
     /* 导航重建后焦点归位到同分类（键盘用户不用重新 Tab） */
     for (const b of document.querySelectorAll("#catNav .cat-btn")) {
       if (b.dataset.cat === key) { b.focus(); break; }
     }
   });
   return btn;
+}
+
+/* 侧栏统计卡：知识数 / 标签数（flomo 式小统计） */
+function renderStatsCard() {
+  const card = $("statCard");
+  card.textContent = "";
+  const cats = catCounts();
+  const cell = (n, l) => {
+    const c = el("div", "stat-cell");
+    c.appendChild(el("span", "n", String(n)));
+    c.appendChild(el("span", "l", l));
+    return c;
+  };
+  card.appendChild(cell(entries.length, "条知识"));
+  card.appendChild(cell([...cats.keys()].filter(Boolean).length, "个标签"));
+}
+
+/* 侧栏热力图：近 N 周每日条目数，朱砂四档（flomo 的标志性组件） */
+function renderHeatmap() {
+  const host = $("heatmap");
+  host.textContent = "";
+  const counts = new Map();
+  for (const e of entries) {
+    const k = dayKey(new Date(e.updatedAt));
+    counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  const today = new Date();
+  const dow = (today.getDay() + 6) % 7; // 周一=0，对齐周列
+  const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dow);
+  const grid = el("div", "heat-grid");
+  grid.setAttribute("role", "img");
+  grid.setAttribute("aria-label", "近 " + HEAT_WEEKS + " 周的知识热力图");
+  for (let w = HEAT_WEEKS - 1; w >= 0; w--) {
+    for (let d = 0; d < 7; d++) {
+      const date = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() - w * 7 + d);
+      const cell = el("div", "heat-cell");
+      if (date > today) {
+        cell.classList.add("blank");
+      } else {
+        const n = counts.get(dayKey(date)) || 0;
+        if (n > 0) cell.classList.add(n <= 2 ? "h1" : n <= 5 ? "h2" : "h3");
+        cell.title = fmtDay(date.getTime()) + "：" + n + " 条";
+      }
+      grid.appendChild(cell);
+    }
+  }
+  host.appendChild(grid);
+  host.appendChild(el("p", "heat-note", "近 " + HEAT_WEEKS + " 周 · 颜色越深记得越多"));
 }
 
 function renderRailMeta() {
@@ -549,22 +494,65 @@ function renderRailMeta() {
   meta.appendChild(btn);
 }
 
-function renderSort() {
-  for (const btn of $("sortRow").querySelectorAll("button")) {
-    btn.classList.toggle("active", btn.dataset.sort === sortMode);
-  }
-}
-
 function entryEl(item) {
   const card = el("article", "k-entry");
   card.dataset.kid = item.id;
   if (editingId === item.id) return editEl(card, item);
-  const head = el("div", "k-head");
-  const title = el("h3", "k-title");
-  appendMarked(title, item.title, keyword);
-  head.appendChild(title);
-  head.appendChild(el("span", "k-date", fmtAgo(item.updatedAt)));
+  /* flomo 无标题卡：首行加粗即标题，换行后接正文 */
+  const text = el("p", "k-text");
+  const strong = el("strong", null);
+  appendMarked(strong, item.title, keyword);
+  text.appendChild(strong);
+  const long = item.content && item.content !== item.title;
+  if (long) {
+    text.appendChild(document.createTextNode("\\n"));
+    appendRich(text, item.content, keyword);
+  }
+  if ((item.title.length + (long ? item.content.length : 0)) > CLAMP_LEN) {
+    if (!expandedIds.has(item.id)) text.classList.add("clamp");
+  }
+  card.appendChild(text);
+  if ((item.title.length + (long ? item.content.length : 0)) > CLAMP_LEN) {
+    const toggle = el("button", "k-toggle", expandedIds.has(item.id) ? "收起" : "展开全文");
+    toggle.type = "button";
+    toggle.setAttribute("aria-expanded", expandedIds.has(item.id) ? "true" : "false");
+    toggle.addEventListener("click", () => {
+      if (expandedIds.has(item.id)) {
+        expandedIds.delete(item.id);
+        text.classList.add("clamp");
+        toggle.textContent = "展开全文";
+        toggle.setAttribute("aria-expanded", "false");
+      } else {
+        expandedIds.add(item.id);
+        text.classList.remove("clamp");
+        toggle.textContent = "收起";
+        toggle.setAttribute("aria-expanded", "true");
+      }
+    });
+    card.appendChild(toggle);
+  }
+  const foot = el("div", "k-foot");
+  const tag = el("button", "k-tag" + (item.category ? "" : " none"), "# " + (item.category || "未分类"));
+  tag.type = "button";
+  if (item.category) tag.title = item.category;
+  tag.addEventListener("click", () => {
+    activeCat = item.category || "NONE";
+    visibleCount = BATCH;
+    renderNav();
+    renderList();
+    window.scrollTo({ top: 0 });
+  });
+  foot.appendChild(tag);
+  foot.appendChild(el("span", "k-date", fmtAgo(item.updatedAt)));
   if (!DEMO_DATA) {
+    const ops = el("div", "k-ops");
+    const edit = el("button", "k-del", "编辑");
+    edit.type = "button";
+    edit.addEventListener("click", () => {
+      editingId = item.id;
+      renderList();
+    });
+    ops.appendChild(edit);
     const del = el("button", "k-del", "删除");
     del.type = "button";
     del.addEventListener("click", () => {
@@ -572,48 +560,10 @@ function entryEl(item) {
         fetch("/api/knowledge/" + item.id, { method: "DELETE" }).then(load).catch(load);
       });
     });
-    head.appendChild(del);
-    const edit = el("button", "k-del", "编辑");
-    edit.type = "button";
-    edit.addEventListener("click", () => {
-      editingId = item.id;
-      renderView();
-    });
-    head.appendChild(edit);
+    ops.appendChild(del);
+    foot.appendChild(ops);
   }
-  card.appendChild(head);
-
-  const content = el("p", "k-content");
-  appendRich(content, item.content, keyword);
-  if (item.content.length > CLAMP_LEN) {
-    if (!expandedIds.has(item.id)) content.classList.add("clamp");
-    card.appendChild(content);
-    const toggle = el("button", "k-toggle", expandedIds.has(item.id) ? "收起" : "展开全文");
-    toggle.type = "button";
-    toggle.setAttribute("aria-expanded", expandedIds.has(item.id) ? "true" : "false");
-    toggle.addEventListener("click", () => {
-      if (expandedIds.has(item.id)) {
-        expandedIds.delete(item.id);
-        content.classList.add("clamp");
-        toggle.textContent = "展开全文";
-        toggle.setAttribute("aria-expanded", "false");
-      } else {
-        expandedIds.add(item.id);
-        content.classList.remove("clamp");
-        toggle.textContent = "收起";
-        toggle.setAttribute("aria-expanded", "true");
-      }
-    });
-    card.appendChild(toggle);
-  } else {
-    card.appendChild(content);
-  }
-  /* memos 形态：tag 胶囊挂在正文之后 */
-  const tags = el("div", "k-tags");
-  const cat = el("span", "k-cat" + (item.category ? "" : " none"), item.category || "未分类");
-  if (item.category) cat.title = item.category;
-  tags.appendChild(cat);
-  card.appendChild(tags);
+  card.appendChild(foot);
   return card;
 }
 
@@ -645,7 +595,7 @@ function editEl(card, item) {
   save.type = "button";
   const cancel = el("button", "k-cancel", "取消");
   cancel.type = "button";
-  cancel.addEventListener("click", () => { editingId = null; renderView(); });
+  cancel.addEventListener("click", () => { editingId = null; renderList(); });
   const fail = (msg) => {
     save.disabled = false;
     note.hidden = false;
@@ -684,7 +634,48 @@ function editEl(card, item) {
   return card;
 }
 
-/* memos 发布框：首行=标题、其余=正文，Ctrl+Enter 记下 */
+function moreBtn(list, shown) {
+  const more = el("button", "tbtn k-more", "显示更多（还有 " + (list.length - shown.length) + " 条）");
+  more.type = "button";
+  more.addEventListener("click", () => { visibleCount += BATCH; renderList(); });
+  return more;
+}
+
+/* 川流主体：按日分组（flomo 式日期分隔头），恒按更新时间倒序 */
+function renderList() {
+  const host = $("listBody");
+  host.textContent = "";
+  if (!entries.length) {
+    host.appendChild(emptyNewEl());
+    return;
+  }
+  const list = filtered();
+  if (!list.length) {
+    host.appendChild(emptyEl("没有匹配的知识条目，换个关键词或标签试试。"));
+    return;
+  }
+  const shown = list.slice(0, visibleCount);
+  const today = new Date().toDateString();
+  const byDay = [];
+  for (const item of shown) {
+    const d = new Date(item.updatedAt);
+    const key = dayKey(d);
+    if (!byDay.length || byDay[byDay.length - 1].key !== key) {
+      byDay.push({ key: key, label: d.toDateString() === today ? "今天" : fmtDay(item.updatedAt), items: [] });
+    }
+    byDay[byDay.length - 1].items.push(item);
+  }
+  for (const g of byDay) {
+    const head = el("div", "day-head");
+    head.appendChild(el("span", null, g.label));
+    head.appendChild(el("span", "day-count", g.items.length + " 条"));
+    host.appendChild(head);
+    for (const item of g.items) host.appendChild(entryEl(item));
+  }
+  if (list.length > shown.length) host.appendChild(moreBtn(list, shown));
+}
+
+/* 发布框：首行=标题、其余=正文，Ctrl+Enter 记下 */
 function bindComposer() {
   const box = $("composer");
   if (!box) return;
@@ -728,375 +719,38 @@ function bindComposer() {
     if ((ev.ctrlKey || ev.metaKey) && ev.key === "Enter") submit();
   });
 }
-function moreBtn(list, shown) {
-  const more = el("button", "tbtn k-more", "显示更多（还有 " + (list.length - shown.length) + " 条）");
-  more.type = "button";
-  more.addEventListener("click", () => { visibleCount += BATCH; renderView(); });
-  return more;
-}
-
-/* ── 视图一：条目列表 ── */
-function renderList() {
-  const body = $("listBody");
-  const note = $("listNote");
-  body.textContent = "";
-  if (!entries.length) {
-    note.textContent = "";
-    body.appendChild(emptyNewEl());
-    return;
-  }
-  const list = filtered();
-  note.textContent = list.length ? list.length + " 条" : "";
-  if (!list.length) {
-    body.appendChild(emptyEl("没有匹配的知识条目，换个关键词或分类试试。"));
-    return;
-  }
-  const shown = list.slice(0, visibleCount);
-  for (const item of shown) body.appendChild(entryEl(item));
-  if (list.length > shown.length) body.appendChild(moreBtn(list, shown));
-}
-
-/* ── 视图二：导图（SVG 横向树：我的知识 → 分类 → 条目） ── */
-const GX_ROOT = 20, GW_ROOT = 112, GH_ROOT = 42;
-const GX_CAT = 208, GW_CAT = 150, GH_CAT = 34;
-const GX_ITEM = 428, GW_ITEM = 256, GH_ITEM = 30;
-const GROW = 40, GGAP = 30;
-function bezier(x1, y1, x2, y2) {
-  const mx = (x1 + x2) / 2;
-  return "M " + x1 + " " + y1 + " C " + mx + " " + y1 + ", " + mx + " " + y2 + ", " + x2 + " " + y2;
-}
-function graphNode(x, y, w, h, rCls, tCls, text, full) {
-  const g = svgEl("g", {});
-  g.appendChild(svgEl("rect", { x: x, y: y, width: w, height: h, rx: 4, class: rCls }));
-  const t = svgEl("text", { x: x + 12, y: y + h / 2, class: tCls });
-  t.textContent = text;
-  g.appendChild(t);
-  const tip = svgEl("title", {});
-  tip.textContent = full || text;
-  g.appendChild(tip);
-  return g;
-}
-function hitify(g, label, onClick) {
-  g.setAttribute("class", "gn-hit");
-  g.setAttribute("tabindex", "0");
-  g.setAttribute("role", "link");
-  g.setAttribute("aria-label", label);
-  g.addEventListener("click", onClick);
-  g.addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); onClick(); }
-  });
-  return g;
-}
-/* 导图节点点击：回到条目视图、展开并滚动到该条目，脉冲提示落点 */
-function focusEntry(id) {
-  const list = filtered();
-  const at = list.findIndex((e) => e.id === id);
-  if (at >= visibleCount) visibleCount = at + 1;
-  expandedIds.add(id);
-  setView("list");
-  const node = document.querySelector('.k-entry[data-kid="' + id + '"]');
-  if (node) {
-    node.scrollIntoView({ block: "center" });
-    node.classList.add("flash");
-    setTimeout(() => node.classList.remove("flash"), 1900);
-  }
-}
-function renderGraph() {
-  const body = $("listBody");
-  const note = $("listNote");
-  body.textContent = "";
-  if (!entries.length) {
-    note.textContent = "";
-    body.appendChild(emptyNewEl());
-    return;
-  }
-  const list = filtered();
-  note.textContent = list.length + " 条";
-  if (!list.length) {
-    body.appendChild(emptyEl("没有匹配的知识条目，换个关键词或分类试试。"));
-    return;
-  }
-  const byCat = new Map();
-  for (const e of list) {
-    const key = e.category || "";
-    if (!byCat.has(key)) byCat.set(key, []);
-    byCat.get(key).push(e);
-  }
-  const groups = [...byCat.entries()]
-    .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "zh"));
-  let y = 12;
-  const groupY = new Map();
-  for (const [name, items] of groups) {
-    groupY.set(name, y);
-    const shown = items.slice(0, GRAPH_MAX);
-    y += (shown.length + (items.length > GRAPH_MAX ? 1 : 0)) * GROW + GGAP;
-  }
-  const H = y - GGAP + 12;
-  const W = GX_ITEM + GW_ITEM + 20;
-  const svg = svgEl("svg", {
-    viewBox: "0 0 " + W + " " + H, width: W, height: H,
-    role: "img", "aria-label": "知识分类导图：" + list.length + " 条",
-  });
-  const rootY = H / 2 - GH_ROOT / 2;
-  /* 连线在节点下层：根→分类（朱砂细线），分类→条目（墨色细线） */
-  for (const [name, items] of groups) {
-    const gy = groupY.get(name);
-    svg.appendChild(svgEl("path", {
-      d: bezier(GX_ROOT + GW_ROOT, rootY + GH_ROOT / 2, GX_CAT, gy + GH_CAT / 2),
-      class: "gn-link",
-    }));
-    const shown = items.slice(0, GRAPH_MAX);
-    for (let i = 0; i < shown.length; i++) {
-      const iy = gy + i * GROW + (GROW - GH_ITEM) / 2 + 2;
-      svg.appendChild(svgEl("path", {
-        d: bezier(GX_CAT + GW_CAT, gy + GH_CAT / 2, GX_ITEM, iy + GH_ITEM / 2),
-        class: "gn-link2",
-      }));
-    }
-    if (items.length > GRAPH_MAX) {
-      const iy = gy + shown.length * GROW + (GROW - GH_ITEM) / 2 + 2;
-      svg.appendChild(svgEl("path", {
-        d: bezier(GX_CAT + GW_CAT, gy + GH_CAT / 2, GX_ITEM, iy + GH_ITEM / 2),
-        class: "gn-link2",
-      }));
-    }
-  }
-  /* 根节点 */
-  svg.appendChild(graphNode(GX_ROOT, rootY, GW_ROOT, GH_ROOT, "gn-root-r", "gn-root-t", "我的知识"));
-  /* 分类与条目节点 */
-  for (const [name, items] of groups) {
-    const gy = groupY.get(name);
-    const none = !name;
-    const catNode = graphNode(
-      GX_CAT, gy, GW_CAT, GH_CAT,
-      "gn-cat-r" + (none ? " none" : ""), "gn-cat-t" + (none ? " none" : ""),
-      name || "未分类", name || "未分类条目",
-    );
-    svg.appendChild(catNode);
-    const shown = items.slice(0, GRAPH_MAX);
-    for (let i = 0; i < shown.length; i++) {
-      const item = shown[i];
-      const iy = gy + i * GROW + (GROW - GH_ITEM) / 2 + 2;
-      const node = graphNode(
-        GX_ITEM, iy, GW_ITEM, GH_ITEM, "gn-item-r", "gn-item-t",
-        ellipsize(item.title, GW_ITEM - 26), item.title,
-      );
-      hitify(node, "条目：" + item.title, () => focusEntry(item.id));
-      svg.appendChild(node);
-    }
-    if (items.length > GRAPH_MAX) {
-      const iy = gy + shown.length * GROW + (GROW - GH_ITEM) / 2 + 2;
-      const rest = items.length - GRAPH_MAX;
-      const cat = none ? "NONE" : name;
-      const node = graphNode(
-        GX_ITEM, iy, GW_ITEM, GH_ITEM, "gn-more-r", "gn-more-t",
-        "还有 " + rest + " 条，回列表看全部",
-      );
-      hitify(node, "还有 " + rest + " 条", () => {
-        activeCat = cat;
-        visibleCount = BATCH;
-        renderNav();
-        setView("list");
-      });
-      svg.appendChild(node);
-    }
-  }
-  const wrap = el("div", "graph-wrap");
-  wrap.appendChild(svg);
-  body.appendChild(wrap);
-}
-
-/* ── 视图三：时间线（按月分组 + 左缘轴点） ── */
-function renderTimeline() {
-  const body = $("listBody");
-  const note = $("listNote");
-  body.textContent = "";
-  if (!entries.length) {
-    note.textContent = "";
-    body.appendChild(emptyNewEl());
-    return;
-  }
-  const list = filtered().sort((a, b) => b.updatedAt - a.updatedAt);
-  note.textContent = "按更新时间 · " + list.length + " 条";
-  if (!list.length) {
-    body.appendChild(emptyEl("没有匹配的知识条目，换个关键词或分类试试。"));
-    return;
-  }
-  const shown = list.slice(0, visibleCount);
-  const byMonth = [];
-  for (const item of shown) {
-    const d = new Date(item.updatedAt);
-    const key = d.getFullYear() + "-" + (d.getMonth() + 1);
-    if (!byMonth.length || byMonth[byMonth.length - 1].key !== key) {
-      byMonth.push({ key: key, label: d.getFullYear() + "年" + (d.getMonth() + 1) + "月", items: [] });
-    }
-    byMonth[byMonth.length - 1].items.push(item);
-  }
-  for (const m of byMonth) {
-    const grp = el("div", "tl-group");
-    const head = el("div", "tl-head");
-    head.appendChild(el("span", "tl-month", m.label));
-    head.appendChild(el("span", "tl-count", m.items.length + " 条"));
-    grp.appendChild(head);
-    for (const item of m.items) {
-      const it = el("div", "tl-item");
-      it.appendChild(entryEl(item));
-      grp.appendChild(it);
-    }
-    body.appendChild(grp);
-  }
-  if (list.length > shown.length) body.appendChild(moreBtn(list, shown));
-}
-
-/* ── 视图四：日历（memos 月历 + 每日条目数，点击某天列出当日条目） ── */
-function dayKey(d) {
-  return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
-}
-function renderCalendar() {
-  const body = $("listBody");
-  const note = $("listNote");
-  body.textContent = "";
-  if (!entries.length) {
-    note.textContent = "";
-    body.appendChild(emptyNewEl());
-    return;
-  }
-  const list = filtered();
-  note.textContent = list.length + " 条";
-  if (!list.length) {
-    body.appendChild(emptyEl("没有匹配的知识条目，换个关键词或分类试试。"));
-    return;
-  }
-  const byDay = new Map();
-  for (const e of list) {
-    const k = dayKey(new Date(e.updatedAt));
-    byDay.set(k, (byDay.get(k) || 0) + 1);
-  }
-  const now = new Date();
-  const anchor = calAnchor ?? new Date(now.getFullYear(), now.getMonth(), 1);
-  const y = anchor.getFullYear();
-  const m = anchor.getMonth();
-  const board = el("div", "cal-board");
-  const nav = el("div", "cal-nav");
-  const prev = el("button", "cal-arrow", "‹");
-  prev.type = "button";
-  prev.setAttribute("aria-label", "上个月");
-  prev.addEventListener("click", () => { calAnchor = new Date(y, m - 1, 1); renderView(); });
-  const next = el("button", "cal-arrow", "›");
-  next.type = "button";
-  next.setAttribute("aria-label", "下个月");
-  next.addEventListener("click", () => { calAnchor = new Date(y, m + 1, 1); renderView(); });
-  nav.appendChild(prev);
-  nav.appendChild(el("h3", null, y + " 年 " + (m + 1) + " 月"));
-  nav.appendChild(next);
-  const grid = el("div", "cal-grid");
-  for (const w of ["日", "一", "二", "三", "四", "五", "六"]) grid.appendChild(el("div", "cal-dow", w));
-  const first = new Date(y, m, 1);
-  const days = new Date(y, m + 1, 0).getDate();
-  for (let i = 0; i < first.getDay(); i++) grid.appendChild(el("div", "cal-day blank"));
-  for (let d = 1; d <= days; d++) {
-    const key = y + "-" + (m + 1) + "-" + d;
-    const n = byDay.get(key) || 0;
-    const btn = el("button", "cal-day" +
-      (key === dayKey(now) ? " today" : "") + (calDay === key ? " sel" : ""));
-    btn.type = "button";
-    btn.appendChild(el("span", "cal-num", String(d)));
-    if (n) btn.appendChild(el("span", "cal-count", String(n)));
-    btn.setAttribute("aria-label", (m + 1) + "月" + d + "日" + (n ? "，" + n + " 条知识" : ""));
-    btn.addEventListener("click", () => { calDay = calDay === key ? null : key; renderView(); });
-    grid.appendChild(btn);
-  }
-  board.appendChild(nav);
-  board.appendChild(grid);
-  body.appendChild(board);
-  if (!calDay) {
-    body.appendChild(emptyEl("点一个日期看当天的知识。"));
-    return;
-  }
-  const dayList = list.filter((e) => dayKey(new Date(e.updatedAt)) === calDay);
-  const parts = calDay.split("-");
-  const head = el("div", "cal-list-head");
-  head.appendChild(el("h4", null, Number(parts[1]) + " 月 " + Number(parts[2]) + " 日"));
-  head.appendChild(el("span", "cnote", dayList.length + " 条"));
-  body.appendChild(head);
-  if (!dayList.length) body.appendChild(emptyEl("这天没有知识条目。"));
-  for (const item of dayList) body.appendChild(entryEl(item));
-}
-
-/* ── 视图切换：tab 状态 + URL hash 记忆 ── */
-function renderView() {
-  if (viewMode === "graph") renderGraph();
-  else if (viewMode === "calendar") renderCalendar();
-  else if (viewMode === "timeline") renderTimeline();
-  else renderList();
-}
-function applyView() {
-  for (const btn of $("viewRow").querySelectorAll("button")) {
-    const on = btn.dataset.view === viewMode;
-    btn.classList.toggle("active", on);
-    btn.setAttribute("aria-pressed", on ? "true" : "false");
-  }
-  /* 发布框只在条目视图出现（memos 的发布框也只在主时间线） */
-  const cp = $("composer");
-  if (cp) cp.style.display = viewMode === "list" ? "" : "none";
-  renderView();
-}
-function setView(v) {
-  viewMode = v;
-  const h = v === "list" ? "" : "#" + v;
-  if (location.hash !== h) location.hash = h;
-  applyView();
-}
 
 function load() {
-  if (DEMO_DATA) { entries = DEMO_DATA; renderNav(); renderRailMeta(); renderView(); return; }
+  if (DEMO_DATA) { entries = DEMO_DATA; renderNav(); renderStatsCard(); renderHeatmap(); renderRailMeta(); renderList(); return; }
   /* 编辑中的表单不重渲（60 秒自动刷新不能吃掉输入框里的字） */
   if (editingId) return;
   fetch("/api/knowledge", { cache: "no-store" })
     .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-    .then((d) => { entries = d.entries || []; renderNav(); renderRailMeta(); renderView(); })
+    .then((d) => { entries = d.entries || []; renderNav(); renderStatsCard(); renderHeatmap(); renderRailMeta(); renderList(); })
     .catch(() => {
-      const body = $("listBody");
-      body.textContent = "";
-      body.appendChild(emptyEl("知识暂时取不出来，请稍候刷新。"));
+      const host = $("listBody");
+      host.textContent = "";
+      host.appendChild(emptyEl("知识暂时取不出来，请稍候刷新。"));
     });
 }
 $("kwBox").addEventListener("input", (ev) => {
   keyword = ev.target.value.trim();
   visibleCount = BATCH;
-  renderView();
+  renderList();
 });
 /* 部分浏览器点搜索框原生 × 只发 search 不发 input，兜底同步一次 */
 $("kwBox").addEventListener("search", (ev) => {
   keyword = ev.target.value.trim();
   visibleCount = BATCH;
-  renderView();
+  renderList();
 });
 $("kwBox").addEventListener("keydown", (ev) => {
   if (ev.key === "Escape" && ev.target.value) {
     ev.target.value = "";
     keyword = "";
     visibleCount = BATCH;
-    renderView();
+    renderList();
   }
-});
-$("sortRow").addEventListener("click", (ev) => {
-  const btn = ev.target.closest("button");
-  if (!btn || !btn.dataset.sort || btn.dataset.sort === sortMode) return;
-  sortMode = btn.dataset.sort;
-  visibleCount = BATCH;
-  renderSort();
-  renderView();
-});
-$("viewRow").addEventListener("click", (ev) => {
-  const btn = ev.target.closest("button");
-  if (!btn || !btn.dataset.view || btn.dataset.view === viewMode) return;
-  setView(btn.dataset.view);
-});
-window.addEventListener("hashchange", () => {
-  const h = location.hash.replace("#", "");
-  const v = h === "graph" || h === "calendar" || h === "timeline" ? h : "list";
-  if (v !== viewMode) { viewMode = v; applyView(); }
 });
 // / 快捷聚焦搜索（正在输入时忽略）
 document.addEventListener("keydown", (ev) => {
@@ -1106,8 +760,6 @@ document.addEventListener("keydown", (ev) => {
   ev.preventDefault();
   $("kwBox").focus();
 });
-const initHash = location.hash.replace("#", "");
-if (initHash === "graph" || initHash === "calendar" || initHash === "timeline") viewMode = initHash;
 bindComposer();
 load();
 if (!DEMO_DATA) {
