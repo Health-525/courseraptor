@@ -353,7 +353,12 @@ function thinkNew(tl) {
   det.appendChild(sum);
   const body = el("thbody");
   det.appendChild(body);
-  const item = { det, st, dur, body, buf: "", at: Date.now(), manual: false };
+  const item = { det, st, dur, body, buf: "", at: Date.now(), manual: false, pinned: true };
+  /* 卡内跟随与主区 pinned 同法：用户贴底才自动跟随，往上翻回看就不打扰。
+     距底阈值取窄一档（24px）——300px 小窗容不下主区那种 60px 的宽容度 */
+  body.addEventListener("scroll", () => {
+    item.pinned = body.scrollHeight - body.scrollTop - body.clientHeight < 24;
+  });
   /* 监听器挂在 open=true 之后：程序化的首次展开不算用户手动开合 */
   det.addEventListener("toggle", () => {
     item.manual = true;
@@ -367,6 +372,8 @@ function thinkDelta(shell, text) {
   const item = shell.think;
   item.buf += text;
   item.body.textContent = item.buf;
+  /* 内容超过限高后把最新一段压进视野：贴底跟随，被切走的不再是新思考 */
+  if (item.pinned) item.body.scrollTop = item.body.scrollHeight;
   scroll(false);
 }
 
