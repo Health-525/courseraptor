@@ -6,7 +6,7 @@ import { z } from 'zod'
  */
 export type UserStatus = 'active' | 'disabled' | 'online'
 
-const userSchema = z.object({
+const _userSchema = z.object({
   id: z.string(),
   username: z.string(),
   disabled: z.boolean(),
@@ -21,6 +21,4 @@ const userSchema = z.object({
   lastRequestAt: z.string().optional(),
   restarts: z.number().optional(),
 })
-export type User = z.infer<typeof userSchema>
-
-export const userListSchema = z.array(userSchema)
+export type User = z.infer<typeof _userSchema>

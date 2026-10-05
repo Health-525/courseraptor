@@ -32,13 +32,13 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
         <DropdownMenuTrigger asChild>
           <Button
             variant='ghost'
-            className='data-[state=open]:bg-muted flex h-8 w-8 p-0'
+            className='flex h-8 w-8 p-0 data-[state=open]:bg-muted'
           >
             <DotsHorizontalIcon className='h-4 w-4' />
             <span className='sr-only'>打开菜单</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align='end' className='w-[160px]'>
+        <DropdownMenuContent align='end' className='w-40'>
           <DropdownMenuItem
             onClick={() => {
               setCurrentRow(row.original)

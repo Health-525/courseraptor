@@ -25,7 +25,7 @@ export function AdminHeader({
   return (
     <Header fixed>
       <div className='flex min-w-0 flex-col gap-0.5'>
-        <span className='text-muted-foreground/70 text-[10px] font-semibold tracking-[0.18em]'>
+        <span className='text-[10px] font-semibold tracking-[0.18em] text-muted-foreground/70'>
           {pretitle}
         </span>
         <span className='truncate text-lg leading-tight font-bold tracking-tight'>
@@ -34,8 +34,8 @@ export function AdminHeader({
       </div>
       <div className='ms-auto flex items-center gap-1.5'>
         {meta && (
-          <span className='text-muted-foreground hidden max-w-72 items-center gap-1.5 truncate rounded-full border px-3 py-1 font-mono text-[11px] tabular-nums md:inline-flex'>
-            <span className='bg-primary size-1.5 rounded-full' />v{meta.version}
+          <span className='hidden max-w-72 items-center gap-1.5 truncate rounded-full border px-3 py-1 font-mono text-[11px] text-muted-foreground tabular-nums md:inline-flex'>
+            <span className='size-1.5 rounded-full bg-primary' />v{meta.version}
             <span className='text-muted-foreground/40'>·</span>
             运行 {fmtUptime(meta.uptimeSec)}
             <span className='text-muted-foreground/40'>·</span>

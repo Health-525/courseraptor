@@ -31,7 +31,7 @@ export function ProfileDropdown() {
           <DropdownMenuLabel className='font-normal'>
             <div className='flex flex-col gap-1.5'>
               <p className='text-sm leading-none font-medium'>管理员</p>
-              <p className='text-muted-foreground text-xs leading-none'>
+              <p className='text-xs leading-none text-muted-foreground'>
                 CourseRaptor · 会话 12 小时有效
               </p>
             </div>

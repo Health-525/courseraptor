@@ -33,18 +33,18 @@ export const usersColumns: ColumnDef<User>[] = [
         }
         onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
         aria-label='全选'
-        className='translate-y-[2px]'
+        className='translate-y-0.5'
       />
     ),
     meta: {
-      className: cn('max-md:sticky start-0 z-10 rounded-tl-[inherit]'),
+      className: cn('inset-s-0 z-10 rounded-tl-[inherit] max-md:sticky'),
     },
     cell: ({ row }) => (
       <Checkbox
         checked={row.getIsSelected()}
         onCheckedChange={(value) => row.toggleSelected(!!value)}
         aria-label='选中该行'
-        className='translate-y-[2px]'
+        className='translate-y-0.5'
       />
     ),
     enableSorting: false,
@@ -61,7 +61,7 @@ export const usersColumns: ColumnDef<User>[] = [
     meta: {
       className: cn(
         'drop-shadow-[0_1px_2px_rgb(0_0_0_/_0.1)] dark:drop-shadow-[0_1px_2px_rgb(255_255_255_/_0.1)]',
-        'ps-0.5 max-md:sticky start-6 @4xl/content:table-cell @4xl/content:drop-shadow-none'
+        'inset-s-6 ps-0.5 max-md:sticky @4xl/content:table-cell @4xl/content:drop-shadow-none'
       ),
     },
     enableHiding: false,
@@ -114,7 +114,7 @@ export const usersColumns: ColumnDef<User>[] = [
       <DataTableColumnHeader column={column} title='注册于' />
     ),
     cell: ({ row }) => (
-      <div className='text-muted-foreground w-fit ps-2 text-sm text-nowrap'>
+      <div className='w-fit ps-2 text-sm text-nowrap text-muted-foreground'>
         {new Date(row.getValue('createdAt')).toLocaleString('zh-CN', {
           year: 'numeric',
           month: '2-digit',
@@ -155,7 +155,7 @@ export const usersColumns: ColumnDef<User>[] = [
     cell: ({ row }) => {
       const u = row.original
       if (!u.online) {
-        return <span className='text-muted-foreground text-xs'>离线</span>
+        return <span className='text-xs text-muted-foreground'>离线</span>
       }
       const started = u.startedAt
         ? new Date(u.startedAt).toLocaleString('zh-CN', {

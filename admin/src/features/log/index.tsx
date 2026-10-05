@@ -87,7 +87,7 @@ export function LogPage() {
                       <TableRow>
                         <TableCell
                           colSpan={2}
-                          className='text-muted-foreground py-8 text-center'
+                          className='py-8 text-center text-muted-foreground'
                         >
                           暂无记录
                         </TableCell>
@@ -95,7 +95,7 @@ export function LogPage() {
                     )}
                     {data.log.map((entry, i) => (
                       <TableRow key={`${entry.at}-${i}`}>
-                        <TableCell className='text-muted-foreground text-xs whitespace-nowrap'>
+                        <TableCell className='text-xs whitespace-nowrap text-muted-foreground'>
                           {fmtDateTime(entry.at)}
                         </TableCell>
                         <TableCell>{entry.text}</TableCell>

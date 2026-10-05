@@ -2,8 +2,10 @@ import { AxiosError } from 'axios'
 import { toast } from 'sonner'
 
 export function handleServerError(error: unknown) {
-  // eslint-disable-next-line no-console
-  console.log(error)
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.log(error)
+  }
 
   let errMsg = 'Something went wrong!'
 
@@ -13,11 +15,14 @@ export function handleServerError(error: unknown) {
     'status' in error &&
     Number(error.status) === 204
   ) {
-    errMsg = 'Content not found.'
+    errMsg = 'No content.'
   }
 
   if (error instanceof AxiosError) {
-    errMsg = error.response?.data.title
+    const title = error.response?.data?.title
+    if (typeof title === 'string' && title.length > 0) {
+      errMsg = title
+    }
   }
 
   toast.error(errMsg)

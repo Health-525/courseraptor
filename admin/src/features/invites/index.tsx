@@ -150,7 +150,7 @@ export function InvitesPage() {
                       <TableRow>
                         <TableCell
                           colSpan={5}
-                          className='text-muted-foreground py-8 text-center'
+                          className='py-8 text-center text-muted-foreground'
                         >
                           还没有邀请码
                         </TableCell>
@@ -237,7 +237,7 @@ function InviteRow({
             <Button
               variant='ghost'
               size='icon'
-              className='text-destructive size-8'
+              className='size-8 text-destructive'
               aria-label='删除邀请码'
               onClick={onDelete}
             >

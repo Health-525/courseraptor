@@ -7,18 +7,18 @@ type AuthLayoutProps = {
 /** 登录页骨架：左侧墨绿品牌面板（桌面端），右侧表单区 */
 export function AuthLayout({ children }: AuthLayoutProps) {
   return (
-    <div className='bg-background grid min-h-svh lg:grid-cols-[1.05fr_1fr]'>
-      <aside className='bg-sidebar text-sidebar-foreground relative hidden flex-col justify-between overflow-hidden p-10 lg:flex'>
+    <div className='grid min-h-svh bg-background lg:grid-cols-[1.05fr_1fr]'>
+      <aside className='relative hidden flex-col justify-between overflow-hidden bg-sidebar p-10 text-sidebar-foreground lg:flex'>
         {/* 爪痕水印：品牌的安静存在感 */}
-        <RaptorMark className='text-sidebar-primary/12 pointer-events-none absolute -end-20 -top-16 size-[30rem] rotate-12' />
+        <RaptorMark className='pointer-events-none absolute -end-20 -top-16 size-[30rem] rotate-12 text-sidebar-primary/12' />
 
         <div className='flex items-center gap-2.5'>
-          <span className='bg-sidebar-primary flex size-8 items-center justify-center overflow-hidden rounded-lg'>
+          <span className='flex size-8 items-center justify-center overflow-hidden rounded-lg bg-sidebar-primary'>
             <RaptorLogo className='size-full' />
           </span>
           <span className='text-sm font-bold tracking-tight'>
             CourseRaptor
-            <span className='text-sidebar-primary font-medium'> · 管理台</span>
+            <span className='font-medium text-sidebar-primary'> · 管理台</span>
           </span>
         </div>
 
@@ -28,27 +28,27 @@ export function AuthLayout({ children }: AuthLayoutProps) {
             <br />
             AI 教务助手
           </h1>
-          <p className='text-sidebar-foreground/70 mt-4 text-sm leading-relaxed'>
+          <p className='mt-4 text-sm leading-relaxed text-sidebar-foreground/70'>
             课表、成绩、考试、通知——同学一句话查询。这里是站长的控制台：
             管账号、发邀请码、审重置、发版本。
           </p>
-          <ul className='text-sidebar-foreground/60 mt-8 space-y-2.5 text-[13px]'>
+          <ul className='mt-8 space-y-2.5 text-[13px] text-sidebar-foreground/60'>
             <li className='flex items-center gap-2.5'>
-              <span className='bg-sidebar-primary/20 size-1.5 rounded-full' />
+              <span className='size-1.5 rounded-full bg-sidebar-primary/20' />
               多用户托管 · 每人独立实例与数据
             </li>
             <li className='flex items-center gap-2.5'>
-              <span className='bg-sidebar-primary/20 size-1.5 rounded-full' />
+              <span className='size-1.5 rounded-full bg-sidebar-primary/20' />
               邀请码注册 · 站点 Key 与额度分账
             </li>
             <li className='flex items-center gap-2.5'>
-              <span className='bg-sidebar-primary/20 size-1.5 rounded-full' />
+              <span className='size-1.5 rounded-full bg-sidebar-primary/20' />
               两步验证 · 管理动作全审计
             </li>
           </ul>
         </div>
 
-        <p className='text-sidebar-foreground/40 text-xs'>
+        <p className='text-xs text-sidebar-foreground/40'>
           CourseRaptor · 班级互助服务
         </p>
       </aside>
@@ -57,12 +57,12 @@ export function AuthLayout({ children }: AuthLayoutProps) {
         <div className='w-full max-w-sm'>
           {/* 移动端 / 窄屏的紧凑品牌头 */}
           <div className='mb-8 flex items-center gap-2.5 lg:hidden'>
-            <span className='bg-primary flex size-8 items-center justify-center overflow-hidden rounded-lg'>
+            <span className='flex size-8 items-center justify-center overflow-hidden rounded-lg bg-primary'>
               <RaptorLogo className='size-full' />
             </span>
             <span className='text-sm font-bold tracking-tight'>
               CourseRaptor
-              <span className='text-primary font-medium'> · 管理台</span>
+              <span className='font-medium text-primary'> · 管理台</span>
             </span>
           </div>
           {children}

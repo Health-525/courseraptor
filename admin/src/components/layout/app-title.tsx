@@ -57,18 +57,18 @@ export function AppTitle() {
               className='grid flex-1 text-start text-sm leading-tight'
             >
               <span className='flex items-center gap-2'>
-                <span className='bg-sidebar-primary flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md'>
+                <span className='flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-md bg-sidebar-primary'>
                   <RaptorLogo className='size-full' />
                 </span>
                 <span className='truncate font-bold tracking-tight'>
                   CourseRaptor
-                  <span className='text-sidebar-primary font-medium'>
+                  <span className='font-medium text-sidebar-primary'>
                     {' '}
                     · 管理台
                   </span>
                 </span>
               </span>
-              <span className='text-sidebar-foreground/60 mt-0.5 truncate text-[11px]'>
+              <span className='mt-0.5 truncate text-[11px] text-sidebar-foreground/60'>
                 班级互助服务控制台
               </span>
             </Link>

@@ -48,20 +48,27 @@ export function UsersDeleteDialog({
         if (!v) setValue('')
         onOpenChange(v)
       }}
-      handleConfirm={handleDelete}
+      form='users-delete-form'
       disabled={value.trim() !== currentRow.username}
       isLoading={remove.isPending}
       title={
         <span className='text-destructive'>
           <AlertTriangle
-            className='stroke-destructive me-1 inline-block'
+            className='me-1 inline-block stroke-destructive'
             size={18}
           />{' '}
           删除用户
         </span>
       }
       desc={
-        <div className='space-y-4'>
+        <form
+          id='users-delete-form'
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleDelete()
+          }}
+          className='space-y-4'
+        >
           <p className='mb-2'>
             确定删除 <span className='font-bold'>{currentRow.username}</span>{' '}
             吗？
@@ -75,6 +82,7 @@ export function UsersDeleteDialog({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder='输入用户名确认删除'
+              autoFocus
             />
           </Label>
 
@@ -82,7 +90,7 @@ export function UsersDeleteDialog({
             <AlertTitle>警告</AlertTitle>
             <AlertDescription>此操作不可恢复，请谨慎执行。</AlertDescription>
           </Alert>
-        </div>
+        </form>
       }
       confirmText='删除'
       destructive
