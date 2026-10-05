@@ -236,3 +236,42 @@ test("技能打包：export-schedule 独立包结构 + 自包含可运行", asyn
   assert.ok(asLatin1.includes("export-schedule/SKILL.md"), "zip 应含 SKILL.md");
   assert.ok(asLatin1.includes("export-schedule/scripts/export.mjs"), "zip 应含 bundle");
 });
+
+test("技能打包：meta-learning 纯提示词技能（无 bundle，整拷即用）", async (t) => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-skill-ml-"));
+  t.after(() => fs.rmSync(outDir, { recursive: true, force: true }));
+
+  const built = await buildSkillPackage({ outDir, skill: "meta-learning" });
+
+  assert.equal(built.promptOnly, true);
+  assert.equal(built.bundleBytes, 0);
+
+  for (const rel of [
+    "SKILL.md",
+    "README.md",
+    "references/deep-understanding.md",
+    "references/exam-strategies.md",
+    "references/knowledge-structure-assessment.md",
+    "references/learning-frameworks.md",
+    "references/note-taking-systems.md",
+    "references/practice-design.md",
+  ]) {
+    assert.ok(fs.existsSync(path.join(built.skillDir, rel)), `产物应包含 ${rel}`);
+  }
+  // 纯提示词技能：不带脚本与配置模板
+  assert.ok(!fs.existsSync(path.join(built.skillDir, "scripts")));
+  assert.ok(!fs.existsSync(path.join(built.skillDir, ".env.example")));
+
+  assert.match(fs.readFileSync(path.join(built.skillDir, "SKILL.md"), "utf8"), /学习/);
+
+  // zip：本地头签名 + 条目前缀 + 条目数恰为 8（SKILL/README + 六篇 references）
+  const zip = fs.readFileSync(built.zipPath);
+  assert.equal(zip.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
+  const asLatin1 = zip.toString("latin1");
+  assert.ok(asLatin1.includes("meta-learning/SKILL.md"), "zip 应含 SKILL.md");
+  assert.ok(
+    asLatin1.includes("meta-learning/references/exam-strategies.md"),
+    "zip 应含 references",
+  );
+  assert.equal(built.files.length, 8, "zip 条目数应为 8（无多余文件混入）");
+});
