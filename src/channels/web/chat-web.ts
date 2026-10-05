@@ -99,6 +99,7 @@ import { scheduleSvgToPng } from "../../core/schedule-png";
 import { renderTermScheduleSVG, renderWeekScheduleSVG } from "../../core/schedule-svg";
 import { listSchoolOptions, school, selectSchool } from "../../core/school";
 import { maybeAutoTitle } from "../../core/session-titles";
+import { tokenUsageSnapshot } from "../../core/token-usage";
 import { PANEL_IDS } from "../../core/tools/panel";
 import {
   addReminder,
@@ -1213,6 +1214,11 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     }
     if (url === "/api/knowledge") {
       json(res, { entries: listKnowledge() });
+      return;
+    }
+    // 功能大厅「用量统计」面板：只读 token-usage 记账（快照前先冲刷 pending）
+    if (url === "/api/usage") {
+      json(res, await tokenUsageSnapshot());
       return;
     }
     if (url === "/api/grades") {

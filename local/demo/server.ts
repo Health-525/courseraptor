@@ -38,6 +38,73 @@ interface DemoSession {
 
 const LIVE_DISCLAIMER = "> 演示模式：以下回答由 AI 实时生成，数据均为虚构示例。\n\n";
 
+/* ── 「用量统计」面板的虚构数据：与正式版 /api/usage 同形状 ── */
+
+/** 确定性伪随机（每次打开演示页都是同一张热力图，不闪变） */
+function seededRandom(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+const beijingDate = (ts: number) =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(ts)
+    .replaceAll("/", "-");
+
+/** 近一年每日 token（周末低频、期中期末两波高峰）+ 两个模型的分布 */
+function demoTokenUsage(): {
+  days: Record<string, { in: number; out: number; total: number }>;
+  models: Array<{ model: string; in: number; out: number; total: number }>;
+  totals: { today: number; week: number; month: number; year: number };
+} {
+  const rand = seededRandom(20260923);
+  const now = Date.now();
+  const today = beijingDate(now);
+  const days: Record<string, { in: number; out: number; total: number }> = {};
+  const models = new Map<string, { in: number; out: number }>();
+  const demoModels = ["deepseek/deepseek-chat", "zhenze/glm-5.3"];
+  for (let i = 364; i >= 0; i--) {
+    const ts = now - i * 86_400_000;
+    const date = beijingDate(ts);
+    const weekday = new Date(date).getUTCDay(); // 0 周日 .. 6 周六
+    if (weekday === 0 || weekday === 6) continue; // 周末没打开过：热力图留空更像真实
+    // 期中（约 60 天前）与期末（约 14 天前）两波高峰
+    const examWave =
+      Math.max(0, 1 - Math.abs(i - 60) / 18) + Math.max(0, 1 - Math.abs(i - 14) / 10);
+    const base = 2000 + rand() * 9000 + examWave * rand() * 26000;
+    const model = demoModels[rand() < 0.7 ? 0 : 1];
+    const usage = { in: Math.round(base * 4), out: Math.round(base) };
+    if (!usage.in && !usage.out) continue;
+    days[date] = { ...usage, total: usage.in + usage.out };
+    const prev = models.get(model) ?? { in: 0, out: 0 };
+    models.set(model, { in: prev.in + usage.in, out: prev.out + usage.out });
+  }
+  const sumFrom = (daysBack: number) => {
+    const from = beijingDate(now - daysBack * 86_400_000);
+    return Object.entries(days).reduce((sum, [date, d]) => (date >= from ? sum + d.total : sum), 0);
+  };
+  return {
+    days,
+    models: [...models.entries()]
+      .map(([model, e]) => ({ model, ...e, total: e.in + e.out }))
+      .sort((a, b) => b.total - a.total),
+    totals: {
+      today: days[today]?.total ?? 0,
+      week: sumFrom(6),
+      month: sumFrom(29),
+      year: sumFrom(364),
+    },
+  };
+}
+
 /* ── 模拟 Agent 过程：思考一段 + 若干工具调用（名称与正式工具一致，参数与结果均为示例）── */
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -315,6 +382,9 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
       } else if (req.method === "GET" && url === "/api/today") {
         // 功能大厅的今日日程/课表/考试/待办/知识面板都吃这份简报（与 /today 页同源）
         json(res, demoTodayBrief());
+      } else if (req.method === "GET" && url === "/api/usage") {
+        // 功能大厅「用量统计」面板：虚构一年的每日 token 热力图与模型分布
+        json(res, demoTokenUsage());
       } else if (req.method === "GET" && url === "/api/data") {
         const sessionValues = [...sessions.values()];
         const demoEntries = demoKnowledge(new Date());

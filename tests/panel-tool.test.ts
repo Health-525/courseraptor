@@ -33,6 +33,7 @@ test("面板白名单：覆盖功能大厅各面板，隐藏卡 import/account �
     "settings",
     "today",
     "todos",
+    "usage",
   ]);
   assert.ok(!(PANEL_IDS as readonly string[]).includes("import"));
   assert.ok(!(PANEL_IDS as readonly string[]).includes("account"));

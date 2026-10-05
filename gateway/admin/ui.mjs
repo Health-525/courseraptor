@@ -173,6 +173,7 @@ export function createAdminUi({
   envDeepseekKeySet = false,
   usersDir = "",
   localUsage = null,
+  tokenUsage = null,
 }) {
   const enabled = typeof password === "string" && password.length >= 8;
   const failures = new Map();
@@ -1002,6 +1003,36 @@ export function createAdminUi({
         return true;
       }
       sendJson(res, 200, await localUsage.stats());
+      return true;
+    }
+    // Token 用量统计（只读聚合；上报入口是内部端点 /internal/usage-report）
+    // 筛选：range=7|30|90|all × user=<userId> × model=<providerId/modelId>
+    if (req.method === "GET" && pathname === "/admin/api/token-usage") {
+      if (!tokenUsage) {
+        sendJson(res, 503, { error: "Token 用量统计未启用" });
+        return true;
+      }
+      const query = new URL(req.url, "http://localhost").searchParams;
+      const range = ["7", "30", "90", "all"].includes(query.get("range"))
+        ? query.get("range")
+        : "30";
+      const user = (query.get("user") ?? "").trim();
+      const model = (query.get("model") ?? "").trim();
+      const result = await tokenUsage.query({ range, user, model });
+      // 用户名映射：已注册用户显示用户名，已删用户的存量数据回退 id
+      const users = await registry.listUsers();
+      const nameOf = new Map(users.map((u) => [u.id, u.username]));
+      sendJson(res, 200, {
+        ...result,
+        byUser: result.byUser.map((row) => ({
+          ...row,
+          username: nameOf.get(row.id) ?? row.id,
+        })),
+        facets: {
+          users: result.facets.users.map((id) => ({ id, username: nameOf.get(id) ?? id })),
+          models: result.facets.models,
+        },
+      });
       return true;
     }
     if (req.method === "POST" && pathname === "/admin/api/log/clear") {

@@ -151,6 +151,7 @@ export function createGatewayServer({
   appVersion = "",
   envDeepseekKeySet = false,
   localUsage = null,
+  tokenUsage = null,
 } = {}) {
   if (!registry) throw new Error("createGatewayServer 需要 registry");
   if (!spawner) throw new Error("createGatewayServer 需要 spawner");
@@ -173,6 +174,7 @@ export function createGatewayServer({
     envDeepseekKeySet,
     usersDir,
     localUsage,
+    tokenUsage,
   });
 
   function signSession(userId, expiresAt) {
@@ -526,6 +528,45 @@ else { input.type = "password"; this.textContent = "显示"; }
         pingThrottle.note(ip);
         const body = await readJsonBody(req, 4096);
         const ok = await localUsage.record(body);
+        sendJson(res, ok ? 204 : 400, ok ? undefined : { error: "bad payload" });
+        finish(ok ? 204 : 400);
+        return;
+      }
+
+      // ── 实例 Token 用量上报（内部端点：spawner 注入的 per-instance 令牌鉴权）──
+      // 令牌经 spawner.resolveReportToken 反查 userId——报文本身不带身份，
+      // 拿不到别人的记账位。与 local-usage 共用同一 IP 滑窗限流（正常实例
+      // 每分钟最多几次调用上报，远够用）。
+      if (req.method === "POST" && pathname === "/internal/usage-report") {
+        if (!tokenUsage) {
+          sendJson(res, 501, { error: "not enabled" });
+          finish(501);
+          return;
+        }
+        const lockSec = pingThrottle.check(ip);
+        if (lockSec) {
+          sendJson(res, 429, { error: "too many requests", retryAfterSec: lockSec });
+          finish(429);
+          return;
+        }
+        const token = String(req.headers["x-report-token"] ?? "");
+        const userId =
+          typeof spawner.resolveReportToken === "function"
+            ? spawner.resolveReportToken(token)
+            : null;
+        if (!userId) {
+          sendJson(res, 403, { error: "invalid report token" });
+          finish(403);
+          return;
+        }
+        pingThrottle.note(ip);
+        const body = await readJsonBody(req, 4096);
+        const ok = await tokenUsage.record({
+          userId,
+          model: body.model,
+          in: body.in,
+          out: body.out,
+        });
         sendJson(res, ok ? 204 : 400, ok ? undefined : { error: "bad payload" });
         finish(ok ? 204 : 400);
         return;
