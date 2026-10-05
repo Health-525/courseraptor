@@ -586,6 +586,15 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                    white-space: pre-wrap; word-break: break-word;
                    max-height: 300px; overflow: auto; }
 
+  /* 卡片内滚动区（思考草稿/工具参数/代码块/表格/幻灯带）的滚动条与侧栏
+     .sess 同语言：细条、平时透明，指针进入才浮现一线 rule-2 纸色。系统
+     默认滚动条（Windows 上又粗又灰）嵌在纸面小窗里最扎眼，一处定义全页统一。 */
+  .think .thbody, .tool pre, .md pre, .md table, .pptstrip {
+    scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  .think .thbody:hover, .tool pre:hover, .md pre:hover,
+  .md table:hover, .pptstrip:hover {
+    scrollbar-color: var(--rule-2) transparent; }
+
   /* 兜底错误行（网络错误 / 中断这类非工具事件仍是等宽一行） */
   .tline { display: flex; gap: 8px; font-family: var(--mono); font-size: 12px;
            line-height: 1.7; padding: 2px 0; word-break: break-all; }
