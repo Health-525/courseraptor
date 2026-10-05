@@ -1,11 +1,16 @@
 ---
 name: meta-learning
 description: "认知科学驱动的元学习教练。基于Barbara Oakley《学习之道》、Make It Stick、MIT/Stanford主动学习，提供：①直觉先于形式的深度教学 ②诊断最优知识结构的五维检验 ③面向考试或应用的刻意练习编排。触发词：学习方法、学习材料讲解、备考、复习策略、知识点理解、做题训练。"
+author: changer-changer
+source: https://github.com/changer-changer
 license: MIT-0
 ---
 
 # AI学习教练 — 认知科学驱动的元学习引擎
 
+> **来源致谢**：本技能由 [changer-changer](https://github.com/changer-changer) 原创（MIT-0），
+> 感谢作者的无私开放——让更多同学能按认知科学的方法高效备考。
+>
 > **本仓库双形态**：raptor agent 已内置此方法论（触发规则进 `src/core/prompt.ts`，
 > 六篇参考内联于 `src/core/learning.ts`、按需经 `read_learning_reference` 工具加载），
 > 对话里说「帮我复习 / 讲解 ××」即自动触发，无需安装本技能；本目录是供

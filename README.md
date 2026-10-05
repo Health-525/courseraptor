@@ -147,7 +147,7 @@ npm run njtech -- search-courses 高等数学
 
 另附 [`skills/export-schedule/`](skills/export-schedule/) 独立技能包：把课表渲染成图片供下载，适配各平台聊天里直接发图看课表的场景。
 
-另有 [`skills/meta-learning/`](skills/meta-learning/) 学习教练技能：认知科学驱动的元学习引擎（深度教学 / 知识结构诊断 / 考试型刻意练习编排），辅助期末备考。**raptor agent 已内置触发**——对话里说「帮我复习高数」「讲解一下傅里叶变换」自动进入学习教练模式（备考先查真实考试安排与历史成绩，方法论经 `read_learning_reference` 按需加载，详见 [docs/capabilities.md](docs/capabilities.md)）；`skills/` 目录这份是给其它 agent 工具（`~/.claude/skills/`、`~/.zcode/skills/` 等）的独立技能包形态，整目录拷走即用。
+另有 [`skills/meta-learning/`](skills/meta-learning/) 学习教练技能：认知科学驱动的元学习引擎（深度教学 / 知识结构诊断 / 考试型刻意练习编排），辅助期末备考，原作者 [changer-changer](https://github.com/changer-changer)（MIT-0，感谢其无私开放）。**raptor agent 已内置触发**——对话里说「帮我复习高数」「讲解一下傅里叶变换」自动进入学习教练模式（备考先查真实考试安排与历史成绩，方法论经 `read_learning_reference` 按需加载，详见 [docs/capabilities.md](docs/capabilities.md)）；`skills/` 目录这份是给其它 agent 工具（`~/.claude/skills/`、`~/.zcode/skills/` 等）的独立技能包形态，整目录拷走即用。
 
 <details>
 <summary><b>💻 系统要求</b>（点开查看）</summary>

@@ -80,4 +80,6 @@
 
 ---
 
+**作者 & 来源**：[changer-changer](https://github.com/changer-changer) · 感谢原作者以 MIT-0 无私开放，让更多同学能按认知科学的方法高效备考。
+
 **License:** MIT-0

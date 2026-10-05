@@ -2,8 +2,9 @@
  * 学习教练（meta-learning）— 认知科学方法论参考库
  *
  * 源自 skills/meta-learning/（MIT-0，认知科学元学习教练：教学/检验/实践
- * 三位一体）。raptor agent 的 basePrompt 只注入精简的触发规则与核心原则
- * （省 token），六篇方法论文档由 read_learning_reference 工具按需加载。
+ * 三位一体），原作者 changer-changer（https://github.com/changer-changer），
+ * 感谢其无私开放。raptor agent 的 basePrompt 只注入精简的触发规则与核心
+ * 原则（省 token），六篇方法论文档由 read_learning_reference 工具按需加载。
  * 内容内联为常量：学生端安装包不带 skills/ 目录，运行时读文件会缺源，
  * 随 src/ 常量走则与托管版/源码版行为完全一致。
  *
