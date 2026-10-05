@@ -68,6 +68,9 @@ test("GET /api/settings：school 块带清单与手动课表标记，默认 njte
     ["njtech", "hebau", "custom"],
   );
   assert.equal(r.school.options[2].manual, true);
+  // 教务通知卡门槛：njtech 接入通知后随教务账号状态走（本机 .env 可能带
+  // 账号，初值别硬编码；「没接入的学校不亮」在下面的切换链路里硬断言）
+  assert.equal(r.school.newsReady, !!r.jwgl?.configured);
 });
 
 test("切学校教务账号跟着切：旧校存回名下、新校空则清空待填、切回自动恢复", async () => {
@@ -92,6 +95,8 @@ test("切学校教务账号跟着切：旧校存回名下、新校空则清空�
   assert.equal(d.status.school.current, "hebau");
   assert.equal(d.status.jwgl.configured, false);
   assert.equal(d.status.jwgl.username, "");
+  // hebau 没接教务通知：不管账号配没配，通知卡一律不亮
+  assert.equal(d.status.school.newsReady, false);
   const store1 = loadCredentialsStore();
   assert.equal(store1?.username, "");
   assert.equal(store1?.jwglAccounts?.njtech?.username, "202311112222", "旧校账号必须还在槽里");
@@ -108,6 +113,8 @@ test("切学校教务账号跟着切：旧校存回名下、新校空则清空�
   );
   assert.equal(bd.status.jwgl.configured, true);
   assert.equal(bd.status.jwgl.username, "202311112222");
+  // 账号已存 + njtech 接入了通知 → 教务通知卡亮
+  assert.equal(bd.status.school.newsReady, true);
 
   // ④ 两校各存各的：hebau 存自己的账号后互切，各用各的
   await wfetch(`${await base()}/api/settings`, {
@@ -144,6 +151,9 @@ test("切学校教务账号跟着切：旧校存回名下、新校空则清空�
   assert.doesNotMatch(hebauNote, /通知/);
   assert.match(opts.find((o) => o.id === "njtech")?.note ?? "", /通知/);
   assert.equal(opts.find((o) => o.id === "custom")?.note, undefined);
+  // 教务通知门禁（2026-10-05 需求）：hebau 配了账号也必须不亮卡——学校没接入
+  // 通知能力就直接不显示；账号未保存的 njtech 同样不亮（配好才显示）
+  assert.equal(toH.status.school.newsReady, false);
 });
 
 test("POST /api/settings 切换学校：运行期生效并落凭证", async () => {
@@ -155,6 +165,8 @@ test("POST /api/settings 切换学校：运行期生效并落凭证", async () =
   const d = await r.json();
   assert.equal(d.status.school.current, "custom");
   assert.equal(d.status.school.manual, true);
+  // 自定义学校没有教务处官网可抓：通知卡同样不亮
+  assert.equal(d.status.school.newsReady, false);
   assert.match(d.results.find((x: { field: string }) => x.field === "school").message, /已切换/);
   const creds = loadCredentialsStore();
   assert.equal(creds?.schoolId, "custom");

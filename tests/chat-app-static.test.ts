@@ -208,3 +208,23 @@ test("提示词模板换序钩子齐全：面板与输入框上方 chips 都可�
   assert.match(fn[0], /renderQchips\(\)/);
   assert.match(fn[0], /saveQuick\(\)/);
 });
+
+test("教务通知卡按学校显隐：newsReady 门禁接线齐全，没接入的学校不出卡", () => {
+  const src = fs.readFileSync(APP_JS, "utf8");
+  // 门槛函数：以服务端算好的 school.newsReady 为准，演示页放行
+  assert.match(src, /function newsAvailable\(\) \{/);
+  const fn = src.match(/function newsAvailable\(\) \{[\s\S]*?\n\}/);
+  assert.ok(fn, "newsAvailable 函数存在");
+  assert.match(fn[0], /HALL_DEMO/);
+  assert.match(fn[0], /schoolState && schoolState\.newsReady/);
+  // 宫格过滤带上 news 门禁（没接入的学校宫格直接不出这张卡）
+  assert.match(src, /c\.id !== "news" \|\| newsAvailable\(\)/);
+  // 对话推送与 #hall=news 深链误触：schoolState 到位后不进无权限面板
+  assert.match(src, /panel === "news" && schoolState && !newsAvailable\(\)/);
+  assert.match(src, /id === "news" && schoolState && !newsAvailable\(\)/);
+  // 启动同步兜底：深链竞态进了 news 但权限不足时退回宫格并清 hash
+  const boot = src.match(/news 门禁状态到位[\s\S]*?\n {2}\}/);
+  assert.ok(boot, "启动同步里有 news 门禁兜底");
+  assert.match(boot[0], /hallPanel === "news" && !newsAvailable\(\)/);
+  assert.match(boot[0], /syncHallHash\(\)/);
+});

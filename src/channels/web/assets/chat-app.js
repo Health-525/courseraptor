@@ -1509,9 +1509,16 @@ let hallBrief = null; // /api/today 一次取数，日程/课表/考试/待办/�
 let hallAutoMuted = false; // 本轮对话里用户手动关过抽屉：这轮不再自动弹
 /* ── 学校模式（设置 → 学校）：从 /api/settings 的 school 块同步，
    各面板与设置页据此区分「已适配学校 / 其他学校（手动课表）」 */
-let schoolState = null; // { current, manual, scheduleCached, custom:{name,city}, options:[] }
+let schoolState = null; // { current, manual, newsReady, scheduleCached, custom:{name,city}, options:[] }
 function schoolManual() {
   return !!(schoolState && schoolState.manual);
+}
+/* 教务通知卡的门槛（与设置页 newsReady 同口径）：本校接入教务通知且教务
+   账号已保存才亮卡；没接入的学校（如河北农大）宫格直接不出这张卡。
+   演示页没有 /api/settings，保持展示（点开是演示空态） */
+function newsAvailable() {
+  if (HALL_DEMO) return true;
+  return !!(schoolState && schoolState.newsReady);
 }
 function applySchoolState(next) {
   if (!next || typeof next !== "object") return;
@@ -2910,7 +2917,9 @@ function renderHall(force) {
     hallTitle.textContent = "功能大厅";
     /* 主页按分组排布：学习安排 / 效率工具 / 系统，扫一眼就能定位 */
     HALL_GROUPS.forEach((g) => {
-      const cards = HALL_CARDS.filter((c) => c.group === g && !c.hidden);
+      const cards = HALL_CARDS.filter(
+        (c) => c.group === g && !c.hidden && (c.id !== "news" || newsAvailable()),
+      );
       if (!cards.length) return;
       const sec = el("hall-sec");
       sec.appendChild(el2("", g));
@@ -3004,6 +3013,9 @@ function renderHall(force) {
   }
 }
 function openHall(panel, opts) {
+  /* 教务通知门禁：无权限时宫格本就没有这张卡，对话推送/深链误触只回宫格。
+     schoolState 未到位（刚刷新）先放行，由启动同步兜底退回 */
+  if (panel === "news" && schoolState && !newsAvailable()) panel = "";
   if (panel) hallPanel = panel;
   /* 记住抽屉外的打开者：关闭时焦点归还；抽屉内卡片跳转不需要 */
   const active = document.activeElement;
@@ -3027,7 +3039,11 @@ let hallHashSync = false;
 function hallPanelFromHash() {
   const m = /^#hall=([a-z]+)$/.exec(location.hash || "");
   const id = m && m[1];
-  return id && (HALL_TITLES[id] || id === "settings") ? id : "";
+  if (!id || !(HALL_TITLES[id] || id === "settings")) return "";
+  /* 教务通知门禁：状态未到位先放行（刷新直达收藏的深链），权限不足时
+     由启动同步退回宫格 */
+  if (id === "news" && schoolState && !newsAvailable()) return "";
+  return id;
 }
 function syncHallHash() {
   if (hallHashSync) return;
@@ -4885,7 +4901,20 @@ refreshSessions().then(() => {
 fetch("/api/settings")
   .then((r) => r.json())
   .then((d) => {
-    if (d.school) applySchoolState(d.school);
+    if (d.school) {
+      applySchoolState(d.school);
+      /* news 门禁状态到位：正在看通知面板但权限不足（深链竞态）时退回宫格；
+         宫格开着时重排一次（schoolState 晚于首渲染到达的场合），该亮的卡补上 */
+      if (hallPanel === "news" && !newsAvailable()) {
+        hallPanel = "";
+        if (document.body.classList.contains("hall-open")) {
+          renderHall();
+          syncHallHash();
+        }
+      } else if (!hallPanel && document.body.classList.contains("hall-open")) {
+        renderHall();
+      }
+    }
     if (Array.isArray(d.quickQuestions) && d.quickQuestions.length) {
       quickQuestions = d.quickQuestions.slice();
       renderQchips();
