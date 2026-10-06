@@ -532,8 +532,7 @@ async function downloadWithCaptcha(url: string): Promise<{ buf: Buffer; contentT
     if (html.includes("本网站只能被校内IP地址访问")) {
       throw new RaptorError(
         "CAMPUS_ONLY",
-        "教务处官网已限制校外 IP 访问，附件暂无法在校外直接下载；请在校园网内获取" +
-          "（通知正文可经 WebVPN 通道读取）",
+        "教务处官网已限制校外 IP 访问，附件暂无法在校外直接下载，请在校园网内获取",
       );
     }
     if (!html.includes("createimage.jsp")) {
@@ -563,8 +562,7 @@ async function downloadWithCaptcha(url: string): Promise<{ buf: Buffer; contentT
   );
 }
 
-/** tesseract OCR 验证码（数字+小写字母），worker 由 getOcrWorker 常驻复用。
- *  webvpn.ts 的统一身份认证登录码也走这里，共用同一开关与 worker。 */
+/** tesseract OCR 验证码（数字+小写字母），worker 由 getOcrWorker 常驻复用。 */
 export async function ocrCaptcha(buf: Buffer): Promise<string> {
   try {
     const worker = await getOcrWorker();

@@ -42,7 +42,7 @@ test("isRaptorError 可选按 code 过滤，普通 Error 一律不匹配", () =>
 
 test("isSessionExpiredError 只认 code，文案里出现「失效」字样不算数", () => {
   assert.equal(isSessionExpiredError(new RaptorError("SESSION_EXPIRED", "会话已失效")), true);
-  assert.equal(isSessionExpiredError(new RaptorError("UPSTREAM", "WebVPN 会话已失效")), false);
+  assert.equal(isSessionExpiredError(new RaptorError("UPSTREAM", "教务系统请求失败")), false);
   assert.equal(isSessionExpiredError(new Error("SESSION_EXPIRED")), false);
 });
 

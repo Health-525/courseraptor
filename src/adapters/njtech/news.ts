@@ -4,9 +4,9 @@
  *
  * 抓取 https://jwc.njtech.edu.cn 三个页面，无需认证（公开页面）。
  * 2026-09 起官网限制仅校内 IP 访问：校外直连只会拿到「本网站只能被
- * 校内IP地址访问」拦截页（HTTP 483），因此抓取走三级阶梯：
- *   直连（校内/学校放开限制时）→ WebVPN 代理（校外，需统一身份认证）
- *   → 上次成功抓取的落盘缓存（前两者都失败时兜底，注明快照时间）。
+ * 校内IP地址访问」拦截页（HTTP 483）。抓取走两级阶梯：
+ *   直连（校内/学校放开限制时）→ 上次成功抓取的落盘缓存
+ *   （直连失败时兜底，注明快照时间）。
  */
 
 import { pdfTextFromBuffer } from "../../core/attachments";
@@ -15,9 +15,19 @@ import { fetchUrlBuffer, fetchUrlText } from "../../core/http";
 import { readJsonCache, writeJsonCache } from "../../core/json-cache";
 import { logger } from "../../core/logger";
 import type { NewsItem } from "../../core/model";
-import { jwcUrlToPath, webvpnFetchJwc, webvpnFetchJwcBuffer, webvpnUrlToPublic } from "./webvpn";
 
 const BASE_URL = "https://jwc.njtech.edu.cn";
+
+/** jwc 文章 URL → 站内路径；非 jwc 域返回 null */
+function jwcUrlToPath(url: string): string | null {
+  try {
+    const u = new URL(url);
+    if (u.hostname !== "jwc.njtech.edu.cn") return null;
+    return u.pathname + u.search;
+  } catch {
+    return null;
+  }
+}
 
 const TARGETS = [
   { label: "公告通知", url: `${BASE_URL}/index/ggtz.htm` },
@@ -25,7 +35,7 @@ const TARGETS = [
   { label: "考试排课", url: `${BASE_URL}/jxgl/ksypk.htm` },
 ];
 
-/** 校外拦截页签名：命中说明直连被拒，需要换 WebVPN 通道 */
+/** 校外拦截页签名：命中说明直连被拒，仅校内网络可访问 */
 const CAMPUS_ONLY_SIGNATURE = "本网站只能被校内IP地址访问";
 
 const NEWS_CACHE_FILE = "jwc-news-cache.json";
@@ -51,14 +61,6 @@ const DIRECT_HEADERS = {
 // pdf.js 的 <iframe src="/system/resource/pdfjs/viewer.html?file=...">
 // HTML 解析只能拿到导航壳；必须下载 PDF 抽文本，才读得到正文。
 
-/** PDF 二进制的 WebVPN 通道（测试可注入替身） */
-let webvpnPdfFetch: (path: string) => Promise<Buffer> = webvpnFetchJwcBuffer;
-
-/** @internal 仅为测试注入替身使用 */
-export function _setWebvpnPdfFetchForTest(fn: ((path: string) => Promise<Buffer>) | null): void {
-  webvpnPdfFetch = fn ?? webvpnFetchJwcBuffer;
-}
-
 /** PDF 文本抽取（pdf-parse v2，测试可注入替身）；失败抛错由调用方降级 */
 async function parsePdfText(buf: Buffer): Promise<string> {
   const text = await pdfTextFromBuffer(buf);
@@ -79,22 +81,18 @@ function isPdfBuffer(buf: Buffer): boolean {
   return buf.subarray(0, 4).toString("latin1") === "%PDF";
 }
 
-/** 下载内嵌 PDF：直连（校内）优先，被校外拦截/网络失败时降级 WebVPN 二进制通道 */
+/** 下载内嵌 PDF（直连）。校外拦截/响应异常时抛错，正文由调用方降级为页面壳文本 */
 async function fetchJwcPdf(path: string): Promise<Buffer> {
-  try {
-    const { status, buf } = await fetchUrlBuffer(`${BASE_URL}${path}`, {
-      timeoutMs: 30_000,
-      headers: DIRECT_HEADERS,
-    });
-    if (status < 400 && isPdfBuffer(buf)) return buf;
-  } catch {
-    /* 直连失败（校外拦截/断网/超时）换 WebVPN 通道 */
+  const { status, buf } = await fetchUrlBuffer(`${BASE_URL}${path}`, {
+    timeoutMs: 30_000,
+    headers: DIRECT_HEADERS,
+  });
+  if (status < 400 && isPdfBuffer(buf)) return buf;
+  const head = buf.subarray(0, 1024).toString("utf8");
+  if (head.includes(CAMPUS_ONLY_SIGNATURE)) {
+    throw new RaptorError("CAMPUS_ONLY", "教务处官网已限制校外 IP 访问，请在校园网内获取");
   }
-  const buf = await webvpnPdfFetch(path);
-  if (!isPdfBuffer(buf)) {
-    throw new RaptorError("PARSE", "内嵌 PDF 下载失败：通道返回的不是 PDF 文件");
-  }
-  return buf;
+  throw new RaptorError("PARSE", "内嵌 PDF 下载失败：通道返回的不是 PDF 文件");
 }
 
 /**
@@ -112,7 +110,7 @@ function findEmbeddedPdfPath(scope: string): string | null {
   } catch {
     decoded = raw;
   }
-  // WebVPN 改写页里 file= 可能是绝对地址：剥掉协议与域名，只留站内路径
+  // file= 也可能配成绝对地址：剥掉协议与域名，只留站内路径
   if (/^https?:\/\//i.test(decoded)) {
     try {
       const u = new URL(decoded);
@@ -146,31 +144,21 @@ function normalizePdfText(text: string): string {
 
 // ── 抓取阶梯 ─────────────────────────────────────────────────
 
-export interface JwcFetch {
-  html: string;
-  via: "direct" | "webvpn";
-}
-
 /**
- * 抓取 jwc 站点的一个页面：先直连，被校外拦截（或网络不通）时降级 WebVPN。
- * 两条路都失败时抛出后者（WebVPN）的错误——那里带着可操作的指引。
+ * 抓取 jwc 站点的一个页面（直连）。校外被拦（HTTP 483/拦截页签名）
+ * 或网络失败时抛错，由调用方决定回退缓存。
  */
-async function fetchJwcHtml(path: string): Promise<JwcFetch> {
-  try {
-    // 重定向跟随（undici 内置 20 跳上限）与 15s 超时都在 fetchUrlText 里
-    const { status, text } = await fetchUrlText(`${BASE_URL}${path}`, {
-      timeoutMs: 15_000,
-      headers: DIRECT_HEADERS,
-    });
-    // 校外被拦时官网回 483（或 200 拦截页）：按状态与页面签名识别后换通道
-    if (status < 400 && !text.includes(CAMPUS_ONLY_SIGNATURE)) {
-      return { html: text, via: "direct" };
-    }
-  } catch {
-    /* 直连失败（断网/超时，RaptorError NETWORK）：换 WebVPN 通道 */
+async function fetchJwcHtml(path: string): Promise<string> {
+  // 重定向跟随（undici 内置 20 跳上限）与 15s 超时都在 fetchUrlText 里
+  const { status, text } = await fetchUrlText(`${BASE_URL}${path}`, {
+    timeoutMs: 15_000,
+    headers: DIRECT_HEADERS,
+  });
+  // 校外被拦时官网回 483（或 200 拦截页）：按状态与页面签名识别后如实报错
+  if (status >= 400 || text.includes(CAMPUS_ONLY_SIGNATURE)) {
+    throw new RaptorError("CAMPUS_ONLY", "教务处官网已限制校外 IP 访问，请在校园网内获取");
   }
-  const html = await webvpnFetchJwc(path);
-  return { html, via: "webvpn" };
+  return text;
 }
 
 // ── HTML 解析 ────────────────────────────────────────────────
@@ -226,34 +214,28 @@ function parseNewsList(html: string, baseUrl: string): NewsItem[] {
 
 export interface JwcNewsResult {
   items: NewsItem[];
-  /** 本次实际使用的通道；校外被拦时为 webvpn */
-  via: "direct" | "webvpn";
-  /** 非空表示本次返回的是落盘缓存快照（直连与 WebVPN 都失败了） */
+  /** 非空表示本次返回的是落盘缓存快照（直连失败的兜底） */
   staleAt?: number;
 }
 
 /**
- * 抓取教务处通知（带通道与降级信息）。get_news 工具用这个版本，
- * 把「经 WebVPN 代理」「缓存快照」如实告诉模型与用户。
+ * 抓取教务处通知（带降级信息）。get_news 工具用这个版本，
+ * 把「缓存快照」如实告诉模型与用户。
  */
 export async function fetchJwcNewsDetailed(
   existingItems: NewsItem[] = [],
   maxItems = 20,
 ): Promise<JwcNewsResult> {
   const allItems: NewsItem[] = [];
-  let usedWebvpn = false;
   let lastError: Error | null = null;
 
   for (const { label, url } of TARGETS) {
     try {
       const path = jwcUrlToPath(url) ?? new URL(url).pathname + new URL(url).search;
-      const { html, via } = await fetchJwcHtml(path);
-      if (via === "webvpn") usedWebvpn = true;
+      const html = await fetchJwcHtml(path);
       const items = parseNewsList(html, url);
       for (const item of items) {
         item.category = label;
-        // WebVPN 页面里的绝对链接带改写前缀，对外统一映射回公网地址
-        item.url = webvpnUrlToPublic(item.url);
       }
       allItems.push(...items);
     } catch (e) {
@@ -275,14 +257,14 @@ export async function fetchJwcNewsDetailed(
       { tag: "jwc-news", items, fetchedAt: Date.now() } satisfies NewsCacheEnvelope,
       "jwc-news",
     );
-    return { items, via: usedWebvpn ? "webvpn" : "direct" };
+    return { items };
   }
 
   // 全部板块失败：先看有没有可用的历史快照
   const cached = readJsonCache(NEWS_CACHE_FILE, isValidNewsCache);
   if (cached) {
-    logger.warn("[jwc-news] 直连与 WebVPN 均失败，回退缓存快照", { error: lastError?.message });
-    return { items: cached.items, via: "direct", staleAt: cached.fetchedAt };
+    logger.warn("[jwc-news] 直连失败，回退缓存快照", { error: lastError?.message });
+    return { items: cached.items, staleAt: cached.fetchedAt };
   }
 
   throw lastError ?? new Error("教务处通知抓取失败（三个板块均无结果）");
@@ -301,7 +283,7 @@ function isValidNewsCache(parsed: unknown): parsed is NewsCacheEnvelope {
 
 // ── 进程内 5 分钟快照：get_news 工具与网页通知面板共用 ────────────
 // 通知是公共数据（对所有人相同），「面板刚看过 + 对话里又问一次」不该
-// 触发两轮全量抓取（直连或 WebVPN 都是三个板块三页请求）。只缓存新鲜
+// 触发两轮全量抓取（直连一轮就是三个板块三页请求）。只缓存新鲜
 // 结果；降级快照（staleAt）不进缓存——下次调用照常重试真实通道。
 
 const NEWS_MEMO_TTL_MS = 5 * 60_000;
@@ -363,7 +345,7 @@ export async function fetchJwcArticle(url: string): Promise<JwcArticle> {
   if (path === null) {
     throw new Error("仅支持 jwc.njtech.edu.cn 域名下的文章 URL");
   }
-  const { html } = await fetchJwcHtml(path);
+  const html = await fetchJwcHtml(path);
   // 权限文章匿名访问 302 到 auth.htm 后返回的仍是 HTTP 200 的鉴权提示页，
   // 不拦住的话这段「您无权访问此页面」会被当成正文往上转
   if (/您无权访问此页面/.test(html)) {
@@ -398,7 +380,7 @@ export async function fetchJwcArticle(url: string): Promise<JwcArticle> {
     if (!text || text.length < 3) continue;
     try {
       // 相对链接按公网文章地址拼全，保持对外 URL 的规范形态
-      const full = webvpnUrlToPublic(new URL(href, url).href);
+      const full = new URL(href, url).href;
       if (!attachments.some((a) => a.url === full)) {
         attachments.push({ name: text, url: full });
       }

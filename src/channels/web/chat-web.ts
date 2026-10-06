@@ -194,7 +194,7 @@ interface ScoredNewsSnapshot {
   items: ScoredNewsItem[];
   gradeBasis: string | null;
   fetchedAt: number;
-  /** 非空表示这次是降级快照（官网直连与 WebVPN 都失败），前端要提示不新鲜 */
+  /** 非空表示这次是降级快照（官网直连失败），前端要提示不新鲜 */
   staleAt?: number;
 }
 
@@ -209,11 +209,7 @@ async function scoredNewsSnapshot(): Promise<ScoredNewsSnapshot> {
   const notices = school().notices;
   const raw = notices?.fetchNewsMemo
     ? await notices.fetchNewsMemo(30)
-    : {
-        items: (await notices?.fetchNews([], 30)) ?? [],
-        via: "direct" as const,
-        staleAt: undefined,
-      };
+    : { items: (await notices?.fetchNews([], 30)) ?? [], staleAt: undefined };
   const grade = await loadUserGrade();
   const scored = raw.items.slice(0, 10).map((i) => {
     const { level, reason } = relevanceOf(i.title, grade);

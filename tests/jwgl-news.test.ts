@@ -14,12 +14,13 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   _setPdfTextParserForTest,
-  _setWebvpnPdfFetchForTest,
   clearNewsMemo,
   fetchJwcArticle,
   fetchJwcNews,
+  fetchJwcNewsDetailed,
   fetchJwcNewsMemo,
 } from "../src/adapters/njtech/news";
+import { deleteJsonCache, writeJsonCache } from "../src/core/json-cache";
 
 function installFetch(respond: (url: string) => string | Buffer) {
   const original = globalThis.fetch;
@@ -109,11 +110,6 @@ const PDF_ARTICLE_HTML = `<html><head><title>关于2026年中秋节、国庆节�
 </body></html>`;
 
 test("正文内嵌 PDF 的通知：直连下载抽全文，不再把导航壳当正文", async () => {
-  let webvpnTouched = false;
-  _setWebvpnPdfFetchForTest(async () => {
-    webvpnTouched = true;
-    return Buffer.from("%PDF-should-not-be-used");
-  });
   _setPdfTextParserForTest(async (buf) => {
     assert.equal(
       buf.subarray(0, 4).toString("latin1"),
@@ -147,21 +143,13 @@ test("正文内嵌 PDF 的通知：直连下载抽全文，不再把导航壳当
       "https://jwc.njtech.edu.cn/__local/B/56/8D/68470E61DC419A135965286BD06_FD7C9A42_12F48.pdf",
       "附件 URL 必须是公网直链",
     );
-    assert.equal(webvpnTouched, false, "直连拿到 PDF 就不该走 WebVPN");
   } finally {
     restore();
     _setPdfTextParserForTest(null);
-    _setWebvpnPdfFetchForTest(null);
   }
 });
 
-test("PDF 直连被校外拦截时降级 WebVPN 二进制通道", async () => {
-  let askedPath = "";
-  _setPdfTextParserForTest(async () => "放假安排正文（经 WebVPN 通道取得）。");
-  _setWebvpnPdfFetchForTest(async (p) => {
-    askedPath = p;
-    return Buffer.from("%PDF-1.7 via-webvpn");
-  });
+test("PDF 直连被校外拦截：附件照常登记，正文降级为页面壳文本", async () => {
   const restore = installFetch((url) =>
     url.includes("/__local/")
       ? "<html><body>本网站只能被校内IP地址访问，校外地址无法访问该网站</body></html>"
@@ -169,12 +157,13 @@ test("PDF 直连被校外拦截时降级 WebVPN 二进制通道", async () => {
   );
   try {
     const article = await fetchJwcArticle("https://jwc.njtech.edu.cn/info/1158/6925.htm");
-    assert.match(article.text, /经 WebVPN 通道取得/);
-    assert.equal(askedPath, "/__local/B/56/8D/68470E61DC419A135965286BD06_FD7C9A42_12F48.pdf");
+    // 直连拿不到 PDF：正文只能是页面壳（导航文本），绝不能是 PDF 内容
+    assert.doesNotMatch(article.text, /放假安排正文/, "拿不到 PDF 时正文不能是 PDF 内容");
+    assert.match(article.text, /网站地图/, "正文降级为页面壳文本");
+    const pdf = article.attachments.find((a) => a.url.includes("/__local/"));
+    assert.ok(pdf, "内嵌 PDF 仍要登记进附件列表（回校园网后可用 fetch_attachment 再取）");
   } finally {
     restore();
-    _setPdfTextParserForTest(null);
-    _setWebvpnPdfFetchForTest(null);
   }
 });
 
@@ -193,10 +182,58 @@ test("fetchJwcNewsMemo：TTL 内重复调用共享同一份快照（面板+工�
     const a = await fetchJwcNewsMemo(30);
     const b = await fetchJwcNewsMemo(30);
     assert.ok(a.items.length > 0);
-    assert.equal(a.via, "direct");
     assert.equal(a.staleAt, undefined, "新鲜结果不携带 staleAt");
     assert.equal(b.items.length, a.items.length);
     assert.equal(fetches, 3, "三个板块只抓一轮；第二次调用应命中进程内快照");
+  } finally {
+    restore();
+    clearNewsMemo();
+  }
+});
+
+// ── 直连失败 → 回退落盘缓存快照（两级阶梯的兜底）─────────────────
+test("直连全部失败时回退缓存快照并带 staleAt", async () => {
+  clearNewsMemo();
+  writeJsonCache(
+    "jwc-news-cache.json",
+    {
+      tag: "jwc-news",
+      items: [
+        {
+          title: "缓存的旧通知标题",
+          url: "https://jwc.njtech.edu.cn/info/1/1.htm",
+          date: "2026-09-01",
+        },
+      ],
+      fetchedAt: Date.now() - 3600_000,
+    },
+    "test",
+  );
+  const restore = installFetch(
+    () => "<html><body>本网站只能被校内IP地址访问，校外地址无法访问该网站</body></html>",
+  );
+  try {
+    const result = await fetchJwcNewsDetailed([], 30);
+    assert.ok(result.staleAt, "必须带 staleAt 标记缓存快照身份");
+    assert.equal(result.items[0].title, "缓存的旧通知标题");
+    // 兼容契约：fetchJwcNews 失败也不抛错
+    const items = await fetchJwcNews([], 30);
+    assert.equal(items[0].title, "缓存的旧通知标题");
+  } finally {
+    restore();
+    clearNewsMemo();
+    deleteJsonCache("jwc-news-cache.json", "test");
+  }
+});
+
+test("直连被校外拦截且无缓存可用时，如实抛出 CAMPUS_ONLY 错误", async () => {
+  clearNewsMemo();
+  deleteJsonCache("jwc-news-cache.json", "test");
+  const restore = installFetch(
+    () => "<html><body>本网站只能被校内IP地址访问，校外地址无法访问该网站</body></html>",
+  );
+  try {
+    await assert.rejects(fetchJwcNewsDetailed([], 30), /限制校外 IP/);
   } finally {
     restore();
     clearNewsMemo();
