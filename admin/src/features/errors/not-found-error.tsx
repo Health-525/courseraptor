@@ -8,16 +8,15 @@ export function NotFoundError() {
     <div className='h-svh'>
       <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>
         <h1 className='text-[7rem] leading-tight font-bold'>404</h1>
-        <span className='font-medium'>Oops! Page Not Found!</span>
+        <span className='font-medium'>页面不存在</span>
         <p className='text-center text-muted-foreground'>
-          It seems like the page you're looking for <br />
-          does not exist or might have been removed.
+          你访问的页面不存在或已被移除
         </p>
         <div className='mt-6 flex gap-4'>
           <Button variant='outline' onClick={() => history.go(-1)}>
-            Go Back
+            返回上页
           </Button>
-          <Button onClick={() => navigate({ to: '/' })}>Back to Home</Button>
+          <Button onClick={() => navigate({ to: '/' })}>回总览</Button>
         </div>
       </div>
     </div>

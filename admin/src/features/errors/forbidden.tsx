@@ -8,16 +8,15 @@ export function ForbiddenError() {
     <div className='h-svh'>
       <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>
         <h1 className='text-[7rem] leading-tight font-bold'>403</h1>
-        <span className='font-medium'>Access Forbidden</span>
+        <span className='font-medium'>无权访问</span>
         <p className='text-center text-muted-foreground'>
-          You don't have necessary permission <br />
-          to view this resource.
+          你没有查看此页面所需的权限
         </p>
         <div className='mt-6 flex gap-4'>
           <Button variant='outline' onClick={() => history.go(-1)}>
-            Go Back
+            返回上页
           </Button>
-          <Button onClick={() => navigate({ to: '/' })}>Back to Home</Button>
+          <Button onClick={() => navigate({ to: '/' })}>回总览</Button>
         </div>
       </div>
     </div>
