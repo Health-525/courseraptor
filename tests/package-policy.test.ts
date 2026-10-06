@@ -49,18 +49,7 @@ test("安装包过滤在真实目录复制时不带出会话、文件、凭证�
   for (const file of publicFiles) assert.equal(existsSync(path.join(target, file)), true, file);
 });
 
-test("网关与更新后台照常分发，落地页与技能包不进学生端安装包", () => {
-  for (const file of [
-    "gateway",
-    "gateway/gateway.mjs",
-    "gateway/admin/ui.mjs",
-    "gateway/headless/entry.ts",
-    "update/app.mjs",
-    "update/update-server.mjs",
-    "update/nginx.conf.example",
-  ]) {
-    assert.equal(shouldPackagePath(file), true, file);
-  }
+test("落地页与技能包不进学生端安装包", () => {
   for (const file of [
     "landing",
     "landing/package.json",
@@ -73,39 +62,23 @@ test("网关与更新后台照常分发，落地页与技能包不进学生端�
   }
 });
 
-test("网关运行数据绝不进学生包：账本、TOTP 密钥、重置码与托管同学数据", () => {
+test("已下线的托管组件（网关/管理台/更新后台）不进学生端安装包", () => {
   for (const file of [
+    "gateway",
+    "gateway/gateway.mjs",
+    "gateway/admin/ui.mjs",
+    "gateway/headless/entry.ts",
     "gateway/state",
     "gateway/state/users.json",
-    "gateway/state/invites.json",
-    "gateway/state/admin-totp.json",
-    "gateway/state/reset-requests.json",
-    "gateway/state/site.json",
-    "gateway/state/admin-log.json",
-    "gateway/users",
-    "gateway/users/u_123/data/chat-sessions.json",
     "gateway/users/u_123/credentials.enc",
-  ]) {
-    assert.equal(shouldPackagePath(file), false, file);
-  }
-});
-
-test("管理台前端只分发构建产物：admin/dist 进包，源码与依赖不进", () => {
-  for (const file of [
+    "update/app.mjs",
+    "update/update-server.mjs",
+    "update/nginx.conf.example",
+    "admin",
     "admin/dist",
     "admin/dist/index.html",
-    "admin/dist/assets/index-CWa5foPH.js",
-    "admin/dist/images/favicon.svg",
-  ]) {
-    assert.equal(shouldPackagePath(file), true, file);
-  }
-  for (const file of [
-    "admin",
-    "admin/package.json",
     "admin/src/main.tsx",
     "admin/node_modules/react/index.js",
-    "admin/vite.config.ts",
-    "admin/dist/assets/app.js.map",
   ]) {
     assert.equal(shouldPackagePath(file), false, file);
   }
