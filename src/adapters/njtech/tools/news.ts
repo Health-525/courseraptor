@@ -21,7 +21,7 @@ export const newsTools = {
   /** 教务处官网通知 */
   get_news: tool({
     description:
-      "抓取南京工业大学教务处官网（jwc.njtech.edu.cn）的最新通知，涵盖三个板块：公告通知（含选课/考试/学籍等重要安排）、教学动态、考试排课。校内直连；官网限制仅校内 IP 后，校外自动经统一身份认证 WebVPN 代理抓取。用户问「最近有什么教务通知」「选课什么时候开始」「有没有关于××的通知」时调用。每条带 relevance：high=需本人行动（点名本年级或全校性必办）、medium=视个人情况（补修/重修/转专业等）、low=基本无关（其他年级或行政公示）。回答时优先讲 high 的，low 的一句带过，不要平铺全部。",
+      "抓取南京工业大学教务处官网（jwc.njtech.edu.cn）的最新通知，涵盖三个板块：公告通知（含选课/考试/学籍等重要安排）、教学动态、考试排课。仅校内网络可直连；官网限制仅校内 IP 后，校外直连会失败，此时回退上次成功抓取的缓存快照并在 note 里注明抓取时间。用户问「最近有什么教务通知」「选课什么时候开始」「有没有关于××的通知」时调用。每条带 relevance：high=需本人行动（点名本年级或全校性必办）、medium=视个人情况（补修/重修/转专业等）、low=基本无关（其他年级或行政公示）。回答时优先讲 high 的，low 的一句带过，不要平铺全部。",
     inputSchema: z.object({
       category: z
         .enum(["公告通知", "教学动态", "考试排课"])
@@ -32,7 +32,7 @@ export const newsTools = {
     execute: async ({ category, limit }) => {
       // 5 分钟进程内快照：网页通知面板刚看过的话，这里直接复用，
       // 不再重复抓官网三页（对所有人相同的公共数据）
-      const { items: fetched, via, staleAt } = await fetchJwcNewsMemo(30);
+      const { items: fetched, staleAt } = await fetchJwcNewsMemo(30);
       const filtered = category ? fetched.filter((i) => i.category === category) : fetched;
       const grade = await loadUserGrade();
       const scored = filtered.slice(0, limit).map((i) => {
@@ -50,14 +50,12 @@ export const newsTools = {
         };
       });
       const mustSee = scored.filter((i) => i.relevance === "high").length;
-      // 通道说明：校外网络下学校官网被拦，列表是经统一身份认证 WebVPN 抓的；
-      // 连 WebVPN 也失败时回退历史快照——时间必须如实告知，不能当新鲜数据
+      // 通道说明：校外网络下学校官网被拦，直连失败时回退历史快照——
+      // 时间必须如实告知，不能当新鲜数据
       const channelNote =
         staleAt !== undefined
-          ? `⚠️ 本次为缓存快照：教务处官网直连与 WebVPN 通道均失败，以下内容抓取于 ${new Date(staleAt).toLocaleString("zh-CN")}，可能已过期。`
-          : via === "webvpn"
-            ? "当前为校外网络：教务处官网已限制校外 IP，本次经统一身份认证 WebVPN 代理抓取（若要求输入 CAS_PASSWORD，在 .env 配置信息门户密码即可）。"
-            : "";
+          ? `⚠️ 本次为缓存快照：教务处官网直连失败（官网限制仅校内 IP，校外无法访问），以下内容抓取于 ${new Date(staleAt).toLocaleString("zh-CN")}，可能已过期。`
+          : "";
       return {
         total: filtered.length,
         /** 年级依据；取不到就退化成纯关键词判断 */

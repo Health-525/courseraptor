@@ -112,12 +112,10 @@ export interface SchoolNotices {
   fetchNewsMemo?(maxItems?: number): Promise<SchoolNewsSnapshot>;
 }
 
-/** fetchNewsMemo 的返回形状：items 之外如实说明通道与新鲜度 */
+/** fetchNewsMemo 的返回形状：items 之外如实说明新鲜度 */
 export interface SchoolNewsSnapshot {
   items: NewsItem[];
-  /** 本次实际使用的通道；校外被拦时为 webvpn */
-  via: "direct" | "webvpn";
-  /** 非空表示本次返回的是落盘缓存快照（直连与 WebVPN 都失败了） */
+  /** 非空表示本次返回的是落盘缓存快照（直连失败时的兜底） */
   staleAt?: number;
 }
 

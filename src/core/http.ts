@@ -253,8 +253,8 @@ export function httpError(resp: HttpResponse): RaptorError | null {
 }
 
 // ── 统一重试 ──────────────────────────────────────────────────
-// 之前重试散在 session（5 次线性）/ grades（3 次线性）/ webvpn（4 次验证码
-// 驱动）各写各的循环；退避曲线与「什么值得重试」无法统一调整。
+// 之前重试散在 session（5 次线性）/ grades（3 次线性）各写各的循环；
+// 退避曲线与「什么值得重试」无法统一调整。
 
 export interface RetryOptions {
   /** 总尝试次数（含首次），默认 3 */
