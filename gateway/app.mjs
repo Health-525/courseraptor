@@ -446,6 +446,18 @@ else { input.type = "password"; this.textContent = "显示"; }
   // 已登录会话的续期簿记（userId → { expiresAt }），签发时写入
   const sessions = new Map();
 
+  // 过期条目清扫：自然过期的会话不再有请求触发删除，条目只增不减；
+  // 挂在签发/续期路径上节流执行（每 5 分钟最多一次，遍历量 = 用户数，微秒级）
+  let lastSessionSweep = 0;
+  const sweepExpiredSessions = () => {
+    const now = Date.now();
+    if (now - lastSessionSweep < 5 * 60_000) return;
+    lastSessionSweep = now;
+    for (const [id, session] of sessions) {
+      if (session.expiresAt < now) sessions.delete(id);
+    }
+  };
+
   function proxyTo(req, res, userId, port) {
     const headers = { ...req.headers, host: `127.0.0.1:${port}` };
     // 后端 Origin 门只对本机放行：经网关转发时由网关会话承担跨站防护
@@ -459,6 +471,7 @@ else { input.type = "password"; this.textContent = "显示"; }
         if (session && session.expiresAt - Date.now() < 24 * 3600_000) {
           session.expiresAt = Date.now() + SESSION_TTL_MS;
           outHeaders["set-cookie"] = sessionCookie(userId, session.expiresAt);
+          sweepExpiredSessions();
         }
         if (outHeaders["transfer-encoding"]) delete outHeaders["transfer-encoding"];
         if (outHeaders["content-length"]) delete outHeaders["content-length"];
@@ -487,6 +500,7 @@ else { input.type = "password"; this.textContent = "显示"; }
   function issueSession(userId) {
     const expiresAt = Date.now() + SESSION_TTL_MS;
     sessions.set(userId, { expiresAt });
+    sweepExpiredSessions();
     return sessionCookie(userId, expiresAt);
   }
 

@@ -1,14 +1,13 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import {
   createReadStream,
+  createWriteStream,
   existsSync,
   mkdirSync,
-  readdirSync,
   readFileSync,
-  statSync,
   unlinkSync,
 } from "node:fs";
-import { readFile, rename, stat, writeFile } from "node:fs/promises";
+import { readdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -68,9 +67,47 @@ async function writeAtomic(file, content) {
   await rename(temp, file);
 }
 
-function semverRank(version) {
-  const [major, minor, patch] = version.split(".").map(Number);
-  return major * 1_000_000 + minor * 1_000 + patch;
+/** 请求体直落临时文件（字节计数超限即断开），返回写入字节数。
+ * 大包发布（上限 200MB）不再整段缓冲进内存——1.7G 内存的 VPS 经不起
+ * 并发上传时瞬时吃掉几百 MB。 */
+function streamBodyToFile(req, file, limit) {
+  return new Promise((resolve, reject) => {
+    const out = createWriteStream(file);
+    let size = 0;
+    let settled = false;
+    const fail = (error) => {
+      if (settled) return;
+      settled = true;
+      out.destroy();
+      reject(error);
+    };
+    req.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        req.destroy();
+        fail(new Error("请求体过大"));
+      }
+    });
+    req.on("end", () => {
+      out.end(() => {
+        if (!settled) {
+          settled = true;
+          resolve(size);
+        }
+      });
+    });
+    req.on("error", fail);
+    out.on("error", fail);
+    req.pipe(out);
+  });
+}
+
+/** 版本倒序比较（逐段数值，大段优先）——major*1e6+minor*1e3+patch 的合成数
+ * 在任一段 ≥1000 时会错序（semver 允许大段号），这里逐段比不再有上限 */
+function compareVersionDesc(a, b) {
+  const [aMajor, aMinor, aPatch] = a.version.split(".").map(Number);
+  const [bMajor, bMinor, bPatch] = b.version.split(".").map(Number);
+  return bMajor - aMajor || bMinor - aMinor || bPatch - aPatch;
 }
 
 const landingHtml = (meta) => `<!doctype html>
@@ -153,6 +190,7 @@ export function createUpdateServer({
 
   // 连续鉴权失败锁定：按客户端 IP 计数，5 次失败锁 15 分钟，成功后清零。
   const failedLogins = new Map();
+  let lastUsedPersistAt = 0;
 
   function clientKey(req) {
     const remote = req.socket.remoteAddress || "unknown";
@@ -186,10 +224,17 @@ export function createUpdateServer({
     if (panelKey) {
       failedLogins.delete(key);
       panelKey.lastUsedAt = new Date().toISOString();
-      try {
-        await writeKeys();
-      } catch (error) {
-        console.error("[server] 密钥使用记录写入失败", error);
+      // lastUsedAt 节流落盘：命中就全量写盘只是为改一个展示字段，轮询的管理台
+      // 每 5 秒打一次 overview 会让磁盘一直刷——30 秒内合并为一次（内存为准，
+      // 崩溃最多丢最近半分钟的使用时间戳，该字段仅展示用）；密钥增删时
+      // writeKeys 会顺带把内存里的最新值带落盘。
+      if (now - lastUsedPersistAt > 30_000) {
+        lastUsedPersistAt = now;
+        try {
+          await writeKeys();
+        } catch (error) {
+          console.error("[server] 密钥使用记录写入失败", error);
+        }
       }
       return true;
     }
@@ -239,13 +284,13 @@ export function createUpdateServer({
   async function listVersions() {
     const byVersion = new Map((await readVersions()).map((v) => [v.version, { ...v }]));
     try {
-      for (const name of readdirSync(dataDir)) {
+      for (const name of await readdir(dataDir)) {
         const match = ZIP_RE.exec(name);
         if (!match) continue;
         const version = match[1];
         let info;
         try {
-          info = statSync(path.join(dataDir, name));
+          info = await stat(path.join(dataDir, name));
         } catch {
           continue;
         }
@@ -267,7 +312,7 @@ export function createUpdateServer({
     const meta = await readMeta();
     return [...byVersion.values()]
       .map((v) => ({ ...v, sizeBytes: v.sizeBytes ?? 0, isCurrent: v.version === meta?.version }))
-      .sort((a, b) => semverRank(b.version) - semverRank(a.version));
+      .sort(compareVersionDesc);
   }
 
   async function rollbackTo(res, version, notes) {
@@ -418,9 +463,23 @@ export function createUpdateServer({
         }
         if (notes.length > 2000)
           return sendJson(res, 400, { error: "更新说明不能超过 2000 个字符" });
-        const body = await readBody(req, MAX_PACKAGE_BODY);
-        if (!body.length) return sendJson(res, 400, { error: "zip 包体为空" });
-        await writeAtomic(zipPath(version), body);
+        // 包体直落临时文件再原子替换（不进内存），超限在流上即断开
+        const temp = `${zipPath(version)}.${process.pid}.${Date.now()}.tmp`;
+        let bytes;
+        try {
+          bytes = await streamBodyToFile(req, temp, MAX_PACKAGE_BODY);
+        } catch (error) {
+          await unlink(temp).catch(() => {});
+          const message = error instanceof Error ? error.message : "上传中断";
+          return sendJson(res, 400, {
+            error: message === "请求体过大" ? "请求体过大" : "上传中断",
+          });
+        }
+        if (!bytes) {
+          await unlink(temp).catch(() => {});
+          return sendJson(res, 400, { error: "zip 包体为空" });
+        }
+        await rename(temp, zipPath(version));
         const meta = { version, notes, publishedAt: new Date().toISOString() };
         await writeAtomic(metaFile, JSON.stringify(meta, null, 2));
         await upsertVersion({ version, notes, publishedAt: meta.publishedAt });
