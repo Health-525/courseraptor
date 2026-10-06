@@ -19,3 +19,17 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+附加限制条款（Additional Restrictions）
+
+在 MIT 许可证授予的权利之上，版权持有人附加以下限制。凡下列条款未许可的用途，均不属于本许可证授予的范围：
+
+1. 学术成果用途：禁止将本软件或其任何部分（包括但不限于源代码、文档、架构设计、界面及衍生作品，无论是否经过修改）作为毕业论文、毕业设计、课程作业、实验报告，或其他以获取学分、学位、证书、荣誉为目的的学术成果，或上述成果的核心组成部分。以注明出处的方式引用、分析本项目的除外。
+
+2. 竞赛用途：禁止将本软件或其任何部分（无论是否经过修改）用于参加任何竞赛、比赛、黑客松、创新创业大赛等赛事活动，包括作为参赛作品或其核心组成部分。
+
+3. 商业用途：任何商业用途（包括但不限于销售本软件或其衍生作品、提供付费服务、集成进商业产品）须事先取得版权持有人书面授权。
+
+MIT 许可证正文与本附加限制条款不一致的，以本附加限制条款为准。商业授权及其他许可事宜，请通过本仓库的 GitHub issue 与版权持有人联系。
