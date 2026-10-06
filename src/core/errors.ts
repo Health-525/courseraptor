@@ -60,7 +60,7 @@ export function isCredentialError(e: unknown): boolean {
 
 /**
  * 选课动作结果协议里的会话失效哨兵值。
- * submitCourse 一族返回 { ok, message } 形状（不抛异常），message 取本常量；
+ * quitCourse 一族返回 { ok, message } 形状（不抛异常），message 取本常量；
  * 与 code "SESSION_EXPIRED" 同名同值，两套协议一个语义。
  */
 export const SESSION_EXPIRED_MESSAGE = "SESSION_EXPIRED";

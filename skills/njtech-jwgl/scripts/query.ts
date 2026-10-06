@@ -3,7 +3,7 @@
  *
  * 设计原则：
  * - 只读封装 src/jwgl 的已验证纯函数，不在本文件复制教务协议逻辑。
- * - 不提供任何真实写操作（抢课/退课）——那些只走交互式 agent 且需用户二次确认。
+ * - 不提供任何真实写操作（选课/退课）——那些只走交互式 agent 且需用户二次确认。
  * - 「拿不到」≠「没有」：传输失败直接以非零退出码报错，绝不静默降级成空数据。
  * - 输出 Markdown，方便直接贴给同学或喂给 agent。
  *
@@ -11,7 +11,7 @@
  *   npx tsx skills/njtech-jwgl/scripts/query.ts <命令> [参数]
  */
 
-import { getCookie, getXkSession, sleep } from "../../../src/adapters/njtech/session";
+import { getCookie, getXkSession } from "../../../src/adapters/njtech/session";
 import {
   fetchScheduleSmart,
   fetchExamsSmart,
@@ -274,31 +274,6 @@ async function cmdSearchClasses(courseName: string) {
   console.log(`# 教学班明细：${courseName}\n\n${blocks.join("\n\n")}`);
 }
 
-async function cmdWatch(courseName: string, durationSec = 60) {
-  if (!courseName) die("用法：watch <课程名关键词> [秒]");
-  const session = await getXkSession();
-  const deadline = Date.now() + durationSec * 1000;
-  const events: string[] = [];
-  let rounds = 0;
-  console.log(`# 余量监控：${courseName}（${durationSec}s，只观察不提交）\n`);
-  while (Date.now() < deadline) {
-    rounds++;
-    const courses = await searchCourses(session, courseName);
-    const matched = courses.filter((c) => c.courseName.includes(courseName) || courseName.includes(c.courseName));
-    const avail = matched.filter((c) => (c.remain ?? 0) > 0 || c.unlimited);
-    if (avail.length > 0) {
-      const msg = `第 ${rounds} 轮发现余量：${avail.map((c) => `${c.courseName}（${c.teacher}）余 ${c.remain}`).join("；")}`;
-      events.push(`- ${msg}`);
-      console.log(msg);
-    }
-    await sleep(3000);
-  }
-  console.log(
-    `\n监控结束：${rounds} 轮，共 ${events.length} 次余量事件。` +
-      (events.length ? "\n\n" + events.join("\n") : "\n目标课程始终无余量。"),
-  );
-}
-
 // ── 入口 ───────────────────────────────────────────────────
 
 async function main() {
@@ -326,8 +301,6 @@ async function main() {
       return await cmdSearchCourses(args[0]);
     case "search-classes":
       return await cmdSearchClasses(args[0]);
-    case "watch":
-      return await cmdWatch(args[0], Number.parseInt(args[1] ?? "60", 10));
     case "help":
     case undefined:
       console.log(
@@ -335,7 +308,7 @@ async function main() {
           "用法：npx tsx skills/njtech-jwgl/scripts/query.ts <命令> [参数]\n\n" +
           "命令：schedule [学期] | grades | exams [学期] | lab-grades [学期] | news [板块] [条数]\n" +
           "      student-info | enrolled-courses | retake-courses [关键词] | selection-status\n" +
-          "      search-courses <关键词> | search-classes <课程名> | watch <课程名> [秒]\n\n" +
+          "      search-courses <关键词> | search-classes <课程名>\n\n" +
           "示例：query.ts schedule\n       query.ts grades\n       query.ts news 公告通知 5\n" +
           "注意：真实写操作不在本脚本内，仅走交互式 raptor agent 且需用户确认。",
       );

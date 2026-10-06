@@ -78,7 +78,7 @@ test("工具描述：场景→篇目对照拼进 description，指导按需选�
 });
 
 test("提示词：学习教练触发规则进 basePrompt，且强调方法论走工具按需取", () => {
-  const s = basePrompt(false);
+  const s = basePrompt();
   assert.match(s, /学习教练/, "应有学习教练段");
   assert.match(s, /触发场景/, "应写明什么对话切换到此模式");
   assert.match(s, /直觉先于形式/, "应带教学核心原则");

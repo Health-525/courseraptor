@@ -93,7 +93,7 @@ export async function createRaptorAgent(channel?: "qq") {
     loadLastSessionTranscript(),
   ]);
   const instructions = [
-    basePrompt(config.enableGrab),
+    basePrompt(),
     memorySection,
     lastSession,
     channel === "qq" ? QQ_CHANNEL_PROMPT : undefined,

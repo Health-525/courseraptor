@@ -122,13 +122,3 @@ async function openXkSessionWithRetry(): Promise<XkSession> {
     label: "选课会话建立失败",
   });
 }
-
-export function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-/** 轮询间隔 + 随机抖动（±20%），避免请求间隔被精确识别 */
-export function pollDelay(baseMs: number): Promise<void> {
-  const jitter = baseMs * (0.8 + Math.random() * 0.4);
-  return sleep(Math.round(jitter));
-}

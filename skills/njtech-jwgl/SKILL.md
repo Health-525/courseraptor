@@ -58,7 +58,6 @@ retake-courses [关键词] # 可重修课程（可关键词过滤）
 selection-status       # 选课模块是否开放、xkkzId、各轮次状态
 search-courses <关键词> # 搜可选课程及余量
 search-classes <课程名> # 某门课下所有教学班明细（含各班余量）
-watch <课程名> [秒]     # 限时监控余量变化（只观察不提交！）
 ```
 
 示例：
@@ -95,7 +94,6 @@ agent 已内置 36 个工具，其中 NJTech 教务相关工具的名称与语�
 | 选课状态 | `selection-status` | `xk.inspectXk` |
 | 搜课/余量 | `search-courses` | `xk.searchCourses` |
 | 教学班明细 | `search-classes` | `xk.searchCourses` + `xk.fetchJxbList` |
-| 余量监控 | `watch` | `xk.searchCourses` 轮询 |
 
 协议细节、限流、模块覆盖与域名清单见 `references/protocol.md`；完整工具/能力清单见
 `references/capabilities.md`。
@@ -106,7 +104,6 @@ agent 已内置 36 个工具，其中 NJTech 教务相关工具的名称与语�
   严禁调高。不要并发或高频刷教务系统。
 - **真实写操作不进本脚本**：任何会真实提交选课/退课请求的工具都不由本脚本提供——
   只应通过交互式 agent，且必须在用户明确点名目标、二次确认后才可调用，绝不批量操作。
-- **`watch` 只观察不提交**：本技能的 `watch` 命令只监控余量变化，绝不提交任何请求。
 - **隐私**：学籍敏感字段（证件号/银行卡/考生号）返回时自动打码；不要向用户回显完整明文。
   本地 `credentials.enc` / `session.json` / `memory.json` 等切勿分享。
 - **「拿不到」≠「没有」**：网络错误/会话失效必须如实上报，绝不能当作「课表为空 / 无成绩」。

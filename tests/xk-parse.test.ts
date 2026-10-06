@@ -12,7 +12,6 @@ import { test } from "node:test";
 import {
   buildCourseListForm,
   isSessionExpired,
-  matchTargets,
   parseCourseList,
   parseCoursePage,
   parseCourseRowsFromHtml,
@@ -202,7 +201,7 @@ test("探针回归: 表单携带 Display 隐藏字段与学生维度字段", () 
   assert.equal(form.jspage, "100");
 });
 
-// ── parseXkStatus / isSessionExpired / matchTargets ──────────
+// ── parseXkStatus / isSessionExpired ─────────────────────────
 
 test("parseXkStatus: iskxk=1 且下发 firstXkkzId", () => {
   const html = `<input id="iskxk" type="hidden" value="1"/>
@@ -221,12 +220,4 @@ test("isSessionExpired: 登录页特征识别", () => {
   assert.equal(isSessionExpired("请登录 用户登录"), true);
   assert.equal(isSessionExpired('{"flag":1,"tmpList":[]}'), false);
   assert.equal(isSessionExpired(""), false);
-});
-
-test("matchTargets: 课程名包含即命中，教师名可选过滤", () => {
-  const c = { courseName: "创造性思维与创新方法(Triz版)", teacher: "李四" } as never;
-  assert.equal(matchTargets(c, [{ courseName: "创新方法" }]), true);
-  assert.equal(matchTargets(c, [{ courseName: "创新方法", teacher: "张三" }]), false);
-  assert.equal(matchTargets(c, [{ courseName: "不存在" }]), false);
-  assert.equal(matchTargets(c, [{ courseName: "" }]), false);
 });

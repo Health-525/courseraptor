@@ -5,7 +5,7 @@
  * 的全部能力组装成 core/school.ts 定义的 SchoolAdapter：
  * - 抓取与登录实现散在同级各模块（auth/academics/grades/portal/news/xk…）
  * - 学校规则（节次作息、绩点算法、校历种子、学期编码、通识六类）随模块走
- * - 工具集在 ./tools（抢课开关在装配时过滤）
+ * - 工具集在 ./tools
  * - 系统提示词段在 ./prompt
  */
 

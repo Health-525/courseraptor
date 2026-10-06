@@ -20,5 +20,5 @@ const hebauToolsAll = {
   ...authTools,
 };
 
-/** 河北农大没有真实写操作（无抢课/退课），不需要 grab 过滤，直接全量提供 */
+/** 河北农大没有真实写操作（无选课/退课），直接全量提供 */
 export const hebauTools = hebauToolsAll;

@@ -33,7 +33,7 @@ export type SchoolCapability =
   | "enrolledCourses" // 已选课程教学班
   | "retakeCourses" // 可重修
   | "labGrades" // 实验成绩
-  | "courseSelection" // 选课 / 抢课
+  | "courseSelection" // 选课查询 / 退课
   | "notices" // 教务通知
   | "calendarExport"; // 日历导出
 
@@ -127,15 +127,11 @@ export interface SchoolSchedule {
   fetchExamsSmart(cookie: string, xnm?: number, xqm?: number): Promise<FetchResult<ExamResult>>;
 }
 
-export interface SchoolPromptOptions {
-  enableGrab: boolean;
-}
-
 /** 学校贡献的系统提示词段：插在通用能力清单处与背景知识处 */
 export interface SchoolPromptSections {
   /** 教务工具说明（选课 / 成绩 / 通知等能力段） */
   tools: string;
-  /** 学校背景知识 + 学校特有的行为规则（如抢课注意） */
+  /** 学校背景知识 + 学校特有的行为规则（如退课护栏） */
   background: string;
 }
 
@@ -148,7 +144,7 @@ export interface SchoolAdapter {
   readonly notices?: SchoolNotices;
   /** 该校贡献给 agent 的工具（与 capabilities 对应；由 agent 与 core 工具合并） */
   readonly tools: ToolSet;
-  promptSections(options: SchoolPromptOptions): SchoolPromptSections;
+  promptSections(): SchoolPromptSections;
 }
 
 let registered: SchoolAdapter | null = null;

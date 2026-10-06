@@ -13,9 +13,9 @@
 import { loadHolidayStore } from "./calendar/holidays";
 import { school } from "./school";
 
-export function basePrompt(enableGrab: boolean): string {
+export function basePrompt(): string {
   const info = school().info;
-  const schoolPrompt = school().promptSections({ enableGrab });
+  const schoolPrompt = school().promptSections();
 
   return `你是「迅猛龙」（CourseRaptor），${info.name}学生的私人教务 agent。
 

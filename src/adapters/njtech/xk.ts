@@ -25,14 +25,6 @@ const XK_DISPLAY = "/xsxk/zzxkyzb_cxZzxkYzbDisplay.html";
 const XK_COURSE_LIST = "/xsxk/zzxkyzb_cxZzxkYzbPartDisplay.html";
 /** 某门课程的教学班列表（含余量，jxb 展开时调用） */
 const XK_JXB_LIST = "/xsxk/zzxkyzbjk_cxJxbWithKchZzxkYzb.html";
-/** 提交选课（zzxkyzb 主 action；单班提交由前端组件调用，开放后用 inspect 校准） */
-const XK_ADD_COURSE = "/xsxk/zzxkyzb_xkZzxkyzbQuickly.html";
-/**
- * 备用提交选课（njtech_grabber 2021-2022 实测确认的旧版 action）。
- * 参数形状与主 action 不同：jxb_ids/kch_id/qz/njdm_id/zyh_id，不需要加密串。
- * 主 action 响应不可解析时兜底一次。
- */
-const XK_ADD_COURSE_FALLBACK = "/xsxk/zzxkyzbjk_xkBcZyZzxkYzb.html";
 /** 本轮已选课程列表（退课数据源；njtech_grabber 确认参数仅 xkxnm/xkxqm） */
 const XK_CHOOSED_LIST = "/xsxk/zzxkyzb_cxZzxkYzbChoosedDisplay.html";
 /** 退课（单参数 jxb_ids；成功响应为裸 "1"，njtech_grabber 实测） */
@@ -69,7 +61,7 @@ export interface XkCourse {
  * 轮次凭证三元组。
  *
  * 查询和提交必须同源——拿主修轮的凭证去问通识选修轮的课，服务端要么返回空
- * 要么报错。这三个字段对 fetchJxbList / submitCourse 其实是**必需**的，
+ * 要么报错。这三个字段对 fetchJxbList 其实是**必需**的，
  * 所以单独抽成必填类型：不让 optional 帮着把 bug 藏过去（搜索结果回填之前的
  * XkCourse 才允许缺省，回填之后必须走 roundRefOf 变成 XkRoundRef）。
  */
@@ -138,13 +130,6 @@ export interface XkSession {
   /** 入口页 csrftoken（正方 V9 部分接口需要） */
   csrftoken: string;
   username: string;
-}
-
-export interface XkTarget {
-  /** 课程名关键词（模糊匹配，包含即命中） */
-  courseName: string;
-  /** 教师名（可选，模糊匹配） */
-  teacher?: string;
 }
 
 export interface XkSubmitResult {
@@ -272,18 +257,8 @@ export function isSessionExpired(body: string): boolean {
 }
 
 /**
- * 目标课程匹配：课程名包含关键词，且（若指定）教师名包含关键词
+ * 本轮已选课程（ChoosedDisplay 返回行，退课流程的数据源）
  */
-export function matchTargets(course: XkCourse, targets: XkTarget[]): boolean {
-  return targets.some((t) => {
-    if (!t.courseName) return false;
-    if (!course.courseName.includes(t.courseName)) return false;
-    if (t.teacher && !course.teacher.includes(t.teacher)) return false;
-    return true;
-  });
-}
-
-/** 本轮已选课程（ChoosedDisplay 返回行，退课流程的数据源） */
 export interface ChoosedCourse {
   /** 教学班名称（含课程名，ChoosedDisplay 的主名称字段） */
   courseName: string;
@@ -320,11 +295,10 @@ export function parseChoosedList(json: unknown): ChoosedCourse[] {
 }
 
 /**
- * 正方提交类接口（选课/退课）的响应判定，已知三种形状：
+ * 正方提交类接口（退课）的响应判定，已知三种形状：
  * - 裸 "1" / 1：退课成功（njtech_grabber 实测）
- * - {flag:"1", msg}：选课 Quickly 主 action
+ * - {flag:"1", msg}：对象形状
  * - {success:true, message}：部分学校变体
- * 返回 null 表示响应不可解析——调用方（submitCourse）据此决定是否走备用接口。
  */
 export function parseActionResponse(body: string): { ok: boolean; message: string } | null {
   let data: unknown;
@@ -715,100 +689,6 @@ export async function quitCourse(session: XkSession, jxbIds: string): Promise<Xk
     ok: false,
     message: `退课响应解析失败（HTTP ${resp.status}），请用 inspect 校准接口`,
   };
-}
-
-/**
- * 提交选课（选一门教学班）
- * 官方 JS 确认 chooseCourseZzxk(jxb_id, do_jxb_id, kch_id, jxbzls)，
- * 单班提交的 action 未在本 JS 中（由通用组件发起）；
- * 先按 zzxkyzb 主 action 提交，开放后用 inspect 校准实际 URL。
- */
-export async function submitCourse(
-  session: XkSession,
-  course: XkCourse,
-  round?: XkRoundRef,
-): Promise<XkSubmitResult> {
-  // 跨轮次提交会失败，所以默认取课程自带的凭证（与查询同源）
-  const ref = round ?? roundRefOf(course, session);
-  if (!ref.xkkzXh) {
-    return { ok: false, message: "缺少加密串（xkkz_xh），无法提交——请先重新建立选课会话" };
-  }
-
-  const form: Record<string, string> = {
-    csrftoken: session.csrftoken,
-    xkkz_id: ref.xkkzId,
-    xkkz_xh: ref.xkkzXh,
-    kklxdm: ref.kklxdm,
-    jxb_id: course.jxbId,
-    kch_id: course.courseCode,
-    do_jxb_id: course.jxbId,
-    jxbzls: "",
-    _: String(Date.now()),
-  };
-
-  const resp = await session.client.req(`${XK_ADD_COURSE}?gnmkdm=N253512`, {
-    method: "POST",
-    body: Object.entries(form)
-      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-      .join("&"),
-  });
-
-  if (isSessionExpired(resp.body)) {
-    return { ok: false, message: SESSION_EXPIRED_MESSAGE };
-  }
-
-  const parsed = parseActionResponse(resp.body);
-  if (parsed) return parsed;
-
-  // 主 action 响应不可解析（404/HTML/空）时，用 njtech_grabber 实测过的
-  // 旧版 action 兜底一次。业务性拒绝（容量已满/时间冲突等）不会走到这里——
-  // 那是服务端的真实答复，换接口重试也不会变，只会白打一倍请求。
-  const fallback = await submitViaLegacyAction(session, course, ref);
-  if (fallback) {
-    // 标记经备用接口成功：抢课事件流里能看出线上实际走的是哪个 action
-    return fallback.ok ? { ...fallback, message: `${fallback.message}（via 备用接口）` } : fallback;
-  }
-
-  return {
-    ok: false,
-    message: `响应解析失败（HTTP ${resp.status}），主/备提交接口均异常，请用 inspect 校准`,
-  };
-}
-
-/**
- * 备用提交 action（zzxkyzbjk_xkBcZy，njtech_grabber 实测确认）：
- * 参数 jxb_ids/kch_id/qz/njdm_id/zyh_id，不需要加密串。
- * njdm/zyh 优先取课程所在轮次（与服务端下发的凭证同源），
- * 找不到时退回入口页学生维度字段。返回 null 表示同样不可解析。
- */
-async function submitViaLegacyAction(
-  session: XkSession,
-  course: XkCourse,
-  ref: XkRoundRef,
-): Promise<XkSubmitResult | null> {
-  const round = session.rounds.find((r) => r.xkkzId === ref.xkkzId);
-  const form: Record<string, string> = {
-    csrftoken: session.csrftoken,
-    jxb_ids: course.jxbId,
-    kch_id: course.courseCode,
-    qz: "0",
-    njdm_id: round?.njdm || session.studentParams.njdm_id_1 || "",
-    zyh_id: round?.zyh || session.studentParams.zyh_id_1 || "",
-    _: String(Date.now()),
-  };
-
-  try {
-    const resp = await session.client.req(`${XK_ADD_COURSE_FALLBACK}?gnmkdm=N253512`, {
-      method: "POST",
-      body: Object.entries(form)
-        .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-        .join("&"),
-    });
-    if (isSessionExpired(resp.body)) return { ok: false, message: SESSION_EXPIRED_MESSAGE };
-    return parseActionResponse(resp.body);
-  } catch {
-    return null;
-  }
 }
 
 export interface XkProbeResult {

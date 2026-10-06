@@ -32,7 +32,7 @@ function normalize(s: string): string {
  *
  * 为什么不用更常见的 bigram Jaccard：Jaccard 对长度差异惩罚过重。以 memory.json
  * 里的真实数据实测——两条真重复条目（同一条偏好换个措辞说了两遍）Jaccard 仅
- * 0.41，而两条必须区分的条目（网课备选 vs 抢课计划）也有 0.23，分离度很差；
+ * 0.41，而两条必须区分的条目（网课备选 vs 选课计划）也有 0.23，分离度很差；
  * 换 LCS 归一化后真重复 0.81、需区分的 0.54，中间是明显空档。
  *
  * 误合并会丢信息，漏合并只是上下文略胖，两者代价不对称，故取保守阈值。
@@ -117,7 +117,7 @@ export async function addMemory(
   }
 
   // 近似重复：同一件事换个说法再说一遍（memory.json 里曾因此堆了两条几乎
-  // 一样的「不要提及抢课」）。以较新的表述为准覆盖，避免条目无限膨胀。
+  // 一样的同主题偏好）。以较新的表述为准覆盖，避免条目无限膨胀。
   const near = entries.find(
     (e) =>
       e.category === category && isActive(e) && similarity(e.content, content) >= DEDUPE_THRESHOLD,
@@ -164,7 +164,7 @@ export async function deleteMemory(id: string): Promise<boolean> {
 
 /**
  * 归档：条目留在文件里可追溯，但不再注入提示词。
- * 用于「事情办完了但还想留档」的场景（如已执行完的抢课计划）。
+ * 用于「事情办完了但还想留档」的场景（如已执行完的计划）。
  */
 export async function archiveMemory(id: string): Promise<MemoryEntry | null> {
   const entries = await loadMemory();
