@@ -177,40 +177,8 @@ export function setupLandingMotion(): () => void {
       },
     )
 
-    // 首屏景深：固定舞台 + 滑动驱动（画面即界面）。只动图形层——
-    // 产品实拍（含贴在界面上的功能便签）整体轻后退让位、标题轻推放大；
-    // 功能便签是信息不是装饰，随实拍整体移动、永不单独消失，pin 结束
-    // 后随 hero 整屏被推走，回滚倒放语义保留。
-    // fromTo 锁定起点（首屏 CSS 入场动画结束后 scrub 完全接管 transform）。
-    mm.add('(min-width: 901px)', () => {
-      const tl = gsap.timeline({
-        defaults: { ease: 'none' },
-        scrollTrigger: {
-          trigger: '.hero',
-          start: 'top top',
-          end: '+=110%',
-          scrub: true,
-          pin: true,
-          anticipatePin: 1,
-        },
-      })
-      tl.fromTo('.hero h1', { scale: 1, y: 0 }, { scale: 1.08, y: -16, duration: 1.1 }, 0)
-      tl.fromTo(
-        '.hero-shot',
-        { scale: 1, y: 0, transformOrigin: '50% 20%' },
-        { scale: 0.9, y: 96, duration: 1.1 },
-        0,
-      )
-    })
-
-    // 窄屏不固定舞台，保留轻视差（缩放幅度与方向不变，去掉 pin）
-    mm.add('(max-width: 900px)', () => {
-      const tl = gsap.timeline({
-        defaults: { ease: 'none' },
-        scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true },
-      })
-      tl.fromTo('.hero-shot', { y: 0, scale: 1 }, { y: -24, scale: 0.95 }, 0)
-    })
+    // 首屏固定：不安装任何滚动动画——hero 是静态区块，随页面自然滚走。
+    // 用户明确要求：下滚时首屏不缩放、不位移、不钉住。
   })
 
   return () => mm.revert()
