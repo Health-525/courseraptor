@@ -1647,7 +1647,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
           json(
             res,
             {
-              error: "没有可导入的课程" + (rejected.length ? `（${rejected.length} 行无效）` : ""),
+              error: `没有可导入的课程${rejected.length ? `（${rejected.length} 行无效）` : ""}`,
             },
             400,
           );

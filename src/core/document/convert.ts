@@ -19,7 +19,7 @@ import { type GeneratedFile, generateAndSave } from "./save";
 import type { DocFormat, DocumentSpec, SheetSpec, TableSpec } from "./types";
 
 const require = createRequire(import.meta.url);
-const requireAny = require as unknown as (id: string) => any;
+const requireAny = require as unknown as (id: string) => unknown;
 
 export interface ConvertInput {
   /** 目标格式 */
@@ -105,14 +105,12 @@ async function extractText(buf: Buffer, filename: string): Promise<string | null
   const ext = filename.toLowerCase().match(/\.([a-z0-9]{1,8})$/)?.[1] ?? "";
   try {
     if (ext === "pdf") {
-      const { PDFParse } = requireAny("pdf-parse");
-      const parser = new PDFParse({ data: new Uint8Array(buf) });
-      const r = await parser.getText();
-      await parser.destroy().catch(() => {});
-      return typeof r === "string" ? r : ((r as any).text ?? null);
+      // 复用附件流水线的类型化 pdf 抽取（此前这里手抄了一份弱类型实现）
+      const { pdfTextFromBuffer } = await import("../attachments");
+      return await pdfTextFromBuffer(buf);
     }
     if (ext === "docx") {
-      const mammoth = requireAny("mammoth");
+      const mammoth = requireAny("mammoth") as typeof import("mammoth");
       const r = await mammoth.extractRawText({ buffer: buf });
       return r.value;
     }

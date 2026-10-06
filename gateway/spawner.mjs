@@ -197,7 +197,7 @@ export function createSpawner({
     if (getSiteDefault) {
       try {
         const site = await getSiteDefault();
-        if (site && site.provider) return String(site.provider);
+        if (site?.provider) return String(site.provider);
       } catch {
         // 查询失败按未配置处理
       }
@@ -210,7 +210,7 @@ export function createSpawner({
     if (!getSiteDefault) return "";
     try {
       const site = await getSiteDefault();
-      return site && site.model ? String(site.model) : "";
+      return site?.model ? String(site.model) : "";
     } catch {
       return "";
     }

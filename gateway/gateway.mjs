@@ -113,7 +113,7 @@ server.listen(port, host, () => {
   );
   console.log(
     env.GATEWAY_ADMIN_PASSWORD
-      ? "   网页管理台：http://" + host + ":" + port + "/admin"
+      ? `   网页管理台：http://${host}:${port}/admin`
       : "   网页管理台未启用（设置 GATEWAY_ADMIN_PASSWORD 开启）；命令行：node gateway/admin/cli.mjs invite",
   );
 });
