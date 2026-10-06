@@ -17,7 +17,7 @@ test("注册表：建号、校验密码、拒绝重名与非法输入", async ()
   assert.match(user.id, /^u_[0-9a-f]{12}$/);
 
   const ok = await registry.authenticate("student01", "password123");
-  assert.ok(ok && ok.user && !ok.disabled);
+  assert.ok(ok?.user && !ok.disabled);
 
   const bad = await registry.authenticate("student01", "wrong-password");
   assert.equal(bad, null);
@@ -44,11 +44,11 @@ test("注册表：停用后立即拒绝认证，启用后恢复", async () => {
   const user = await registry.createUser({ username: "student01", password: "password123" });
   await registry.setDisabled(user.id, true);
   const blocked = await registry.authenticate("student01", "password123");
-  assert.ok(blocked && blocked.disabled && !blocked.user);
+  assert.ok(blocked?.disabled && !blocked.user);
 
   await registry.setDisabled(user.id, false);
   const restored = await registry.authenticate("student01", "password123");
-  assert.ok(restored && restored.user);
+  assert.ok(restored?.user);
 });
 
 test("注册表：重置密码后旧密码失效", async () => {
@@ -57,7 +57,7 @@ test("注册表：重置密码后旧密码失效", async () => {
   await registry.setPassword(user.id, "newpassword456");
   assert.equal(await registry.authenticate("student01", "password123"), null);
   const ok = await registry.authenticate("student01", "newpassword456");
-  assert.ok(ok && ok.user);
+  assert.ok(ok?.user);
 });
 
 test("邀请码：一次性消费，无效/过期/已用都拒绝", async () => {
@@ -261,6 +261,6 @@ test("快照语义：findUserById/ByName 返回副本，外部改动不回渗写
   const byName = await registry.findUserByName("student01");
   assert.ok(byName);
   (byName as { username?: string }).username = "hijacked-too";
-  assert.equal((await registry.findUserByName("hijacked-too")), null);
+  assert.equal(await registry.findUserByName("hijacked-too"), null);
   assert.ok(await registry.findUserByName("student01"));
 });
