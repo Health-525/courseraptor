@@ -29,7 +29,8 @@ import fs from "node:fs";
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { brotliCompressSync, gzipSync } from "node:zlib";
+import { promisify } from "node:util";
+import { brotliCompress, gzip } from "node:zlib";
 import QRCode from "qrcode";
 import {
   generateRecoveryCodes,
@@ -342,8 +343,14 @@ export function createAdminUi({
     if (encoding) {
       let cached = compressedCache.get(rel);
       if (!cached) {
-        cached = { br: brotliCompressSync(body), gzip: gzipSync(body) };
+        cached = {};
         compressedCache.set(rel, cached);
+      }
+      // 按需只压客户端声明的那一种格式（此前双格式同步预压缩：553KB 主包
+      // 首访要同步压两遍，阻塞事件循环）；结果缓存，压缩是一次性成本
+      if (cached[encoding] === undefined) {
+        const compress = encoding === "br" ? brotliCompress : gzip;
+        cached[encoding] = await promisify(compress)(body);
       }
       payload = cached[encoding];
     }
@@ -380,12 +387,6 @@ export function createAdminUi({
       return true;
     }
 
-    // 两步验证状态每次请求现读：启用/关闭后无需重启即生效；
-    // sessionEpoch 参与会话签名，状态一变所有旧管理会话立即失效
-    const totpDoc = await registry.getAdminTotp();
-    const epoch = totpDoc?.sessionEpoch ?? 0;
-    const mfaOn = Boolean(totpDoc);
-
     // ── 前端 SPA：静态产物 + 前端路由回落 ─────────────────────
     if (req.method === "GET" && pathname === "/admin") {
       await serveIndex(req, res);
@@ -407,6 +408,13 @@ export function createAdminUi({
       }
       // /admin/api/* 的 GET 落到下面的 API 分支
     }
+
+    // 两步验证状态每次请求现读：启用/关闭后无需重启即生效；
+    // sessionEpoch 参与会话签名，状态一变所有旧管理会话立即失效。
+    // 放在静态分支之后——首屏十几个静态资源请求不再逐个读盘 admin-totp.json
+    const totpDoc = await registry.getAdminTotp();
+    const epoch = totpDoc?.sessionEpoch ?? 0;
+    const mfaOn = Boolean(totpDoc);
 
     // ── 会话探测：登录页据此决定是否显示动态码输入框 ──────────
     if (req.method === "GET" && pathname === "/admin/api/session") {

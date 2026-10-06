@@ -227,3 +227,40 @@ test("effectiveProviderIdFor：同学自选 > 站点默认 > deepseek（与 spaw
     "查询失败按未配置，绝不拦请求",
   );
 });
+
+test("users.json 写穿缓存：外部进程改盘后一次读取即感知，不吐旧数据", async () => {
+  const { registry, stateDir } = makeRegistry();
+  const user = await registry.createUser({ username: "student01", password: "password123" });
+  // 预热缓存（此后常规读全部命中内存）
+  assert.equal((await registry.findUserById(user.id))?.username, "student01");
+
+  // 模拟管理台 CLI 等外部进程直接改盘：绕过 registry 实例写 users.json
+  await new Promise((resolve) => setTimeout(resolve, 20)); // 跨过文件系统 mtime 精度窗口
+  const usersFile = path.join(stateDir, "users.json");
+  const doc = JSON.parse(fs.readFileSync(usersFile, "utf8"));
+  doc.users[0].username = "renamed-by-cli";
+  fs.writeFileSync(usersFile, JSON.stringify(doc, null, 2));
+
+  // 缓存按 mtime 失效：下一次读取看到外部改动，而不是写穿缓存把旧状态回写
+  assert.equal((await registry.findUserById(user.id))?.username, "renamed-by-cli");
+  // 外部改动之后的内部写不丢外部状态：改密码后用户名仍是外部改的那个
+  await registry.setPassword(user.id, "newpassword456");
+  assert.equal((await registry.findUserById(user.id))?.username, "renamed-by-cli");
+  const onDisk = JSON.parse(fs.readFileSync(usersFile, "utf8"));
+  assert.equal(onDisk.users[0].username, "renamed-by-cli");
+});
+
+test("快照语义：findUserById/ByName 返回副本，外部改动不回渗写穿缓存", async () => {
+  const { registry } = makeRegistry();
+  const user = await registry.createUser({ username: "student01", password: "password123" });
+  const snapshot = await registry.findUserById(user.id);
+  assert.ok(snapshot);
+  // 调用方改副本（哪怕是恶意/误操作），不能污染注册表缓存与落盘
+  (snapshot as { username?: string }).username = "hijacked";
+  assert.equal((await registry.findUserById(user.id))?.username, "student01");
+  const byName = await registry.findUserByName("student01");
+  assert.ok(byName);
+  (byName as { username?: string }).username = "hijacked-too";
+  assert.equal((await registry.findUserByName("hijacked-too")), null);
+  assert.ok(await registry.findUserByName("student01"));
+});

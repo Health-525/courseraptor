@@ -10,25 +10,29 @@
  * 与项目其他落盘（credentials.enc / update-data）的约定一致。
  */
 
-import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
 import { mkdirSync } from "node:fs";
-import { readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 
 const USERNAME_RE = /^[A-Za-z0-9_-]{2,32}$/;
 const MIN_PASSWORD_LEN = 8;
+const scryptAsync = promisify(scrypt);
 
-/** scrypt 参数与 src/core/credentials.ts 同族：N=16384、keylen=64 */
-function hashPassword(password, salt = randomBytes(16)) {
-  const hash = scryptSync(password, salt, 64);
+/** scrypt 参数与 src/core/credentials.ts 同族：N=16384、keylen=64。
+ * 异步版：scryptSync(N=16384) 单次约几十毫秒，登录高峰串在事件循环上
+ * 会卡住其他请求，这里交给线程池。 */
+async function hashPassword(password, salt = randomBytes(16)) {
+  const hash = await scryptAsync(password, salt, 64);
   return { salt: salt.toString("base64"), hash: hash.toString("base64") };
 }
 
-function verifyPassword(stored, password) {
+async function verifyPassword(stored, password) {
   try {
     const salt = Buffer.from(stored.salt, "base64");
     const expected = Buffer.from(stored.hash, "base64");
-    const actual = scryptSync(password, salt, expected.length);
+    const actual = await scryptAsync(password, salt, expected.length);
     return timingSafeEqual(expected, actual);
   } catch {
     return false;
@@ -84,8 +88,32 @@ export function createRegistry({ stateDir }) {
     await rename(temp, file);
   }
 
-  const readUsers = () => readJson(usersFile, { users: [] }, { strict: true });
-  const writeUsers = (users) => writeAtomic(usersFile, JSON.stringify({ users }, null, 2));
+  // users.json 写穿缓存：此前每个同学请求（含静态页面）都全量读盘+解析，
+  // /api/chat 一轮叠加限额/记账/Key 判定要读 4-6 次。现在解析结果留在内存，
+  // 每次读只 stat 一次校验 mtime——管理台 CLI 等外部进程改盘后一次 stat 即可
+  // 感知（跨进程写网关缓存回写的窗口，与改造前同样存在，未扩大）。
+  // 写路径写穿：落盘成功才刷新缓存，落盘语义不变。
+  let usersCache = null; // { mtimeMs, store }
+  const readUsers = async () => {
+    let mtimeMs = 0;
+    try {
+      mtimeMs = (await stat(usersFile)).mtimeMs;
+    } catch (e) {
+      if (e?.code !== "ENOENT") throw e;
+    }
+    if (usersCache && usersCache.mtimeMs === mtimeMs) return usersCache.store;
+    const store = await readJson(usersFile, { users: [] }, { strict: true });
+    usersCache = { mtimeMs, store };
+    return store;
+  };
+  const writeUsers = async (users) => {
+    await writeAtomic(usersFile, JSON.stringify({ users }, null, 2));
+    try {
+      usersCache = { mtimeMs: (await stat(usersFile)).mtimeMs, store: { users } };
+    } catch {
+      usersCache = null; // 刚写完的文件 stat 不应失败，防御性失效缓存
+    }
+  };
   const readInvites = () => readJson(invitesFile, { invites: [] }, { strict: true });
   const resetsFile = path.join(stateDir, "reset-requests.json");
   const readResets = () => readJson(resetsFile, { requests: [], codes: [] }, { strict: true });
@@ -109,7 +137,7 @@ export function createRegistry({ stateDir }) {
         const user = {
           id: `u_${randomBytes(6).toString("hex")}`,
           username,
-          pass: hashPassword(password),
+          pass: await hashPassword(password),
           disabled: false,
           createdAt: new Date().toISOString(),
           turns: { date: "", count: 0 },
@@ -121,20 +149,23 @@ export function createRegistry({ stateDir }) {
       });
     },
 
+    /** 只读查询返回快照（浅拷贝）：外部拿到副本，不会被写穿缓存的对象引用牵连 */
     async findUserByName(username) {
       const users = (await readUsers()).users;
-      return users.find((u) => u.username === username) ?? null;
+      const user = users.find((u) => u.username === username) ?? null;
+      return user ? { ...user } : null;
     },
 
     async findUserById(id) {
       const users = (await readUsers()).users;
-      return users.find((u) => u.id === id) ?? null;
+      const user = users.find((u) => u.id === id) ?? null;
+      return user ? { ...user } : null;
     },
 
     async authenticate(username, password) {
       const user = await this.findUserByName(String(username ?? ""));
       // 用户不存在与密码错误返回同一种失败，避免探测已注册用户名
-      if (!user || !verifyPassword(user.pass, String(password ?? ""))) return null;
+      if (!user || !(await verifyPassword(user.pass, String(password ?? "")))) return null;
       if (user.disabled) return { user: null, disabled: true };
       return { user, disabled: false };
     },
@@ -147,7 +178,7 @@ export function createRegistry({ stateDir }) {
         if (typeof newPassword !== "string" || newPassword.length < MIN_PASSWORD_LEN) {
           throw new Error(`密码至少 ${MIN_PASSWORD_LEN} 位`);
         }
-        user.pass = hashPassword(newPassword);
+        user.pass = await hashPassword(newPassword);
         await writeUsers(users);
       });
     },
