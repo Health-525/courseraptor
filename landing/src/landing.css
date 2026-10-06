@@ -47,6 +47,9 @@
 html {
   scroll-behavior: smooth;
   scroll-padding-top: calc(var(--header-h) + 10px);
+  /* 待出场元素的水平位移（两栏对开）不允许撑出横向滚动条 */
+  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 body { margin: 0; background: var(--navy); color: var(--text); font-size: 16px; line-height: 1.7 }
@@ -112,7 +115,6 @@ code { font-family: var(--font-mono) }
 
 .brand { display: flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 800; letter-spacing: -0.7px }
 .brand img { border-radius: 50% }
-.brand-tag { font-family: var(--font-mono); font-size: 11px; letter-spacing: 1.2px; color: var(--teal); margin-left: 6px }
 
 .header nav { display: flex; align-items: center; gap: 28px; font-size: 14px }
 .header nav a { transition: color 0.2s }
@@ -179,7 +181,7 @@ code { font-family: var(--font-mono) }
   letter-spacing: 0.5px;
   color: rgb(189 232 138 / 0.9);
   box-shadow: 0 18px 42px rgba(3, 12, 22, 0.42);
-  animation: rise-in 0.7s var(--ease-out) 0.55s both, cell-pulse 4.5s ease-in-out 1.4s infinite;
+  animation: rise-in 0.7s var(--ease-out) 0.55s backwards, cell-pulse 4.5s ease-in-out 1.4s infinite;
 }
 
 .hero-copy, .hero-art { position: relative; z-index: 1 }
@@ -190,13 +192,14 @@ code { font-family: var(--font-mono) }
   to { opacity: 1; transform: none }
 }
 
-.hero-copy > * { animation: rise-in 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) both }
+/* fill 用 backwards：入场结束后不占住 transform，滚动景深（motion.ts）才能接管元素 */
+.hero-copy > * { animation: rise-in 0.7s cubic-bezier(0.22, 0.61, 0.36, 1) backwards }
 .hero-copy > :nth-child(1) { animation-delay: 0.05s }
 .hero-copy > :nth-child(2) { animation-delay: 0.15s }
 .hero-copy > :nth-child(3) { animation-delay: 0.25s }
 .hero-copy > :nth-child(4) { animation-delay: 0.35s }
 .hero-copy > :nth-child(5) { animation-delay: 0.45s }
-.hero-art { animation: rise-in 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 0.3s both }
+.hero-art { animation: rise-in 0.8s cubic-bezier(0.22, 0.61, 0.36, 1) 0.3s backwards }
 
 .eyebrow {
   font-family: var(--font-mono);
@@ -226,6 +229,7 @@ h1 {
   letter-spacing: -0.5px;
   margin-bottom: 30px;
   font-weight: 850;
+  text-wrap: balance;
 }
 h1 em { font-style: normal; color: var(--mint) }
 
@@ -276,7 +280,7 @@ h1 em { font-style: normal; color: var(--mint) }
 
 /* ---------- 薄荷绿缎带 ---------- */
 
-.ribbon { background: var(--mint); color: var(--navy); padding: 20px 0 }
+.ribbon { background: var(--mint); color: var(--navy); padding: 20px 0; overflow: hidden }
 .ribbon-inner { display: flex; align-items: center; justify-content: space-between; gap: 24px; font-size: 17px; font-weight: 700 }
 .ribbon-inner span:nth-child(even) { font-size: 27px; font-weight: 400 }
 
@@ -292,9 +296,10 @@ section { scroll-margin-top: 0 }
 .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 30px; margin-bottom: 32px }
 .section-head .eyebrow { margin-bottom: 16px }
 
-h2 { font-size: clamp(32px, 3.3vw, 46px); line-height: 1.35; letter-spacing: -0.3px; margin-bottom: 20px }
+h2 { font-size: clamp(32px, 3.3vw, 46px); line-height: 1.35; letter-spacing: -0.3px; margin-bottom: 20px; text-wrap: balance }
 .section-head h2 { margin-bottom: 0 }
-.section-head > p { font-size: 16px; color: var(--muted); margin-bottom: 4px }
+.section-head > p { font-size: 16px; color: var(--muted); margin-bottom: 4px; text-wrap: pretty }
+.hero-desc, .feature p, .capability p, .faq-list p { text-wrap: pretty }
 
 .small { font-size: 13px; line-height: 1.8 }
 .muted { color: var(--muted) }
@@ -634,19 +639,8 @@ details[open] summary::after { transform: rotate(45deg) }
 .footer a:hover { color: var(--mint) }
 
 /* ---------- 动效系统 ---------- */
-
-/* 滚动显现：JS 往 [data-reveal] 上加 .in-view；"children" 表示父块本身不隐藏、子项依次浮现 */
-[data-reveal] { opacity: 0; translate: 0 16px; transition: opacity 0.45s ease, translate 0.45s var(--ease-out) }
-[data-reveal].in-view { opacity: 1; translate: 0 0 }
-
-[data-reveal="children"] { opacity: 1; translate: none }
-[data-reveal="children"] > * { opacity: 0; translate: 0 16px; transition: opacity 0.45s ease, translate 0.45s var(--ease-out) }
-[data-reveal="children"].in-view > * { opacity: 1; translate: 0 0 }
-[data-reveal="children"].in-view > :nth-child(2) { transition-delay: 0.08s }
-[data-reveal="children"].in-view > :nth-child(3) { transition-delay: 0.16s }
-[data-reveal="children"].in-view > :nth-child(4) { transition-delay: 0.24s }
-[data-reveal="children"].in-view > :nth-child(5) { transition-delay: 0.32s }
-[data-reveal="children"].in-view > :nth-child(6) { transition-delay: 0.4s }
+/* 滚动出场由 GSAP（src/motion.ts）接管：滑动触发的区块出场 + 首屏景深。
+   此处只保留 React 切换态与首屏入场的关键帧；区块初始不做 CSS 隐藏，JS 不可用时内容直接可见。 */
 
 @keyframes step-in {
   from { opacity: 0; transform: translateY(7px) scale(0.94) }
@@ -713,7 +707,6 @@ details[open] summary::after { transform: rotate(45deg) }
   .wrap { width: calc(100% - 56px) }
   .hero { gap: 34px; padding-block: 70px }
   .hero-grid, .hero-cell { display: none }
-  .brand-tag { display: none }
   .header nav { gap: 18px }
   .feature-wide { padding-right: 24% }
   .feature-symbol { font-size: 120px; right: 22px }
@@ -812,5 +805,4 @@ details[open] summary::after { transform: rotate(45deg) }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto }
   *, *::before, *::after { transition: none !important; animation: none !important }
-  [data-reveal], [data-reveal="children"] > * { opacity: 1; translate: none }
 }
