@@ -29,11 +29,8 @@ export type SchoolCapability =
   | "schedule" // 课表
   | "exams" // 考试安排
   | "grades" // 成绩 / GPA
-  | "student" // 学籍
   | "enrolledCourses" // 已选课程教学班
-  | "retakeCourses" // 可重修
-  | "labGrades" // 实验成绩
-  | "courseSelection" // 选课查询 / 退课
+  | "courseSelection" // 选课查询
   | "notices" // 教务通知
   | "calendarExport"; // 日历导出
 

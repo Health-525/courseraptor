@@ -62,7 +62,7 @@ test("演示不伪造实时数据、文件和任意 AI 回答", () => {
   for (const message of ["课表", "成绩", "学分", "通知", "考试", "日历", "知识", "随机问题"]) {
     assert.match(demoReply(message), /虚构示例/);
   }
-  assert.match(demoReply("日历"), /没有生成文件或发布链接/);
+  assert.match(demoReply("日历"), /没有生成文件/);
   assert.match(demoReply("知识库"), /自动归类/);
   assert.match(demoReply("今天有什么安排"), /今日简报/, "演示应有日程+待办结合的示例回答");
   assert.match(demoReply("随机问题"), /不调用 AI/);

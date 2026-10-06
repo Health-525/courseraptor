@@ -1,6 +1,6 @@
 /**
  * 成绩与考试工具：get_grades / get_exams
- * （get_lab_grades / get_student_info 等能力河北农大教务没有对应接口，不提供）
+ * （学籍等能力河北农大教务没有对应接口，不提供）
  */
 
 import { tool } from "ai";

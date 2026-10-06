@@ -6,7 +6,7 @@
  * `scripts/xk.ts inspect` dump 原始响应进行校准，只需调整常量。
  */
 
-import { RaptorError, SESSION_EXPIRED_MESSAGE } from "../../core/errors";
+import { RaptorError } from "../../core/errors";
 import type { HttpClient } from "../../core/http";
 import { createClient } from "../../core/http";
 import { BASE, loginJwgl } from "./auth";
@@ -25,10 +25,8 @@ const XK_DISPLAY = "/xsxk/zzxkyzb_cxZzxkYzbDisplay.html";
 const XK_COURSE_LIST = "/xsxk/zzxkyzb_cxZzxkYzbPartDisplay.html";
 /** 某门课程的教学班列表（含余量，jxb 展开时调用） */
 const XK_JXB_LIST = "/xsxk/zzxkyzbjk_cxJxbWithKchZzxkYzb.html";
-/** 本轮已选课程列表（退课数据源；njtech_grabber 确认参数仅 xkxnm/xkxqm） */
+/** 本轮已选课程列表（数据源；njtech_grabber 确认参数仅 xkxnm/xkxqm） */
 const XK_CHOOSED_LIST = "/xsxk/zzxkyzb_cxZzxkYzbChoosedDisplay.html";
-/** 退课（单参数 jxb_ids；成功响应为裸 "1"，njtech_grabber 实测） */
-const XK_QUIT_COURSE = "/xsxk/zzxkyzb_tuikBcZzxkYzb.html";
 
 // ── 类型 ──────────────────────────────────────────────────────
 
@@ -130,11 +128,6 @@ export interface XkSession {
   /** 入口页 csrftoken（正方 V9 部分接口需要） */
   csrftoken: string;
   username: string;
-}
-
-export interface XkSubmitResult {
-  ok: boolean;
-  message: string;
 }
 
 // ── 纯解析函数（可单测）────────────────────────────────────────
@@ -292,32 +285,6 @@ export function parseChoosedList(json: unknown): ChoosedCourse[] {
       teacher: pickString(item, ["jsxx", "jsmc", "jgxm"]),
       raw: item,
     }));
-}
-
-/**
- * 正方提交类接口（退课）的响应判定，已知三种形状：
- * - 裸 "1" / 1：退课成功（njtech_grabber 实测）
- * - {flag:"1", msg}：对象形状
- * - {success:true, message}：部分学校变体
- */
-export function parseActionResponse(body: string): { ok: boolean; message: string } | null {
-  let data: unknown;
-  try {
-    data = JSON.parse(body);
-  } catch {
-    return null;
-  }
-  if (data === "1" || data === 1) return { ok: true, message: "操作成功" };
-  if (data && typeof data === "object") {
-    const obj = data as Record<string, unknown>;
-    const flag = obj.flag ?? obj.success;
-    const msg = (obj.msg as string) || (obj.message as string) || "";
-    if (flag === "1" || flag === 1 || flag === true) {
-      return { ok: true, message: msg || "操作成功" };
-    }
-    return { ok: false, message: msg || "未知响应" };
-  }
-  return { ok: false, message: String(data) };
 }
 
 // ── HTTP 函数 ─────────────────────────────────────────────────
@@ -659,36 +626,6 @@ export async function fetchChoosedList(session: XkSession): Promise<ChoosedCours
   }
   // 合法 JSON 的形状容错仍由纯函数兜底：非列表输入返回空
   return parseChoosedList(raw);
-}
-
-/**
- * 退课（单教学班）。jxb_ids 即教学班 ID；成功响应为裸 "1"
- * （njtech_grabber 实测），parseActionResponse 同时兼容对象形状。
- */
-export async function quitCourse(session: XkSession, jxbIds: string): Promise<XkSubmitResult> {
-  const form: Record<string, string> = {
-    csrftoken: session.csrftoken,
-    jxb_ids: jxbIds,
-    _: String(Date.now()),
-  };
-
-  const resp = await session.client.req(`${XK_QUIT_COURSE}?gnmkdm=N253512`, {
-    method: "POST",
-    body: Object.entries(form)
-      .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
-      .join("&"),
-  });
-
-  if (isSessionExpired(resp.body)) {
-    return { ok: false, message: SESSION_EXPIRED_MESSAGE };
-  }
-
-  const parsed = parseActionResponse(resp.body);
-  if (parsed) return parsed;
-  return {
-    ok: false,
-    message: `退课响应解析失败（HTTP ${resp.status}），请用 inspect 校准接口`,
-  };
 }
 
 export interface XkProbeResult {

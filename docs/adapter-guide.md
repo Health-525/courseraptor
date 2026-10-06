@@ -47,7 +47,7 @@ src/
 | `tools` | ✅ | 贡献给 agent 的工具集（与 capabilities 对应；先给空对象也合法） |
 | `promptSections()` | ✅ | 学校侧系统提示词：工具说明段 + 背景知识段 |
 
-`capabilities` 可选值：`schedule` `exams` `grades` `student` `enrolledCourses` `retakeCourses` `labGrades` `courseSelection` `notices` `calendarExport`——**缺哪项，agent 就少哪组工具**，所以可以渐进式交付：先跑通课表，再补成绩、考试、通知。
+`capabilities` 可选值：`schedule` `exams` `grades` `enrolledCourses` `courseSelection` `notices` `calendarExport`——**缺哪项，agent 就少哪组工具**，所以可以渐进式交付：先跑通课表，再补成绩、考试、通知。
 
 **最小可用适配** = `info` + `capabilities: ["schedule"]` + `terms` + `auth` + `schedule` + 空 `tools` + 极简 `promptSections`。做到这一步，「查课表」就已经能用了。
 

@@ -19,7 +19,6 @@
 |------|------|------|----------|
 | `get_grades` | 全部学期成绩 + GPA + 已获必修课学分 + 通识分类概览（重修取最高分；通过型不计 GPA） | `grades.fetchAllGrades` | `grades` |
 | `get_exams` | 考试安排（科目/日期/时间/考场/座位） | `academics.fetchExamsSmart` | `exams` |
-| `get_lab_grades` | 实验课程成绩（按学期） | `portal.fetchLabGradesSmart` | `lab-grades` |
 
 ## 三、通知情报
 
@@ -29,15 +28,7 @@
 | `read_notice` | 读取官网文章正文全文 + 附件链接（webplus CMS 解析） | `news.fetchJwcArticle` | — |
 | `fetch_attachment` | 下载并解析通知附件（xlsx/csv 表格概览、docx/pdf/txt 分页/关键词定位） | `attachments.fetchAttachment` | — |
 
-## 四、学籍与课程信息
-
-| 工具 | 语义 | 底层 | 脚本命令 |
-|------|------|------|----------|
-| `get_student_info` | 学籍个人信息（敏感字段打码） | `portal.fetchProfile` | `student-info` |
-| `get_enrolled_courses` | 本学期已选教学班（含时间/地点/学分/性质） | `portal.fetchEnrolledClasses` | `enrolled-courses` |
-| `get_retake_courses` | 可重修课程（可关键词过滤） | `portal.fetchRetakeCourses` | `retake-courses` |
-
-## 五、选课（只读查询）
+## 四、选课（只读查询）
 
 | 工具 | 语义 | 底层 | 脚本命令 |
 |------|------|------|----------|
@@ -48,7 +39,7 @@
 
 ## 调用约定（agent 视角）
 
-- **确定性单点查询**（课表/成绩/考试/通知/学籍/搜课）优先走技能脚本 `query.ts`，更快且不烧 LLM token。
-- **多轮推理 / 附件解析 / 放假落盘 / 真实选退课** 走交互式 `raptor` agent 的对应工具。
+- **确定性单点查询**（课表/成绩/考试/通知/搜课）优先走技能脚本 `query.ts`，更快且不烧 LLM token。
+- **多轮推理 / 附件解析 / 放假落盘 / 课表图与日历导出** 走交互式 `raptor` agent 的对应工具。
 - 所有「登录类」查询经 `jwgl/session.getCookie` 复用 25 分钟会话缓存，失效自动重登（带 5 次指数退避）。
 - 「拿不到」与「确认为空」严格区分：传输失败一律报错上报，不允许降级成空列表。

@@ -21,12 +21,6 @@ import {
   periodTimeRange,
 } from "../../../src/adapters/njtech/academics";
 import { fetchAllGrades } from "../../../src/adapters/njtech/grades";
-import {
-  fetchProfile,
-  fetchEnrolledClasses,
-  fetchRetakeCourses,
-  fetchLabGradesSmart,
-} from "../../../src/adapters/njtech/portal";
 import { fetchJwcNews } from "../../../src/adapters/njtech/news";
 import {
   inspectXk,
@@ -50,20 +44,6 @@ function parseTerm(arg?: string): { year: number; semester: number } | null {
   const p = parseSemesterString(arg);
   if (!p) die(`学期格式无法解析：「${arg}」，应为「2026-2027-1」这类格式`);
   return p;
-}
-
-function maskSensitive(record: Record<string, string>): Record<string, string> {
-  const SENSITIVE = /证件号码|银行卡|考生号/;
-  const out: Record<string, string> = {};
-  let masked = 0;
-  for (const [k, v] of Object.entries(record)) {
-    if (SENSITIVE.test(k) && v.length > 8) {
-      out[k] = `${v.slice(0, 4)}****${v.slice(-4)}`;
-      masked++;
-    } else out[k] = v;
-  }
-  if (masked) process.stderr.write(`ℹ️ 已对 ${masked} 个敏感字段打码\n`);
-  return out;
 }
 
 function table(headers: string[], rows: (string | undefined)[][]): string {
@@ -141,22 +121,6 @@ async function cmdExams(term?: { year: number; semester: number }) {
   console.log(`# 考试安排 · ${label}\n\n${table(["科目", "日期", "时间", "考场", "座位"], rows)}`);
 }
 
-async function cmdLabGrades(term?: { year: number; semester: number }) {
-  const cookie = await getCookie();
-  const { label, items } = await fetchLabGradesSmart(cookie, term?.year, term?.semester);
-  if (items.length === 0) {
-    console.log(`# 实验成绩 · ${label}\n\n该学期暂无实验成绩（无实验课属正常）`);
-    return;
-  }
-  const rows = items.slice(0, 30).map((i: Record<string, unknown>) => [
-    String(i.kcmc ?? ""),
-    String(i.cj ?? ""),
-    String(i.xf ?? ""),
-    String(i.xqmmc ?? ""),
-  ]);
-  console.log(`# 实验成绩 · ${label}\n\n${table(["课程", "成绩", "学分", "学期"], rows)}`);
-}
-
 async function cmdNews(category?: string, limit = 10) {
   const items = await fetchJwcNews([], 30);
   const filtered = category ? items.filter((i) => i.category === category) : items;
@@ -170,41 +134,6 @@ async function cmdNews(category?: string, limit = 10) {
     `# 教务处通知${category ? ` · ${category}` : ""}\n\n` +
       `共抓到 ${filtered.length} 条，显示前 ${Math.min(limit, filtered.length)} 条。\n\n` +
       table(["标题", "日期", "板块", "链接"], rows),
-  );
-}
-
-async function cmdStudentInfo() {
-  const cookie = await getCookie();
-  const profile = maskSensitive(await fetchProfile(cookie));
-  const keys = Object.keys(profile);
-  if (keys.length === 0) die("个人信息页解析失败（页面结构可能变化）");
-  const rows = keys.map((k) => [k, profile[k]]);
-  console.log(`# 学籍信息\n\n${table(["字段", "值"], rows)}`);
-}
-
-async function cmdEnrolled() {
-  const cookie = await getCookie();
-  const classes = await fetchEnrolledClasses(cookie);
-  if (classes.length === 0) {
-    console.log("# 已选课程\n\n暂无已选课程（学期初未选课属正常）");
-    return;
-  }
-  const rows = classes.map((c) => [c.courseName, c.className, c.teacher, c.time, c.place, c.credit, c.nature]);
-  console.log(`# 已选教学班（${classes.length}）\n\n${table(["课程", "教学班", "教师", "时间", "地点", "学分", "性质"], rows)}`);
-}
-
-async function cmdRetake(keyword?: string) {
-  const cookie = await getCookie();
-  const all = await fetchRetakeCourses(cookie);
-  const filtered = keyword ? all.filter((c) => c.courseName.includes(keyword)) : all;
-  if (filtered.length === 0) {
-    console.log(`# 可重修课程${keyword ? ` · 含「${keyword}」` : ""}\n\n无匹配结果`);
-    return;
-  }
-  const rows = filtered.slice(0, 40).map((c) => [c.courseName, c.courseCode, c.credit, c.department, c.semester]);
-  console.log(
-    `# 可重修课程（共 ${all.length} 门，显示 ${filtered.length}）\n\n` +
-      table(["课程", "课程号", "学分", "开课学院", "学期"], rows),
   );
 }
 
@@ -285,16 +214,8 @@ async function main() {
       return await cmdGrades();
     case "exams":
       return await cmdExams(parseTerm(args[0]));
-    case "lab-grades":
-      return await cmdLabGrades(parseTerm(args[0]));
     case "news":
       return await cmdNews(args[0], Number.parseInt(args[1] ?? "10", 10));
-    case "student-info":
-      return await cmdStudentInfo();
-    case "enrolled-courses":
-      return await cmdEnrolled();
-    case "retake-courses":
-      return await cmdRetake(args[0]);
     case "selection-status":
       return await cmdSelectionStatus();
     case "search-courses":
@@ -306,8 +227,7 @@ async function main() {
       console.log(
         "NJTech 教务查询（njtech-jwgl 技能）\n\n" +
           "用法：npx tsx skills/njtech-jwgl/scripts/query.ts <命令> [参数]\n\n" +
-          "命令：schedule [学期] | grades | exams [学期] | lab-grades [学期] | news [板块] [条数]\n" +
-          "      student-info | enrolled-courses | retake-courses [关键词] | selection-status\n" +
+          "命令：schedule [学期] | grades | exams [学期] | news [板块] [条数] | selection-status\n" +
           "      search-courses <关键词> | search-classes <课程名>\n\n" +
           "示例：query.ts schedule\n       query.ts grades\n       query.ts news 公告通知 5\n" +
           "注意：真实写操作不在本脚本内，仅走交互式 raptor agent 且需用户确认。",
