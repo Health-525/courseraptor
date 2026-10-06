@@ -235,9 +235,10 @@ h1 {
 .note-green { background: var(--note-green) }
 .note-hand { font-family: var(--font-hand); font-size: 15.5px }
 
-.hero-note:nth-of-type(2) { right: 4%; top: 2%; transform: rotate(3.4deg) }
-.hero-note:nth-of-type(3) { left: 3%; top: 34%; transform: rotate(-2.6deg) }
-.hero-note:nth-of-type(4) { right: 7%; bottom: 10%; transform: rotate(-3.6deg) }
+/* 定位用显式类名（hero-note 里混有 aside 与 span，nth-of-type 按标签类型计数不可靠） */
+.hero-note.note-yellow { right: 4%; top: 2%; transform: rotate(3.4deg) }
+.hero-note.note-white { left: 3%; top: 34%; transform: rotate(-2.6deg) }
+.hero-note.note-green { right: 7%; bottom: 10%; transform: rotate(-3.6deg) }
 
 /* 尾注：恐龙脚下的小字（第三端提示） */
 .hero-note-end { position: static; display: inline-block; margin-top: 12px; padding: 5px 14px; font-size: 14px; color: var(--ink-soft); background: transparent; box-shadow: none }
@@ -729,9 +730,9 @@ details[open] summary::after { transform: rotate(45deg) }
   .hero-note { position: static; display: inline-block; max-width: none; margin: 8px 6px 0; padding: 8px 14px; font-size: 12.5px; vertical-align: top }
   .hero-note b { display: inline; font-size: 16px; margin: 0 2px 0 0 }
   .hero-note .tape { display: none }
-  .hero-note:nth-of-type(2), .hero-note:nth-of-type(3), .hero-note:nth-of-type(4) { transform: rotate(-1.4deg) }
-  .hero-note:nth-of-type(3) { transform: rotate(1.2deg) }
-  .hero-note:nth-of-type(4) { transform: rotate(-0.8deg) }
+  .hero-note.note-yellow { transform: rotate(1.6deg) }
+  .hero-note.note-white { transform: rotate(-1.2deg) }
+  .hero-note.note-green { transform: rotate(0.9deg) }
   .hero-note-hand { font-size: 14px }
   .community-inner { grid-template-columns: 1fr; gap: 44px; text-align: center }
   .community .eyebrow { justify-content: center }
