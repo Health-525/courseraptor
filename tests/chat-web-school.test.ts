@@ -95,7 +95,7 @@ test("切学校教务账号跟着切：旧校存回名下、新校空则清空�
   assert.equal(d.status.school.current, "hebau");
   assert.equal(d.status.jwgl.configured, false);
   assert.equal(d.status.jwgl.username, "");
-  // hebau 没接教务通知：不管账号配没配，通知卡一律不亮
+  // hebau 账号未配置：即使已接入教务通知，通知卡也不亮（newsReady = 接入 && 凭证就绪）
   assert.equal(d.status.school.newsReady, false);
   const store1 = loadCredentialsStore();
   assert.equal(store1?.username, "");
@@ -144,16 +144,16 @@ test("切学校教务账号跟着切：旧校存回名下、新校空则清空�
   ).json();
   assert.equal(toH.status.jwgl.username, "202501010203");
 
-  // ⑤ 能力说明按学校 capabilities 生成：hebau 没接通知就不能写通知
+  // ⑤ 能力说明按学校 capabilities 生成：hebau 已接入通知，说明里含通知
   const opts = toH.status.school.options as Array<{ id: string; note?: string }>;
   const hebauNote = opts.find((o) => o.id === "hebau")?.note ?? "";
-  assert.match(hebauNote, /课表 \/ 成绩 \/ 考试/);
-  assert.doesNotMatch(hebauNote, /通知/);
+  assert.match(hebauNote, /课表 \/ 成绩 \/ 考试 \/ 通知/);
+  assert.doesNotMatch(hebauNote, /选课/);
   assert.match(opts.find((o) => o.id === "njtech")?.note ?? "", /通知/);
   assert.equal(opts.find((o) => o.id === "custom")?.note, undefined);
-  // 教务通知门禁（2026-10-05 需求）：hebau 配了账号也必须不亮卡——学校没接入
-  // 通知能力就直接不显示；账号未保存的 njtech 同样不亮（配好才显示）
-  assert.equal(toH.status.school.newsReady, false);
+  // 教务通知门禁：hebau 已接入通知且账号已配置 → 通知卡亮；
+  // 账号未保存的 njtech 同样不亮（配好才显示）
+  assert.equal(toH.status.school.newsReady, true);
 });
 
 test("POST /api/settings 切换学校：运行期生效并落凭证", async () => {

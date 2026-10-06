@@ -627,7 +627,7 @@ function openPanelIdOf(name: string | undefined, input: unknown): string | undef
   if (name !== "open_panel") return undefined;
   const id = (input as { panel?: unknown } | null | undefined)?.panel;
   if (typeof id !== "string" || !(PANEL_IDS as readonly string[]).includes(id)) return undefined;
-  /* 教务通知门禁：与设置页 newsReady 同口径——本校没接入（hebau/custom）或
+  /* 教务通知门禁：与设置页 newsReady 同口径——本校没接入（custom）或
    * 教务账号未保存时，对话里点名要看通知也不推面板（宫格本就没有这张卡） */
   if (id === "news" && !school().notices) return undefined;
   if (id === "news" && !(config.jwglUsername && config.jwglPassword)) return undefined;
@@ -743,7 +743,7 @@ function settingsPayload() {
       /** 手动课表模式下教务账号栏隐藏、各面板给「未适配」空态 */
       manual: school().info.manual === true,
       /** 教务通知卡门槛：本校接入教务通知且教务账号已保存才显示；
-       *  没接入的学校（hebau/custom）宫格直接不出「教务通知」卡 */
+       *  没接入的学校（custom）宫格直接不出「教务通知」卡 */
       newsReady: !!school().notices && !!(config.jwglUsername && config.jwglPassword),
       /** 已有导入课表缓存（「去导入课表」与「重新导入」的文案分叉） */
       scheduleCached: !!loadScheduleCache(),
@@ -756,7 +756,7 @@ function settingsPayload() {
         name: a.info.name,
         shortName: a.info.shortName,
         manual: a.info.manual === true,
-        /** 能力说明按本校 capabilities 如实生成（hebau 没接通知就不写通知） */
+        /** 能力说明按本校 capabilities 如实生成（没接入的能力就不写） */
         note: a.info.manual ? undefined : schoolOptionNote(a.capabilities),
       })),
     },

@@ -14,6 +14,7 @@
 import type { SchoolAdapter } from "../../core/school";
 import * as academics from "./academics";
 import { loginHebau } from "./cas";
+import { fetchHebauArticle, fetchNews, fetchNewsMemo } from "./news";
 import { hebauPromptSections } from "./prompt";
 import * as session from "./session";
 import * as termDates from "./term-dates";
@@ -27,7 +28,7 @@ export const hebauSchool: SchoolAdapter = {
     city: "保定",
     timezone: "Asia/Shanghai",
   },
-  capabilities: ["schedule", "exams", "grades"],
+  capabilities: ["schedule", "exams", "grades", "calendarExport", "notices"],
   terms: {
     label: academics.termLabel,
     candidates: (now?: Date) => academics.candidateXnxqList(now),
@@ -52,6 +53,12 @@ export const hebauSchool: SchoolAdapter = {
   schedule: {
     fetchSmart: academics.fetchScheduleSmart,
     fetchExamsSmart: academics.fetchExamsSmart,
+  },
+  notices: {
+    fetchNews: (existing, maxItems) => fetchNews(existing, maxItems),
+    fetchArticle: (url) => fetchHebauArticle(url),
+    // 面板与 get_news 共用的 5 分钟进程内快照（见 news.ts 的 fetchNewsMemo）
+    fetchNewsMemo: (maxItems) => fetchNewsMemo(maxItems),
   },
   tools: hebauTools,
   promptSections: hebauPromptSections,
