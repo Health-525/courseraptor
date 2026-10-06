@@ -41,7 +41,7 @@ If you are building agents yourself, the repo doubles as a reference implementat
 | Can I turn this material into a document? | Local document/table reading and Word, Excel, PowerPoint, and PDF generation with cross-format conversion |
 | My school is not NJTECH | Manual timetable mode: paste timetable text or upload Excel/CSV/PDF/Word/TXT, and the AI parses it into a structured timetable |
 
-The agent ships **36 tools** (Nanjing Tech's default set; 40 with course-grabbing enabled, auto-trimmed per school). See [capabilities](docs/capabilities.md) for the full table. A headless CLI ([`skills/njtech-jwgl/`](skills/njtech-jwgl/SKILL.md)) exposes the same academic queries for scripting without touching the LLM.
+The agent ships **36 tools** (Nanjing Tech's default set, auto-trimmed per school). See [capabilities](docs/capabilities.md) for the full table. A headless CLI ([`skills/njtech-jwgl/`](skills/njtech-jwgl/SKILL.md)) exposes the same academic queries for scripting without touching the LLM.
 
 Both screenshots below use fictional demo data.
 

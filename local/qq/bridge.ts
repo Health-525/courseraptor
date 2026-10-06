@@ -268,7 +268,7 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
         log.log(`[auth] 新授权 openid=${senderId}`);
         await bot.sendText(
           msg.replyTarget,
-          "✅ 已授权，迅猛龙上线！直接说需求即可：查课表 / 盯课 / 抢课 / 读教务通知。",
+          "✅ 已授权，迅猛龙上线！直接说需求即可：查课表 / 查成绩 / 查考试 / 读教务通知。",
         );
       } else if (!rejectedNotified.has(senderId)) {
         noteRejection(senderId);

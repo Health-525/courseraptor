@@ -280,7 +280,7 @@ async function cmdWatch(courseName: string, durationSec = 60) {
   const deadline = Date.now() + durationSec * 1000;
   const events: string[] = [];
   let rounds = 0;
-  console.log(`# 盯课监控：${courseName}（${durationSec}s，只观察不提交）\n`);
+  console.log(`# 余量监控：${courseName}（${durationSec}s，只观察不提交）\n`);
   while (Date.now() < deadline) {
     rounds++;
     const courses = await searchCourses(session, courseName);
@@ -337,7 +337,7 @@ async function main() {
           "      student-info | enrolled-courses | retake-courses [关键词] | selection-status\n" +
           "      search-courses <关键词> | search-classes <课程名> | watch <课程名> [秒]\n\n" +
           "示例：query.ts schedule\n       query.ts grades\n       query.ts news 公告通知 5\n" +
-          "注意：抢课/退课不在本脚本内，仅走交互式 raptor agent 且需用户确认。",
+          "注意：真实写操作不在本脚本内，仅走交互式 raptor agent 且需用户确认。",
       );
       return;
     default:
