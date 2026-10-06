@@ -22,14 +22,14 @@ SOFTWARE.
 
 ---
 
-附加限制条款（Additional Restrictions）
+Additional Restrictions
 
-在 MIT 许可证授予的权利之上，版权持有人附加以下限制。凡下列条款未许可的用途，均不属于本许可证授予的范围：
+In addition to the rights granted under the MIT License above, the copyright holder imposes the following restrictions. Any use falling within the scope of these restrictions is not permitted by this license:
 
-1. 学术成果用途：禁止将本软件或其任何部分（包括但不限于源代码、文档、架构设计、界面及衍生作品，无论是否经过修改）作为毕业论文、毕业设计、课程作业、实验报告，或其他以获取学分、学位、证书、荣誉为目的的学术成果，或上述成果的核心组成部分。以注明出处的方式引用、分析本项目的除外。
+1. Academic Submission Use: The Software, or any portion thereof (including but not limited to source code, documentation, architectural design, interfaces, and derivative works, whether modified or not), must not be submitted as, or used as a core component of, a graduation thesis, graduation project, course assignment, laboratory report, or any other academic work intended to obtain credits, degrees, certificates, or honors. Citation and analysis of this project with proper attribution are excluded from this restriction.
 
-2. 竞赛用途：禁止将本软件或其任何部分（无论是否经过修改）用于参加任何竞赛、比赛、黑客松、创新创业大赛等赛事活动，包括作为参赛作品或其核心组成部分。
+2. Competition Use: The Software, or any portion thereof (whether modified or not), must not be used to participate in any competition, contest, hackathon, innovation or entrepreneurship contest, or similar event, including as an entry or as a core component of an entry.
 
-3. 商业用途：任何商业用途（包括但不限于销售本软件或其衍生作品、提供付费服务、集成进商业产品）须事先取得版权持有人书面授权。
+3. Commercial Use: Any commercial use (including but not limited to selling the Software or its derivative works, offering paid services, or integrating it into commercial products) requires prior written authorization from the copyright holder.
 
-MIT 许可证正文与本附加限制条款不一致的，以本附加限制条款为准。商业授权及其他许可事宜，请通过本仓库的 GitHub issue 与版权持有人联系。
+In the event of any conflict between the MIT License text above and these Additional Restrictions, the Additional Restrictions shall prevail. For commercial licensing and other permission inquiries, please contact the copyright holder via the GitHub issue tracker of this repository.
