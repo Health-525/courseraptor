@@ -7,7 +7,15 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["src/**", "local/**", "tests/**", "gateway/**", "update/**", "scripts/**", "bin/**"]
+    "includes": [
+      "src/**",
+      "local/**",
+      "tests/**",
+      "gateway/**",
+      "update/**",
+      "scripts/**",
+      "bin/**"
+    ]
   },
   "formatter": {
     "enabled": true,
