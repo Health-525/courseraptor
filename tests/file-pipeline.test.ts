@@ -258,21 +258,28 @@ test("pptx 附件可抽出幻灯片文本（此前上传白名单收、解析端
 
 test("缓存失效：同体积改内容（mtime 变化）不再读到旧缓存", async () => {
   const file = path.join(tmpFiles, "会更新的.txt");
-  fs.writeFileSync(file, "第一版内容，长度固定十个字");
+  // mtime 用 utimesSync 显式控制：CI 的 VM 上快速连续写入时文件系统
+  // mtime 精度不足（第一/二/三版可能拿到同一时间戳），测试会时序脆弱
+  const writeWithMtime = (text: string, ageMs: number) => {
+    fs.writeFileSync(file, text);
+    const at = new Date(Date.now() - ageMs);
+    fs.utimesSync(file, at, at);
+  };
+  writeWithMtime("第一版内容，长度固定十个字", 3000);
   const first = await openLocalFile(file);
   assert.equal(first.mode, "text");
   if (first.mode !== "text") return;
   assert.ok(first.text.includes("第一版"));
 
   // 同长度改内容：体积判断骗得过，mtime 骗不过
-  fs.writeFileSync(file, "第二版内容，长度固定十个字");
+  writeWithMtime("第二版内容，长度固定十个字", 2000);
   const second = await openLocalFile(file);
   assert.equal(second.mode, "text");
   if (second.mode !== "text") return;
   assert.ok(second.text.includes("第二版"), "mtime 变化必须触发重新入缓存，否则永远读旧内容");
 
   // 改回第一版：解析缓存同样按 mtime 失效，不吐第二版旧解析
-  fs.writeFileSync(file, "第一版内容，长度固定十个字");
+  writeWithMtime("第一版内容，长度固定十个字", 1000);
   const third = await openLocalFile(file);
   assert.equal(third.mode, "text");
   if (third.mode !== "text") return;
