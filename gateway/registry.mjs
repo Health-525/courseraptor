@@ -89,29 +89,39 @@ export function createRegistry({ stateDir }) {
   }
 
   // users.json 写穿缓存：此前每个同学请求（含静态页面）都全量读盘+解析，
-  // /api/chat 一轮叠加限额/记账/Key 判定要读 4-6 次。现在解析结果留在内存，
-  // 每次读只 stat 一次校验 mtime——管理台 CLI 等外部进程改盘后一次 stat 即可
-  // 感知（跨进程写网关缓存回写的窗口，与改造前同样存在，未扩大）。
+  // /api/chat 一轮叠加限额/记账/Key 判定要读 4-6 次。现在解析结果留内存，
+  // 每次读只 stat 一次校验 mtime+size——管理台 CLI 等外部进程改盘后一次 stat
+  // 即可感知（跨进程写网关缓存回写的窗口，与改造前同样存在，未扩大）。
+  // 双指纹：毫秒粒度内连续两次写盘 mtime 可能相同（Windows 实测），size
+  // 兜住「同 mtime 改内容」的绝大多数场景。
   // 写路径写穿：落盘成功才刷新缓存，落盘语义不变。
-  let usersCache = null; // { mtimeMs, store }
+  // 按文件路径键控（与 chat-sessions 的 readCache 同款）：registry 实例
+  // 之间（测试各用独立 stateDir）永不串缓存，失效只看同一路径的指纹。
+  const usersCache = new Map(); // usersFile → { mtimeMs, size, store }
   const readUsers = async () => {
     let mtimeMs = 0;
+    let size = -1;
     try {
-      mtimeMs = (await stat(usersFile)).mtimeMs;
+      const st = await stat(usersFile);
+      mtimeMs = st.mtimeMs;
+      size = st.size;
     } catch (e) {
       if (e?.code !== "ENOENT") throw e;
     }
-    if (usersCache && usersCache.mtimeMs === mtimeMs) return usersCache.store;
+    const cached = usersCache.get(usersFile);
+    if (cached && cached.mtimeMs === mtimeMs && cached.size === size) return cached.store;
     const store = await readJson(usersFile, { users: [] }, { strict: true });
-    usersCache = { mtimeMs, store };
+    usersCache.set(usersFile, { mtimeMs, size, store });
     return store;
   };
   const writeUsers = async (users) => {
-    await writeAtomic(usersFile, JSON.stringify({ users }, null, 2));
+    const content = JSON.stringify({ users }, null, 2);
+    await writeAtomic(usersFile, content);
     try {
-      usersCache = { mtimeMs: (await stat(usersFile)).mtimeMs, store: { users } };
+      const st = await stat(usersFile);
+      usersCache.set(usersFile, { mtimeMs: st.mtimeMs, size: st.size, store: { users } });
     } catch {
-      usersCache = null; // 刚写完的文件 stat 不应失败，防御性失效缓存
+      usersCache.delete(usersFile); // 刚写完的文件 stat 不应失败，防御性失效缓存
     }
   };
   const readInvites = () => readJson(invitesFile, { invites: [] }, { strict: true });
