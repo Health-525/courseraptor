@@ -21,6 +21,7 @@
 | `QQBOT_PUSH_OPENIDS` | 可选，QQ 主动推送目标 openid（逗号分隔）：待办到期提醒只发给这些人；不配置则不发推送，白名单里的其他授权用户收不到你的提醒 |
 | `GITHUB_TOKEN` / `GITEE_TOKEN` | 可选，将课表日历发布到公开仓库；分享范围需本人确认 |
 | `RAPTOR_NO_UPDATE_CHECK` | `1` 关闭启动时版本检查 |
+| `RAPTOR_NO_TELEMETRY` | `1` 关闭安装包内置的匿名装机统计（每 24h 报随机设备号 + 版本 + 平台，不含学号、账号与对话内容；源码运行默认不上报） |
 | `RAPTOR_LOG_LEVEL` | 后台诊断日志级别 `debug\|info\|warn\|error`（默认 `info`），写入 `data/raptor.log`，超 5MB 自动轮转 |
 | `RAPTOR_NO_TODO_REMINDERS` | `1` 关闭待办到期自动提醒（默认开启：距到期 ≤ 7 天每天一次，Windows 桌面通知 + QQ 推送） |
 | `RAPTOR_UPDATE_SERVER` | 维护者本地覆盖 HTTPS 更新服务地址；分发包可内置地址 |

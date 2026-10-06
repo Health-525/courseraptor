@@ -6,7 +6,7 @@
 
 ### Less time navigating academic portals. More time for student life.
 
-**An open-source conversational academic agent — fully adapted for Nanjing Tech University (NJTECH), usable at other schools via manual timetable import.**
+**An open-source conversational academic agent — fully adapted for Nanjing Tech University (NJTECH), community-adapted for Hebei Agricultural University (HEBAU), usable at any other school via manual timetable import.**
 
 **Also a production-grade local-first Agent engineering reference**: Vercel AI SDK v7 · ports-and-adapters `SchoolAdapter` architecture · three entrances, one kernel · everything auditable.
 
@@ -22,11 +22,11 @@
 
 </div>
 
-CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Ask in the terminal, the browser, or QQ — three entrances sharing one agent kernel and one memory store. Everything runs on your own machine: credentials are AES-256-GCM encrypted on disk, there is no telemetry, and it talks to your own model API key — DeepSeek by default, with 10 more built-in Chinese providers (Qwen, Zhipu GLM, Kimi, Doubao, Hunyuan, MiniMax, Step, ERNIE, Spark, SiliconFlow) plus custom OpenAI-compatible endpoints.
+CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Ask in the terminal, the browser, or QQ — three entrances sharing one agent kernel and one memory store. Everything runs on your own machine: credentials are AES-256-GCM encrypted on disk, and it talks to your own model API key — DeepSeek by default, with 11 more built-in Chinese providers (Qwen, Zhipu GLM, Kimi, Doubao, Hunyuan, MiniMax, Step, ERNIE, Spark, SiliconFlow, China Mobile Cloud) plus custom OpenAI-compatible endpoints. The Windows installer includes anonymous install telemetry (a random device ID, version, and platform once every 24h; disable with `RAPTOR_NO_TELEMETRY=1`); running from source never reports.
 
-If you are building agents yourself, the repo doubles as a reference implementation: how a `ToolLoopAgent` loop organizes 30+ tools, how external systems sit behind a ports-and-adapters boundary (a new school is one self-contained directory, zero kernel changes), and how a multi-provider model layer is assembled from a plain-data registry. See [Build with us](#build-with-us) below.
+If you are building agents yourself, the repo doubles as a reference implementation: how a `ToolLoopAgent` loop organizes 36 tools, how external systems sit behind a ports-and-adapters boundary (a new school is one self-contained directory, zero kernel changes), and how a multi-provider model layer is assembled from a plain-data registry. See [Build with us](#build-with-us) below.
 
-> ⚠️ **The online academic-system integration supports Nanjing Tech University only.** This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project. The [Chinese README](README.md) is the authoritative, fully detailed version.
+> ⚠️ **The online academic-system integration supports Nanjing Tech University (full) and Hebei Agricultural University (community adapter, PR #204).** Any other school can start immediately with manual timetable import. This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project. The [Chinese README](README.md) is the authoritative, fully detailed version.
 
 ## What it does
 
@@ -41,7 +41,7 @@ If you are building agents yourself, the repo doubles as a reference implementat
 | Can I turn this material into a document? | Local document/table reading and Word, Excel, PowerPoint, and PDF generation with cross-format conversion |
 | My school is not NJTECH | Manual timetable mode: paste timetable text or upload Excel/CSV/PDF/Word/TXT, and the AI parses it into a structured timetable |
 
-The agent ships **30+ tools**. See [capabilities](docs/capabilities.md) for the full table. A headless CLI ([`skills/njtech-jwgl/`](skills/njtech-jwgl/SKILL.md)) exposes the same academic queries for scripting without touching the LLM.
+The agent ships **36 tools** (Nanjing Tech's default set; 40 with course-grabbing enabled, auto-trimmed per school). See [capabilities](docs/capabilities.md) for the full table. A headless CLI ([`skills/njtech-jwgl/`](skills/njtech-jwgl/SKILL.md)) exposes the same academic queries for scripting without touching the LLM.
 
 Both screenshots below use fictional demo data.
 
@@ -73,14 +73,14 @@ To showcase real AI analysis with the same fictional data, run `npm run demo:liv
 
 ## Use your own academic account
 
-Windows users can grab a self-contained installer (bundled Node runtime, ~110 MB) from [Releases](https://github.com/Health-525/courseraptor/releases/latest) — no development environment needed. From source, run `npm start` (or double-click `start.bat` on Windows). Follow the prompts to configure your university credentials and model API key (DeepSeek by default; other providers can be switched in the web Settings panel). You can also skip the campus account with an empty Enter and fill it in later via the web Settings panel. Provider API usage may incur charges.
+Windows users can grab a self-contained installer (bundled Node runtime, ~116 MB) from [Releases](https://github.com/Health-525/courseraptor/releases/latest) — no development environment needed. From source, run `npm start` (or double-click `start.bat` on Windows). Follow the prompts to configure your university credentials and model API key (DeepSeek by default; other providers can be switched in the web Settings panel). You can also skip the campus account with an empty Enter and fill it in later via the web Settings panel. Provider API usage may incur charges.
 
 The browser UI usually runs at `http://localhost:3210`; follow the actual startup address if that port is busy. Keep the terminal running. To change your API key securely, enter `/key` without arguments in the terminal.
 
 ## Architecture overview
 
 - **Agent runtime**: Vercel AI SDK v7 (`ToolLoopAgent` + `runAgentTUI` for terminal)
-- **LLM**: DeepSeek by default (`deepseek-flash` / V4.1-Flash), switchable to 10 more Chinese providers or a custom OpenAI-compatible endpoint — each provider's key stored and hot-swapped independently
+- **LLM**: DeepSeek by default (`deepseek-flash` / V4.1-Flash), switchable to 11 more Chinese providers or a custom OpenAI-compatible endpoint — each provider's key stored and hot-swapped independently
 - **Academic protocol**: Custom NJTECH 正方新版 adapter (RSA + CSRF login; course selection reverse-engineered from official frontend)
 - **Web UI**: Single-page Node server (`src/channels/web/`) with push-panel layout, session history, and real-time tool result sync
 - **Ports and adapters**: `src/core/school.ts` defines the `SchoolAdapter` port; core never imports adapters, so adding a school means adding one self-contained directory under `src/adapters/`
@@ -111,7 +111,7 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 - Local calendar export does not require publication. The current subscription implementation publishes to a **public repository**, so confirm the disclosure of course locations and times.
 - QQ users share the configured university identity; the allowlist is not multi-student account isolation.
 - Real course-enrollment submission is disabled by default. Follow university rules and confirm actions before enabling it.
-- Planned reminders, schedule-change notifications, curriculum audits, and additional university integrations are **not yet implemented**.
+- Curriculum audits are **not yet implemented**. (Reminders, schedule-change detection, and a second university integration — HEBAU — have all shipped.)
 
 Share the repository URL or an inspected clean installation package, never your used project directory. See [privacy and security](SECURITY.md).
 
@@ -128,9 +128,9 @@ Other schools work through the manual timetable mode (paste or upload a timetabl
 
 Beyond the student tool, the repo is a working reference for local-first agents — every pattern below ships in daily use, backed by tests, free to lift under the MIT license with additional restrictions (academic submissions and competition entries are not permitted — see [LICENSE](LICENSE)):
 
-- **Agent loop**: Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI` driving 30+ tools across multi-turn loops — [`src/core/agent.ts`](src/core/agent.ts)
+- **Agent loop**: Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI` driving 36 tools across multi-turn loops — [`src/core/agent.ts`](src/core/agent.ts)
 - **Ports & adapters**: the `SchoolAdapter` port (`src/core/school.ts`) keeps the kernel free of any school import; Zhengfang-new and CAS+URP differences never leak past an adapter — [`src/adapters/`](src/adapters/)
-- **Multi-provider model layer**: a plain-data provider registry plus one model factory; 11 Chinese providers + custom OpenAI-compatible endpoints, keys encrypted independently and hot-swapped — [`src/core/providers.ts`](src/core/providers.ts)
+- **Multi-provider model layer**: a plain-data provider registry plus one model factory; 12 Chinese providers + custom OpenAI-compatible endpoints, keys encrypted independently and hot-swapped — [`src/core/providers.ts`](src/core/providers.ts)
 - **Two-tier memory**: cross-restart session continuity plus self-maintained long-term facts, local JSON only — [`src/core/memory/`](src/core/memory/)
 - **Local-first security**: AES-256-GCM credentials bound to the machine fingerprint, loopback-only web with Origin/CSRF checks, network-less sandboxed JS — [`src/core/credentials.ts`](src/core/credentials.ts)
 - **Engineering floor**: TypeScript `strict`, node:test with a coverage floor, Biome, dual-OS CI — [`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml)

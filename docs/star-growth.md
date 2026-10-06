@@ -35,11 +35,11 @@
 >
 > **项目地址**：<https://github.com/Health-525/courseraptor>
 >
-> **项目简介**：开源校园智能助手，把课表、成绩、考试、教务通知、待办、日历、知识库与记忆变成一句话对话。终端 TUI / 网页 / QQ 机器人三种入口，全本地运行，凭证 AES-256-GCM 加密落盘，无遥测。内置免账号离线演示（`npm run demo`，虚构数据）。
+> **项目简介**：开源校园智能助手，把课表、成绩、考试、教务通知、待办、日历、知识库与记忆变成一句话对话。终端 TUI / 网页 / QQ 机器人三种入口，全本地运行，凭证 AES-256-GCM 加密落盘（安装包仅匿名装机统计、可一键关闭）。内置免账号离线演示（`npm run demo`，虚构数据）。
 >
-> **推荐理由**：面向真实校园场景的完整 AI Agent 工程样例：Vercel AI SDK v7 ToolLoopAgent + DeepSeek + 自研正方新版教务协议适配层，32 个工具、两层记忆、附件云解析与 .ics 日历导出。架构上 core / adapters / channels 三层解耦，正在征集更多学校的适配共建。
+> **推荐理由**：面向真实校园场景的完整 AI Agent 工程样例：Vercel AI SDK v7 ToolLoopAgent + DeepSeek + 自研正方新版教务协议适配层，36 个工具、两层记忆、学习教练、用量统计热力图、附件云解析与 .ics 日历导出。架构上 core / adapters / channels 三层解耦，适配器飞轮已转过一圈（河北农业大学社区适配器已合入）。
 >
-> **适用人群**：南京工业大学在校学生；想学习本地 AI Agent 工程实现的开发者。
+> **适用人群**：南京工业大学与河北农业大学在校学生（其他学校手动课表模式可用）；想学习本地 AI Agent 工程实现的开发者。
 >
 > **项目截图**：`docs/screenshots/tui.png`、`docs/screenshots/gui.png`（虚构演示数据）
 
@@ -55,9 +55,9 @@
 >
 > 能干什么：一句话查课表 / 成绩 / 考试 / 学籍 / 教务通知，通知附件自动下载和表格筛选，待办到期提醒，课表导出 .ics 到手机日历，还能生成 Word/Excel/PPT/PDF。终端敲 `raptor` 直接聊，也能开网页版，接了个 QQ 官方机器人。
 >
-> 技术栈：TypeScript + Vercel AI SDK v7（ToolLoopAgent）+ DeepSeek，教务侧是正方新版的协议适配（RSA + CSRF 登录，选课接口逆向自官方前端）。架构分了 core / adapters / channels 三层，学校无关内核和学校适配层是解耦的——目前只适配了 NJTECH，欢迎其他学校的同学来共建适配层。
+> 技术栈：TypeScript + Vercel AI SDK v7（ToolLoopAgent）+ DeepSeek，教务侧是正方新版的协议适配（RSA + CSRF 登录，选课接口逆向自官方前端）。架构分了 core / adapters / channels 三层，学校无关内核和学校适配层是解耦的——已适配 NJTECH（全量）与河北农业大学（社区贡献），欢迎其他学校的同学来共建适配层。
 >
-> 隐私方面比较较真：全本地运行，教务密码和 API Key 用 AES-256-GCM 加密落盘，无任何遥测。仓库里有免账号的离线演示（npm run demo，虚构数据），不想配 Key 也能先看效果。
+> 隐私方面比较较真：全本地运行，教务密码和 API Key 用 AES-256-GCM 加密落盘，安装包仅匿名装机统计（不含学号、账号与对话内容，可一键关闭）。仓库里有免账号的离线演示（npm run demo，虚构数据），不想配 Key 也能先看效果。
 >
 > 免费帮同学干活但不是免费 API：正式对话走自己的 DeepSeek Key。抢课退课这类写操作只在交互模式里做且要二次确认，无头脚本不碰。
 >
@@ -69,7 +69,7 @@
 
 发在「开发调优」类板块，语气比 V2EX 更口语一点，可复用上文但**改写开头两段**（两站用户重叠高，避免同文检测与观感）。建议增加一段：
 
-> 去防吞楼：项目纯本地、不收集任何数据，登录凭证加密存本机，源码可审计，欢迎扒代码。
+> 去防吞楼：项目纯本地、仅匿名装机统计（可一键关闭），登录凭证加密存本机，源码可审计，欢迎扒代码。
 
 ## 5. 掘金 / 少数派长文（教程角度）
 
@@ -86,7 +86,7 @@
 
 | 目标仓库 | 建议条目 |
 |---|---|
-| [e2b-dev/awesome-ai-agents](https://github.com/e2b-dev/awesome-ai-agents) | `- [CourseRaptor](https://github.com/Health-525/courseraptor) - Open-source campus assistant agent for timetables, grades, exams and announcements (NJTECH, local-first).` |
+| [e2b-dev/awesome-ai-agents](https://github.com/e2b-dev/awesome-ai-agents) | `- [CourseRaptor](https://github.com/Health-525/courseraptor) - Open-source campus assistant agent for timetables, grades, exams and announcements (NJTECH + HEBAU adapters, manual mode for any school, local-first).` |
 | [deepseek-ai/Awesome-DeepSeek-Integration](https://github.com/deepseek-ai/Awesome-DeepSeek-Integration) | 按"Applications"分区格式提交，注明本地运行 + AI SDK v7 |
 | [alebcay/awesome-cli-apps](https://github.com/alebcay/awesome-cli-apps) | `- [CourseRaptor](…) - Conversational campus/academic assistant in the terminal.`（归入 Productivity 类） |
 

@@ -76,7 +76,7 @@ npx tsx skills/njtech-jwgl/scripts/query.ts search-courses 高等数学
 npm run dev            # 或全局命令 raptor
 ```
 
-agent 已内置 32 个工具，其中 NJTech 教务相关工具的名称与语义见 `references/capabilities.md`。
+agent 已内置 36 个工具（默认配置；`RAPTOR_ENABLE_GRAB=1` 后 40 个），其中 NJTech 教务相关工具的名称与语义见 `references/capabilities.md`。
 本技能加载后，你（agent）应优先用**路径 A 的脚本**完成确定性的单点查询（更快、可脚本化、不烧 token）；
 需要多轮推理、附件解析、放假/调休落盘、或真实选课/退课操作时，再走路径 B 或对应工具。
 
