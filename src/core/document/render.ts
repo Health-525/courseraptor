@@ -11,12 +11,13 @@
  */
 
 import { createRequire } from "node:module";
+import type * as Docx from "docx";
 import { resolveCjkFont, resolveCjkFontFamily } from "./font";
 import { renderPptxThemed } from "./pptx-theme";
 import type { DocBlock, DocumentSpec, SheetSpec, TableSpec } from "./types";
 
 const require = createRequire(import.meta.url);
-const requireAny = require as unknown as (id: string) => any;
+const requireAny = require as unknown as (id: string) => unknown;
 
 /** 统一中文字体名（docx/pptx 里作为引用写入，阅读器回退到本机同名字体） */
 const CJK_FONT = "Microsoft YaHei";
@@ -28,9 +29,10 @@ function firstNonEmpty(...xs: (string | undefined | null)[]): string {
 
 /** 从 spec 推导一个建议文件名（不含扩展名） */
 export function suggestBaseName(spec: DocumentSpec): string {
+  const firstHeading = spec.blocks?.[0];
   const t = firstNonEmpty(
     spec.title,
-    spec.blocks?.[0]?.type === "heading" ? (spec.blocks[0] as any).text : "",
+    firstHeading?.type === "heading" ? firstHeading.text : "",
     spec.slides?.[0]?.title,
     spec.sheets?.[0]?.name,
   );
@@ -42,6 +44,17 @@ export function suggestBaseName(spec: DocumentSpec): string {
 }
 
 // ── docx ──────────────────────────────────────────────────────
+/** docx 官方类型（type-only import 编译期擦除，运行时仍走 createRequire） */
+type DocxLib = typeof Docx;
+type DocxBlockLib = Pick<
+  DocxLib,
+  "Paragraph" | "TextRun" | "Table" | "TableRow" | "TableCell" | "WidthType" | "PageBreak"
+>;
+type DocxTableLib = Pick<
+  DocxLib,
+  "Paragraph" | "TextRun" | "Table" | "TableRow" | "TableCell" | "WidthType"
+>;
+
 export async function renderDocx(spec: DocumentSpec): Promise<Buffer> {
   const {
     Document,
@@ -54,9 +67,9 @@ export async function renderDocx(spec: DocumentSpec): Promise<Buffer> {
     WidthType,
     AlignmentType,
     PageBreak,
-  } = requireAny("docx");
+  } = requireAny("docx") as DocxLib;
 
-  const children: any[] = [];
+  const children: (Docx.Paragraph | Docx.Table)[] = [];
   if (spec.title) {
     children.push(
       new Paragraph({
@@ -86,7 +99,11 @@ export async function renderDocx(spec: DocumentSpec): Promise<Buffer> {
   return Buffer.from(await Packer.toBuffer(doc));
 }
 
-function pushDocxBlock(children: any[], b: DocBlock, lib: any): void {
+function pushDocxBlock(
+  children: (Docx.Paragraph | Docx.Table)[],
+  b: DocBlock,
+  lib: DocxBlockLib,
+): void {
   const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, PageBreak } = lib;
   switch (b.type) {
     case "heading": {
@@ -138,7 +155,7 @@ function pushDocxBlock(children: any[], b: DocBlock, lib: any): void {
   }
 }
 
-function docxTable(lib: any, table: TableSpec): any {
+function docxTable(lib: DocxTableLib, table: TableSpec): Docx.Table {
   const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType } = lib;
   const allRows: (string | number)[][] = table.headers
     ? [table.headers, ...table.rows]
@@ -173,7 +190,7 @@ function docxTable(lib: any, table: TableSpec): any {
 
 // ── xlsx ──────────────────────────────────────────────────────
 export function renderXlsx(spec: DocumentSpec): Buffer {
-  const XLSX = requireAny("xlsx");
+  const XLSX = requireAny("xlsx") as typeof import("xlsx");
   const wb = XLSX.utils.book_new();
   const sheets: SheetSpec[] = spec.sheets?.length
     ? spec.sheets
@@ -207,8 +224,47 @@ function safeSheetName(name: string, used: Set<string>): string {
 export { renderPptxThemed as renderPptx };
 
 // ── pdf ───────────────────────────────────────────────────────
+/** pdfkit 无官方 @types，按 renderPdf/drawPdfTable 用到的成员收窄的最小结构面 */
+interface PdfKitDoc {
+  on(event: "data", listener: (chunk: Buffer) => void): void;
+  on(event: "end", listener: () => void): void;
+  on(event: "error", listener: (err: Error) => void): void;
+  registerFont(name: string, path: string, family?: string): void;
+  font(name: string): PdfKitDoc;
+  fontSize(size: number): PdfKitDoc;
+  fillColor(color: string): PdfKitDoc;
+  strokeColor(color: string): PdfKitDoc;
+  text(
+    s: string,
+    opts?: { align?: string; width?: number; lineBreak?: boolean; indent?: number },
+  ): PdfKitDoc;
+  text(
+    s: string,
+    x?: number,
+    y?: number,
+    opts?: { align?: string; width?: number; lineBreak?: boolean; indent?: number },
+  ): PdfKitDoc;
+  moveDown(n?: number): PdfKitDoc;
+  addPage(): PdfKitDoc;
+  lineWidth(w: number): PdfKitDoc;
+  rect(x: number, y: number, w: number, h: number): PdfKitDoc;
+  stroke(): PdfKitDoc;
+  end(): void;
+  x: number;
+  y: number;
+  readonly page: {
+    margins: { left: number; right: number; top: number; bottom: number };
+    width: number;
+    height: number;
+  };
+}
+
 export async function renderPdf(spec: DocumentSpec): Promise<Buffer> {
-  const PDFDocument = requireAny("pdfkit");
+  const PDFDocument = requireAny("pdfkit") as new (opts: {
+    size?: string;
+    margins?: { top: number; bottom: number; left: number; right: number };
+    bufferPages?: boolean;
+  }) => PdfKitDoc;
   const doc = new PDFDocument({
     size: "A4",
     margins: { top: 60, bottom: 60, left: 60, right: 60 },
@@ -280,14 +336,14 @@ export async function renderPdf(spec: DocumentSpec): Promise<Buffer> {
   return done;
 }
 
-function ensureRoom(doc: any, bottom: number, need: number): void {
+function ensureRoom(doc: PdfKitDoc, bottom: number, need: number): void {
   if (doc.y > bottom - need) {
     doc.addPage();
   }
 }
 
 function drawPdfTable(
-  doc: any,
+  doc: PdfKitDoc,
   table: TableSpec,
   left: number,
   right: number,
@@ -344,6 +400,6 @@ export async function renderDocument(
     case "pdf":
       return { buffer: await renderPdf(spec), baseName };
     default:
-      throw new Error(`不支持的格式: ${(spec as any).format}`);
+      throw new Error(`不支持的格式: ${(spec as { format?: string }).format}`);
   }
 }

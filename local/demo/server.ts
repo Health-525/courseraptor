@@ -263,6 +263,12 @@ export function demoReply(message: string): string {
 export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null }): http.Server {
   const liveAgent = options?.liveAgent ?? null;
   const sessions = new Map<string, DemoSession>();
+  // 演示服务只留最近 30 个会话，超限淘汰最老的（插入序）
+  const evictOldestSession = () => {
+    if (sessions.size <= 30) return;
+    const oldest = sessions.keys().next().value;
+    if (oldest !== undefined) sessions.delete(oldest);
+  };
   const json = (res: http.ServerResponse, value: unknown, status = 200) => {
     res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
     res.end(JSON.stringify(value));
@@ -428,7 +434,11 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
             string,
             unknown
           >;
-          const session = sessions.get(id)!;
+          const session = sessions.get(id);
+          if (!session) {
+            json(res, { error: "会话不存在" }, 404);
+            return;
+          }
           if (typeof body.title === "string" && body.title.trim())
             session.title = body.title.trim().slice(0, 60);
           if (typeof body.pinned === "boolean") session.pinned = body.pinned;
@@ -522,7 +532,7 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
             session.messages = session.messages.slice(-40);
             session.updatedAt = Date.now();
             sessions.set(id, session);
-            if (sessions.size > 30) sessions.delete(sessions.keys().next().value!);
+            evictOldestSession();
           }
           return;
         }
@@ -537,7 +547,7 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
         session.messages = session.messages.slice(-40);
         session.updatedAt = now;
         sessions.set(id, session);
-        if (sessions.size > 30) sessions.delete(sessions.keys().next().value!);
+        evictOldestSession();
 
         // 与正式 /api/chat 同形的 SSE 事件流：思考一段 → 工具卡 → 结果卡（示例数据）→ 正文分段
         const script = demoScript(message);

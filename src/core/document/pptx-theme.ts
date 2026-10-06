@@ -23,7 +23,7 @@ import type { PptOp, PptProgram } from "./ppt-program";
 import type { DocumentSpec, SlideSpec, TableSpec } from "./types";
 
 const require = createRequire(import.meta.url);
-const requireAny = require as unknown as (id: string) => any;
+const requireAny = require as unknown as (id: string) => unknown;
 
 /** 统一中文字体名（pptx 里作为引用写入，阅读器回退到本机同名字体） */
 const FONT = "Microsoft YaHei";
@@ -483,7 +483,7 @@ function addSeal(
  * 只删文件不修 rels 会留下悬空引用，PowerPoint 打开就是破损图片。
  */
 async function dedupeMedia(buf: Buffer): Promise<Buffer> {
-  const JSZip = requireAny("jszip");
+  const JSZip = requireAny("jszip") as typeof import("jszip");
   const zip = await JSZip.loadAsync(buf);
   const keepByHash = new Map<string, string>();
   const rename = new Map<string, string>(); // 待删名 → 保留名
@@ -512,9 +512,10 @@ async function dedupeMedia(buf: Buffer): Promise<Buffer> {
 
 /** 品牌画布：pptxgenjs 实例 + 三张母版（封面/章节/内容）+ 印章 logo */
 function newBrandDeck(): { pptx: PptxDeck; logo: string | null } {
-  const PptxGenJS = requireAny("pptxgenjs");
-  const Ctor = PptxGenJS.default ?? PptxGenJS;
-  const pptx = new Ctor() as PptxDeck;
+  // pptxgenjs 互操作形状不定（CJS default / 具名都有过），收窄成「零参构造出结构闸」
+  const mod = requireAny("pptxgenjs") as { default?: unknown };
+  const Ctor = (mod.default ?? mod) as new () => PptxDeck;
+  const pptx = new Ctor();
   pptx.layout = "LAYOUT_16x9";
   const logo = loadLogoDataUri();
 
@@ -910,6 +911,8 @@ export async function renderPptxProgram(program: PptProgram): Promise<Buffer> {
 
 async function writeDeck(pptx: PptxDeck): Promise<Buffer> {
   const out = await pptx.write({ outputType: "nodebuffer" });
-  const raw = Buffer.isBuffer(out) ? out : Buffer.from(out as any);
+  const raw = Buffer.isBuffer(out)
+    ? out
+    : Buffer.from(new Uint8Array(out as ArrayBuffer | Uint8Array));
   return dedupeMedia(raw);
 }

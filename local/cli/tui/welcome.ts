@@ -220,7 +220,7 @@ async function refreshSchedule() {
     const s = school();
     const cookie = await s.auth.getCookie();
     const r = await s.schedule?.fetchSmart(cookie);
-    if (!r || !r.ok) {
+    if (!r?.ok) {
       panel.scheduleLines = [dim("  课表获取失败，可直接问我查详情")];
       render();
       return;

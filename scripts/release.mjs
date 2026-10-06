@@ -35,7 +35,7 @@ const [maj, min, pat] = pkg.version.split(".").map(Number);
 const next =
   bump === "major" ? [maj + 1, 0, 0] : bump === "minor" ? [maj, min + 1, 0] : [maj, min, pat + 1];
 pkg.version = next.join(".");
-writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 
 const tag = `v${pkg.version}`;
 const branch = git("git branch --show-current");

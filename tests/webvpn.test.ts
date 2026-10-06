@@ -243,7 +243,7 @@ test("TTL 内的死会话：force 重登不再从磁盘读回同一个会话", a
     "webvpn-session.json",
     {
       cookie: "dead-cookie-marker",
-      jwcPrefix: "/http/webvpn" + "a".repeat(64),
+      jwcPrefix: `/http/webvpn${"a".repeat(64)}`,
       createdAt: Date.now(),
     },
     "webvpn-test",

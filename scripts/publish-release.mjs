@@ -59,7 +59,7 @@ pkg.version =
     : bump === "minor"
       ? `${maj}.${min + 1}.0`
       : `${maj}.${min}.${pat + 1}`;
-writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
+writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 const version = pkg.version;
 console.log(`版本号 -> v${version}${notes ? `（${notes}）` : ""}`);
 
