@@ -17,7 +17,7 @@ npm run demo
 
 ## 代码结构导览
 
-仓库按部署单元分顶层目录：`src/` 是公用核心（core + adapters + channels/web 网页界面，本地版与线上托管版共用）；`local/` 是本地版专属入口（TUI `cli/`、QQ 机器人 `qq/`、演示 `demo/`）；`gateway/` 是线上托管版（多用户网关 + 网关管理台 `admin/` + 托管实例入口 `headless/`）；`update/` 是更新分发后台（安装包发布/下载，服务本地版升级）；`landing/` 是项目介绍落地页（React+Vite，发 GitHub Pages，与运行时无关）。
+仓库按部署单元分顶层目录：`src/` 是公用核心（core + adapters + channels/web 网页界面，供本地版各入口共用）；`local/` 是本地版专属入口（TUI `cli/`、QQ 机器人 `qq/`、演示 `demo/`）；`landing/` 是项目介绍落地页（React+Vite，发 GitHub Pages，与运行时无关）。历史上另有线上托管版（`gateway/` 多用户网关 + `admin/` 管理台 + `update/` 更新分发后台），已于 2026-10 整体下线并从仓库移除（留档见仓库 git 历史）。
 
 依赖方向：channels → core ← adapters。core 定义 SchoolAdapter 端口（`src/core/school.ts`）并只依赖端口；adapters 实现端口并可自由使用 core；channels（终端/网页/QQ）只做装配与展示，不 import 任何学校适配器。core 与 channels 里 import `adapters/njtech` 视为架构违规。
 
@@ -49,32 +49,8 @@ npm run demo
 
 除便携 zip 外，`node scripts/package-exe.mjs --selftest` 会把同一份 zip 嵌进 .NET 启动器，打成单文件 exe（`courseraptor-vX.Y.Z-portable-win-x64.exe`，用 Windows 自带的 csc.exe 编译，无需第三方打包器）：同学双击后在 **exe 旁边**释放出 `CourseRaptor` 文件夹（exe 已在该文件夹内则直接复用，绿色版可原地升级；`RAPTOR_PORTABLE_HOME` 可整体重定向），版本号变化才重新释放，本地运行数据不在 zip 里、升级不覆盖。`--selftest` 会对同一安装目录跑两遍内置 `--raptor-selftest`（doctor），验证「首释放」与「秒开」两条路径。zip 与 exe 应作为同一版本的两个资产一起传 GitHub Release。
 
-## 更新后台
+## 版本发布
 
-后台入口为 `update/update-server.mjs`，数据保存在 `update-data/`。Node 默认监听本机，通过 Nginx 和 HTTPS 对外提供服务；参考 `update/nginx.conf.example`。
+正式发版走 GitHub Release：`npm run release` 提升版本号、打 Git 标签并推送，随后用 `node scripts/package-exe.mjs --selftest` 产出便携 zip 与单文件 exe，作为同一版本的两个资产一起传 GitHub Release。
 
-需要维护者配置 `UPDATE_ADMIN_TOKEN`、`HOST`、`PORT`。密钥使用自己的高强度随机值，通过部署环境注入，不写进 README、Issue 或示例文件。
-
-客户端未配置更新服务仍可正常查询。正式安装包的更新地址由发布脚本写入副本；开发时可用 `RAPTOR_UPDATE_SERVER` 覆盖，必须 HTTPS。用户可设置 `RAPTOR_NO_UPDATE_CHECK=1` 关闭检查。
-
-### Admin 管理（无独立面板）
-
-发版管理的网页入口在**网关管理台的「版本发布」面板**（`gateway/admin/ui.mjs`，见 `docs/multi-user-deploy.md`）：上传新版本（zip 拖拽上传带进度，与 `npm run publish` 共用 `/publish` 接口）、查看历史版本、一键回滚、删除，均经网关 `/admin/api/update/*` 流式代理到更新后台，鉴权由网关管理会话承担。
-
-更新后台自身不再提供网页面板（原先 `server/admin/` 的 React SPA 已移除），只保留机器接口：`/admin/api/overview|versions|rollback|delete` 与 `/publish`，全部要求 `x-admin-token`。发布历史记录在 `update-data/versions.json`，由 publish / rollback / delete 自动维护，删除历史文件不影响后台运行。
-
-安全：管理员密钥连续 5 次校验失败会按来源 IP 锁定 15 分钟（返回 429），成功后清零，锁定同时覆盖 `/publish` 与全部 admin API；经 Nginx 反代时靠示例配置里已有的 `proxy_set_header X-Real-IP` 区分来源。
-
-## 发布命令的副作用
-
-只有维护者决定正式发版、确认目标和内容后才运行：
-
-```bash
-npm run publish -- "本次更新说明"
-```
-
-该命令会提升版本号、生成安装包并向 `UPDATE_SERVER_URL` 上传，需要 `UPDATE_ADMIN_TOKEN`。`minor` / `major` 档位见脚本说明。
-
-另一个 `npm run release` 脚本会进行 Git 提交、打标签和推送。它与上传更新后台不是同一条发布链路，不能把创建 Git 标签当成安装包已经发布。日常代码提交和 README 更新也不会自动生成新的安装包版本。
-
-用户更新流程为 `/update` → 下载与覆盖应用文件 → 安装依赖 → 重启。当前升级会保护本机整个 `data/`、凭证、会话和输出目录。CI 文件已提供，远程验证结果需实际运行后确认。
+客户端更新检查默认对比 GitHub 仓库 `package.json` 的版本号（可用 `RAPTOR_UPDATE_SERVER` 覆盖为自建更新后台地址，必须 HTTPS）；`RAPTOR_NO_UPDATE_CHECK=1` 关闭检查。用户更新流程为 `/update` → 下载与覆盖应用文件 → 安装依赖 → 重启，升级会保护本机整个 `data/`、凭证、会话和输出目录。

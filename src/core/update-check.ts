@@ -1,6 +1,7 @@
 /**
- * 更新检查：对比「更新后台」上的最新版本与本地版本，有新版则提示。
- * 后台 = update/update-server.mjs（发版用 npm run publish 推上去）。
+ * 更新检查：对比最新版本与本地版本，有新版则提示。
+ * 默认对比 GitHub 仓库 package.json 的版本号（RAW_URL）；维护者可通过
+ * RAPTOR_UPDATE_SERVER 覆盖为自建更新后台地址。
  *
  * 设计约束：
  *  - 每 24h 最多真正联网一次，结果（含「没有新版」）缓存 data/update-check.json，
@@ -22,9 +23,9 @@ import { PROJECT_ROOT } from "./paths";
 const exec = promisify(execCb);
 
 /**
- * 发版脚本会把占位符替换为 HTTPS 更新后台地址并随 zip 一起分发；
- * 源码开发时占位符会解析为空，避免没有后台的本地开发被阻断。
- * .env 的 RAPTOR_UPDATE_SERVER 只用于维护者/本地测试覆盖。
+ * __RAPTOR_RELEASE_SERVER__ 保留为历史占位符（自建更新后台已下线，不再随发版替换），
+ * 恒解析为空：未配置后台时走 GitHub 兜底链路。
+ * .env 的 RAPTOR_UPDATE_SERVER 用于维护者/本地测试覆盖。
  */
 const DEFAULT_UPDATE_SERVER = "__RAPTOR_RELEASE_SERVER__";
 

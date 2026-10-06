@@ -1,8 +1,6 @@
 node_modules/
 .env
 dist/
-# 管理台前端构建产物随仓库提交（服务器 git pull + restart 即生效，不在机上构建）
-!admin/dist/
 downloads/
 memory.json
 session.json
@@ -17,7 +15,6 @@ eng.traineddata
 credentials.enc
 # 上游 skills 合集（体积大、仅本地参考，不入库不打包）
 skills/upstream-*/
-update-data/
 .spec-workflow/
 .tmp-banner/
 # 根目录临时脚本/状态（会话工作产物，含 .tmp-banner/ 一类前缀）
@@ -29,7 +26,7 @@ update-data/
 .playwright-mcp/
 outputs/
 hall-main.png
-# 管理台/同学端 UI 评审截图（根目录快照，含用户列表等界面，不入库）
+# 同学端 UI 评审截图（根目录快照，含会话界面，不入库）
 /desk-*.png
 /mob-*.png
 /shot-*.png
@@ -37,6 +34,3 @@ hall-main.png
 .qmuse/
 # 本地语义评审临时产物，不入库
 semantic-review/
-# 多用户网关本地默认状态（用户表/邀请码/各实例数据，仅开发自用时出现）
-gateway/state/
-gateway/users/

@@ -4,10 +4,9 @@
  * 打 Windows x64「便携包」：内置 Node 运行时 + 生产依赖，同学解压后双击 start.bat 即用，
  * 无需自己安装 Node.js、无需联网 npm ci。
  *
- * 与 publish-release.mjs 的关键区别：
- *   - publish-release 传源码 zip 到自建更新后台（要求同学装 Node）。
- *   - 本脚本产出的是「免装 Node」的自包含便携 zip，用于 GitHub Release 直接给同学下载。
- *   - scripts/package-exe.mjs 在本产物基础上再打「单文件 exe」（内置释放逻辑的 .NET 启动器）。
+ * 与 GitHub Release 的关系：本脚本产出「免装 Node」的自包含便携 zip，
+ * 上传 GitHub Release 直接给同学下载。
+ * scripts/package-exe.mjs 在本产物基础上再打「单文件 exe」（内置释放逻辑的 .NET 启动器）。
  *
  * 用法：
  *   node scripts/package-portable.mjs            # 用 package.json 版本，产物打印路径
@@ -106,7 +105,7 @@ export function buildPortable({ keep = false } = {}) {
     );
     console.log(`匿名使用上报已烘入：${telemetryUrl}`);
   } else {
-    console.warn("[!] 本机 .env 未配 TELEMETRY_PING_URL：本包不带使用统计（管理台看不到这批设备）");
+    console.warn("[!] 本机 .env 未配 TELEMETRY_PING_URL：本包不带使用统计");
   }
 
   console.log("源码已暂存（node_modules / data 未包含）");

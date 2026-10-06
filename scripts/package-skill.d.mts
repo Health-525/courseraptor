@@ -1,4 +1,4 @@
-/** scripts/package-skill.mjs 的类型声明（同 gateway/*.d.mts 惯例） */
+/** scripts/package-skill.mjs 的类型声明 */
 
 export interface SkillPackageResult {
   /** 技能名（njtech-jwgl / export-schedule / meta-learning） */
