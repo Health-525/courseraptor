@@ -1,7 +1,9 @@
 name: Checks
 
 on:
+  # push 只跑 main：分支场景由 pull_request 覆盖，避免「push 分支 + 开 PR」双跑
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -61,6 +63,9 @@ jobs:
           cache-dependency-path: admin/package-lock.json
       - name: 安装依赖
         run: npm ci
+        working-directory: admin
+      - name: 格式检查
+        run: npm run format:check
         working-directory: admin
       - name: Lint
         run: npm run lint

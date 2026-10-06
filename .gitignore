@@ -24,6 +24,7 @@ update-data/
 .tmp-*
 .openai/
 .zcode/
+.zhanlu/
 # 本地临时产物（Playwright MCP 抓取、UI 截图、架构图草稿、大厅主图快照）
 .playwright-mcp/
 outputs/

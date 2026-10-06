@@ -30,6 +30,8 @@ jobs:
           cache-dependency-path: landing/package-lock.json
       - run: npm ci
         working-directory: landing
+      - run: npm run lint
+        working-directory: landing
       - run: npm run build
         working-directory: landing
         env:
