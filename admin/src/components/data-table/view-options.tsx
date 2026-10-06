@@ -26,11 +26,11 @@ export function DataTableViewOptions<TData>({
           className='ms-auto hidden h-8 lg:flex'
         >
           <MixerHorizontalIcon className='size-4' />
-          View
+          列显示
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='end' className='w-37.5'>
-        <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+        <DropdownMenuLabel>显示列</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {table
           .getAllColumns()
@@ -46,7 +46,8 @@ export function DataTableViewOptions<TData>({
                 checked={column.getIsVisible()}
                 onCheckedChange={(value) => column.toggleVisibility(!!value)}
               >
-                {column.id}
+                {(column.columnDef.meta as { label?: string } | undefined)
+                  ?.label ?? column.id}
               </DropdownMenuCheckboxItem>
             )
           })}

@@ -6,5 +6,7 @@ declare module '@tanstack/react-table' {
     className?: string // apply to both th and td
     tdClassName?: string
     thClassName?: string
+    /** 列的中文名（「列显示」下拉等 UI 用，缺省回退 column.id） */
+    label?: string
   }
 }

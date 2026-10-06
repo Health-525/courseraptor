@@ -2,7 +2,6 @@ import { Loader2, RefreshCw } from 'lucide-react'
 import { useBootstrap, useInvalidateBootstrap } from '@/lib/admin-data'
 import { fmtUptime } from '@/lib/format'
 import { Button } from '@/components/ui/button'
-import { ConfigDrawer } from '@/components/config-drawer'
 import { Header } from '@/components/layout/header'
 import { ThemeSwitch } from '@/components/theme-switch'
 
@@ -57,7 +56,6 @@ export function AdminHeader({
           )}
         </Button>
         <ThemeSwitch />
-        <ConfigDrawer />
       </div>
     </Header>
   )

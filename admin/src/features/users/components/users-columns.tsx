@@ -113,6 +113,7 @@ export const usersColumns: ColumnDef<User>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='注册于' />
     ),
+    meta: { label: '注册于' },
     cell: ({ row }) => (
       <div className='w-fit ps-2 text-sm text-nowrap text-muted-foreground'>
         {new Date(row.getValue('createdAt')).toLocaleString('zh-CN', {
@@ -131,6 +132,7 @@ export const usersColumns: ColumnDef<User>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='今日轮数' />
     ),
+    meta: { label: '今日轮数' },
     cell: ({ row }) => {
       const u = row.original
       const turns = u.turns.date === today() ? u.turns.count : 0
@@ -152,6 +154,7 @@ export const usersColumns: ColumnDef<User>[] = [
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title='专属实例' />
     ),
+    meta: { label: '专属实例' },
     cell: ({ row }) => {
       const u = row.original
       if (!u.online) {

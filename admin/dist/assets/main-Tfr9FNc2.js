@@ -1,0 +1,1 @@
+import{j as x,e}from"./index-CoOAl5OV.js";function r({fixed:t,className:o,fluid:n,...a}){return x.jsx("main",{"data-layout":t?"fixed":"auto",className:e("px-4 py-6",t&&"flex grow flex-col overflow-hidden",!n&&"@7xl/content:mx-auto @7xl/content:w-full @7xl/content:max-w-7xl",o),...a})}export{r as M};
