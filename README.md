@@ -29,15 +29,15 @@ Vercel AI SDK v7 · `SchoolAdapter` 端口-适配器架构 · 三端入口 · �
 
 把散落在教务系统各处的信息收进一句对话：问「这周课表」「我的 GPA」「最近的考试」「通识学分还缺哪几类」，agent 自动登录教务、抓取、结构化后回答。**终端敲 `raptor`、浏览器开 `localhost:3210`、QQ 里 @机器人**——三个入口共用同一个 Agent 内核与同一份记忆。
 
-一切都在你自己的电脑上运行：凭证 AES-256-GCM 加密落盘、无遥测上报、教务数据不经第三方；接的是你自己的模型 API Key——默认 DeepSeek，也内置**通义千问、智谱 GLM、Kimi、豆包、混元、MiniMax、阶跃、文心、讯飞、硅基流动**等 11 家国内厂商，外加自定义 OpenAI 兼容端点，按量计费、用量透明。目前对南京工业大学做了全量适配，**其他学校开箱可用「手动课表」模式**。
+一切都在你自己的电脑上运行：凭证 AES-256-GCM 加密落盘、教务数据不经第三方；安装包内置匿名装机统计（仅随机设备号 + 版本 + 平台，不含学号、账号与对话内容，`RAPTOR_NO_TELEMETRY=1` 一键关闭，源码运行默认不上报）；接的是你自己的模型 API Key——默认 DeepSeek，共 **12 家国内厂商**可选：**通义千问、智谱 GLM、Kimi、豆包、混元、MiniMax、阶跃、文心、讯飞、硅基流动、移动云**，外加自定义 OpenAI 兼容端点，按量计费、用量透明。已对**南京工业大学全量适配**、**河北农业大学社区适配**，**其他学校开箱可用「手动课表」模式**。
 
-正在写 Agent 的人，可以直接把它当参考实现读：`ToolLoopAgent` 多轮工具循环怎么组织 30+ 工具、外部系统怎么用端口-适配器隔离（新增一所学校 = 新增一个自包含目录，内核零改动）、11 家厂商的模型层怎么用纯数据注册表装配——见下方 [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程) 一节。
+正在写 Agent 的人，可以直接把它当参考实现读：`ToolLoopAgent` 多轮工具循环怎么组织 36 个工具、外部系统怎么用端口-适配器隔离（新增一所学校 = 新增一个自包含目录，内核零改动）、12 家厂商的模型层怎么用纯数据注册表装配——见下方 [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程) 一节。
 
 ---
 
 ## ✨ 核心特性
 
-Agent 共装备 **30+ 个工具**。完整参数表、耗时、环境变量与教务模块覆盖见 [📖 能力文档](docs/capabilities.md)。
+Agent 共装备 **36 个工具**（南工大默认配置；开启抢课后 40 个，其他学校按已接入能力自动裁剪）。完整参数表、耗时、环境变量与教务模块覆盖见 [📖 能力文档](docs/capabilities.md)。
 
 - **教务全量查询** —— 课表、成绩与 GPA（重修取最高、通识六类统计）、考试、学籍、已选/重修/实验成绩，一句话直查；学期交界自动探测候选学期，不靠日历猜
 - **选课分析（只读）** —— 搜课搜班看余量；多门课自动查各教学班明细，与已选课程做时间冲突检测，覆盖单双周与部分周重叠
@@ -46,9 +46,10 @@ Agent 共装备 **30+ 个工具**。完整参数表、耗时、环境变量与�
 - **文件与文档** —— 读本地 Word / PDF / Excel / TXT，千行大表按条件取行而非整本塞给模型；沙箱 JS 计算；生成 Word / Excel / PPT / PDF 及跨格式互转，中文原生
 - **记忆 · 知识 · 待办** —— 两层记忆（会话跨重启延续 + 长期事实自主维护）；知识点对话自动沉淀、按课表真实课程归类；待办三端同步，到期桌面通知 + QQ 推送双提醒
 - **手动课表（其他学校）** —— 粘贴课表文字（教务网页表格、Excel、其他课表 App 导出都行）或上传 Excel / CSV / PDF / Word / TXT，AI 解析成结构化课表，拿不准会追问，预览里逐行确认
-- **三端入口** —— 终端 TUI（首屏即今日课表、待办、考试、通知速览）、本地网页「功能大厅」（九大面板、会话管理、文件上传）、QQ 官方机器人（白名单制、零封号）
-- **多厂商模型** —— 11 家国内厂商 + 自定义 OpenAI 兼容端点任选：每家 Key 独立加密保存、切换不丢，型号列表实时拉取，网页端下拉即切
-- **更多** —— 番茄钟、天气与穿衣建议、自动更新；另有无头 CLI 可脚本化直查教务，不经模型、不耗 token
+- **三端入口** —— 终端 TUI（首屏即今日课表、待办、考试、通知速览）、本地网页「功能大厅」（十大面板、会话管理、文件上传）、QQ 官方机器人（白名单制、零封号）
+- **多厂商模型** —— 12 家国内厂商 + 自定义 OpenAI 兼容端点任选：每家 Key 独立加密保存、切换不丢，型号列表实时拉取，网页端下拉即切
+- **学习教练** —— 学习类对话自动切换教练模式：直觉先于形式、答错先给提示，备考按「模板 → 变式 → 整卷」编排，先查真实考试安排与历史成绩再定计划
+- **更多** —— 用量统计（一年热力图）、番茄钟、天气与穿衣建议、自动更新；另有无头 CLI 可脚本化直查教务，不经模型、不耗 token
 
 ---
 
@@ -76,10 +77,10 @@ Agent 共装备 **30+ 个工具**。完整参数表、耗时、环境变量与�
 
 | 你要解决的问题 | 这里的做法 | 源码 |
 |---|---|---|
-| Agent 主循环 | Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI`：30+ 工具的多轮循环，思考与工具调用全程透出 | [`src/core/agent.ts`](src/core/agent.ts) |
+| Agent 主循环 | Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI`：36 个工具的多轮循环，思考与工具调用全程透出 | [`src/core/agent.ts`](src/core/agent.ts) |
 | 给 Agent 接外部系统 | `SchoolAdapter` 端口 + 每校一个自包含适配器目录；内核永不反向依赖实现，正方新版 / CAS+URP 的差异全部被适配器吃掉 | [`src/core/school.ts`](src/core/school.ts) · [`src/adapters/`](src/adapters/) |
-| 多模型厂商接入 | 供应商注册表纯数据 + 模型工厂统一装配：11 家国内厂商 + 自定义 OpenAI 兼容端点，Key 独立加密、运行时热切 | [`src/core/providers.ts`](src/core/providers.ts) · [`src/core/models.ts`](src/core/models.ts) |
-| 工具层设计 | 30+ 工具的参数与返回契约，覆盖教务、文档、日历、记忆四域，可渐进式挂载 | [`src/core/tools/`](src/core/tools/) |
+| 多模型厂商接入 | 供应商注册表纯数据 + 模型工厂统一装配：12 家国内厂商 + 自定义 OpenAI 兼容端点，Key 独立加密、运行时热切 | [`src/core/providers.ts`](src/core/providers.ts) · [`src/core/models.ts`](src/core/models.ts) |
+| 工具层设计 | 36 个工具的参数与返回契约，覆盖教务、通知、文件、文档、日历、记忆六域，可渐进式挂载 | [`src/core/tools/`](src/core/tools/) |
 | 两层记忆 | 会话跨重启续聊 + 长期事实自主维护，全部本地 JSON、无数据库 | [`src/core/memory/`](src/core/memory/) |
 | 多入口单内核 | 终端 TUI / 本地网页 / QQ 机器人共享同一内核与记忆；另有无头 CLI 不经 LLM、零 token | [`src/channels/`](src/channels/) · [`local/`](local/) · [`skills/njtech-jwgl/`](skills/njtech-jwgl/) |
 | 本地优先安全 | 凭证 AES-256-GCM 绑定本机指纹；Web 仅回环监听 + Host/Origin/CSRF 校验；沙箱 JS 无网络无磁盘 | [`src/core/credentials.ts`](src/core/credentials.ts) · [`src/core/sandbox-js.ts`](src/core/sandbox-js.ts) |
@@ -107,9 +108,9 @@ npm run demo
 
 ### 方式一：下载安装包（推荐给同学，无需任何开发环境）
 
-到 [Releases](https://github.com/Health-525/courseraptor/releases/latest) 下载任一安装包（约 110 MB，**已内置 Node 运行时**，不用装 Node.js、也不用联网装依赖）。别下页面最底部 GitHub 自动生成的 Source code 包。
+到 [Releases](https://github.com/Health-525/courseraptor/releases/latest) 下载任一安装包（约 116 MB，**已内置 Node 运行时**，不用装 Node.js、也不用联网装依赖）。别下页面最底部 GitHub 自动生成的 Source code 包。
 
-- **`portable-win-x64.exe`（最省事，推荐）**：双击即用。exe 放哪、程序就装到哪——首次双击在旁边释放 `CourseRaptor` 文件夹（约 110 MB）后直接进入对话；之后秒开，删文件夹即卸载。**升级 = 新版 exe 放进原文件夹再双击**，账号、记忆、数据全部保留
+- **`portable-win-x64.exe`（最省事，推荐）**：双击即用。exe 放哪、程序就装到哪——首次双击在旁边释放 `CourseRaptor` 文件夹（约 116 MB）后直接进入对话；之后秒开，删文件夹即卸载。**升级 = 新版 exe 放进原文件夹再双击**，账号、记忆、数据全部保留
 - **`portable-win-x64.zip`（绿色版）**：解压后双击文件夹里的 `start.bat`，适合 U 盘携带或机房电脑
 
 启动不在终端提问，直接进入界面；教务账号和模型 API Key（默认 DeepSeek，其他厂商在网页「设置 → AI 模型」里切换）都在网页「功能大厅 → 设置」里填写，加密存本机、之后免填。
@@ -183,7 +184,7 @@ npm run njtech -- search-courses 高等数学
 |------|----------|
 | 数据不出设备 | 教务查询、文件解析、文档生成、记忆与知识库存储均在本机完成 |
 | 凭证加密存储 | 教务密码、API Key、QQ 机器人密钥均经 AES-256-GCM 加密写入 `credentials.enc`（密钥绑定本机指纹，拷走的文件在别的电脑解不开） |
-| 无遥测/上报 | 代码中无任何统计埋点、错误上报、使用情况收集逻辑 |
+| 匿名装机统计（仅安装包） | 每 24h 一次报随机设备号 + 版本 + 平台（`src/core/usage-ping.ts`）；不含学号、账号与对话内容，`RAPTOR_NO_TELEMETRY=1` 一键关闭；源码运行默认不上报 |
 | 可审计 | 完全开源，`src/` 下所有网络请求、文件读写、加密逻辑均可直接阅读 |
 
 安全细节：
@@ -207,7 +208,7 @@ npm run njtech -- search-courses 高等数学
 
 **本地优先（Local-first）**：交互入口、Agent 内核、两层记忆与知识库全部跑在本机，数据不出电脑；教务系统、天气等外部服务仅在查询时按需访问。
 
-**技术栈**：[Vercel AI SDK v7](https://ai-sdk.dev)（`ToolLoopAgent` + `runAgentTUI`）· 模型层：DeepSeek（默认 `deepseek-flash`，即 V4.1-Flash）+ 通义千问 / 智谱 GLM / Kimi / 豆包 / 混元 / MiniMax / 阶跃 / 文心 / 讯飞 / 硅基流动 + 自定义 OpenAI 兼容端点（供应商注册表纯数据、模型工厂统一装配）· TypeScript + Node 内置 HTTP（网页端零框架）· Biome + node:test
+**技术栈**：[Vercel AI SDK v7](https://ai-sdk.dev)（`ToolLoopAgent` + `runAgentTUI`）· 模型层：DeepSeek（默认 `deepseek-flash`，即 V4.1-Flash）+ 通义千问 / 智谱 GLM / Kimi / 豆包 / 混元 / MiniMax / 阶跃 / 文心 / 讯飞 / 硅基流动 / 移动云 + 自定义 OpenAI 兼容端点（供应商注册表纯数据、模型工厂统一装配）· TypeScript + Node 内置 HTTP（网页端零框架）· Biome + node:test
 
 **项目结构**（完整树见 [能力文档](docs/capabilities.md#-项目结构完整树)）：
 
@@ -258,7 +259,7 @@ npm run njtech -- search-courses 高等数学
 安装包未做代码签名（exe 是自释放启动器、zip 里的 `runtime\node.exe` 是 Node 官方运行时），SmartScreen 弹窗选「更多信息 → 仍要运行」，或把安装 / 解压目录加入杀软信任区。
 
 **没有模型 API Key，能先用吗？**
-可以先跑上面的离线演示，零凭证体验界面。正式对话需要自己的 Key——默认 DeepSeek，但**通义千问、智谱 GLM、Kimi、豆包等 11 家国内厂商任选一家**，或填自定义 OpenAI 兼容端点；教务账号可以跳过，之后在网页「功能大厅 → 设置 → 教务账号」补填。
+可以先跑上面的离线演示，零凭证体验界面。正式对话需要自己的 Key——默认 DeepSeek，也可换**其余 11 家国内厂商**（通义千问、智谱 GLM、Kimi、豆包、移动云等，共 12 家）任选一家，或填自定义 OpenAI 兼容端点；教务账号可以跳过，之后在网页「功能大厅 → 设置 → 教务账号」补填。
 
 **网页打不开，或提示端口被占用？**
 以终端启动时打印的实际地址为准（默认 `http://127.0.0.1:3210`，被占用会自动换端口）；页面表现异常先 `Ctrl+F5` 强刷缓存。

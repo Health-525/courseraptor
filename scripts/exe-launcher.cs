@@ -45,7 +45,7 @@ internal static class Launcher
             {
                 Console.WriteLine("🦖 CourseRaptor " + Version + " 首次启动：正在释放文件到");
                 Console.WriteLine("   " + root);
-                Console.WriteLine("   （约 110MB，稍等一会儿；之后每次启动都是秒开）");
+                Console.WriteLine("   （约 115MB，稍等一会儿；之后每次启动都是秒开）");
                 int n = ExtractEmbedded(root);
                 File.WriteAllText(marker, Version);
                 Console.WriteLine("   释放完成，共 " + n + " 个文件。");

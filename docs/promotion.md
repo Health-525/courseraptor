@@ -2,7 +2,7 @@
 
 [返回首页](../README.md) · [路线图](roadmap.md)
 
-定位建议：**南京工业大学学生的开源教务助手，把课表、成绩、考试和通知变成一句话查询。**
+定位建议：**已适配学校的开源教务助手（南京工业大学全量 + 河北农业大学社区维护，其他学校手动课表模式），把课表、成绩、考试和通知变成一句话查询。**
 
 目前没有用户访谈、转化率或留存数据。以下是待验证的推广方案，不把 Star 数、用户数或使用效果写成已有成绩。
 
@@ -18,7 +18,7 @@
 
 ## 可以直接使用的介绍文案
 
-> 做了一个给南工同学用的开源教务助手 CourseRaptor：一句话查课表、成绩、考试和教务通知，还能整理通识修读情况、导出手机日历。可以先运行离线演示看看效果，正式查询需要配置自己的教务账号和模型 API Key。项目目前支持南京工业大学，欢迎反馈最希望解决的使用问题。
+> 做了一个给同学们用的开源教务助手 CourseRaptor：一句话查课表、成绩、考试和教务通知，还能整理通识修读情况、导出手机日历。可以先运行离线演示看看效果，正式查询需要配置自己的教务账号和模型 API Key。项目已支持南京工业大学（全量）与河北农业大学，其他学校手动课表模式可用，欢迎反馈最希望解决的使用问题。
 >
 > 项目地址：[Health-525/courseraptor](https://github.com/Health-525/courseraptor)
 
@@ -41,7 +41,7 @@
 
 > 开源了一个给南工学生用的教务 AI 助手 CourseRaptor。技术上是 TypeScript + Vercel AI SDK，连接课表、成绩、考试和教务通知，并支持本地日历与文档导出。这次补上免凭证离线演示、学业概览、数据保护和 CI。
 >
-> 项目目前只适配南京工业大学，正式查询需要配置自己的教务账号和模型 Key。想听听大家对学生工具的需求，尤其是首次配置、通知截止提醒和培养方案核对。
+> 项目已适配南京工业大学（全量）与河北农业大学，其他学校可用手动课表导入；正式查询需要配置自己的教务账号和模型 Key。想听听大家对学生工具的需求，尤其是首次配置、通知截止提醒和培养方案核对。
 >
 > [源码与使用说明](https://github.com/Health-525/courseraptor)
 
@@ -49,7 +49,7 @@
 
 > CourseRaptor is an open-source academic AI assistant for Nanjing Tech University students. It brings timetables, grades, exams, announcements, and calendar exports into a browser or terminal conversation.
 >
-> Built with TypeScript and the Vercel AI SDK. A credential-free offline demo uses fictional data and scripted responses. Live use requires the student's own university credentials and model API key. The current integration supports NJTECH only; feedback and contributions are welcome.
+> Built with TypeScript and the Vercel AI SDK. A credential-free offline demo uses fictional data and scripted responses. Live use requires the student's own university credentials and model API key. The current integrations cover NJTECH (full) and Hebei Agricultural University (community adapter), with a manual-timetable mode for any other school; feedback and contributions are welcome.
 >
 > [Repository](https://github.com/Health-525/courseraptor)
 

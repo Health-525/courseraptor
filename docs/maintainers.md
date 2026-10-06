@@ -43,7 +43,7 @@ npm run demo
 
 `scripts/package-policy.mjs` 定义包内容：应用源码、入口、脚本、测试、依赖锁文件与选定的公开文档/素材。新增需要随包分发的文档时同步更新该清单。
 
-`data/`、`outputs/`、下载、日志、环境文件和根目录凭证不进入安装包。公共校历基础值在 `src/jwgl/term-dates.ts`；学生自己的校历修正保存在本地并在升级时保留。如果需要全体同步校历，后续应设计专用的公共校历数据源，不能直接分发个人 `data/term-dates.json`。
+`data/`、`outputs/`、下载、日志、环境文件和根目录凭证不进入安装包。公共校历基础值在各校适配器目录内（`src/adapters/njtech/term-dates.ts`、`src/adapters/hebau/term-dates.ts`）；学生自己的校历修正保存在本地并在升级时保留。如果需要全体同步校历，后续应设计专用的公共校历数据源，不能直接分发个人 `data/term-dates.json`。
 
 发版前检查最终 zip 的文件清单，确认没有私密文件；不要直接压缩已使用的项目目录转发给同学。历史安装包若由旧打包脚本生成，应由维护者检查是否夹带个人文件，再决定撤回或替换。
 
@@ -51,7 +51,7 @@ npm run demo
 
 ## 更新后台
 
-后台入口为 `update/update-server.mjs`，数据保存在 `update-data/`。Node 默认监听本机，通过 Nginx 和 HTTPS 对外提供服务；参考 `server/nginx.conf.example`。
+后台入口为 `update/update-server.mjs`，数据保存在 `update-data/`。Node 默认监听本机，通过 Nginx 和 HTTPS 对外提供服务；参考 `update/nginx.conf.example`。
 
 需要维护者配置 `UPDATE_ADMIN_TOKEN`、`HOST`、`PORT`。密钥使用自己的高强度随机值，通过部署环境注入，不写进 README、Issue 或示例文件。
 
