@@ -12,7 +12,7 @@ Vercel AI SDK v7 · `SchoolAdapter` 端口-适配器架构 · 三端入口 · �
 
 [![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
 [![下载最新版](https://img.shields.io/github/v/release/Health-525/courseraptor?label=%E4%B8%8B%E8%BD%BD%E6%9C%80%E6%96%B0%E7%89%88&color=orange)](https://github.com/Health-525/courseraptor/releases/latest)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT + 附加限制](https://img.shields.io/badge/License-MIT_附加限制-blue.svg)](LICENSE)
 [![Vercel AI SDK](https://img.shields.io/badge/Vercel%20AI%20SDK-v7-black.svg)](https://ai-sdk.dev)
 [![LLM](https://img.shields.io/badge/LLM-DeepSeek%20%C2%B7%20%E5%A4%9A%E5%8E%82%E5%95%86-4D6BFE.svg)](https://www.deepseek.com)
 [![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social)](https://github.com/Health-525/courseraptor)
@@ -72,7 +72,7 @@ Agent 共装备 **30+ 个工具**。完整参数表、耗时、环境变量与�
 
 ## 🧰 给开发者：一套可整体搬走的本地 Agent 工程
 
-> 在找「Vercel AI SDK 的生产级完整例子」，或者「Agent 怎么接一堆外部系统而不失控」？这个仓库是一份答案：三端入口跑在真实用户的日常使用里，每个设计都有源码可查、有测试兜底，MIT 许可随便拆走复用。
+> 在找「Vercel AI SDK 的生产级完整例子」，或者「Agent 怎么接一堆外部系统而不失控」？这个仓库是一份答案：三端入口跑在真实用户的日常使用里，每个设计都有源码可查、有测试兜底，MIT + 附加限制条款，欢迎拆走复用——但**打比赛、交毕设/课程作业、商用须事先获作者授权**（详见 [LICENSE](LICENSE)）。
 
 | 你要解决的问题 | 这里的做法 | 源码 |
 |---|---|---|
@@ -245,7 +245,7 @@ npm run njtech -- search-courses 高等数学
 
 ## ⚠️ 免责声明与使用建议
 
-- 本项目可在 [MIT 许可证](LICENSE) 条款下自由使用、复制、修改和分发；本项目与南京工业大学官方无关，也未获其授权或认可。
+- 本项目基于 [MIT 许可证 + 附加限制条款](LICENSE) 授权：可自由使用、复制、修改和分发，但**禁止用于毕业论文、毕业设计、课程作业等学术成果和任何竞赛参赛作品，商业用途须事先取得作者书面授权**（详见 [LICENSE](LICENSE)）；本项目与南京工业大学官方无关，也未获其授权或认可。
 - 使用者需**自行承担全部风险**：请遵守学校相关规定及教务系统使用条款，因使用本工具产生的任何后果（包括但不限于账号受限、成绩处理）由使用者本人负责。
 - 请避免大规模或高频请求，尊重教务系统的承载能力（传输层内置全局限速令牌桶，`RAPTOR_MAX_RPS` 只允许下调、请勿调高）。
 - **关于验证码识别**：附件下载路径中的图形验证码由本地 tesseract 自动识别，这在技术上属于绕过网站的反自动化措施。此能力仅限用于获取**本人有权访问的通知附件**，重试上限 3 次；如需完全停用，设 `RAPTOR_DISABLE_CAPTCHA_OCR=1`。
@@ -284,7 +284,7 @@ npm run njtech -- search-courses 高等数学
 
 <div align="center">
 
-**🦖 CourseRaptor** · 让迅猛龙替你守教务 · [MIT 许可证](LICENSE)
+**🦖 CourseRaptor** · 让迅猛龙替你守教务 · [MIT + 附加限制条款](LICENSE)
 
 觉得好用？[点个 ⭐ Star](https://github.com/Health-525/courseraptor) 让更多同学看到它。写 Agent 的朋友参考这套工程做自己的项目时，也欢迎来 [Discussions](https://github.com/Health-525/courseraptor/discussions) 留个项目链接。遇到问题或有想法，欢迎开 [issue](https://github.com/Health-525/courseraptor/issues/new/choose) 聊聊。
 
