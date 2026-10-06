@@ -37,7 +37,7 @@ interface TUIStreamArgs {
 /**
  * 包装 agent：软打断信号 → 中止本轮生成，其余行为（tools 等）原样透传。
  * 软打断用独立的 AbortController 实现，和库传入的 abortSignal 合并——
- * 工具执行拿到的是合并后的信号，长工具（盯课/抢课）也能被 ESC 停下来。
+ * 工具执行拿到的是合并后的信号，长耗时工具也能被 ESC 停下来。
  */
 export function withSoftInterrupt<
   A extends {

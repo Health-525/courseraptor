@@ -30,7 +30,7 @@ test("parseCourseList：jxbmc 平铺行（njtech_grabber 实测的 PartDisplay �
   });
   assert.equal(courses.length, 1);
   const c = courses[0];
-  // jxbmc 兜底之前这里会是空串，matchTargets 全部落空
+  // jxbmc 兜底之前这里会是空串，课程名匹配全落空
   assert.equal(c.courseName, "大学物理(上)-2024级化工1班");
   assert.equal(c.courseCode, "WLGX1001");
   assert.equal(c.jxbId, "JXB2024001");
@@ -82,9 +82,9 @@ test('parseActionResponse：退课成功的裸 "1" 形状（njtech_grabber 实�
 });
 
 test("parseActionResponse：选课 flag 形状（成功/业务拒绝）", () => {
-  assert.deepEqual(parseActionResponse('{"flag":"1","msg":"选课成功"}'), {
+  assert.deepEqual(parseActionResponse('{"flag":"1","msg":"退课成功"}'), {
     ok: true,
-    message: "选课成功",
+    message: "退课成功",
   });
   assert.deepEqual(parseActionResponse('{"flag":"0","msg":"此教学班容量已满"}'), {
     ok: false,
@@ -97,7 +97,7 @@ test("parseActionResponse：选课 flag 形状（成功/业务拒绝）", () => 
   });
 });
 
-test("parseActionResponse：不可解析返回 null（submitCourse 据此走备用接口）", () => {
+test("parseActionResponse：不可解析返回 null（调用方据此报校准错误）", () => {
   assert.equal(parseActionResponse("<html>404</html>"), null);
   assert.equal(parseActionResponse(""), null);
   assert.equal(parseActionResponse('{"flag":'), null);

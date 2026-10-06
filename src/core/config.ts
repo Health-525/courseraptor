@@ -57,8 +57,6 @@ export interface RaptorConfig {
   qqPushOpenids: string[];
   /** QQ 凭证来源（诊断用）；「完整可用」指 AppID 与 AppSecret 都在 */
   qqBotSource: QQBotSource;
-  /** 抢课功能开关（选课季设为 1 才暴露抢课/盯课工具，平时关闭回到日常对话） */
-  enableGrab: boolean;
   /** 教务请求全局限速（zod 校验后的 RAPTOR_MAX_RPS / RAPTOR_BURST） */
   rateLimit: { rps: number; burst: number };
 }
@@ -284,7 +282,6 @@ function loadConfig(): RaptorConfig {
     qqBotPasscode: resolvedQQ.passcode,
     qqBotSource: resolvedQQ.source,
     qqPushOpenids: parseQQPushOpenids(env("QQBOT_PUSH_OPENIDS")),
-    enableGrab: env("RAPTOR_ENABLE_GRAB") === "1",
     rateLimit: parseRateLimit(),
   };
 

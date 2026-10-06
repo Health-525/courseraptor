@@ -122,7 +122,7 @@ test("能力边界：无教务登录、无通知面；fetchSmart 即读缓存", 
     const exams = await adapter.schedule!.fetchExamsSmart("");
     assert.ok(!exams.ok);
     // 提示词段如实交代能力边界
-    const sections = adapter.promptSections({ enableGrab: false });
+    const sections = adapter.promptSections();
     assert.match(sections.tools + sections.background, /手动导入/);
     assert.match(sections.background, /不可用/);
   });

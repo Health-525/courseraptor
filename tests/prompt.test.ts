@@ -51,7 +51,7 @@ test("校历段：开学日期与放假/调休从运行时真值渲染进提示�
 const { basePrompt } = await import("../src/core/prompt");
 
 test("行为准则：今日简报规则要求日程与待办结合分析", () => {
-  const s = basePrompt(false);
+  const s = basePrompt();
   assert.match(s, /今日简报/, "应有今日简报规则");
   assert.match(s, /manage_todos list 看未完成待办/, "应要求结合待办");
   assert.match(s, /不要分两张清单各念各的/, "应要求交叉分析而非两张清单");
