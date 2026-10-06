@@ -8,7 +8,7 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { writeFileAtomicSync } from "./atomic-write";
+import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
 import { dataDir, isInsideDir } from "./paths";
 
 function statePath(): string {
@@ -48,13 +48,23 @@ interface WorkspaceState {
 const emptyState = (): WorkspaceState => ({ uploads: [], reminders: [] });
 
 function readState(): WorkspaceState {
+  const file = statePath();
+  let raw: string;
   try {
-    const value = JSON.parse(fs.readFileSync(statePath(), "utf8")) as Partial<WorkspaceState>;
+    raw = fs.readFileSync(file, "utf8");
+  } catch {
+    return emptyState(); // 文件不存在：正常首启
+  }
+  try {
+    const value = JSON.parse(raw) as Partial<WorkspaceState>;
     return {
       uploads: Array.isArray(value.uploads) ? value.uploads : [],
       reminders: Array.isArray(value.reminders) ? value.reminders : [],
     };
   } catch {
+    // 损坏先留档再当空（与 chat-sessions/knowledge 同约定）：直接当空的话，
+    // 下一次写操作会用空状态覆盖真实索引，uploads/reminders 全部失联
+    quarantineCorruptFileSync(file);
     return emptyState();
   }
 }

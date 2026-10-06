@@ -10,6 +10,8 @@ import {
   deleteAttachment,
   getMeta,
   listAttachments,
+  parsedCacheGet,
+  parsedCachePut,
   readStoredBuffer,
 } from "../attachment-store";
 import { openLocalFile } from "../attachments";
@@ -95,8 +97,17 @@ export const filesTools = {
           error: `缓存中不存在 id=${input.id} 的表格（可能已清理）。先 fetch_attachment 或 read_local_file 重新获取。`,
         };
       }
-      const buf = readStoredBuffer(meta.id);
-      const sheets = buf ? loadWorkbook(buf, meta.filename) : null;
+      // 解析结果进程内缓存：模型对同一张大表连续 filter/rows/values 查询
+      // 很常见（5-10 次），此前每次都全量读盘 + 整本 XLSX.read。键含
+      // size+mtimeMs+fetchedAt（附件更新必经重新登记，键随之变化），
+      // 缓存命中时连读盘都省。
+      const sheetsKey = `sheets|${meta.id}|${meta.size}|${meta.mtimeMs ?? ""}|${meta.fetchedAt}`;
+      let sheets = parsedCacheGet<TableSheet[]>(sheetsKey);
+      if (!sheets) {
+        const buf = readStoredBuffer(meta.id);
+        sheets = buf ? (loadWorkbook(buf, meta.filename) ?? undefined) : undefined;
+        if (sheets) parsedCachePut(sheetsKey, sheets);
+      }
       if (!sheets) {
         return { error: `「${meta.filename}」不是可解析的表格文件（支持 xlsx/xls/csv/tsv）` };
       }

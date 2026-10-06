@@ -57,14 +57,26 @@ export interface AttachmentMeta {
 
 type IndexShape = Record<string, AttachmentMeta>;
 
+// 索引进程内读缓存（写穿，参照 chat-sessions 的同款模式）：一次 query_table
+// 内部经 getMeta + readStoredBuffer 至少读两遍 index.json，每次 /api/* 请求
+// 亦然。写路径全部经 loadIndexSync 拿同一引用再 saveIndex，mutate 即更新。
+// RAPTOR_DATA_DIR 变化时键跟着变，测试隔离不受影响。
+const indexCache = new Map<string, IndexShape>();
+
 function loadIndexSync(): IndexShape {
+  const file = indexFile();
+  const cached = indexCache.get(file);
+  if (cached) return cached;
+  let idx: IndexShape = {};
   try {
-    const raw = fs.readFileSync(indexFile(), "utf8");
+    const raw = fs.readFileSync(file, "utf8");
     const parsed = JSON.parse(raw) as IndexShape;
-    return parsed && typeof parsed === "object" ? parsed : {};
+    if (parsed && typeof parsed === "object") idx = parsed;
   } catch {
-    return {};
+    // 不存在或损坏：按空索引起步（损坏的旧文件会被下一次原子写覆盖）
   }
+  indexCache.set(file, idx);
+  return idx;
 }
 
 async function saveIndex(idx: IndexShape): Promise<void> {
@@ -218,4 +230,32 @@ export async function clearAttachments(): Promise<number> {
     if (await deleteAttachment(m.id)) removed++;
   }
   return removed;
+}
+
+// ── 解析结果进程内缓存 ──────────────────────────────────────────
+// query_table 对同一张表连续筛选/分页、文本附件的续读与检索，都不需要每次
+// 整本重跑 XLSX.read / pdf-parse / mammoth（读盘 + 解析是两大头）。键由
+// 调用方携带失效信息（登记后 meta 的 size + fetchedAt）：附件更新后
+// fetchedAt 变化即自然换键。LRU 上限 8 份，防长会话内存膨胀。
+
+const PARSED_CACHE_MAX = 8;
+const parsedCache = new Map<string, unknown>();
+
+export function parsedCacheGet<T>(key: string): T | undefined {
+  const hit = parsedCache.get(key);
+  if (hit !== undefined) {
+    parsedCache.delete(key);
+    parsedCache.set(key, hit); // LRU 触碰
+  }
+  return hit as T;
+}
+
+export function parsedCachePut(key: string, value: unknown): void {
+  if (parsedCache.has(key)) parsedCache.delete(key);
+  parsedCache.set(key, value);
+  while (parsedCache.size > PARSED_CACHE_MAX) {
+    const oldest = parsedCache.keys().next().value;
+    if (oldest === undefined) break;
+    parsedCache.delete(oldest);
+  }
 }
