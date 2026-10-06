@@ -160,17 +160,23 @@ function App() {
       <main id="main">
         <section className="hero wrap" aria-labelledby="hero-title">
           <p className="eyebrow"><span className="status-dot"></span> 开源 · 本地运行 · 给同学的助手 · 给开发者的样例</p>
-          <h1 id="hero-title">教务琐事，<br /><span className="hl">一句话。</span></h1>
-          <p className="hero-desc">早八在哪上，通识修了哪些，考试什么时候。<br />把反复翻找的时间，留给更想做的事。</p>
-          <div className="hero-board">
-            <div className="mascot"><span className="mascot-pin" aria-hidden="true"></span><img src={logoHero} alt="戴着眼镜的绿色小恐龙 CourseRaptor" width="840" height="840" fetchPriority="high" /></div>
-            <aside className="hero-note note-yellow" aria-label="产品亮点"><span className="tape" aria-hidden="true"></span><b>36</b>个内置工具，教务到备考一套内核全包</aside>
-            <aside className="hero-note note-white note-hand" aria-label="使用示例"><span className="tape" aria-hidden="true"></span>早八在哪上？<br />直接问它就好。</aside>
-            <aside className="hero-note note-green" aria-label="模型选择"><span className="tape" aria-hidden="true"></span><b>12 家</b>模型厂商可选，自己的 Key 自己配</aside>
-            <span className="hero-note hero-note-end note-hand" aria-hidden="true">Web · CLI · 可选 QQ</span>
+          <div className="hero-head">
+            <div>
+              <h1 id="hero-title">教务琐事，<span className="hl">一句话。</span></h1>
+              <p className="hero-desc">早八在哪上，通识修了哪些，考试什么时候——把反复翻找的时间，留给更想做的事。</p>
+            </div>
+            <div className="actions"><a className="button primary" href="#start">带走小恐龙 · exe 约 115MB <span aria-hidden="true">↓</span></a><a className="button ghost" href="#try">先看看它怎么答 <span aria-hidden="true">↓</span></a></div>
           </div>
-          <div className="actions"><a className="button primary" href="#start">带走小恐龙 · exe 约 115MB <span aria-hidden="true">↓</span></a><a className="button ghost" href="#try">先看看它怎么答 <span aria-hidden="true">↓</span></a></div>
-          <p className="hero-note-fine">无需账号即可体验离线演示。正式查询需自行配置教务账号与模型 API&nbsp;Key。</p>
+          <figure className="hero-shot">
+            <span className="photo-pin pin-l" aria-hidden="true"></span>
+            <span className="photo-pin pin-r" aria-hidden="true"></span>
+            <img src={screenshotHall} alt="CourseRaptor 网页版实拍：对话区与右侧功能大厅宫格，含新上线的用量统计热力图" width="1600" height="881" fetchPriority="high" />
+            <span className="hero-sticker" aria-hidden="true"><img src={logoHero} alt="" width="840" height="840" /></span>
+            <aside className="shot-tag tag-a"><span className="tape" aria-hidden="true"></span><b>新上线</b>一年用量热力图——每天用了多少、花在哪个模型，一格一天</aside>
+            <aside className="shot-tag tag-b"><span className="tape" aria-hidden="true"></span>聊过的知识自动沉淀，<b>flomo 式知识库</b></aside>
+            <aside className="shot-tag tag-c"><span className="tape" aria-hidden="true"></span>课表图<b>直接发在对话里</b></aside>
+          </figure>
+          <p className="hero-note-fine">36 个内置工具 · 12 家模型厂商 · 终端 / 网页 / QQ 三端同一份记忆 · 凭证 AES-256-GCM 加密不出本机</p>
         </section>
         <div className="tape-band" aria-hidden="true"><div className="wrap tape-inner"><span>课表与考试</span><span>✳</span><span>成绩与学籍</span><span>✳</span><span>通知与待办</span><span>✳</span><span>日历与知识库</span></div></div>
         <section className="section wrap screen" id="features" aria-labelledby="features-title">
@@ -214,7 +220,7 @@ function App() {
         <section className="section wrap product screen" aria-labelledby="product-title"><div className="section-head"><div><p className="eyebrow">03 / ON YOUR OWN DESK</p><h2 id="product-title">三种打开方式，<br />同一个助手。</h2></div><p>终端 TUI、本地网页与 QQ 机器人共享同一内核与记忆。<br />正式模式支持下载日历和生成的文档。</p></div>
           <div className="figure-grid">
             <figure className="photo photo-a"><span className="photo-pin" aria-hidden="true"></span><div className="window-bar"><span className="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>CourseRaptor · 对话与功能大厅</span><span aria-hidden="true">↗</span></div><img src={screenshotHall} alt="CourseRaptor 网页版：对话区与右侧功能大厅宫格（今日日程、课表、考试、待办、知识库、用量统计等面板）" width="1600" height="881" loading="lazy" /><figcaption>对话 + 功能大厅：一句话把面板推出来，虚构演示数据。</figcaption></figure>
-            <figure className="photo photo-b"><span className="photo-pin" aria-hidden="true"></span><div className="window-bar"><span className="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>CourseRaptor · 知识库</span><span aria-hidden="true">↗</span></div><img src={screenshotKnowledge} alt="CourseRaptor 知识库独立页：标签侧栏、发布框与按日分组的卡片川流，卷首是全年记录热力带" width="1600" height="881" loading="lazy" /><figcaption>知识库独立页（/knowledge）：对话里的知识点自动沉淀，热力带看一年记录，虚构演示数据。</figcaption></figure>
+            <figure className="photo photo-b"><span className="photo-pin" aria-hidden="true"></span><div className="window-bar"><span className="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>CourseRaptor · 知识库</span><span aria-hidden="true">↗</span></div><img src={screenshotKnowledge} alt="CourseRaptor 知识库独立页：标签侧栏、发布框与按日分组的卡片川流，卷首是近 16 周记录热力带" width="1600" height="881" loading="lazy" /><figcaption>知识库独立页（/knowledge）：对话里的知识点自动沉淀，16 周热力带看记录密度，虚构演示数据。</figcaption></figure>
             <figure className="photo photo-c"><span className="photo-pin" aria-hidden="true"></span><div className="window-bar"><span className="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>CourseRaptor · 终端 TUI</span><span aria-hidden="true">↗</span></div><img src={screenshotTui} alt="CourseRaptor 终端 TUI 首屏：今日课表、待办、考试与通知速览" width="1600" height="881" loading="lazy" /><figcaption>终端 TUI 首屏（演示模式数据）。</figcaption></figure>
           </div>
         </section>

@@ -177,9 +177,10 @@ export function setupLandingMotion(): () => void {
       },
     )
 
-    // 首屏景深：固定舞台 + 滑动驱动。只动图形层——恐龙后退缩小让位、标题轻推放大；
-    // 便利贴承载核心卖点（36 工具/12 厂商），是信息不是装饰：不参与滚动清除，
-    // pin 结束后随 hero 整屏一起被推走，回滚倒放语义保留。
+    // 首屏景深：固定舞台 + 滑动驱动（画面即界面）。只动图形层——
+    // 产品实拍（含贴在界面上的功能便签）整体轻后退让位、标题轻推放大；
+    // 功能便签是信息不是装饰，随实拍整体移动、永不单独消失，pin 结束
+    // 后随 hero 整屏被推走，回滚倒放语义保留。
     // fromTo 锁定起点（首屏 CSS 入场动画结束后 scrub 完全接管 transform）。
     mm.add('(min-width: 901px)', () => {
       const tl = gsap.timeline({
@@ -187,17 +188,17 @@ export function setupLandingMotion(): () => void {
         scrollTrigger: {
           trigger: '.hero',
           start: 'top top',
-          end: '+=120%',
+          end: '+=110%',
           scrub: true,
           pin: true,
           anticipatePin: 1,
         },
       })
-      tl.fromTo('.hero h1', { scale: 1, y: 0 }, { scale: 1.08, y: -12, duration: 1.2 }, 0)
+      tl.fromTo('.hero h1', { scale: 1, y: 0 }, { scale: 1.08, y: -16, duration: 1.1 }, 0)
       tl.fromTo(
-        '.mascot',
-        { scale: 1, y: 0, transformOrigin: '50% 60%' },
-        { scale: 0.84, y: 46, duration: 1.2 },
+        '.hero-shot',
+        { scale: 1, y: 0, transformOrigin: '50% 20%' },
+        { scale: 0.9, y: 96, duration: 1.1 },
         0,
       )
     })
@@ -208,7 +209,7 @@ export function setupLandingMotion(): () => void {
         defaults: { ease: 'none' },
         scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: true },
       })
-      tl.fromTo('.mascot', { y: 0, scale: 1 }, { y: -24, scale: 0.94 }, 0)
+      tl.fromTo('.hero-shot', { y: 0, scale: 1 }, { y: -24, scale: 0.95 }, 0)
     })
   })
 

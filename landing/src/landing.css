@@ -114,15 +114,14 @@ code { font-family: var(--font-mono); font-size: 0.92em; background: rgba(127,17
 .github-link { padding: 8px 16px; border: 1.5px solid rgba(74, 68, 58, 0.24); border-radius: 999px; color: var(--ink) !important; transition: border-color 0.2s, background 0.2s, transform 0.2s var(--ease-out) }
 .github-link:hover { border-color: var(--green); background: rgba(127, 176, 105, 0.1); transform: translateY(-1px) }
 
-/* ---------- 首屏：居中单一物件 ---------- */
+/* ---------- 首屏：画面即界面（产品实样 + 新功能便签） ---------- */
 
 .hero {
   position: relative;
-  text-align: center;
-  padding-block: 64px 30px;
+  padding-block: 52px 34px;
 }
 
-/* 入场：文案逐行浮起（fill 用 backwards，结束后不占 transform，滚动叙事由 motion.ts 接管） */
+/* 入场：文案与主视觉逐行浮起（fill 用 backwards，结束后不占 transform，滚动叙事由 motion.ts 接管） */
 @keyframes rise-in {
   from { opacity: 0; transform: translateY(18px) }
   to { opacity: 1; transform: none }
@@ -130,16 +129,14 @@ code { font-family: var(--font-mono); font-size: 0.92em; background: rgba(127,17
 .hero > * { animation: rise-in 0.65s var(--ease-out) backwards }
 .hero > :nth-child(1) { animation-delay: 0.05s }
 .hero > :nth-child(2) { animation-delay: 0.16s }
-.hero > :nth-child(3) { animation-delay: 0.27s }
-.hero > :nth-child(4) { animation-delay: 0.38s }
-.hero > :nth-child(5) { animation-delay: 0.5s }
-.hero > :nth-child(6) { animation-delay: 0.6s }
+.hero > :nth-child(3) { animation-delay: 0.32s }
+.hero > :nth-child(4) { animation-delay: 0.44s }
 
 .eyebrow {
   font-size: 12.5px;
   letter-spacing: 1.1px;
   font-weight: 700;
-  margin: 0 auto 18px;
+  margin: 0 0 16px;
   color: var(--green-deep);
   display: flex;
   align-items: center;
@@ -157,11 +154,11 @@ code { font-family: var(--font-mono); font-size: 0.92em; background: rgba(127,17
 h1, h2, h3, p { margin-top: 0 }
 
 h1 {
-  font-size: clamp(48px, 6.6vw, 84px);
-  line-height: 1.24;
+  font-size: clamp(42px, 4.8vw, 66px);
+  line-height: 1.22;
   font-weight: 800;
   letter-spacing: 0.5px;
-  margin: 0 auto 26px;
+  margin: 0 0 14px;
   text-wrap: balance;
 }
 
@@ -186,29 +183,24 @@ h1 {
   to { transform: skewX(-4deg) rotate(-0.6deg) scaleX(1) }
 }
 
-.hero-desc { font-size: 17.5px; line-height: 1.95; color: var(--ink-soft); margin: 0 auto 10px; max-width: 34em; text-wrap: pretty }
+/* 标题与行动按钮同行：标题左、按钮右下对齐 */
+.hero-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; margin-bottom: 30px }
+.hero-desc { font-size: 16.5px; line-height: 1.9; color: var(--ink-soft); margin: 0; max-width: 30em; text-wrap: pretty }
+.hero .actions { margin: 0; flex-shrink: 0 }
 
-/* ---------- 恐龙 + 四周便利贴 ---------- */
+/* ---------- 主视觉：贴在板上的产品实拍 + 功能便签 ---------- */
 
-.hero-board { position: relative; width: fit-content; margin: 26px auto 0 }
-
-.mascot {
-  width: min(400px, 66vw);
-  position: relative;
-  filter: drop-shadow(7px 11px 0 rgba(127, 176, 105, 0.18));
-}
-.mascot img { width: 100% }
-.mascot-pin, .photo-pin {
+.photo-pin {
   position: absolute;
   width: 17px;
   height: 17px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #fff 0 18%, var(--green-deep) 40%, #456036 100%);
   box-shadow: 0 3px 3px rgba(74, 68, 58, 0.28);
+  z-index: 3;
 }
-.mascot-pin { top: 4%; left: 50%; transform: translateX(-50%) }
 
-/* 便利贴通用 */
+/* 便签通用胶带 */
 .tape {
   position: absolute;
   top: -9px;
@@ -220,29 +212,55 @@ h1 {
   border-left: 1px dashed rgba(74, 68, 58, 0.2);
   border-right: 1px dashed rgba(74, 68, 58, 0.2);
 }
-.hero-note {
-  position: absolute;
-  padding: 13px 16px;
-  font-size: 13px;
-  line-height: 1.65;
-  text-align: left;
-  max-width: 178px;
-  box-shadow: var(--shadow-card);
+
+.hero-shot {
+  position: relative;
+  margin: 0 auto;
+  /* 按视口高反推图宽，保证首屏完整装下（截图比例 1600:881） */
+  width: min(100%, calc((100vh - 372px) * 1.816));
+  background: var(--paper);
+  padding: 10px 10px 13px;
+  border-radius: 6px;
+  box-shadow: var(--shadow-card), 0 1px 0 rgba(255, 255, 255, 0.9) inset;
+  transform: rotate(-0.6deg);
 }
-.hero-note b { display: block; font-size: 22px; font-weight: 800; margin-bottom: 3px }
-.note-yellow { background: var(--note-yellow) }
-.note-white { background: var(--paper) }
-.note-green { background: var(--note-green) }
-.note-hand { font-family: var(--font-hand); font-size: 15.5px }
+.hero-shot > img { width: 100%; display: block; border-radius: 2px }
+.hero-shot .pin-l { top: -9px; left: 9% }
+.hero-shot .pin-r { top: -9px; right: 9% }
 
-/* 定位用显式类名（hero-note 里混有 aside 与 span，nth-of-type 按标签类型计数不可靠） */
-.hero-note.note-yellow { right: 4%; top: 2%; transform: rotate(3.4deg) }
-.hero-note.note-white { left: 3%; top: 34%; transform: rotate(-2.6deg) }
-.hero-note.note-green { right: 7%; bottom: 10%; transform: rotate(-3.6deg) }
+/* 恐龙贴纸：贴在照片左上角 */
+.hero-sticker {
+  position: absolute;
+  left: -30px;
+  top: -30px;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  border: 5px solid #fff;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  transform: rotate(-7deg);
+  z-index: 3;
+}
+.hero-sticker img { width: 100%; height: 100%; object-fit: cover; display: block }
 
-/* 尾注：恐龙脚下的小字（第三端提示） */
-.hero-note-end { position: static; display: inline-block; margin-top: 12px; padding: 5px 14px; font-size: 14px; color: var(--ink-soft); background: transparent; box-shadow: none }
-.hero-note-end::before { display: none }
+/* 功能便签：贴在界面上讲最新功能（信息，不参与滚动清除） */
+.shot-tag {
+  position: absolute;
+  z-index: 2;
+  padding: 12px 16px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  max-width: 232px;
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-hand);
+  font-size: 15px;
+}
+.shot-tag b { font-weight: 700; color: var(--green-deep); margin: 0 2px }
+.shot-tag.tag-a b { display: inline; font-size: 15px }
+.tag-a { right: -18px; top: 44px; background: var(--note-yellow); transform: rotate(2.6deg) }
+.tag-b { left: -24px; bottom: 84px; background: var(--paper); transform: rotate(-2.2deg) }
+.tag-c { right: 9%; bottom: -24px; background: var(--note-green); transform: rotate(-1.8deg) }
 
 /* ---------- 行动区 ---------- */
 
@@ -696,8 +714,7 @@ details[open] summary::after { transform: rotate(45deg) }
 /* ---------- 响应式 ---------- */
 
 @media (max-width: 1350px) and (min-width: 1051px) {
-  .hero { padding-block: 52px 26px }
-  .mascot { width: min(340px, 52vw) }
+  .hero { padding-block: 48px 26px }
   .section, .product, .try-section, .start-section { padding-block: 48px }
   .screen { min-height: 100vh }
   .section-head { margin-bottom: 26px }
@@ -721,19 +738,20 @@ details[open] summary::after { transform: rotate(45deg) }
   .figure-grid { grid-template-columns: 1fr 1fr }
   .figure-grid .photo-c { grid-column: span 2 }
   .try-grid, .start-grid, .faq { gap: 40px }
-  .hero { padding-block: 70px 26px }
+  .hero { padding-block: 48px 26px }
 }
 
 @media (max-width: 900px) {
-  /* 首屏便利贴：绝对定位改为横排小标签，信息不丢 */
-  .hero-board { width: 100% }
-  .hero-note { position: static; display: inline-block; max-width: none; margin: 8px 6px 0; padding: 8px 14px; font-size: 12.5px; vertical-align: top }
-  .hero-note b { display: inline; font-size: 16px; margin: 0 2px 0 0 }
-  .hero-note .tape { display: none }
-  .hero-note.note-yellow { transform: rotate(1.6deg) }
-  .hero-note.note-white { transform: rotate(-1.2deg) }
-  .hero-note.note-green { transform: rotate(0.9deg) }
-  .hero-note-hand { font-size: 14px }
+  /* 首屏：标题与按钮纵向堆叠；功能便签改为拍立得白边上的横排标签，信息不丢 */
+  .hero-head { flex-direction: column; align-items: flex-start; gap: 20px }
+  .hero .actions { justify-content: flex-start }
+  .hero-shot { width: 100%; padding-bottom: 20px }
+  .shot-tag { position: static; display: inline-block; max-width: none; margin: 12px 7px 0; padding: 9px 14px; vertical-align: top }
+  .shot-tag .tape { display: none }
+  .tag-a { transform: rotate(1.4deg) }
+  .tag-b { transform: rotate(-1deg) }
+  .tag-c { transform: rotate(0.8deg) }
+  .hero-sticker { width: 78px; height: 78px; left: -14px; top: -16px; border-width: 4px }
   .community-inner { grid-template-columns: 1fr; gap: 44px; text-align: center }
   .community .eyebrow { justify-content: center }
   .community .actions { justify-content: center }
@@ -749,12 +767,12 @@ details[open] summary::after { transform: rotate(45deg) }
   .header nav { width: 100%; justify-content: space-between; gap: 10px; font-size: 13px }
   .github-link { padding: 5px 11px }
   html { scroll-padding-top: calc(var(--header-h) + 42px) }
-  .hero { padding-block: 46px 22px }
+  .hero { padding-block: 40px 22px }
   h1 { font-size: clamp(46px, 11.4vw, 58px) }
   .hero .eyebrow { font-size: 11px; letter-spacing: 0.7px; margin-bottom: 18px }
   .hero-desc { font-size: 16.5px }
-  .mascot { width: min(300px, 62vw) }
-  .hero-note-end { display: none }
+  .hero-sticker { width: 64px; height: 64px; left: -10px; top: -12px }
+  .shot-tag { font-size: 13.5px }
   .section { padding-block: 54px }
   #features { padding-block: 44px }
   .section-head { display: block; margin-bottom: 26px }
