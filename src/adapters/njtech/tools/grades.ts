@@ -1,5 +1,5 @@
 /**
- * 成绩与考试工具：get_grades / get_exams / get_lab_grades
+ * 成绩与考试工具：get_grades / get_exams
  */
 
 import { tool } from "ai";
@@ -11,7 +11,6 @@ import type { ExamResult } from "../../../core/model";
 import { summarizeAcademics, summarizeGeneralElectives } from "../academic-summary";
 import { fetchExamsSmart, parseSemesterString } from "../academics";
 import { fetchAllGrades } from "../grades";
-import { fetchLabGradesSmart } from "../portal";
 import { withAuthRetry } from "../session";
 
 export const gradesTools = {
@@ -124,33 +123,6 @@ export const gradesTools = {
             ? `⚠️ 教务在线查询失败，这是本地缓存的最后已知考试安排（保存于 ${new Date(staleAt).toLocaleString("zh-CN")}），可能已过期；网络恢复后再问一次即可刷新。`
             : undefined,
         note: exams.length === 0 ? "该学期暂无考试安排" : undefined,
-      };
-    },
-  }),
-
-  /** 实验成绩 */
-  get_lab_grades: tool({
-    description:
-      "查询实验课程成绩（按学期，默认自动探测最新学期，也可指定如「2026-2027-1」）。没有实验课的学期返回空属正常。",
-    inputSchema: z.object({
-      semester: z
-        .string()
-        .optional()
-        .describe("指定学期，格式如「2026-2027-1」；不填则自动探测最新学期"),
-    }),
-    execute: async ({ semester }) => {
-      const parsed = semester ? parseSemesterString(semester) : null;
-      if (semester && !parsed) {
-        return { error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
-      }
-      const { label, items } = await withAuthRetry((c) =>
-        fetchLabGradesSmart(c, parsed?.year, parsed?.semester),
-      );
-      return {
-        term: label,
-        total: items.length,
-        items: items.slice(0, 30),
-        note: items.length === 0 ? "该学期暂无实验成绩（无实验课属正常）" : undefined,
       };
     },
   }),

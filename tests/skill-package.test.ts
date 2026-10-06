@@ -64,7 +64,7 @@ test("技能打包：独立目录 + 单文件 bundle + zip，自包含可运行"
   assert.match(help.stdout, /grades/);
 
   // 未配置凭证 → 非零退出 + 明确报错（「拿不到」≠「没有」的入口语义）
-  const noCreds = run(["student-info"]);
+  const noCreds = run(["grades"]);
   assert.notEqual(noCreds.status, 0);
   assert.match(noCreds.stderr, /尚未配置教务账号/);
 

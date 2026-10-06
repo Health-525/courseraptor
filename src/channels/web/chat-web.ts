@@ -706,7 +706,6 @@ function schoolOptionNote(capabilities: readonly string[]): string {
     ["grades", "成绩"],
     ["exams", "考试"],
     ["notices", "通知"],
-    ["student", "学籍"],
     ["courseSelection", "选课"],
   ];
   const have = labels.filter(([cap]) => capabilities.includes(cap)).map(([, label]) => label);

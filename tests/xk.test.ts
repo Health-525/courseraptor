@@ -3,17 +3,14 @@
  *
  * 背景：njtech_grabber（2021-2022 年代实测的同校 Python 脚本）确认的响应
  * 形状此前没有 fixture 钉住——parseCourseList 不认 jxbmc（教学班名称），
- * 旧版平铺行的课程名会解析成空串、目标匹配全部落空；退课成功的裸 "1"
- * 响应也没有任何路径能判成成功。这里用 grabber 实测形状 + 本项目校准
- * 过的形状双轨钉住。
+ * 旧版平铺行的课程名会解析成空串、目标匹配全部落空。这里用 grabber 实测
+ * 形状 + 本项目校准过的形状双轨钉住。
  */
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-const { parseCourseList, parseChoosedList, parseActionResponse } = await import(
-  "../src/adapters/njtech/xk"
-);
+const { parseCourseList, parseChoosedList } = await import("../src/adapters/njtech/xk");
 
 test("parseCourseList：jxbmc 平铺行（njtech_grabber 实测的 PartDisplay 形状）", () => {
   const courses = parseCourseList({
@@ -74,31 +71,4 @@ test("parseChoosedList：非列表输入返回空", () => {
   assert.deepEqual(parseChoosedList(null), []);
   assert.deepEqual(parseChoosedList("nope"), []);
   assert.deepEqual(parseChoosedList({ foo: 1 }), []);
-});
-
-test('parseActionResponse：退课成功的裸 "1" 形状（njtech_grabber 实测）', () => {
-  assert.deepEqual(parseActionResponse('"1"'), { ok: true, message: "操作成功" });
-  assert.deepEqual(parseActionResponse("1"), { ok: true, message: "操作成功" });
-});
-
-test("parseActionResponse：选课 flag 形状（成功/业务拒绝）", () => {
-  assert.deepEqual(parseActionResponse('{"flag":"1","msg":"退课成功"}'), {
-    ok: true,
-    message: "退课成功",
-  });
-  assert.deepEqual(parseActionResponse('{"flag":"0","msg":"此教学班容量已满"}'), {
-    ok: false,
-    message: "此教学班容量已满",
-  });
-  // 缺 msg 的成功/失败走默认文案
-  assert.deepEqual(parseActionResponse('{"flag":"1"}'), {
-    ok: true,
-    message: "操作成功",
-  });
-});
-
-test("parseActionResponse：不可解析返回 null（调用方据此报校准错误）", () => {
-  assert.equal(parseActionResponse("<html>404</html>"), null);
-  assert.equal(parseActionResponse(""), null);
-  assert.equal(parseActionResponse('{"flag":'), null);
 });

@@ -5,7 +5,7 @@
 # 🦖 CourseRaptor
 
 **大学教务对话式 Agent**
-课表 · 成绩 · 考试 · 学籍 · 教务通知 · 待办 · 知识库 · 记忆，一句话搞定。
+课表 · 成绩 · 考试 · 教务通知 · 待办 · 知识库 · 记忆，一句话搞定。
 
 **也是一套可整体搬走的本地 Agent 工程样例**
 Vercel AI SDK v7 · `SchoolAdapter` 端口-适配器架构 · 三端入口 · 本地优先。
@@ -31,18 +31,18 @@ Vercel AI SDK v7 · `SchoolAdapter` 端口-适配器架构 · 三端入口 · �
 
 一切都在你自己的电脑上运行：凭证 AES-256-GCM 加密落盘、教务数据不经第三方；安装包内置匿名装机统计（仅随机设备号 + 版本 + 平台，不含学号、账号与对话内容，`RAPTOR_NO_TELEMETRY=1` 一键关闭，源码运行默认不上报）；接的是你自己的模型 API Key——默认 DeepSeek，共 **12 家国内厂商**可选：**通义千问、智谱 GLM、Kimi、豆包、混元、MiniMax、阶跃、文心、讯飞、硅基流动、移动云**，外加自定义 OpenAI 兼容端点，按量计费、用量透明。已对**南京工业大学全量适配**、**河北农业大学社区适配**，**其他学校开箱可用「手动课表」模式**。
 
-正在写 Agent 的人，可以直接把它当参考实现读：`ToolLoopAgent` 多轮工具循环怎么组织 36 个工具、外部系统怎么用端口-适配器隔离（新增一所学校 = 新增一个自包含目录，内核零改动）、12 家厂商的模型层怎么用纯数据注册表装配——见下方 [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程) 一节。
+正在写 Agent 的人，可以直接把它当参考实现读：`ToolLoopAgent` 多轮工具循环怎么组织 31 个工具、外部系统怎么用端口-适配器隔离（新增一所学校 = 新增一个自包含目录，内核零改动）、12 家厂商的模型层怎么用纯数据注册表装配——见下方 [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程) 一节。
 
 ---
 
 ## ✨ 核心特性
 
-Agent 共装备 **36 个工具**（南工大默认配置；其他学校按已接入能力自动裁剪）。完整参数表、耗时、环境变量与教务模块覆盖见 [📖 能力文档](docs/capabilities.md)。
+Agent 共装备 **31 个工具**（南工大默认配置；其他学校按已接入能力自动裁剪）。完整参数表、耗时、环境变量与教务模块覆盖见 [📖 能力文档](docs/capabilities.md)。
 
-- **教务全量查询** —— 课表、成绩与 GPA（重修取最高、通识六类统计）、考试、学籍、已选/重修/实验成绩，一句话直查；学期交界自动探测候选学期，不靠日历猜
+- **教务核心查询** —— 课表、成绩与 GPA（重修取最高、通识六类统计）、考试，一句话直查；学期交界自动探测候选学期，不靠日历猜
 - **选课分析（只读）** —— 搜课搜班看余量；多门课自动查各教学班明细，与已选课程做时间冲突检测，覆盖单双周与部分周重叠
 - **通知情报** —— 教务处通知按你的年级标相关度，正文全文直读；附件下载一次即缓存，表格按问题筛选、文档分页续读或关键词定位
-- **日历导出与订阅** —— 整学期 `.ics`（假期自动跳过、调休按周几补课、考试带提醒）导入手机日历；或发布到 Gitee / GitHub 拿订阅链接，课表更新自动刷新
+- **日历导出** —— 整学期 `.ics`（假期自动跳过、调休按周几补课、考试带提醒）导入手机日历；课表变化后重新导出即可
 - **文件与文档** —— 读本地 Word / PDF / Excel / TXT，千行大表按条件取行而非整本塞给模型；沙箱 JS 计算；生成 Word / Excel / PPT / PDF 及跨格式互转，中文原生
 - **记忆 · 知识 · 待办** —— 两层记忆（会话跨重启延续 + 长期事实自主维护）；知识点对话自动沉淀、按课表真实课程归类；待办三端同步，到期桌面通知 + QQ 推送双提醒
 - **手动课表（其他学校）** —— 粘贴课表文字（教务网页表格、Excel、其他课表 App 导出都行）或上传 Excel / CSV / PDF / Word / TXT，AI 解析成结构化课表，拿不准会追问，预览里逐行确认
@@ -77,10 +77,10 @@ Agent 共装备 **36 个工具**（南工大默认配置；其他学校按已接
 
 | 你要解决的问题 | 这里的做法 | 源码 |
 |---|---|---|
-| Agent 主循环 | Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI`：36 个工具的多轮循环，思考与工具调用全程透出 | [`src/core/agent.ts`](src/core/agent.ts) |
+| Agent 主循环 | Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI`：31 个工具的多轮循环，思考与工具调用全程透出 | [`src/core/agent.ts`](src/core/agent.ts) |
 | 给 Agent 接外部系统 | `SchoolAdapter` 端口 + 每校一个自包含适配器目录；内核永不反向依赖实现，正方新版 / CAS+URP 的差异全部被适配器吃掉 | [`src/core/school.ts`](src/core/school.ts) · [`src/adapters/`](src/adapters/) |
 | 多模型厂商接入 | 供应商注册表纯数据 + 模型工厂统一装配：12 家国内厂商 + 自定义 OpenAI 兼容端点，Key 独立加密、运行时热切 | [`src/core/providers.ts`](src/core/providers.ts) · [`src/core/models.ts`](src/core/models.ts) |
-| 工具层设计 | 36 个工具的参数与返回契约，覆盖教务、通知、文件、文档、日历、记忆六域，可渐进式挂载 | [`src/core/tools/`](src/core/tools/) |
+| 工具层设计 | 31 个工具的参数与返回契约，覆盖教务、通知、文件、文档、日历、记忆六域，可渐进式挂载 | [`src/core/tools/`](src/core/tools/) |
 | 两层记忆 | 会话跨重启续聊 + 长期事实自主维护，全部本地 JSON、无数据库 | [`src/core/memory/`](src/core/memory/) |
 | 多入口单内核 | 终端 TUI / 本地网页 / QQ 机器人共享同一内核与记忆；另有无头 CLI 不经 LLM、零 token | [`src/channels/`](src/channels/) · [`local/`](local/) · [`skills/njtech-jwgl/`](skills/njtech-jwgl/) |
 | 本地优先安全 | 凭证 AES-256-GCM 绑定本机指纹；Web 仅回环监听 + Host/Origin/CSRF 校验；沙箱 JS 无网络无磁盘 | [`src/core/credentials.ts`](src/core/credentials.ts) · [`src/core/sandbox-js.ts`](src/core/sandbox-js.ts) |
@@ -135,7 +135,7 @@ raptor             # 启动；项目内也可 npm run dev
 
 ### 方式三：无头命令行（自动化 / 二次封装，不消耗 token）
 
-仓库内置技能 [`skills/njtech-jwgl/`](skills/njtech-jwgl/SKILL.md) 把南京工业大学教务查询（课表 / 成绩 / 考试 / 通知 / 学籍 / 选课）封装成无头 CLI——**不经过 LLM 对话、不消耗 DeepSeek token**。需按方式二克隆源码并配好教务账号（无需 DeepSeek Key）。
+仓库内置技能 [`skills/njtech-jwgl/`](skills/njtech-jwgl/SKILL.md) 把南京工业大学教务查询（课表 / 成绩 / 考试 / 通知 / 选课）封装成无头 CLI——**不经过 LLM 对话、不消耗 DeepSeek token**。需按方式二克隆源码并配好教务账号（无需 DeepSeek Key）。
 
 ```bash
 npm run njtech -- schedule            # 课表
@@ -144,7 +144,7 @@ npm run njtech -- news 公告通知 5      # 通知列表
 npm run njtech -- search-courses 高等数学
 ```
 
-12 个子命令：`schedule` · `grades` · `exams` · `lab-grades` · `news` · `student-info` · `enrolled-courses` · `retake-courses` · `selection-status` · `search-courses` · `search-classes` · `watch`。协议细节与安全红线见 [SKILL.md](skills/njtech-jwgl/SKILL.md) 与其 `references/`。
+7 个子命令：`schedule` · `grades` · `exams` · `news` · `selection-status` · `search-courses` · `search-classes`。协议细节与安全红线见 [SKILL.md](skills/njtech-jwgl/SKILL.md) 与其 `references/`。
 
 另附 [`skills/export-schedule/`](skills/export-schedule/) 独立技能包：把课表渲染成图片供下载，适配各平台聊天里直接发图看课表的场景。
 
@@ -169,7 +169,7 @@ npm run njtech -- search-courses 高等数学
 
 | 学校 | 能力面 | 适配维护者 |
 |------|--------|-----------|
-| [南京工业大学](src/adapters/njtech/)（NJTECH） | 全部在线能力（课表/成绩/考试/学籍/通知/选课…） | [@Health-525](https://github.com/Health-525) |
+| [南京工业大学](src/adapters/njtech/)（NJTECH） | 在线能力（课表/成绩/考试/通知/选课查询…） | [@Health-525](https://github.com/Health-525) |
 | [河北农业大学](src/adapters/hebau/)（HEBAU） | 课表/成绩/考试（CAS 统一认证 + 正方 URP；动态码二次认证） | [@公子小白](https://github.com/gzxb001-sketch) |
 
 设置第一栏先选学校：已适配学校填教务账号即可自动抓取；**其他学校走「手动课表」模式**——粘贴或上传课表，AI 解析成结构化课表，课表 / 今日日程 / 周次推算照常可用。
@@ -190,7 +190,7 @@ npm run njtech -- search-courses 高等数学
 安全细节：
 
 - 网页服务仅监听 `127.0.0.1`：Host / Origin 校验、写请求须携带 CSRF token、仅认 `application/json`
-- 学籍敏感字段（证件号/银行卡/考生号）返回时自动打码；沙箱 JS 无网络无磁盘、超时截断
+- 沙箱 JS 无网络无磁盘、超时截断；教务工具全为只读查询，不含任何提交类操作
 - `.env`、`session.json`、`memory.json`、`data/chat-sessions.json` 等含个人数据的文件已被 `.gitignore` 排除，**切勿提交或分享**
 - 「本地运行」不等于完全离线：提示词与相关查询结果会发给你配置的模型服务商；附件云解析仅用于公开网站，教务数据一律本地直连、不经第三方
 

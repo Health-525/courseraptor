@@ -3,7 +3,7 @@
  *
  * 钉住三类真实回归：
  * 1. portal 查询曾把断网/会话失效吞成「空列表」——故障被翻译成正常态，
- *    同学说「没有重修课」其实是没连上（fetchRetakeCourses/fetchEnrolledClasses）。
+ *    同学说「暂无已选课程」其实是没连上（fetchEnrolledClasses）。
  * 2. 死 cookie 熬满 25 分钟 TTL：fetch 层识别登录页抛 SESSION_EXPIRED，
  *    session.withAuthRetry 换新 cookie 自动重登一次。
  * 3. 一轮对话里模型并行调多个教务工具时并发 getCookie 只登录一次
@@ -26,9 +26,7 @@ process.env.JWGL_PASSWORD = "test-password";
 
 const { setRateLimit } = await import("../src/core/http");
 const { RaptorError, isRaptorError } = await import("../src/core/errors");
-const { fetchEnrolledClasses, fetchLabGradesSmart, fetchRetakeCourses } = await import(
-  "../src/adapters/njtech/portal"
-);
+const { fetchEnrolledClasses } = await import("../src/adapters/njtech/portal");
 const { getCookie, invalidateAuthCache, withAuthRetry } = await import(
   "../src/adapters/njtech/session"
 );
@@ -153,23 +151,6 @@ test("登录遇验证码错误：如实说验证码，不误导同学改密码",
 
 // ── 1. portal 错误可见性：故障 ≠ 空列表 ─────────────────────────
 
-test("fetchRetakeCourses：拿到登录页（会话失效）必须抛 SESSION_EXPIRED，不是空列表", async () => {
-  looseRate();
-  const mock = installMock(() => ({
-    status: 200,
-    chunks: [LOGIN_PAGE_HTML("expired")],
-  }));
-  try {
-    await assert.rejects(
-      fetchRetakeCourses("JSESSIONID=dead"),
-      (e: unknown) => isRaptorError(e, "SESSION_EXPIRED"),
-      "登录页应识别为会话失效",
-    );
-  } finally {
-    mock.restore();
-  }
-});
-
 test("fetchEnrolledClasses：网络故障必须抛错，不能翻译成「暂无已选课程」", async () => {
   looseRate();
   const mock = installMock(() => ({ status: 200, networkError: "connect ECONNREFUSED" }));
@@ -191,33 +172,6 @@ test("fetchEnrolledClasses：非 JSON 响应抛 PARSE（改版可见），不再
     await assert.rejects(fetchEnrolledClasses("JSESSIONID=ok"), (e: unknown) =>
       isRaptorError(e, "PARSE"),
     );
-  } finally {
-    mock.restore();
-  }
-});
-
-test("fetchLabGradesSmart：全部候选都失败时抛 UPSTREAM，不是「暂无实验成绩」", async () => {
-  looseRate();
-  const mock = installMock(() => ({ status: 200, networkError: "connect ETIMEDOUT" }));
-  try {
-    await assert.rejects(fetchLabGradesSmart("JSESSIONID=dead"), (e: unknown) =>
-      isRaptorError(e, "UPSTREAM"),
-    );
-  } finally {
-    mock.restore();
-  }
-});
-
-test("fetchLabGradesSmart：候选学期查通但为空（无实验课）仍返回空结果——合法空态", async () => {
-  looseRate();
-  const mock = installMock(() => ({
-    status: 200,
-    chunks: [Buffer.from(JSON.stringify({ items: [] }))],
-  }));
-  try {
-    const r = await fetchLabGradesSmart("JSESSIONID=ok");
-    assert.equal(r.items.length, 0);
-    assert.ok(r.label, "返回应带学期标签");
   } finally {
     mock.restore();
   }
