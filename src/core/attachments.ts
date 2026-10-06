@@ -21,6 +21,8 @@ import {
   findByLocalPath,
   findByUrl,
   getMeta,
+  parsedCacheGet,
+  parsedCachePut,
   putAttachment,
   readStoredBuffer,
   touchAttachment,
@@ -290,7 +292,15 @@ async function analyzeBuffer(
 
   // 1) 表格：结构化概览（默认只给每 sheet 表头 + 前 15 行，读不完是设计而非事故）
   if (isTableFilename(filename)) {
-    const sheets = loadWorkbook(buf, filename);
+    // 解析结果进程内缓存：mtime 分量用本次 extra 传入的（reused 复用不会
+    // 更新 meta 里的旧值），「同体积改内容」时键随之变化不吐旧解析；
+    // refresh 一律绕过缓存（含写入，避免污染与盘不同步的旧键）
+    const reusedSheetsKey = reused
+      ? `sheets|${id}|${reused.size}|${extra?.mtimeMs ?? ""}|${reused.fetchedAt}`
+      : null;
+    const cachedSheets =
+      reusedSheetsKey && !opts.refresh ? parsedCacheGet<TableSheet[]>(reusedSheetsKey) : undefined;
+    const sheets = cachedSheets ?? loadWorkbook(buf, filename);
     if (sheets) {
       const meta = await register({
         filename,
@@ -301,11 +311,23 @@ async function analyzeBuffer(
         buf,
         sheetNames: sheets.map((s) => s.name),
       });
+      if (reusedSheetsKey && cachedSheets === undefined && !opts.refresh) {
+        parsedCachePut(reusedSheetsKey, sheets);
+      }
       return tableResult(meta, sheets, opts);
     }
   }
 
-  // 2) 文本类：全文缓存 + 分页/检索视图
+  // 2) 文本类：全文缓存 + 分页/检索视图（解析结果进程内缓存——续读/检索
+  //    此前每页都整本重跑 pdf-parse/mammoth；键与失效规则同表格侧）
+  const reusedTextKey = reused
+    ? `text|${id}|${reused.size}|${extra?.mtimeMs ?? ""}|${reused.fetchedAt}`
+    : null;
+  const cachedText =
+    reusedTextKey && !opts.refresh ? parsedCacheGet<string>(reusedTextKey) : undefined;
+  if (cachedText !== undefined && reused) {
+    return textResult(reused, cachedText, opts);
+  }
   const parsed = await extractText(buf, filename);
   if (parsed?.text.trim()) {
     const meta = await register({
@@ -317,6 +339,12 @@ async function analyzeBuffer(
       buf,
       textLength: parsed.text.length,
     });
+    if (!opts.refresh) {
+      parsedCachePut(
+        `text|${id}|${meta.size}|${extra?.mtimeMs ?? ""}|${meta.fetchedAt}`,
+        parsed.text,
+      );
+    }
     return textResult(meta, parsed.text, opts);
   }
 
@@ -439,6 +467,31 @@ async function getOcrWorker() {
  * 首次请求返回验证码页 -> 拉验证码图 -> OCR 识别 -> 带 codeValue 重试。
  * 验证码存于 session，全程必须复用同一 cookie。识别失败自动换新码重试。
  */
+/**
+ * 下载限流读体：边读边计数，超过 MAX_FILE_BYTES 立即断开（与本地文件同限）。
+ * 此前 res.arrayBuffer() 拉多大算多大——恶意或误给的大 URL 会全量进内存，
+ * 既是性能坑也是 DoS 面（MAX_FILE_BYTES 只在 openLocalFile 检查过）。
+ */
+async function readBodyLimited(res: Response): Promise<Buffer> {
+  if (!res.body) return Buffer.from(await res.arrayBuffer());
+  const chunks: Buffer[] = [];
+  let size = 0;
+  const reader = res.body.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > MAX_FILE_BYTES) {
+      await reader.cancel().catch(() => {});
+      throw new Error(
+        `附件过大（超过 ${Math.round(MAX_FILE_BYTES / 1024 / 1024)} MB），已中止下载`,
+      );
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks);
+}
+
 async function downloadWithCaptcha(url: string): Promise<{ buf: Buffer; contentType: string }> {
   if (!CAPTCHA_OCR_ENABLED) {
     throw new Error(CAPTCHA_DISABLED_MSG);
@@ -464,7 +517,7 @@ async function downloadWithCaptcha(url: string): Promise<{ buf: Buffer; contentT
         .join("; ");
     }
     return {
-      buf: Buffer.from(await res.arrayBuffer()),
+      buf: await readBodyLimited(res),
       type: res.headers.get("content-type") || "",
     };
   };
@@ -564,7 +617,7 @@ export async function fetchAttachment(
         signal: AbortSignal.timeout(60000),
       });
       if (!res.ok) throw new Error(`下载失败 HTTP ${res.status}`);
-      buf = Buffer.from(await res.arrayBuffer());
+      buf = await readBodyLimited(res);
     }
   } catch (e) {
     // 下载失败但历史缓存还在 -> 用旧缓存继续干活（读得出比下得动重要）
@@ -637,7 +690,8 @@ export async function openLocalFile(
       const buf = readStoredBuffer(cached.id);
       if (buf) {
         touchAttachment(cached.id);
-        return analyzeBuffer(buf, cached.filename, source, opts);
+        // mtimeMs 必须透传：解析缓存的键含它（与首次入缓存路径的写键一致）
+        return analyzeBuffer(buf, cached.filename, source, opts, { mtimeMs: stat.mtimeMs });
       }
     }
   }

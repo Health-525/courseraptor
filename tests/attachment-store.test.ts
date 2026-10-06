@@ -142,3 +142,18 @@ test("clearAttachments：只清缓存副本，一次删光", async () => {
   // clear 后索引里不残留任何登记（含越界假条目）
   assert.equal(listAttachments().length, 0);
 });
+
+test("解析缓存：LRU 触碰与上限淘汰（query_table/续读共用的基础设施）", async () => {
+  const { parsedCacheGet, parsedCachePut } = await import("../src/core/attachment-store");
+  parsedCachePut("k1", "v1");
+  parsedCachePut("k2", "v2");
+  parsedCachePut("k3", "v3");
+  // 触碰 k1：k2 变成最旧
+  assert.equal(parsedCacheGet<string>("k1"), "v1");
+  assert.equal(parsedCacheGet<string>("不存在"), undefined);
+  // 挤到上限之外：k2（最旧）被淘汰，k1（刚触碰）保留
+  for (let i = 0; i < 6; i++) parsedCachePut(`new${i}`, i);
+  assert.equal(parsedCacheGet<string>("k2"), undefined, "最旧的先被淘汰");
+  assert.equal(parsedCacheGet<string>("k1"), "v1", "刚触碰过的不能被淘汰");
+  assert.equal(parsedCacheGet<string>("k3"), "v3", "k3 在 k2 之后写入，晚于 k2 淘汰");
+});

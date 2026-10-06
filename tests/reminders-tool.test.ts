@@ -97,3 +97,26 @@ test("update/delete 缺 id 与未知 id 的错误路径", async () => {
     /未找到/,
   );
 });
+
+test("坏文件隔离：损坏的 web-workspace.json 先留档再当空，不被空基回写清光", async () => {
+  // 造一条真实数据，再把存储文件改成损坏的 JSON
+  await manage.execute({ action: "add", items: [{ title: "隔离前待办", dueAt: "2026-10-01" }] });
+  const stateFile = path.join(tmpData, "web-workspace.json");
+  const good = fs.readFileSync(stateFile, "utf8");
+  fs.writeFileSync(stateFile, "{ 坏掉的 JSON");
+
+  // 损坏时按空处理，且留下隔离备份（.corrupt-*），而不是让下一次写入把坏状态固化
+  assert.equal(listReminders().length, 0);
+  const quarantined = fs
+    .readdirSync(tmpData)
+    .find((n) => n.startsWith("web-workspace.json.corrupt-"));
+  assert.ok(quarantined, "必须留档隔离备份");
+  assert.equal(fs.readFileSync(path.join(tmpData, quarantined), "utf8"), "{ 坏掉的 JSON");
+
+  // 隔离后正常重建：新待办可写、可读
+  await manage.execute({ action: "add", items: [{ title: "隔离后待办", dueAt: "2026-10-02" }] });
+  const titles = listReminders().map((r) => r.title);
+  assert.ok(titles.includes("隔离后待办"));
+  assert.ok(!titles.includes("隔离前待办"), "坏文件里的旧条目不再出现（备份可人工找回）");
+  assert.notEqual(fs.readFileSync(stateFile, "utf8"), good, "隔离后的存储是新重建的");
+});

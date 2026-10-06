@@ -18,10 +18,9 @@ const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-pipeline-"));
 const tmpFiles = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-userfiles-"));
 process.env.RAPTOR_DATA_DIR = tmpData;
 
-const { openLocalFile } = await import("../src/core/attachments");
+const { openLocalFile, fetchAttachment } = await import("../src/core/attachments");
 const { coreTools } = await import("../src/core/tools");
 const { listAttachments, attachmentStats } = await import("../src/core/attachment-store");
-
 const require = createRequire(import.meta.url);
 const XLSX = require("xlsx") as typeof import("xlsx");
 
@@ -259,16 +258,83 @@ test("pptx 附件可抽出幻灯片文本（此前上传白名单收、解析端
 
 test("缓存失效：同体积改内容（mtime 变化）不再读到旧缓存", async () => {
   const file = path.join(tmpFiles, "会更新的.txt");
-  fs.writeFileSync(file, "第一版内容，长度固定十个字");
+  // mtime 用 utimesSync 显式控制：CI 的 VM 上快速连续写入时文件系统
+  // mtime 精度不足（第一/二/三版可能拿到同一时间戳），测试会时序脆弱
+  const writeWithMtime = (text: string, ageMs: number) => {
+    fs.writeFileSync(file, text);
+    const at = new Date(Date.now() - ageMs);
+    fs.utimesSync(file, at, at);
+  };
+  writeWithMtime("第一版内容，长度固定十个字", 3000);
   const first = await openLocalFile(file);
   assert.equal(first.mode, "text");
   if (first.mode !== "text") return;
   assert.ok(first.text.includes("第一版"));
 
   // 同长度改内容：体积判断骗得过，mtime 骗不过
-  fs.writeFileSync(file, "第二版内容，长度固定十个字");
+  writeWithMtime("第二版内容，长度固定十个字", 2000);
   const second = await openLocalFile(file);
   assert.equal(second.mode, "text");
   if (second.mode !== "text") return;
   assert.ok(second.text.includes("第二版"), "mtime 变化必须触发重新入缓存，否则永远读旧内容");
+
+  // 改回第一版：解析缓存同样按 mtime 失效，不吐第二版旧解析
+  writeWithMtime("第一版内容，长度固定十个字", 1000);
+  const third = await openLocalFile(file);
+  assert.equal(third.mode, "text");
+  if (third.mode !== "text") return;
+  assert.ok(third.text.includes("第一版"), "内容回退后解析缓存必须跟着失效（键含 mtime）");
+});
+
+test("query_table 解析缓存：连续查询结果一致，缓存对调用方透明", async () => {
+  const file = path.join(tmpFiles, "网课目录.xlsx");
+  const { id } = (await openLocalFile(file)) as { id: string };
+  const q = coreTools.query_table as unknown as {
+    execute: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  };
+  // 第一轮（填缓存）与第二轮（缓存命中）必须给出同样的结果
+  const first = await q.execute({
+    id,
+    action: "filter",
+    sheet: "总表",
+    where: [{ col: "学院", op: "eq", value: "信息学院" }],
+    limit: 5,
+  });
+  const second = await q.execute({
+    id,
+    action: "filter",
+    sheet: "总表",
+    where: [{ col: "学院", op: "eq", value: "信息学院" }],
+    limit: 5,
+  });
+  assert.equal(first.error, undefined);
+  assert.deepEqual(second.rows, first.rows, "缓存命中不改变查询结果");
+  assert.equal(second.matched, first.matched);
+});
+
+test("URL 下载限流：超过 50MB 的响应流在途中断，不再全量进内存", async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    // 60MB 的流：读到 50MB 上限时必须主动 cancel，抛「附件过大」
+    globalThis.fetch = (async () =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            const mb = new Uint8Array(1024 * 1024).fill(65);
+            for (let i = 0; i < 60; i++) controller.enqueue(mb);
+            controller.close();
+          },
+        }),
+        { headers: { "content-type": "application/octet-stream" } },
+      )) as typeof fetch;
+    const url = "https://example.edu.cn/attach/huge.bin";
+    await assert.rejects(() => fetchAttachment(url, "huge.bin"), /附件过大/);
+    // 失败下载不得留下缓存登记
+    assert.equal(
+      listAttachments().some((m) => m.url === url),
+      false,
+    );
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
