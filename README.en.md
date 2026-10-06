@@ -126,7 +126,7 @@ Other schools work through the manual timetable mode (paste or upload a timetabl
 
 ## Build with us
 
-Beyond the student tool, the repo is a working reference for local-first agents — every pattern below ships in daily use, backed by tests, free to lift under the MIT license with additional restrictions (academic submissions, competition entries, and commercial use require prior permission — see [LICENSE](LICENSE)):
+Beyond the student tool, the repo is a working reference for local-first agents — every pattern below ships in daily use, backed by tests, free to lift under the MIT license with additional restrictions (academic submissions and competition entries are not permitted — see [LICENSE](LICENSE)):
 
 - **Agent loop**: Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI` driving 30+ tools across multi-turn loops — [`src/core/agent.ts`](src/core/agent.ts)
 - **Ports & adapters**: the `SchoolAdapter` port (`src/core/school.ts`) keeps the kernel free of any school import; Zhengfang-new and CAS+URP differences never leak past an adapter — [`src/adapters/`](src/adapters/)
@@ -147,4 +147,4 @@ npm test
 
 Found it useful? A star, a reproducible issue, or a concrete student use case helps the project improve. Built something of your own on these patterns? Share it in [Discussions](https://github.com/Health-525/courseraptor/discussions).
 
-Released under the [MIT License](LICENSE) with additional restrictions: using this software for academic submissions (theses, coursework), competition entries, or commercial purposes requires prior written permission from the author (see [LICENSE](LICENSE)). No official affiliation with or endorsement by Nanjing Tech University.
+Released under the [MIT License](LICENSE) with additional restrictions: using this software for academic submissions (theses, coursework) or competition entries is not permitted (see [LICENSE](LICENSE)). No official affiliation with or endorsement by Nanjing Tech University.
