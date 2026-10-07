@@ -116,15 +116,6 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 
 Share the repository URL or an inspected clean installation package, never your used project directory. See [privacy and security](SECURITY.md).
 
-## Supported schools
-
-| University | Capabilities | Adapter maintainer |
-|---|---|---|
-| [Nanjing Tech University](src/adapters/njtech/) (NJTECH) | All online capabilities | [@Health-525](https://github.com/Health-525) |
-| [Hebei Agricultural University](src/adapters/hebau/) (HEBAU) | Timetable / grades / exams (CAS SSO + Zhengfang URP; dynamic-code second factor) | [@gzxb001-sketch](https://github.com/gzxb001-sketch) |
-
-Other schools work through the manual timetable mode (paste or upload a timetable and let the AI parse it). Your school not listed? [Request an adapter](https://github.com/Health-525/courseraptor/issues/new?template=request-school.yml) with a few details.
-
 ## Build with us
 
 Beyond the student tool, the repo is a working reference for local-first agents — every pattern below ships in daily use, backed by tests, free to lift under the MIT license with additional restrictions (academic submissions and competition entries are not permitted — see [LICENSE](LICENSE)):
