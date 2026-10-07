@@ -10,29 +10,21 @@ import type { ModelMessage } from "ai";
 import { ToolLoopAgent, tool } from "ai";
 import { z } from "zod";
 import { type DemoCard, demoCardFromTool } from "./cards";
-import {
-  DEMO_PERIOD_TIMES,
-  demoExams,
-  demoGrades,
-  demoKnowledge,
-  demoNews,
-  demoTodayBrief,
-  demoTodos,
-} from "./data";
+import { DEMO_PERIOD_TIMES, demoKnowledge, demoTodayBrief, demoTodos } from "./data";
 
 /* ── 系统提示词：声明演示环境，引导真实分析 ── */
 
 const DEMO_PROMPT = `你是「迅猛龙」课程助手的演示版，正在离线演示环境中接待一位体验产品的大学生。
 
 环境约定：
-- 你调用的所有工具返回的都是虚构示例数据（课表、成绩、考试、待办、通知一律是编造的示例），不代表任何真实学生或学校。
+- 你调用的所有工具返回的都是虚构示例数据（课表、待办、知识一律是编造的示例），不代表任何真实学生或学校。
 - 不要声称读取了真实教务系统；不要编造文件、下载链接或网址（演示模式没有生成文件的能力）。
 - 工具数据里的「示例课程」「示例教学楼」等就是这位演示学生的全部事实，基于它们做真实、有用的分析。
 
 工作方式：
 - 凡涉及时间判断（今天几号周几、第几周、距截止还剩几天）必须先调 get_time，禁止凭训练数据猜「今天」。
-- 查课表用 get_schedule，成绩/通识学分用 get_grades，考试用 get_exams，教务通知用 get_news；待办与知识库的增删改查用 manage_todos / manage_knowledge。
-- 主动做结合分析：比如把课表空档、考试倒计时和待办截止时间放在一起给建议——这正是产品的核心价值。
+- 查课表用 get_schedule；待办与知识库的增删改查用 manage_todos / manage_knowledge；学习类请求（讲知识点、备考、出题带练）按 meta-learning 学习教练方法论回答，需要方法论细节时调 read_learning_reference。
+- 主动做结合分析：比如把课表空档和待办截止时间放在一起给建议——这正是产品的核心价值。
 
 表达：
 - 用简体中文，Markdown 排版（表格、列表、加粗按需使用），先给结论再给细节。
@@ -161,33 +153,36 @@ export function demoLiveTools() {
         };
       },
     }),
-    /** 成绩查询：虚构成绩单与通识分类汇总 */
-    get_grades: tool({
+    /** 学习教练方法参考：虚构的按需加载（与正式 read_learning_reference 同形） */
+    read_learning_reference: tool({
       description:
-        "查演示学生的成绩：必修 GPA、已获学分、逐门成绩（含未通过与缓考）和通识分类学分汇总。",
-      inputSchema: z.object({}),
-      execute: async () => demoGrades(),
-    }),
-    /** 考试查询：虚构考试安排 */
-    get_exams: tool({
-      description: "查演示学生的近期考试安排：科目、日期时间、考场与座位号、倒计时天数。",
-      inputSchema: z.object({}),
-      execute: async () => {
-        const exams = demoExams(new Date());
-        return {
-          summary: `${exams.length} 场考试，最近一场 ${exams[0].inDays} 天后（虚构示例）`,
-          exams,
-          note: "虚构示例考试安排",
+        "按需加载一篇学习教练方法论参考。用户要求讲解知识点、备考复习或出题带练时，先直觉后形式；需要方法论细节（记忆机制、考试策略、笔记系统、知识结构诊断、练习编排）时调用本工具。",
+      inputSchema: z.object({
+        topic: z
+          .enum([
+            "deep-understanding",
+            "exam-strategies",
+            "note-taking-systems",
+            "learning-frameworks",
+            "knowledge-structure-assessment",
+            "practice-design",
+          ])
+          .describe("要加载的参考篇目"),
+      }),
+      execute: async ({ topic }) => {
+        const titles: Record<string, string> = {
+          "deep-understanding": "深度理解",
+          "exam-strategies": "考试专项策略",
+          "note-taking-systems": "笔记与阅读系统",
+          "learning-frameworks": "记忆与专注机制",
+          "knowledge-structure-assessment": "知识结构五维诊断",
+          "practice-design": "练习编排",
         };
-      },
-    }),
-    /** 通知查询：虚构教务通知 */
-    get_news: tool({
-      description: "查演示数据里的教务处通知列表（标题、日期、摘要与正文）。没有真实链接。",
-      inputSchema: z.object({}),
-      execute: async () => {
-        const news = demoNews(new Date());
-        return { summary: `${news.length} 条通知（虚构示例）`, count: news.length, news };
+        return {
+          loaded: topic,
+          title: titles[topic] ?? topic,
+          note: "虚构示例：正式模式返回对应参考全文，演示模式只回篇目名",
+        };
       },
     }),
     /** 待办维护：内存态，形状与正式 manage_todos 一致 */

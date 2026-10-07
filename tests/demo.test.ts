@@ -35,10 +35,10 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
     );
     assert.match(reply, /"t":"tool","phase":"start","id":"demo-get_schedule/);
     assert.match(reply, /"t":"end","dur":\d+,"sid":"demo-a"/);
-    await send({ message: "我的成绩和 GPA", sessionId: "demo-b" });
+    await send({ message: "我有哪些待办", sessionId: "demo-b" });
     const first = await (await fetch(`${base}/api/sessions/demo-a`)).json();
     assert.equal(first.messages.length, 2);
-    assert.ok(!JSON.stringify(first).includes("学业概览"));
+    assert.ok(!JSON.stringify(first).includes("待办功能示例"), "另一会话的回答不得串进本会话");
     // 卡片随会话消息保存，重开会话时重绘
     assert.equal(first.messages[1].cards[0].kind, "schedule");
     assert.equal((await send(null)).status, 400);
@@ -59,12 +59,22 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
 });
 
 test("演示不伪造实时数据、文件和任意 AI 回答", () => {
-  for (const message of ["课表", "成绩", "学分", "通知", "考试", "日历", "知识", "随机问题"]) {
-    assert.match(demoReply(message), /虚构示例/);
+  for (const message of [
+    "课表",
+    "待办",
+    "复习高数",
+    "课表图",
+    "日历",
+    "知识",
+    "成绩",
+    "随机问题",
+  ]) {
+    assert.match(demoReply(message), /虚构示例/, `「${message}」的回答必须声明虚构示例`);
   }
   assert.match(demoReply("日历"), /没有生成文件/);
   assert.match(demoReply("知识库"), /自动归类/);
   assert.match(demoReply("今天有什么安排"), /今日简报/, "演示应有日程+待办结合的示例回答");
+  assert.match(demoReply("帮我复习高数"), /学习教练/, "学习类请求应进入教练剧本");
   assert.match(demoReply("随机问题"), /不调用 AI/);
 });
 
@@ -84,7 +94,7 @@ test("演示模式的今日日程页：内嵌虚构数据，不发请求", async
     assert.match(html, /const DEMO_DATA = \{/);
     assert.match(html, /示例高等数学/);
     assert.match(html, /if \(!DEMO_DATA\) \{/, "自动刷新与取数都必须被演示守卫挡住");
-    // 课表/待办/知识已拆独立页：今日页只留头条与考试，左栏导航直达
+    // 课表/待办/知识已拆独立页：今日页只留头条速览（考试无数据源，如实空态），左栏导航直达
     assert.match(html, /href="\/schedule"/);
     assert.match(html, /href="\/todos"/);
     assert.match(html, /href="\/knowledge"/);

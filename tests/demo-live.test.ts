@@ -6,13 +6,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { type DemoStreamAgent, demoLiveTools, runDemoLiveTurn } from "../local/demo/agent";
-import {
-  demoCardFromTool,
-  demoCardsForMessage,
-  examsCard,
-  scheduleCard,
-} from "../local/demo/cards";
-import { demoExams, demoGrades, demoNews, demoTodayBrief, demoTodos } from "../local/demo/data";
+import { demoCardFromTool, demoCardsForMessage, scheduleCard } from "../local/demo/cards";
+import { demoTodayBrief, demoTodos } from "../local/demo/data";
 import { createDemoServer } from "../local/demo/server";
 
 const asTool = (t: unknown) =>
@@ -20,46 +15,25 @@ const asTool = (t: unknown) =>
 
 /* ── 虚构数据 fixtures ── */
 
-test("demoGrades：与离线剧本同数字（GPA 3.30 / 42 学分 / 58 分未过 / 缓考）", () => {
-  const g = demoGrades();
-  assert.equal(g.gpa, 3.3);
-  assert.equal(g.creditsEarned, 42);
-  const failed = g.courses.find((c) => c.name === "示例课程 A");
-  assert.equal(failed?.score, 58);
-  assert.equal(failed?.status, "未通过");
-  assert.ok(g.courses.some((c) => c.name === "示例课程 B" && String(c.status).includes("缓考")));
-  assert.equal(g.general.公共艺术类, 0);
+test("demoTodayBrief：学期固定第 2 周；考试如实给空态（产品不接入教务）", () => {
+  const brief = demoTodayBrief();
+  assert.equal(brief.term.week, 2);
+  assert.equal(brief.exams.available, false);
+  assert.deepEqual(brief.exams.upcoming, []);
+  assert.match(brief.exams.note ?? "", /暂无考试数据/);
 });
 
-test("demoExams：两场考试、日期相对今天（+5/+7）、非今天", () => {
-  const now = new Date(2026, 8, 26, 12, 0); // 2026-09-26
-  const exams = demoExams(now);
-  assert.equal(exams.length, 2);
-  assert.equal(exams[0].date, "2026-10-01");
-  assert.equal(exams[1].date, "2026-10-03");
-  assert.ok(exams.every((e) => e.inDays > 0 && e.isToday === false));
-});
-
-test("demoNews：3 条虚构通知，任何字段都不含真实链接", () => {
-  const news = demoNews(new Date());
-  assert.equal(news.length, 3);
-  assert.ok(!JSON.stringify(news).includes("http"));
-});
-
-test("demoTodos/demoTodayBrief：逾期/今天/数天后三种形态，学期固定第 2 周", () => {
+test("demoTodos：逾期/今天/数天后三种形态", () => {
   const t = demoTodos(new Date());
   assert.equal(t.items.length, 3);
   assert.equal(t.items[0].overdue, true);
   assert.equal(t.items[1].isToday, true);
   assert.equal(t.done.length, 1);
-  const brief = demoTodayBrief();
-  assert.equal(brief.term.week, 2);
-  assert.equal(brief.exams.upcoming[0].subject, "示例课程 A");
 });
 
 /* ── live 工具集（纯内存，不落盘）── */
 
-test("get_time / get_schedule / get_grades / get_exams / get_news：返回虚构数据", async () => {
+test("get_time / get_schedule / read_learning_reference：返回虚构数据", async () => {
   const tools = demoLiveTools();
   const time = await asTool(tools.get_time).execute({});
   assert.equal(time.week, 2);
@@ -69,14 +43,9 @@ test("get_time / get_schedule / get_grades / get_exams / get_news：返回虚构
   assert.equal((schedule.week as { days: unknown[] }).days.length, 7);
   assert.ok(JSON.stringify(schedule).includes("示例高等数学"));
 
-  const grades = await asTool(tools.get_grades).execute({});
-  assert.equal(grades.gpa, 3.3);
-
-  const exams = await asTool(tools.get_exams).execute({});
-  assert.equal((exams.exams as unknown[]).length, 2);
-
-  const news = await asTool(tools.get_news).execute({});
-  assert.equal(news.count, 3);
+  const ref = await asTool(tools.read_learning_reference).execute({ topic: "exam-strategies" });
+  assert.equal(ref.loaded, "exam-strategies");
+  assert.match(String(ref.title), /考试专项策略/);
 });
 
 test("manage_todos：add → list → update 完成 → 再 list 不含已完成", async () => {
@@ -137,32 +106,23 @@ test("scheduleCard：每天每门课一行、今天与调休有标注、下一�
   assert.match(String(card.badge), /虚构示例/);
 });
 
-test("examsCard：日期由相对 fixtures 生成，含座位信息", () => {
-  const card = examsCard();
-  assert.equal(card.rows?.length, 2);
-  assert.match(String(card.rows?.[0].meta), /座位 12/);
-  assert.equal(card.metrics?.[0].value, "5 天后");
-});
-
 test("demoCardFromTool：读态查询映射卡片，写操作与未知工具不出卡", () => {
   assert.equal(demoCardFromTool("get_schedule", {})?.kind, "schedule");
-  assert.equal(demoCardFromTool("get_grades", {})?.kind, "grades");
-  assert.equal(demoCardFromTool("get_exams", {})?.kind, "exams");
-  assert.equal(demoCardFromTool("get_news", {})?.kind, "news");
   assert.equal(demoCardFromTool("manage_todos", { todos: [] })?.kind, "todos");
   assert.equal(demoCardFromTool("manage_todos", { ok: true }), null, "写操作不出卡");
   assert.equal(demoCardFromTool("manage_knowledge", { entries: [{}] })?.kind, "knowledge");
   assert.equal(demoCardFromTool("get_weather", {}), null);
+  assert.equal(demoCardFromTool("read_learning_reference", {}), null, "方法参考不出卡");
 });
 
 test("demoCardsForMessage：离线剧本关键词推导，同 kind 去重", () => {
   const cards = demoCardsForMessage("今天有什么安排");
   const kinds = cards.map((c) => c.kind);
   assert.deepEqual(kinds, ["schedule", "todos"], "今日简报出课表+待办两张卡");
-  const grades = demoCardsForMessage("我的成绩和 GPA，顺便看看通识学分");
-  assert.ok(
-    grades.every((c) => c.kind === "grades"),
-    "成绩/通识只出一张成绩卡",
+  assert.deepEqual(
+    demoCardsForMessage("我的成绩和 GPA").map((c) => c.kind),
+    [],
+    "成绩无工具支撑，不出卡",
   );
   assert.deepEqual(demoCardsForMessage("随便聊聊"), []);
 });
