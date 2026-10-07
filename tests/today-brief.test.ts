@@ -20,12 +20,12 @@ const { buildTodayBrief } = await import("../src/channels/web/today-brief");
 const { saveScheduleCache } = await import("../src/core/schedule-cache");
 const { saveExamCache } = await import("../src/core/exam-cache");
 const { addKnowledge } = await import("../src/core/knowledge");
-const { recordWeek1Monday } = await import("../src/adapters/njtech/term-dates");
+const { recordManualTermStart } = await import("../src/core/manual-terms");
 const { recordSpecialDays, removeSpecialDays } = await import("../src/core/calendar/holidays");
 const { addReminder, listReminders, updateReminder } = await import("../src/core/workspace-data");
 
 // 校准 2026 秋学期：第 1 周从 2026-08-31（周一）开始
-recordWeek1Monday(2026, 3, "2026-08-31", "known", "测试校历");
+recordManualTermStart(2026, 3, "2026-08-31");
 
 const courses = [
   {
@@ -81,12 +81,12 @@ test("普通教学日：今日课程按周次过滤、状态与下一节课正�
   // 2026-09-01 周二，第 1 周（单周，大学英语在单周上）
   const b = buildTodayBrief(new Date("2026-09-01T10:00:00"));
   assert.equal(b.term.weekLabel, "第 1 周");
-  assert.equal(b.term.weekSource, "known");
+  assert.equal(b.term.weekSource, "recorded");
   assert.deepEqual(
     b.schedule.courses.map((c) => c.title),
     ["高等数学", "大学英语"],
   );
-  assert.equal(b.schedule.courses[0].status, "done"); // 08:10-09:50 已结束
+  assert.equal(b.schedule.courses[0].status, "done"); // 08:00-09:40 已结束
   assert.equal(b.schedule.courses[1].status, "upcoming"); // 14:00 未开始
   assert.equal(b.next?.course.title, "大学英语");
   assert.equal(b.next?.dateLabel, "今天");
@@ -100,9 +100,9 @@ test("单双周：双周不含「(单)」课，下一节课跨天到明天", () 
     b.schedule.courses.map((c) => c.title),
     ["高等数学"],
   );
-  assert.equal(b.next?.course.title, "程序设计"); // 周三 16:10-17:50
+  assert.equal(b.next?.course.title, "程序设计"); // 周三 16:00-17:40
   assert.equal(b.next?.dateLabel, "明天");
-  assert.equal(b.next?.startsInMin, 1440 + 16 * 60 + 10 - 10 * 60); // 第 7 节 16:10 开课
+  assert.equal(b.next?.startsInMin, 1440 + 16 * 60 - 10 * 60); // 第 7 节 16:00 开课
 });
 
 test("调休补课日：按被换周几的课表上课", () => {
@@ -114,7 +114,7 @@ test("调休补课日：按被换周几的课表上课", () => {
     b.schedule.courses.map((c) => c.title),
     ["高等数学", "大学英语"],
   );
-  assert.equal(b.schedule.courses[0].status, "current"); // 08:10-09:50 正在上
+  assert.equal(b.schedule.courses[0].status, "current"); // 08:00-09:40 正在上
   assert.match(b.schedule.note ?? "", /调休补课日/);
   // 本周概览的周六带补课标记与补出的课
   const sat = b.week?.days.find((d) => d.weekday === 6);
@@ -137,11 +137,11 @@ test("放假日：今日课表作废，下一节课跳到明天", () => {
 });
 
 test("深夜与跨午夜：午夜前后两次计算给出一致的下一节课", () => {
-  // 周一 23:30：今天无课，下一节是明天 08:10 的高等数学
+  // 周一 23:30：今天无课，下一节是明天 08:00 的高等数学
   const late = buildTodayBrief(new Date("2026-08-31T23:30:00"));
   assert.equal(late.next?.dateLabel, "明天");
   assert.equal(late.next?.course.title, "高等数学");
-  assert.equal(late.next?.startsInMin, 1440 + 8 * 60 + 10 - (23 * 60 + 30));
+  assert.equal(late.next?.startsInMin, 1440 + 8 * 60 - (23 * 60 + 30));
   // 跨过午夜：日期翻到 9-1，今天的课就是昨晚算到的那门
   const am = buildTodayBrief(new Date("2026-09-01T00:10:00"));
   assert.match(am.dateLabel, /9月1日 周二/);
@@ -164,7 +164,7 @@ test("本周概览：周一锚点、今日标记与按日课程", () => {
   assert.equal(b.week?.days[1].courses[0].pEnd, 2);
   assert.equal(b.week?.days[1].courses[0].teacher, "张三");
   assert.equal(b.week?.days[1].courses[0].weeks, "1-16");
-  assert.equal(b.periodTimes["1"], "08:10-08:55");
+  assert.equal(b.periodTimes["1"], "08:00-08:45");
   assert.equal(b.week?.days[5].courses.length, 0); // 周六无课
 });
 
@@ -258,7 +258,7 @@ test("假期里显式选周：周视图照常给出（翻下学期课表的场�
   assert.ok(b.week, "显式选周时周概览不得为空");
   assert.equal(b.term.week, 1);
   assert.equal(b.term.weekLabel, "第 1 周");
-  assert.equal(b.term.weekSource, "known", "开学日期基准沿用实测记录");
+  assert.equal(b.term.weekSource, "recorded", "开学日期基准沿用导入时记录");
   // 周一锚点是 2026-08-31，第 1 周周一应就是它
   assert.equal(b.week.days[0].dateISO, "2026-08-31");
   // 不选周默认行为不变（上面的假期用例钉住），selectedWeek 越界回落默认

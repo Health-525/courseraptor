@@ -1,8 +1,8 @@
 /**
  * 文件流水线端到端测试：read_local_file -> 缓存 -> query_table 筛选 -> 清理
  *
- * 复现真实痛点：教务处通知带一个上千行的 xlsx 附件，旧链路把整本表转成
- * 一坨 CSV 文本、超 12000 字符掐断——模型永远读不完，也无从筛选。
+ * 复现真实痛点：一份上千行的 xlsx，旧链路把整本表转成一坨 CSV 文本、
+ * 超 12000 字符掐断——模型永远读不完，也无从筛选。
  * 新链路：解析成结构 -> 落盘缓存回概览 -> 按条件筛行 -> 任务完删缓存副本。
  * 全程离线（不碰网络），数据目录隔离在临时路径。
  */
@@ -18,7 +18,7 @@ const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-pipeline-"));
 const tmpFiles = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-userfiles-"));
 process.env.RAPTOR_DATA_DIR = tmpData;
 
-const { openLocalFile, fetchAttachment } = await import("../src/core/attachments");
+const { openLocalFile } = await import("../src/core/attachments");
 const { coreTools } = await import("../src/core/tools");
 const { listAttachments, attachmentStats } = await import("../src/core/attachment-store");
 const require = createRequire(import.meta.url);
@@ -310,31 +310,4 @@ test("query_table 解析缓存：连续查询结果一致，缓存对调用方�
   assert.equal(first.error, undefined);
   assert.deepEqual(second.rows, first.rows, "缓存命中不改变查询结果");
   assert.equal(second.matched, first.matched);
-});
-
-test("URL 下载限流：超过 50MB 的响应流在途中断，不再全量进内存", async () => {
-  const realFetch = globalThis.fetch;
-  try {
-    // 60MB 的流：读到 50MB 上限时必须主动 cancel，抛「附件过大」
-    globalThis.fetch = (async () =>
-      new Response(
-        new ReadableStream({
-          start(controller) {
-            const mb = new Uint8Array(1024 * 1024).fill(65);
-            for (let i = 0; i < 60; i++) controller.enqueue(mb);
-            controller.close();
-          },
-        }),
-        { headers: { "content-type": "application/octet-stream" } },
-      )) as typeof fetch;
-    const url = "https://example.edu.cn/attach/huge.bin";
-    await assert.rejects(() => fetchAttachment(url, "huge.bin"), /附件过大/);
-    // 失败下载不得留下缓存登记
-    assert.equal(
-      listAttachments().some((m) => m.url === url),
-      false,
-    );
-  } finally {
-    globalThis.fetch = realFetch;
-  }
 });

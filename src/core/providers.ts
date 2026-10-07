@@ -6,8 +6,8 @@
  * `GET {base}/models` 实时结果为准（models.ts），这里只内置「断网/未配 Key
  * 时的兜底清单」——厂商换代时型号 id 会过期，兜底宁可保守，注明以拉取为准。
  *
- * 依赖方向红线：本模块会被 config.ts / models.ts import，而它们在 njtech
- * 技能包的 esbuild 闭包里——所以这里绝不能 import SDK 或任何重依赖。
+ * 依赖方向红线：本模块会被 config.ts / models.ts import，而它们会被打进
+ * 独立技能包的 esbuild 闭包——所以这里绝不能 import SDK 或任何重依赖。
  */
 
 export interface ModelOption {

@@ -448,7 +448,7 @@ test("网页上传只回附件编号，对话可读取受控路径且详情不�
   assert.ok(!detailText.includes("storedPath") && !detailText.includes("web-uploads"));
 });
 
-test("教务工具结果不再产生结果卡，工具状态与文本照常下发", async () => {
+test("工具结果不再产生结果卡，工具状态与文本照常下发", async () => {
   setChatAgent({
     stream() {
       async function* gen() {
@@ -487,8 +487,8 @@ test("待办可创建、完成并导出日历，本地数据接口回脱敏概�
     body: JSON.stringify({
       title: "提交选课材料",
       dueAt: "2026-09-10T09:00:00+08:00",
-      source: "教务通知",
-      sourceUrl: "https://jwc.njtech.edu.cn/example",
+      source: "班级通知",
+      sourceUrl: "https://example.edu.cn/notice/1",
     }),
   });
   assert.equal(create.status, 201);
@@ -680,8 +680,6 @@ test("GET /api/settings 只回脱敏状态，不吐明文密钥", async () => {
   const res = await fetch(`${url}/api/settings`);
   assert.equal(res.status, 200);
   const s = await res.json();
-  assert.equal(typeof s.jwgl.configured, "boolean");
-  assert.ok(!("password" in s.jwgl), "不得返回教务密码");
   assert.equal(typeof s.deepseek.configured, "boolean");
   assert.ok(!("key" in s.deepseek) && !("apiKey" in s.deepseek), "不得返回完整 Key");
   // QQ 分组同样是脱敏状态：只有打码 AppID，绝不回显 AppSecret
@@ -719,7 +717,7 @@ test("default 会话可被侧栏点击读取（id 白名单必须放行字母）
   assert.equal(res.status, 200, "GET default 档不得 404（曾致点击无反应）");
 });
 
-test("POST /api/settings：坏格式 Key、半套教务凭证、清单外模型都被拒且不落盘", async () => {
+test("POST /api/settings：坏格式 Key、清单外模型都被拒且不落盘", async () => {
   const url = (await startChatWeb())!;
   const call = (body: unknown) =>
     wfetch(`${url}/api/settings`, {
@@ -733,11 +731,6 @@ test("POST /api/settings：坏格式 Key、半套教务凭证、清单外模型�
   const d1 = await r1.json();
   assert.equal(d1.ok, false);
   assert.match(d1.results[0].message, /sk-/);
-
-  const r2 = await call({ jwglUsername: "2026000001" });
-  assert.equal(r2.status, 400);
-  const d2 = await r2.json();
-  assert.match(d2.results[0].message, /一起/);
 
   // 空提交视为无修改（200），同样不应产生任何写入
   const r3 = await call({});
@@ -1156,7 +1149,7 @@ test("GET /todos 返回独立待办页：语法自检 + 勾选删除走 /api/rem
   );
 });
 
-test("GET /api/grades 纯缓存读取（无缓存时 savedAt=null，绝不登录教务）", async () => {
+test("GET /api/grades 纯缓存读取（无缓存时 savedAt=null，不联网）", async () => {
   const url = (await startChatWeb())!;
   const res = await fetch(`${url}/api/grades`);
   assert.equal(res.status, 200);
@@ -1187,11 +1180,11 @@ test("GET /api/today 纯本地组装当日档案（无缓存时如实降级）",
 
 test("写请求不带 CSRF token 一律 403（跨站页面拿不到 token）", async () => {
   const url = (await startChatWeb())!;
-  // 恶意网页用 text/plain 免预检 POST 覆写教务凭证：无 token 直接被拒
+  // 恶意网页用 text/plain 免预检 POST 覆写凭证：无 token 直接被拒
   const noToken = await fetch(`${url}/api/settings`, {
     method: "POST",
     headers: { "content-type": "text/plain" },
-    body: JSON.stringify({ jwglUsername: "2026000001", jwglPassword: "evil-pass" }),
+    body: JSON.stringify({ apiKey: "sk-evil", qqBotAppId: "10000" }),
   });
   assert.equal(noToken.status, 403);
   // token 值错误同样被拒，且不产生数据

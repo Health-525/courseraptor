@@ -31,7 +31,7 @@ const {
 } = await import("../src/core/attachment-store");
 
 const URL_A =
-  "https://jwc.njtech.edu.cn/system/_content/download.jsp?urltype=news.DownloadAttachUrl&owner=1&wbfileid=ABC";
+  "https://example.edu.cn/system/_content/download.jsp?urltype=news.DownloadAttachUrl&owner=1&wbfileid=ABC";
 
 test("id 稳定：同 URL 永远同 id，不同来源不同 id", () => {
   assert.equal(attachmentIdForSource("url", URL_A), attachmentIdForSource("url", URL_A));

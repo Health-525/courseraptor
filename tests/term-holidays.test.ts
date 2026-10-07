@@ -24,7 +24,19 @@ const {
   specialDaysOfWeek,
   loadHolidayStore,
 } = await import("../src/core/calendar/holidays");
-const { annotateWeekGroups, buildWeekIndex } = await import("../src/adapters/njtech/academics");
+const { annotateWeekGroups, buildWeekIndex } = await import("../src/core/academic-utils");
+
+// 测试内节次表（不依赖任何学校实现；断言只关心假期叠加逻辑）
+const TIME_TABLE: Record<string, string> = {
+  "1": "08:00-08:45",
+  "2": "08:55-09:40",
+  "3": "10:00-10:45",
+  "4": "10:55-11:40",
+};
+const timeRange = (periods: number[]) => {
+  const a = periods.map((p) => TIME_TABLE[String(p)]).filter(Boolean);
+  return a.length ? `${a[0].slice(0, 5)}-${a[a.length - 1].slice(6)}` : undefined;
+};
 
 // 2026 秋：第 1 周 2026-08-31（周一）～ 9-06
 const WEEK1_MONDAY = "2026-08-31";
@@ -95,7 +107,12 @@ test("annotateWeekGroups: holiday 周带合并后的放假说明", () => {
       teacher: "张",
     },
   ];
-  const groups = annotateWeekGroups(courses, WEEK1_MONDAY, buildWeekIndex(courses));
+  const groups = annotateWeekGroups(
+    courses,
+    WEEK1_MONDAY,
+    buildWeekIndex(courses, timeRange),
+    timeRange,
+  );
   const week5 = groups.find((g) => g.week === 5)!;
   // 周四的课仍按周次表达式正常出现在 lines（覆盖由模型按 holiday 字段语义执行）
   assert.ok(week5.lines.some((l) => l.includes("高等数学")));
@@ -121,7 +138,12 @@ test("annotateWeekGroups: makeup 日按 follows 周几补出课行", () => {
       teacher: "李",
     },
   ];
-  const groups = annotateWeekGroups(courses, WEEK1_MONDAY, buildWeekIndex(courses));
+  const groups = annotateWeekGroups(
+    courses,
+    WEEK1_MONDAY,
+    buildWeekIndex(courses, timeRange),
+    timeRange,
+  );
   const week1 = groups.find((g) => g.week === 1)!;
   assert.equal(week1.makeup?.length, 1);
   const line = week1.makeup![0];
@@ -137,7 +159,12 @@ test("annotateWeekGroups: makeup 不在该周周次范围内的课不会补", ()
   const courses = [
     { title: "只开单周", weekday: 3, periods: [1, 2], weeks: "3,5,7", location: "", teacher: "" },
   ];
-  const groups = annotateWeekGroups(courses, WEEK1_MONDAY, buildWeekIndex(courses));
+  const groups = annotateWeekGroups(
+    courses,
+    WEEK1_MONDAY,
+    buildWeekIndex(courses, timeRange),
+    timeRange,
+  );
   // 该课只排在 3/5/7 周：第 1 周（含 9-05 调休日）根本无分组，周三的课也补不进任何周
   assert.equal(
     groups.find((g) => g.week === 1),

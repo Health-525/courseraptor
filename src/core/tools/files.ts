@@ -54,7 +54,7 @@ export const filesTools = {
   /** 表格筛选查询（大表按需取行） */
   query_table: tool({
     description:
-      "对已缓存的表格（id 来自 fetch_attachment / read_local_file 返回的 id 字段）做结构化查询，替代「通读整个 Excel」。action：sheets=看所有 sheet 的表头与行数（默认 sheet 不确定时先这个）；rows=按分页/排序读行；filter=关键词（keyword 全列模糊匹配）+ 多条件（where，col/op/value，AND 关系，op 支持 contains/eq/ne/gt/ge/lt/le/regex/empty/notEmpty，数值条件自动按数字比较）+ 排序（sortBy/sortDesc）+ 分页（offset/limit）；values=某列去重计数（如「表里有哪些学院」）。典型用法：学生问「网课目录里我们专业大三要上哪门」→ filter 用 where 专业列 contains + keyword 年级。结果行用「 | 」拼接，表头在 headers。",
+      "对已缓存的表格（id 来自 read_local_file 返回的 id 字段）做结构化查询，替代「通读整个 Excel」。action：sheets=看所有 sheet 的表头与行数（默认 sheet 不确定时先这个）；rows=按分页/排序读行；filter=关键词（keyword 全列模糊匹配）+ 多条件（where，col/op/value，AND 关系，op 支持 contains/eq/ne/gt/ge/lt/le/regex/empty/notEmpty，数值条件自动按数字比较）+ 排序（sortBy/sortDesc）+ 分页（offset/limit）；values=某列去重计数（如「表里有哪些学院」）。典型用法：学生问「网课目录里我们专业大三要上哪门」→ filter 用 where 专业列 contains + keyword 年级。结果行用「 | 」拼接，表头在 headers。",
     inputSchema: z.object({
       id: z.string().describe("附件缓存 id"),
       action: z.enum(["sheets", "rows", "filter", "values"]).default("sheets").describe("查询类型"),
@@ -94,7 +94,7 @@ export const filesTools = {
       const meta = getMeta(input.id);
       if (!meta) {
         return {
-          error: `缓存中不存在 id=${input.id} 的表格（可能已清理）。先 fetch_attachment 或 read_local_file 重新获取。`,
+          error: `缓存中不存在 id=${input.id} 的表格（可能已清理）。先 read_local_file 重新获取。`,
         };
       }
       // 解析结果进程内缓存：模型对同一张大表连续 filter/rows/values 查询

@@ -18,8 +18,7 @@ export interface CachedSchedule {
   /** 落盘时间戳（ms），仅调试用，不做过期判断 */
   savedAt: number;
   schedule: ScheduleResult;
-  /** 落盘时的学校 id：切换学校后（如 custom 切回 njtech）在线失败时，
-   *  不得回退到别校导入的课表冒充「最后已知课表」 */
+  /** 落盘时的学校 id：跨校数据不共用，别校导入的课表不得冒充「最后已知课表」 */
   schoolId?: string;
 }
 

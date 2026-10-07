@@ -1,7 +1,7 @@
 /**
- * 校历提示词段渲染：运行时真值（term-dates/term-holidays）能进提示词。
+ * 校历提示词段渲染：运行时真值（导入记录/term-holidays）能进提示词。
  * 提示词不再硬编码校历——过去对话里修正过的开学日期只进了记忆没进代码，
- * 两份真相漂移过一整个学期；现在只认 data/ 下的落盘数据。
+ * 两份真相漂移过一整个学期；现在只认落盘数据。
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -9,24 +9,19 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-// 必须在导入被测模块前设好数据目录（term-dates/holidays 首次 load 即缓存；
-// 每个测试文件是独立进程，不会污染其他用例）
+// 必须在导入被测模块前设好数据与凭证目录（记录/假期首次 load 即缓存；
+// 每个测试文件是独立进程，不会污染其他用例，也绝不读真机 credentials.enc）
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-prompt-"));
 process.env.RAPTOR_DATA_DIR = dataDir;
+process.env.RAPTOR_CREDENTIALS_FILE = path.join(dataDir, "credentials.enc");
 
 await import("../src/adapters");
+const { recordManualTermStart } = await import("../src/core/manual-terms");
 const { writeFileAtomicSync } = await import("../src/core/atomic-write");
 
-writeFileAtomicSync(
-  path.join(dataDir, "term-dates.json"),
-  JSON.stringify({
-    "2026-1": {
-      week1Monday: "2026-08-31",
-      source: "recorded",
-      evidence: "南工教〔2026〕91号",
-    },
-  }),
-);
+// 手动课表模式的开学日期真值：用户导入课表时记录（加密凭证里）
+recordManualTermStart(2026, 3, "2026-08-31");
+
 writeFileAtomicSync(
   path.join(dataDir, "term-holidays.json"),
   JSON.stringify({
@@ -41,8 +36,8 @@ const { calendarSection } = await import("../src/core/prompt");
 
 test("校历段：开学日期与放假/调休从运行时真值渲染进提示词", () => {
   const s = calendarSection();
-  assert.match(s, /2026-1 学期：第 1 周 2026-08-31（周一）/);
-  assert.match(s, /南工教〔2026〕91号/, "recorded 来源要带证据（通知文号）");
+  assert.match(s, /2026-2027-1 学期：第 1 周 2026-08-31（周一）/);
+  assert.match(s, /导入课表时记录的开学日期/, "recorded 来源要如实标注依据");
   assert.match(s, /2026-10-01 放假（国庆节）/);
   assert.match(s, /2026-09-27 调休补课（按周4课表）/);
   assert.match(s, /以工具返回为准/, "永远声明运行时真值优先级");

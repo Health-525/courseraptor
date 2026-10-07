@@ -54,7 +54,7 @@ async function loadSource(input: ConvertInput): Promise<{ loaded?: Loaded; error
   }
   if (input.sourceId) {
     const meta = getMeta(input.sourceId);
-    if (!meta) return { error: `找不到附件 id=${input.sourceId}（先用 fetch_attachment 读入）` };
+    if (!meta) return { error: `找不到附件 id=${input.sourceId}（先用 read_local_file 读入）` };
     buf = readStoredBuffer(input.sourceId);
     filename = meta.filename;
     if (meta.kind === "table" || /\.(xlsx|xls|csv|tsv)$/i.test(meta.filename)) {

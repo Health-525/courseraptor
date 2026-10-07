@@ -80,10 +80,10 @@ export const documentTools = {
   /** 转换/改写文档（读入源文件→重排为另一种格式） */
   convert_document: tool({
     description:
-      "文件格式转换与重排：把已有内容（fetch_attachment 读入的附件 id、或本机文件路径、或直接一段文本）转换/重排成 Word/Excel/PPT/PDF 目标格式。用于「把这份 PDF/Word 转成 PPT」「把表格转成 Word」「把这段文字整理成一份排版好的文档」。源文件只读，成品写 data/generated 并返回路径。改写润色本身（换词、调结构）你直接改好文本再用 generate_document 即可，本工具擅长跨格式搬运与排版。",
+      "文件格式转换与重排：把已有内容（附件缓存 id、或本机文件路径、或直接一段文本）转换/重排成 Word/Excel/PPT/PDF 目标格式。用于「把这份 PDF/Word 转成 PPT」「把表格转成 Word」「把这段文字整理成一份排版好的文档」。源文件只读，成品写 data/generated 并返回路径。改写润色本身（换词、调结构）你直接改好文本再用 generate_document 即可，本工具擅长跨格式搬运与排版。",
     inputSchema: z.object({
       target: z.enum(["docx", "xlsx", "pptx", "pdf"]).describe("目标格式"),
-      sourceId: z.string().optional().describe("附件缓存 id（fetch_attachment 返回的 id）"),
+      sourceId: z.string().optional().describe("附件缓存 id（read_local_file 返回的 id）"),
       sourcePath: z.string().optional().describe("本机文件绝对路径（只读，不落库原件）"),
       text: z.string().optional().describe("直接提供一段文本作为来源"),
       title: z.string().optional().describe("成品标题（默认取源文件名）"),

@@ -35,7 +35,7 @@ function fixture() {
       {
         title: "最优化方法",
         weekday: 3, // 周三
-        periods: [1, 2], // 08:10-09:50
+        periods: [1, 2], // 08:00-09:40（手动课表模式兜底作息）
         weeks: "1-2",
         location: "仁智楼518",
         teacher: "张三",
@@ -43,7 +43,7 @@ function fixture() {
       {
         title: "周六课,含逗号",
         weekday: 6, // 周六
-        periods: [3, 4], // 10:20-12:00
+        periods: [3, 4], // 10:00-11:40
         weeks: "1-2", // 第 1 周周六（09-05）是调休补课日：不照常上；第 2 周正常
         location: "",
         teacher: "",
@@ -84,20 +84,20 @@ test("假期吞课、全天事件补齐、调休按被换周几补课", () => {
   assert.equal(r.makeupEvents, 1); // 09-05 按周三课表补出
   assert.equal(r.noTimeSkipped, 1); // 无节次课定时不了，如实跳过
 
-  // 正常周次展开：第 2 周周三 = 2026-09-09 08:10、第 2 周周六 = 09-12 10:20
-  assert.ok(r.ics.includes("DTSTART;TZID=Asia/Shanghai:20260909T081000"));
-  assert.ok(r.ics.includes("DTSTART;TZID=Asia/Shanghai:20260912T102000"));
+  // 正常周次展开：第 2 周周三 = 2026-09-09 08:00、第 2 周周六 = 09-12 10:00
+  assert.ok(r.ics.includes("DTSTART;TZID=Asia/Shanghai:20260909T080000"));
+  assert.ok(r.ics.includes("DTSTART;TZID=Asia/Shanghai:20260912T100000"));
   // 放假日：全天事件而不是定时事件
   assert.ok(r.ics.includes("DTSTART;VALUE=DATE:20260902"));
   assert.ok(r.ics.includes("DTSTART;VALUE=DATE:20260904"));
   assert.ok(r.ics.includes("SUMMARY:放假：测试节"));
   // 当天的课确实被吞掉
-  assert.ok(!r.ics.includes("20260902T081000"));
+  assert.ok(!r.ics.includes("20260902T080000"));
   // 调休补课：09-05（周六）出现周三的第 1-2 节课
-  assert.ok(r.ics.includes("DTSTART;TZID=Asia/Shanghai:20260905T081000"));
+  assert.ok(r.ics.includes("DTSTART;TZID=Asia/Shanghai:20260905T080000"));
   assert.ok(r.ics.includes("调休补课（按周三课表）"));
   // 自然落在 09-05 的周六课不照常上（该天执行周三课表）
-  assert.ok(!r.ics.includes("20260905T1020"));
+  assert.ok(!r.ics.includes("20260905T1000"));
 });
 
 test("考试事件带时刻、考场座位与提前 30 分钟提醒", () => {

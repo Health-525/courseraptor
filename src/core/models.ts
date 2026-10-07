@@ -14,7 +14,7 @@
  *
  * 本模块不 import config，免得和 config <-> credentials 的依赖绕圈：baseUrl、
  * apiKey 由调用方显式传入，fetch 也可注入，纯逻辑与网络都能单独测。
- * （本模块在 njtech 技能包闭包内，只准 import providers.ts 这类纯数据。）
+ * （本模块会被打进独立技能包闭包，只准 import providers.ts 这类纯数据。）
  */
 
 import {

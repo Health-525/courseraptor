@@ -10,7 +10,7 @@
  *   保住与 DeepSeek 相同的「保存 Key 即热生效」语义。
  *
  * 本模块 import SDK，严禁被 config.ts / models.ts / credentials.ts 引用——
- * 它们在 njtech 技能包的 esbuild 闭包里，拖进 SDK 会撑爆单文件包。
+ * 它们会在独立技能包的 esbuild 闭包里，拖进 SDK 会撑爆单文件包。
  */
 
 import { createDeepSeek } from "@ai-sdk/deepseek";

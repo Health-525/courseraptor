@@ -1,7 +1,8 @@
 /**
- * 自定义学校（其他学校）适配器 — 手动课表模式
+ * 手动课表模式 — 唯一内置学校形态
  *
- * 没有真实教务系统可接：课表来自用户在设置页导入的本地缓存，
+ * 不接入任何学校教务系统：课表等数据全部来自用户自行导入的本地缓存
+ * （设置页「导入课表」，可粘贴文本或上传文件由 AI 解析），
  * 成绩/考试/通知/选课等在线能力一概不声明（agent 相应少一组工具）。
  * 学期规则与开学日期见 ./academics，工具见 ./tools，提示词见 ./prompt。
  */
@@ -12,20 +13,14 @@ import { loadScheduleCache } from "../../core/schedule-cache";
 import type { SchoolAdapter } from "../../core/school";
 import * as academics from "./academics";
 import { customPromptSections } from "./prompt";
+import { calendarTools } from "./tools/calendar";
 import { customScheduleTools } from "./tools/schedule";
-
-/** 自定义学校没有教务登录：任何登录调用都指回设置页 */
-const noJwgl = async () => {
-  throw new Error(
-    "自定义学校模式没有接入教务系统：课表用 设置 → 学校 → 导入课表；需要教务在线功能请换回已适配学校",
-  );
-};
 
 export const customSchool: SchoolAdapter = {
   info: {
     id: "custom",
-    name: "其他学校（手动课表）",
-    shortName: "自定义",
+    name: "手动课表模式",
+    shortName: "手动课表",
     city: "",
     timezone: "Asia/Shanghai",
     manual: true,
@@ -50,23 +45,19 @@ export const customSchool: SchoolAdapter = {
     periodTimes: () => academics.DEFAULT_PERIOD_TIMES,
     weekdayName: academics.weekdayName,
   },
-  auth: {
-    login: noJwgl,
-    getCookie: noJwgl,
-  },
   schedule: {
-    // 手动课表的「抓取」就是读缓存：欢迎面板与今日页与 njtech 同一条路
+    // 手动课表的「抓取」就是读缓存：欢迎面板与今日页与通用路径同一条路
     fetchSmart: async (): Promise<FetchResult<ScheduleResult>> => {
       const cached = loadScheduleCache();
       return cached
         ? { ok: true, data: cached.schedule }
-        : { ok: false, error: "尚未导入课表（设置 → 学校 → 导入课表）" };
+        : { ok: false, error: "尚未导入课表（设置 → 导入课表）" };
     },
     fetchExamsSmart: async (): Promise<FetchResult<ExamResult>> => ({
       ok: false,
-      error: "自定义学校暂不支持考试安排查询",
+      error: "考试安排需要学校教务数据，手动课表模式暂不支持",
     }),
   },
-  tools: customScheduleTools,
+  tools: { ...customScheduleTools, ...calendarTools },
   promptSections: customPromptSections,
 };

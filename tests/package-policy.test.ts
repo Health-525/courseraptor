@@ -56,7 +56,7 @@ test("落地页与技能包不进学生端安装包", () => {
     "landing/src/App.tsx",
     "landing/node_modules/react/index.js",
     "landing/dist/index.html",
-    "skills/njtech-jwgl/SKILL.md",
+    "skills/export-schedule/SKILL.md",
   ]) {
     assert.equal(shouldPackagePath(file), false, file);
   }
@@ -98,5 +98,5 @@ test("更新保护全部本地数据，同时允许应用源码更新", () => {
     assert.equal(isProtected(file), true, file);
   }
   assert.equal(isProtected("local/cli/index.ts"), false);
-  assert.equal(isProtected("src/adapters/njtech/term-dates.ts"), false);
+  assert.equal(isProtected("src/adapters/custom/index.ts"), false);
 });

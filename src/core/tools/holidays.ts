@@ -1,9 +1,8 @@
 /**
  * 放假/调休落盘工具：set_holidays
  *
- * 从 njtech/tools/schedule.ts 抽出的跨校通用工具：假期日历（core/calendar）
- * 不属于任何学校，自定义学校（手动课表）同样需要「放假那周课表作废、
- * 调休按周几补课」的叠加能力。njtech 侧 re-export 保持工具名不变。
+ * 跨校通用工具：假期日历（core/calendar）不属于任何学校，手动课表模式
+ * 同样需要「放假那周课表作废、调休按周几补课」的叠加能力。
  */
 
 import { tool } from "ai";

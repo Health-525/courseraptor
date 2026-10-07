@@ -1,17 +1,15 @@
 /**
  * 启动欢迎面板：往 @ai-sdk/tui 的空状态（scripts/patch-tui.mjs 打的补丁）
- * 注入实时教务数据。补丁每次重绘都读 globalThis.__raptorWelcome，所以这里
- * 分阶段拉、逐段刷新：最新通知（无需登录）→ 今日课表（登录）。
+ * 注入本地数据。补丁每次重绘都读 globalThis.__raptorWelcome，所以这里
+ * 分阶段拉、逐段刷新：通知（可选）→ 今日课表（本地导入缓存）。
  * 任何一段失败只降级那一段的文案，不影响其他段和正常对话。
- * 未选学校（教务账号与导入课表都没有）时只留栏目题头与网页地址，
- * 不显示、也不拉取任何教务信息（用户 2026-10-04 指示）。
+ * 未导入课表时只留栏目题头与网页地址，不显示、也不拉取任何数据。
  */
 
 import { startChatWeb } from "../../../src/channels/web/chat-web";
-import { config } from "../../../src/core/config";
 import { loadExamCache } from "../../../src/core/exam-cache";
 import type { ScheduleResult } from "../../../src/core/model";
-import { loadScheduleCache, saveScheduleCache } from "../../../src/core/schedule-cache";
+import { loadScheduleCache } from "../../../src/core/schedule-cache";
 import { school } from "../../../src/core/school";
 import { listReminders } from "../../../src/core/workspace-data";
 import { dim, header } from "./color";
@@ -32,17 +30,17 @@ function todayWeekday(): number {
 const panel = {
   week: undefined as number | undefined,
   webUrl: null as string | null,
-  /** 未选学校：栏目只留题头，内容一律不显示，面板只补网页地址 */
+  /** 未导入课表：栏目只留题头，内容一律不显示，面板只补网页地址 */
   blank: false,
-  scheduleLines: [dim("  正在登录教务系统…")],
+  scheduleLines: [dim("  正在读取课表…")],
   todoLines: [dim("  正在获取…")],
   examLines: [dim("  正在获取…")],
   newsLines: [dim("  正在获取…")],
 };
 
-/** 「已选学校」= 配了教务账号，或自定义学校已导入课表；两者都没有时不拉任何教务信息 */
+/** 「已就绪」= 已导入课表缓存；没有时不拉任何教务信息 */
 export function schoolConfigured(): boolean {
-  return Boolean((config.jwglUsername && config.jwglPassword) || loadScheduleCache());
+  return Boolean(loadScheduleCache());
 }
 
 function render() {
@@ -87,13 +85,13 @@ export function startWelcomeBootstrap(): void {
 }
 
 async function bootstrap() {
-  // 未选学校（教务账号与导入课表都没有）：栏目题头保留、里面不显示任何信息，
-  // 也不再发起教务/通知请求——只把网页地址补进面板，配置都在网页「设置」里做
+  // 未导入课表：栏目题头保留、里面不显示任何信息，也不再发起任何请求——
+  // 只把网页地址补进面板，导入课表在网页「设置」里做
   panel.blank = !schoolConfigured();
   render();
   void refreshWebUrl(); // 网页版地址随本地服务起好后补进面板
   if (panel.blank) return;
-  void refreshNews(); // 通知不依赖教务登录，并行先刷
+  void refreshNews(); // 通知源可选，并行先刷
   refreshTodos(); // 待办是本地数据，同步读
   refreshExams(); // 考试是本地缓存，同步读
   await refreshSchedule();
@@ -136,7 +134,7 @@ function refreshExams() {
   try {
     const cached = loadExamCache();
     if (!cached) {
-      panel.examLines = [dim("  暂无考试数据，问一次考试安排即缓存")];
+      panel.examLines = [dim("  暂无考试数据（不接入教务系统）")];
       render();
       return;
     }
@@ -181,7 +179,7 @@ async function refreshWebUrl() {
 
 async function refreshNews() {
   try {
-    // 截图/演示开关：RAPTOR_DEMO_NEWS=1 时用虚构通知，不请求教务处网站
+    // 截图/演示开关：RAPTOR_DEMO_NEWS=1 时用虚构通知，不请求任何站点
     if (process.env.RAPTOR_DEMO_NEWS === "1") {
       const demoNews = [
         { title: "关于 2026-2027-1 学期期中教学检查安排的通知（示例）", date: "2026-09-22" },
@@ -195,7 +193,7 @@ async function refreshNews() {
     const news = (await school().notices?.fetchNews([], 3)) ?? [];
     panel.newsLines = news.length
       ? news.map((n) => `• ${n.title} ${dim(String(n.date).slice(5))}`)
-      : [dim("  暂无通知")];
+      : [dim("  暂无通知（不接入教务通知源）")];
   } catch {
     panel.newsLines = [dim("  通知获取失败（不影响使用）")];
   }
@@ -203,33 +201,16 @@ async function refreshNews() {
 }
 
 async function refreshSchedule() {
-  // 课表一学期基本不变：有本地缓存就直接渲染，不登录不请求教务系统。
-  // 缓存由 get_schedule 工具在用户问课表时刷新，学期切换后问一次即同步。
+  // 课表一学期基本不变：直接渲染本地导入的缓存。
   const cached = loadScheduleCache();
-  if (cached) {
-    renderSchedule(cached.schedule);
-    return;
-  }
-  // 没配教务账号（首次引导被跳过）就不去撞登录接口，直接给补填指引
-  if (!config.jwglUsername || !config.jwglPassword) {
-    panel.scheduleLines = [dim("  尚未配置教务账号；网页「设置 → 教务账号」里补填后即可查课表")];
+  if (!cached) {
+    panel.scheduleLines = [
+      dim("  尚未导入课表：网页「设置 → 导入课表」里粘贴或上传，AI 解析后即可查询"),
+    ];
     render();
     return;
   }
-  try {
-    const s = school();
-    const cookie = await s.auth.getCookie();
-    const r = await s.schedule?.fetchSmart(cookie);
-    if (!r?.ok) {
-      panel.scheduleLines = [dim("  课表获取失败，可直接问我查详情")];
-      render();
-      return;
-    }
-    saveScheduleCache(r.data);
-    renderSchedule(r.data);
-  } catch {
-    panel.scheduleLines = [dim("  教务登录失败，直接提问可看详细报错")];
-  }
+  renderSchedule(cached.schedule);
   render();
 }
 

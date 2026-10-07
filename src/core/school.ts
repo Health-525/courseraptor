@@ -3,13 +3,17 @@
  *
  * 依赖方向约定（重构自 roadmap P3「多校适配」）：
  * - core 与 channels 只允许 import 本文件的类型与 school()/registerSchool()，
- *   绝不 import src/adapters/njtech 下的任何模块
- * - 适配器（adapters/njtech）可以 import core 的任何东西
+ *   绝不 import src/adapters 下的任何模块
+ * - 适配器（adapters/*）可以 import core 的任何东西
  * - 装配点在 src/adapters/index.ts：入口文件顶部 `import "../adapters"`
- *   （或 ../../adapters）完成默认学校的注册，之后 school() 全局可用
+ *   （或 ../../adapters）完成学校注册，之后 school() 全局可用
  *
- * 学校规则（绩点算法、节次作息表、校历种子、学期编码、通识分类）一律通过
- * 本端口暴露，core 不再持有任何具体学校的常量或域名。
+ * 学校规则（节次作息表、校历种子、学期编码）一律通过本端口暴露，
+ * core 不再持有任何具体学校的常量或域名。
+ *
+ * 2026-10 起仓库内置实现只剩手动课表模式（custom）：不保存教务密码、
+ * 不代登录、不请求学校教务系统，课表等数据由用户自行导入。端口保持
+ * 开放，未来若出现合规的官方数据源适配器，按本端口接入即可。
  */
 
 import type { ToolSet } from "ai";
@@ -35,19 +39,19 @@ export type SchoolCapability =
   | "calendarExport"; // 日历导出
 
 export interface SchoolInfo {
-  /** 适配器标识（RAPTOR_SCHOOL 环境变量取值） */
+  /** 适配器标识 */
   id: string;
   /** 学校全名，用于系统提示词自我介绍 */
   name: string;
-  /** 短名（如 NJTECH），用于标题栏等紧凑位置 */
+  /** 短名，用于标题栏等紧凑位置 */
   shortName: string;
   /** 学校所在城市：天气等工具的默认城市 */
   city: string;
   /** 学校所在时区（IANA 名）：教学周与「北京时间」口径 */
   timezone: string;
   /**
-   * 手动课表模式（「其他学校」伪适配器）：教务在线能力（成绩/考试/通知/
-   * 选课）一概没有，课表来自用户导入的本地缓存。设置页据此切换门禁文案。
+   * 手动课表模式：数据全部来自用户导入的本地缓存，没有教务在线能力
+   * （成绩/考试/通知/选课）。设置页据此显示「导入课表」形态。
    */
   manual?: boolean;
 }
@@ -61,8 +65,7 @@ export interface WeekSnapshot {
 }
 
 /**
- * 学期规则：编码（正方 xqm=3/12 或其他体系）、校历真值、周次展开与
- * 节次作息，全部由学校侧给出。
+ * 学期规则：编码、校历真值、周次展开与节次作息，全部由学校侧给出。
  */
 export interface SchoolTerms {
   /** 学期展示名，如「2026-2027学年第一学期」 */
@@ -87,14 +90,6 @@ export interface SchoolTerms {
   periodTimes(): Record<string, string>;
   /** 教学周星期名（1=周一 … 7=周日） */
   weekdayName(weekday: number): string;
-}
-
-/** 教务登录与会话 */
-export interface SchoolAuth {
-  /** 用学号密码登录（校验凭证有效性）；失败抛错 */
-  login(username: string, password: string): Promise<void>;
-  /** 取已登录会话 Cookie（无则自动登录）；force=true 强制重登 */
-  getCookie(force?: boolean): Promise<string>;
 }
 
 /** 教务处通知 */
@@ -134,7 +129,6 @@ export interface SchoolAdapter {
   readonly info: SchoolInfo;
   readonly capabilities: readonly SchoolCapability[];
   readonly terms: SchoolTerms;
-  readonly auth: SchoolAuth;
   readonly schedule?: SchoolSchedule;
   readonly notices?: SchoolNotices;
   /** 该校贡献给 agent 的工具（与 capabilities 对应；由 agent 与 core 工具合并） */
@@ -143,27 +137,6 @@ export interface SchoolAdapter {
 }
 
 let registered: SchoolAdapter | null = null;
-
-/** 可选学校清单：装配点（src/adapters/index.ts）把全部实现登记进来，供设置页枚举与运行期切换 */
-const options = new Map<string, SchoolAdapter>();
-
-/** 登记一个可选学校（不去切换当前学校；幂等，装配点调用） */
-export function registerSchoolOption(adapter: SchoolAdapter): void {
-  options.set(adapter.info.id, adapter);
-}
-
-/** 全部已登记学校（登记序）；设置页的学校选择列表数据源 */
-export function listSchoolOptions(): SchoolAdapter[] {
-  return [...options.values()];
-}
-
-/** 按 id 运行期切换学校；未知 id 返回 false（当前学校保持不变） */
-export function selectSchool(id: string): boolean {
-  const adapter = options.get(id);
-  if (!adapter) return false;
-  registered = adapter;
-  return true;
-}
 
 /** 注册学校适配器（幂等；装配点在 src/adapters/index.ts） */
 export function registerSchool(adapter: SchoolAdapter): void {
@@ -177,9 +150,7 @@ export function registeredSchool(): SchoolAdapter | null {
 /** 取当前学校适配器；未装配时给出可操作的报错 */
 export function school(): SchoolAdapter {
   if (!registered) {
-    throw new Error(
-      '尚未装配学校适配器：入口文件应先 import "../adapters"（或调用 installDefaultSchool()）',
-    );
+    throw new Error('尚未装配学校适配器：入口文件应先 import "../adapters"');
   }
   return registered;
 }

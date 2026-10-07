@@ -2,33 +2,20 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { startStandaloneQQ } from "../local/qq/bridge";
 
-test("独立 QQ 启动加载凭证后启动桥接", async () => {
+test("独立 QQ 入口按序拉起桥", async () => {
   const order: string[] = [];
-  await startStandaloneQQ({
-    ensureCredentials: async () => {
-      order.push("credentials");
-    },
-    startBridge: async () => {
-      order.push("bridge");
-    },
+  await startStandaloneQQ(async () => {
+    order.push("bridge");
   });
-  assert.deepEqual(order, ["credentials", "bridge"]);
+  assert.deepEqual(order, ["bridge"]);
 });
 
-test("独立 QQ 凭证加载失败时不得启动桥接", async () => {
-  const order: string[] = [];
+test("桥启动失败原样上抛（不吞错）", async () => {
   await assert.rejects(
     () =>
-      startStandaloneQQ({
-        ensureCredentials: async () => {
-          order.push("credentials");
-          throw new Error("凭证加载失败");
-        },
-        startBridge: async () => {
-          order.push("bridge");
-        },
+      startStandaloneQQ(async () => {
+        throw new Error("桥启动失败");
       }),
-    /凭证加载失败/,
+    /桥启动失败/,
   );
-  assert.deepEqual(order, ["credentials"]);
 });
