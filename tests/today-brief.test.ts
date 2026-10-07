@@ -11,9 +11,10 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-// 必须在导入被测模块之前指向临时数据目录，避免读写真实 data/
+// 必须在导入被测模块之前指向临时数据与凭证目录，避免读写真实 data/ 与 credentials.enc
 const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-today-"));
 process.env.RAPTOR_DATA_DIR = tmpData;
+process.env.RAPTOR_CREDENTIALS_FILE = path.join(tmpData, "credentials.enc");
 
 await import("../src/adapters");
 const { buildTodayBrief } = await import("../src/channels/web/today-brief");

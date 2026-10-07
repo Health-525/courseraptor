@@ -2,7 +2,8 @@
  * 时间模块测试
  *
  * 全程离线、时钟注入：getTimeReport 不碰真实 Date.now()，时区换算靠
- * Node 自带 Intl；教学周用临时数据目录里的种子真值（2026 秋 8-31 开学）。
+ * Node 自带 Intl；教学周用显式记录的开学日期种子（2026 秋 8-31 开学），
+ * 凭证目录一并隔离，绝不读写真机 credentials.enc。
  * 钉住的行为有四条——
  * 1. 读数来自注入时刻，字段齐全且互相一致（datetime = date + weekday + time）；
  * 2. 时区换算正确，跨日边界时两地的日期/星期各自正确，不共用；
@@ -19,12 +20,17 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-// 必须在导入被测模块之前指向临时数据目录，避免读写真实 data/
+// 必须在导入被测模块之前指向临时数据与凭证目录，避免读写真实 data/ 与 credentials.enc
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-time-"));
+process.env.RAPTOR_CREDENTIALS_FILE = path.join(process.env.RAPTOR_DATA_DIR, "credentials.enc");
 
 await import("../src/adapters");
+const { recordManualTermStart } = await import("../src/core/manual-terms");
 const { getTimeReport, schoolTimezone } = await import("../src/core/time");
 const SCHOOL_TIMEZONE = schoolTimezone();
+
+// 种子：2026 秋 8-31（周一）开学——教学周断言的真值来源（不依赖本机环境与时区）
+recordManualTermStart(2026, 3, "2026-08-31");
 
 type Ok = Extract<ReturnType<typeof getTimeReport>, { ok: true }>["data"];
 
@@ -69,13 +75,13 @@ test("跨日边界：北京已过午夜是周日，纽约还在周六", () => {
   assert.equal(bj.weekday, "周日");
 });
 
-test("教学周：开学第 1 周，周次真值来自种子（week1Monday=2026-08-31）", () => {
+test("教学周：开学第 1 周，周次真值来自记录的开学日期（week1Monday=2026-08-31）", () => {
   const t = mustOk(getTimeReport(undefined, new Date("2026-09-05T06:30:45Z")));
   assert.equal(t.term.label, "2026-2027学年第一学期");
   assert.equal(t.term.week, 1);
   assert.equal(t.term.week1Monday, "2026-08-31");
   assert.equal(t.term.weekRange, "2026-08-31 ~ 2026-09-06");
-  assert.ok(t.term.source === "known" || t.term.source === "recorded");
+  assert.equal(t.term.source, "recorded");
 });
 
 test("教学周：第 2 周周一，weekRange 对齐到本周一~周日", () => {
