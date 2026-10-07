@@ -43,16 +43,6 @@ If you are building agents yourself, the repo doubles as a reference implementat
 
 The agent ships **21 tools**. See [capabilities](docs/capabilities.md) for the full table.
 
-Both screenshots below use fictional demo data.
-
-**Terminal TUI** — type `raptor` to chat; the first screen shows today's classes and todos:
-
-<p align="center"><img src="docs/screenshots/tui.png" width="800" alt="Terminal TUI welcome panel: classes and todos (fictional demo data)"></p>
-
-**Web chat** — open `http://localhost:3210` in a browser; reasoning and tool calls are visible in the conversation:
-
-<p align="center"><img src="docs/screenshots/gui.png" width="800" alt="Web chat: reasoning card, tool calls and timetable reply (fictional demo data)"></p>
-
 ## Try it without credentials
 
 Install Node.js 24 or later, then:
