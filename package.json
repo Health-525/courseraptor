@@ -1,6 +1,6 @@
 {
   "name": "courseraptor",
-  "version": "0.3.3",
+  "version": "0.4.0",
   "description": "开源本地学习助理：自行导入课表后一句话直查，配待办/文档/知识库/学习教练等通用能力；也是 Vercel AI SDK + 端口-适配器架构的本地 Agent 工程样例",
   "scripts": {
     "dev": "tsx local/cli/index.ts",
