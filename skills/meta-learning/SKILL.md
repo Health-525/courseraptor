@@ -161,10 +161,8 @@ license: MIT-0
 
 ## 与本仓库其他技能协同（CourseRaptor）
 
-- 备考前查考试安排 → `njtech-jwgl` 的 `exams`（`npx tsx skills/njtech-jwgl/scripts/query.ts exams [学期]`），按科目与日期倒排复习优先级
-- 定位薄弱科目 → `njtech-jwgl` 的 `grades` / `lab-grades`，从历史成绩反推知识结构缺口
-- 补考/重修场景 → `njtech-jwgl` 的 `retake-courses` 确认可重修课程
 - 同学所用工具里若装有闪卡/出题类技能（如 `flashcard-studio` / `anki-card-maker` / `bloom-quiz-maker`），可按需调用生成间隔重复材料
+- 需要课表数据时，优先读完整 CourseRaptor 项目里用户导入的本地课表缓存（`get_schedule`），没有就让用户告知或从成绩单/教务页自行提供——不编造考试安排
 
 ---
 

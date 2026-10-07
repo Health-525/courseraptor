@@ -1,12 +1,14 @@
 /**
- * 教务凭证安全存储
+ * 凭证安全存储
  *
- * 首次运行引导录入学号/密码 -> AES-256-GCM 加密落盘 credentials.enc，
- * 启动时解密注入。密钥由机器指纹（主机名 + 系统用户名）派生：
- * 凭证文件被拷贝到其他机器无法解密，防住云同步/误分享等明文泄露路径。
- * 边界：对同机同用户的恶意程序无防护作用（本机派生密钥本机可解）。
+ * API Key / QQ 凭证等敏感配置经设置页保存 -> AES-256-GCM 加密落盘
+ * credentials.enc，启动时解密注入。密钥由机器指纹（主机名 + 系统用户名）
+ * 派生：凭证文件被拷贝到其他机器无法解密，防住云同步/误分享等明文泄露
+ * 路径。边界：对同机同用户的恶意程序无防护作用（本机派生密钥本机可解）。
  *
- * 优先级：.env 的 JWGL_* > credentials.enc > 首次运行引导录入
+ * 优先级：.env > credentials.enc
+ * （2026-10 起不再存储任何教务账号——程序不保存教务密码，课表数据由
+ * 用户自行导入；详见仓库 README 合规说明。）
  */
 
 import crypto from "node:crypto";
@@ -15,16 +17,9 @@ import os from "node:os";
 import path from "node:path";
 import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
 import { PROJECT_ROOT } from "./paths";
-import { registeredSchool } from "./school";
 
 // RAPTOR_CREDENTIALS_FILE 可把凭证文件指到别处（测试隔离用），默认项目根
 const CRED_FILE = process.env.RAPTOR_CREDENTIALS_FILE || path.join(PROJECT_ROOT, "credentials.enc");
-
-export interface StoredCredentials {
-  username: string;
-  password: string;
-  savedAt: string;
-}
 
 /** 机器指纹派生密钥（salt 随文件存储，不是秘密） */
 function machineKey(salt: string): Buffer {
@@ -32,10 +27,8 @@ function machineKey(salt: string): Buffer {
   return crypto.scryptSync(fingerprint, salt, 32);
 }
 
-/** 加密存储的凭证（通用 KV：教务账号 + API Key 等） */
+/** 加密存储的凭证（通用 KV：API Key / QQ / 学校配置等） */
 export interface CredentialsStore {
-  username?: string;
-  password?: string;
   deepseekApiKey?: string;
   /** 经 /key 明确确认的本机覆盖值；启动时优先于 .env。 */
   deepseekApiKeyOverride?: boolean;
@@ -66,21 +59,7 @@ export interface CredentialsStore {
   qqBotPasscode?: string;
   /** 网页「提示词」模板（用户在提示词模板面板自选；空/缺失即回默认清单） */
   webQuickQuestions?: string[];
-  /** 设置里选定的学校适配器 id（"njtech" / "hebau" / "custom"）；未存过按 RAPTOR_SCHOOL / 默认 njtech */
-  schoolId?: string;
-  /**
-   * 教务账号（username/password）保存时所在的学校 id。教务凭证字段本身
-   * 不分学校，切学校后旧账号对不上新校——有这个标记，设置页才能提醒
-   * 「已保存的账号是原学校的，请更新」。旧数据无此字段视为未知。
-   */
-  jwglSchoolId?: string;
-  /**
-   * 每所学校各自的教务账号槽位（schoolId -> 账号）：切学校跟着切账号，
-   * 各校互不覆盖、切走再切回不丢（与 providerKeys 每厂商一把同一原则）。
-   * username/password 字段始终镜像「当前学校」的账号，供旧读取端兼容。
-   */
-  jwglAccounts?: Record<string, { username: string; password: string }>;
-  /** custom：用户自填的学校显示名（空则用「其他学校」） */
+  /** custom：用户自填的学校显示名（展示用） */
   customSchoolName?: string;
   /** custom：所在城市（天气默认城市；空则问用户） */
   customCity?: string;
@@ -123,7 +102,7 @@ export function saveCredentialsStore(patch: Partial<CredentialsStore>): void {
   if (!existing && hasStoredCredentials()) {
     quarantineCorruptFileSync(CRED_FILE);
     console.warn(
-      "⚠️ 本机凭证文件无法解密（换过机器或文件已损坏），已另存备份后重建；教务账号可能需要重新配置。",
+      "⚠️ 本机凭证文件无法解密（换过机器或文件已损坏），已另存备份后重建；已保存的 API Key 等可能需要重新配置。",
     );
   }
   const payload: CredentialsStore = {
@@ -149,31 +128,6 @@ export function saveCredentialsStore(patch: Partial<CredentialsStore>): void {
       2,
     ),
   );
-}
-
-/** 旧接口兼容（onboarding 使用） */
-export function loadStoredCredentials(): CredentialsStore | null {
-  return loadCredentialsStore();
-}
-
-export function saveStoredCredentials(username: string, password: string): void {
-  const schoolId = registeredSchool()?.info.id;
-  if (!schoolId) {
-    saveCredentialsStore({ username, password });
-    return;
-  }
-  // 引导保存同样按学校入槽：username/password 镜像当前学校，槽位留底
-  const accounts = { ...(loadCredentialsStore()?.jwglAccounts ?? {}) };
-  accounts[schoolId] = { username, password };
-  saveCredentialsStore({ username, password, jwglSchoolId: schoolId, jwglAccounts: accounts });
-}
-
-export function clearStoredCredentials(): void {
-  try {
-    fs.unlinkSync(CRED_FILE);
-  } catch {
-    /* 不存在 */
-  }
 }
 
 export function hasStoredCredentials(): boolean {

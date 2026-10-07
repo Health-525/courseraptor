@@ -63,7 +63,7 @@ export function dueWithinWindow(now: Date): Reminder[] {
     .sort((a, b) => a.dueAt.localeCompare(b.dueAt));
 }
 
-/** 本地星期表（JS getDay 索引，周日=0），不引 jwgl 模块 */
+/** 本地星期表（JS getDay 索引，周日=0） */
 const WEEKDAY_NAMES = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] as const;
 
 /** 提醒文案：今天到期给钟点，未来给日期+剩余天数 */

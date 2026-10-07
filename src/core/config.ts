@@ -1,10 +1,9 @@
 /**
- * 配置加载：.env 读取 + 教务凭证解析（.env > 加密凭证文件 > 首次引导）
+ * 配置加载：.env 读取 + API Key / QQ 凭证解析（.env > 加密凭证文件）
  * Node 24 原生 process.loadEnvFile()，无 dotenv 依赖
  */
 
 import path from "node:path";
-import { z } from "zod";
 import { type CredentialsStore, loadCredentialsStore } from "./credentials";
 import { isValidModelId, resolveStoredModel } from "./models";
 // 项目根目录解析独立成 paths.ts，避免与 credentials.ts 循环依赖
@@ -35,11 +34,7 @@ export interface RaptorConfig {
   deepseekApiKeySource: DeepSeekApiKeySource;
   deepseekBaseUrl?: string;
   model: string;
-  jwglUsername: string;
-  jwglPassword: string;
-  /** 教务凭证来源（诊断用） */
-  credentialsSource: "env" | "encrypted" | "unset";
-  /** Firecrawl 云解析（通知附件转 markdown），可选 */
+  /** Firecrawl 云解析（附件转 markdown），可选 */
   firecrawlApiKey?: string;
   /** QQ 官方机器人（开放平台 q.qq.com，可选，npm run qq 启动桥接） */
   qqBotAppId?: string;
@@ -53,8 +48,6 @@ export interface RaptorConfig {
   qqPushOpenids: string[];
   /** QQ 凭证来源（诊断用）；「完整可用」指 AppID 与 AppSecret 都在 */
   qqBotSource: QQBotSource;
-  /** 教务请求全局限速（zod 校验后的 RAPTOR_MAX_RPS / RAPTOR_BURST） */
-  rateLimit: { rps: number; burst: number };
 }
 
 export type QQBotSource = "env" | "encrypted" | "unset";
@@ -66,7 +59,7 @@ export interface ResolvedQQBotCredentials {
   source: QQBotSource;
 }
 
-/** QQ 凭证解析：.env 优先（与教务账号同规则），缺失时回退加密存储 */
+/** QQ 凭证解析：.env 优先，缺失时回退加密存储 */
 export function resolveQQBotCredentials(input: {
   environmentAppId?: string;
   environmentAppSecret?: string;
@@ -177,33 +170,6 @@ function env(key: string): string | undefined {
   return v?.trim() ? v.trim() : undefined;
 }
 
-// ── 数值型环境变量：zod 校验，坏值启动即报错（不再是 NaN 悄悄进限速桶）────
-
-/** @internal 导出仅供测试钉住校验规则 */
-export const rateLimitSchema = z.object({
-  // 只允许下调：默认 3 rps 是对学校系统的礼貌边界，想调高请改代码并想清楚
-  rps: z.coerce.number().int().min(1).max(3).default(3),
-  burst: z.coerce.number().int().min(1).max(64).default(8),
-});
-
-function parseRateLimit(): { rps: number; burst: number } {
-  const parsed = rateLimitSchema.safeParse({
-    rps: env("RAPTOR_MAX_RPS") ?? 3,
-    burst: env("RAPTOR_BURST") ?? 8,
-  });
-  if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    const key = issue.path.join(".");
-    throw new Error(
-      `环境变量校验失败：${key === "rps" ? "RAPTOR_MAX_RPS" : "RAPTOR_BURST"} ` +
-        `必须是 1-${key === "rps" ? "3" : "64"} 的整数（当前值：${
-          key === "rps" ? env("RAPTOR_MAX_RPS") : env("RAPTOR_BURST")
-        }），请修正 .env 后重启`,
-    );
-  }
-  return parsed.data;
-}
-
 function loadConfig(): RaptorConfig {
   const stored = loadCredentialsStore();
   // 供应商解析：网关注入（RAPTOR_PROVIDER_ID）优先于本地保存的选择，
@@ -267,45 +233,13 @@ function loadConfig(): RaptorConfig {
         ? (env("RAPTOR_SITE_MODEL") as string)
         : undefined,
     }),
-    jwglUsername: env("JWGL_USERNAME") ?? "",
-    jwglPassword: env("JWGL_PASSWORD") ?? "",
-    credentialsSource: "env",
     firecrawlApiKey: env("FIRECRAWL_API_KEY"),
     qqBotAppId: resolvedQQ.appId,
     qqBotAppSecret: resolvedQQ.appSecret,
     qqBotPasscode: resolvedQQ.passcode,
     qqBotSource: resolvedQQ.source,
     qqPushOpenids: parseQQPushOpenids(env("QQBOT_PUSH_OPENIDS")),
-    rateLimit: parseRateLimit(),
   };
-
-  // 凭证解析：教务账号保持 .env 优先，缺失时再解密本地存储。
-  // 本地存储按学校分槽（jwglAccounts）：启动选中哪所学校就装哪所的账号——
-  // 旧格式（无槽位）的 username/password 只在其归属校装载：带 jwglSchoolId
-  // 按标记判；无标记的存量账号只可能属于历史默认校 njtech
-  if (!config.jwglUsername || !config.jwglPassword) {
-    const selectedSchool = env("RAPTOR_SCHOOL") ?? stored?.schoolId ?? "njtech";
-    const slot = stored?.jwglAccounts?.[selectedSchool];
-    const legacyStamped =
-      stored?.username && stored.password && stored.jwglSchoolId === selectedSchool
-        ? { username: stored.username, password: stored.password }
-        : null;
-    const legacyUnstamped =
-      stored?.username &&
-      stored.password &&
-      stored.jwglSchoolId === undefined &&
-      selectedSchool === "njtech"
-        ? { username: stored.username, password: stored.password }
-        : null;
-    const picked = slot ?? legacyStamped ?? legacyUnstamped;
-    if (picked) {
-      config.jwglUsername = picked.username;
-      config.jwglPassword = picked.password;
-      config.credentialsSource = "encrypted";
-    } else {
-      config.credentialsSource = "unset";
-    }
-  }
 
   return config;
 }

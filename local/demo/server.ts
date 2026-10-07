@@ -333,7 +333,6 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
         );
       } else if (req.method === "GET" && url === "/api/settings") {
         json(res, {
-          jwgl: { configured: false, username: "", sourceLabel: "演示模式" },
           deepseek: { configured: false, masked: "", sourceLabel: "演示模式" },
           qq: { configured: false, passcodeSet: false, source: "unset", sourceLabel: "演示模式" },
           /* 供应商块与正式版同形状：全部内置厂商可选（纯预览，保存被 403） */
@@ -348,17 +347,14 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
           model: FALLBACK_MODEL_ID,
           models: FALLBACK_MODELS.map((m) => ({ ...m })),
           quickQuestions: DEFAULT_QUESTIONS,
-          /* 学校块与正式版同形状（chat-web.ts statusPayload）：没有它演示页
-             设置里「选择学校」是空的，看不出复选框选学校 → 下方出表单的联动 */
+          /* 学校块与正式版同形状（chat-web.ts settingsPayload）：演示页自带
+              一份虚构课表缓存，展示「已导入课表」形态 */
           school: {
-            current: "njtech",
-            manual: false,
+            current: "custom",
+            manual: true,
+            newsReady: false,
             scheduleCached: true,
             custom: { name: "", city: "" },
-            options: [
-              { id: "njtech", name: "南京工业大学", shortName: "NJTECH", manual: false },
-              { id: "custom", name: "其他学校（手动课表）", shortName: "自定义", manual: true },
-            ],
           },
         });
       } else if (req.method === "GET" && url.startsWith("/api/models")) {

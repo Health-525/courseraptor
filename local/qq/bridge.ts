@@ -32,7 +32,6 @@ import { appendRound } from "../../src/core/chat-sessions";
 import { config } from "../../src/core/config";
 import { drainGeneratedRound, runInDocumentRound } from "../../src/core/document/save";
 import { isRaptorError, isSessionExpiredError } from "../../src/core/errors";
-import { ensureCredentials } from "../../src/core/onboarding";
 import { migratedDataPath } from "../../src/core/paths";
 import { maybeAutoTitle } from "../../src/core/session-titles";
 import { localOnlyCommandMessage } from "../cli/tui/slash-menu";
@@ -147,22 +146,22 @@ function startWaitingNotices(send: (text: string) => Promise<unknown>): () => vo
 
 /**
  * 把技术错误转译成人话，并给出下一步动作。
- * 用户不需要知道 SESSION_EXPIRED 是什么，只需要知道「重试就好」还是「这功能坏了」。
- * RaptorError 先按 code 精确分诊；裸 Error（http 层网络异常等）再退回文案正则。
+ * 用户不需要知道错误码是什么，只需要知道「重试就好」还是「这功能坏了」。
+ * RaptorError 先按 code 精确分诊；裸 Error（网络异常等）再退回文案正则。
  */
 function humanizeError(e: unknown): string {
   const raw = (e as Error)?.message ?? String(e);
-  if (isSessionExpiredError(e) || /SESSION_EXPIRED|登录|login|未授权/i.test(raw)) {
-    return "教务登录态掉了，我正在重新登录。稍等几秒再问一次就好。";
-  }
   if (isRaptorError(e, "NETWORK", "UPSTREAM")) {
-    return "教务系统这会儿连不上，多半是线路抖动。稍等一两分钟再试一次。";
+    return "网络这会儿连不上，多半是线路抖动。稍等一两分钟再试一次。";
+  }
+  if (isSessionExpiredError(e) || /登录|login|未授权/i.test(raw)) {
+    return "刚才那步需要重新来一次。稍等几秒再问一次就好。";
   }
   if (/ETIMEDOUT|ECONN|ENOTFOUND|fetch failed|network|timeout|socket|EOF/i.test(raw)) {
-    return "教务系统这会儿连不上，多半是线路抖动。稍等一两分钟再试一次。";
+    return "网络这会儿连不上，多半是线路抖动。稍等一两分钟再试一次。";
   }
   if (/JSON|parse|解析|Unexpected|结构/i.test(raw)) {
-    return "教务页面结构可能变了，这个查询暂时用不了。其他功能不受影响。";
+    return "返回的数据结构可能变了，这个功能暂时用不了。其他功能不受影响。";
   }
   return "这件事没办成。稍后再试一次，或者换个说法告诉我。";
 }
@@ -268,7 +267,7 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
         log.log(`[auth] 新授权 openid=${senderId}`);
         await bot.sendText(
           msg.replyTarget,
-          "✅ 已授权，迅猛龙上线！直接说需求即可：查课表 / 查成绩 / 查考试 / 读教务通知。",
+          "✅ 已授权，迅猛龙上线！直接说需求即可：查课表 / 记待办 / 写文档 / 学知识。",
         );
       } else if (!rejectedNotified.has(senderId)) {
         noteRejection(senderId);
@@ -393,23 +392,11 @@ const isEntry = (() => {
   }
 })();
 
-export interface StandaloneQQDependencies {
-  ensureCredentials(): Promise<void>;
-  startBridge(): Promise<void>;
-}
-
-/** 独立 QQ 入口与主程序共用相同的授权前置条件。 */
+/** 独立 QQ 入口与主程序共用相同的启动前置。 */
 export async function startStandaloneQQ(
-  dependencies: StandaloneQQDependencies = {
-    // 引导现在可跳过（返回 configured/skipped）；桥只关心流程走完与否
-    ensureCredentials: async () => {
-      await ensureCredentials();
-    },
-    startBridge: () => startQQBridge(),
-  },
+  startBridge: () => Promise<void> = () => startQQBridge(),
 ): Promise<void> {
-  await dependencies.ensureCredentials();
-  await dependencies.startBridge();
+  await startBridge();
 }
 
 if (isEntry) {

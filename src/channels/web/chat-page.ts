@@ -1490,7 +1490,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
       <div class="seal" aria-hidden="true"><img src="/logo.png" alt="" width="80" height="80"></div>
       <p class="hero-kicker" id="heroKicker">TODAY</p>
       <h2 id="heroGreet">同学，你好。</h2>
-      <p>课表、成绩、考试、通知——直接用一句话问。${
+      <p>课表、待办、文档、知识——直接用一句话问。${
         demo
           ? `<br>
       <span class="hint">点击下方提示词体验示例；演示会话在服务重启后清空。</span>`
@@ -1535,16 +1535,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
         </nav>
         <div class="set-main">
           <section class="set-pane on" id="setPaneSchool" role="tabpanel" aria-labelledby="setTabSchool" data-pane="school">
-            <p class="dlg-intro">先选学校：适配学校填教务账号自动查询；其他学校导入课表即可。</p>
-            <label class="fld"><span>学校</span><button type="button" class="dd-btn" id="schoolSelect" aria-haspopup="listbox" aria-expanded="false"></button></label>
-            <div id="schoolJwglBox" hidden>
-              <div class="pane-sub">教务账号</div>
-              <label class="fld"><span>学号</span><input id="sUser" type="text" autocomplete="off" ${demo ? "disabled" : ""}></label>
-              <label class="fld"><span>登录密码</span><span class="fld-row"><input id="sPass" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyePass" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
-              <div class="cur" id="curJwgl"></div>
-              <div class="diagrow"><button class="tbtn" id="testJwgl" type="button" ${demo ? "disabled" : ""}>检测教务连接</button><span class="diagstate" id="diagJwgl"></span></div>
-            </div>
-            <div id="schoolImportBox" hidden>
+            <p class="dlg-intro">课表数据由你导入：粘贴任意格式的课表文本或上传文件，AI 解析确认后保存到本机，对话即可直接查。</p>
+            <div id="schoolImportBox">
               <div class="pane-sub">导入课表</div>
               <div class="cur" id="curSchool"></div>
               <div class="diagrow"><button class="tbtn" id="openImport" type="button" ${demo ? "disabled" : ""}>导入 / 重新导入课表</button><span class="diagstate" id="diagSchool"></span></div>

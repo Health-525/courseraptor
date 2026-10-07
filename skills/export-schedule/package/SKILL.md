@@ -106,5 +106,4 @@ node scripts/export.mjs --cache D:/backup/schedule-cache.json --week 3
 ## 与完整项目的关系
 
 本包是开源项目 [CourseRaptor](https://github.com/Health-525/courseraptor)
-课表渲染层的只读打包。查课表/成绩/考试、对话式 agent 等能力需要完整项目
-（或配套的 njtech-jwgl 技能），不在本包内。
+课表渲染层的只读打包。对话式 agent、导入课表等能力需要完整项目，不在本包内。

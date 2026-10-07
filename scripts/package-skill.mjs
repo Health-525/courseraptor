@@ -2,8 +2,7 @@
  * 打包独立技能包：npm run package:skill [-- <技能名>|all]
  *
  * 支持的技能（skills/<名>/ 为源码，package/ 为独立包门面）：
- * - njtech-jwgl      教务无头查询（默认，不带参数时打它，向后兼容）
- * - export-schedule  课表图片导出（读本地缓存渲染 PNG/SVG）
+ * - export-schedule  课表图片导出（读本地缓存渲染 PNG/SVG；默认，不带参数时打它）
  * - meta-learning    学习教练（纯提示词技能：无 scripts，SKILL.md + references 整拷）
  *
  * 产物（默认在 dist/ 下）：
@@ -39,13 +38,13 @@ import { fileURLToPath } from "node:url";
 const REPO_ROOT = fileURLToPath(new URL("../", import.meta.url));
 
 // 惰性依赖：源码里函数体内 require(...)，独立包不携带，标记 external
-const EXTERNAL_LAZY_DEPS = ["jszip", "pdf-parse", "mammoth", "tesseract.js"];
+const EXTERNAL_LAZY_DEPS = ["jszip", "pdf-parse", "mammoth"];
 
 function banner(skillVarDocs) {
   // 注意：banner 不参与 esbuild 的重命名/去重，绑定一律用 __skill 前缀避免与
   // bundle 顶部保留的 node 内置导入（fs/path 等）撞名；const require 供源码里
   // 函数体内的惰性 require(...)（jszip 等）落到本文件解析。
-  return `// njtech-jwgl 独立技能包运行时引导（package-skill.mjs 注入，勿手改）
+  return `// 独立技能包运行时引导（package-skill.mjs 注入，勿手改）
 // - 数据/凭证/会话默认落在本技能目录 data/ 下（RAPTOR_DATA_DIR 等可覆盖）
 // - 支持本技能根目录 .env（与 SKILL.md 同级）
 // - 为惰性依赖（${EXTERNAL_LAZY_DEPS.join("/")}）提供 require；独立包未携带，
@@ -77,15 +76,6 @@ try {
     }
   }
 } catch {}
-// 限速预检（在 .env 读取之后）：坏值在模块初始化（zod 校验）前就干净退出，
-// 避免用户看到压缩堆栈
-if (process.env.RAPTOR_MAX_RPS !== undefined) {
-  const __rps = Number(process.env.RAPTOR_MAX_RPS);
-  if (!Number.isInteger(__rps) || __rps < 1 || __rps > 3) {
-    process.stderr.write("❌ .env 里 RAPTOR_MAX_RPS 必须是 1-3 的整数（限速只许下调）\\n");
-    process.exit(1);
-  }
-}
 `;
 }
 
@@ -194,14 +184,6 @@ function loadEsbuild() {
 // ── 技能定义表：一个技能一条静态配置 ─────────────────────────────────
 
 const SKILL_DEFS = {
-  "njtech-jwgl": {
-    entry: "scripts/query.ts",
-    bundleName: "query.mjs",
-    // references/ 目录整拷（存在才拷）
-    references: true,
-    externals: EXTERNAL_LAZY_DEPS,
-    selfCheck: { args: [], expect: [/schedule/, /grades/] },
-  },
   "export-schedule": {
     entry: "scripts/export.ts",
     bundleName: "export.mjs",
@@ -272,7 +254,7 @@ function stageResvgBinaries(root, skillDir) {
 export async function buildSkillPackage({
   projectRoot = REPO_ROOT,
   outDir,
-  skill = "njtech-jwgl",
+  skill = "export-schedule",
   includeBinaries = true,
 } = {}) {
   const def = SKILL_DEFS[skill];
@@ -364,7 +346,7 @@ export async function buildSkillPackage({
   };
 }
 
-// ── CLI 入口：npm run package:skill [-- <技能名...>|all]，缺省打 njtech-jwgl ──
+// ── CLI 入口：npm run package:skill [-- <技能名...>|all]，缺省打 export-schedule ──
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const argSkills = process.argv.slice(2);
@@ -372,7 +354,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     ? Object.keys(SKILL_DEFS)
     : argSkills.length > 0
       ? argSkills
-      : ["njtech-jwgl"];
+      : ["export-schedule"];
 
   (async () => {
     for (const skill of targets) {

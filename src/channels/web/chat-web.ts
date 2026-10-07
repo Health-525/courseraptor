@@ -97,7 +97,7 @@ import {
 } from "../../core/schedule-import";
 import { scheduleSvgToPng } from "../../core/schedule-png";
 import { renderTermScheduleSVG, renderWeekScheduleSVG } from "../../core/schedule-svg";
-import { listSchoolOptions, school, selectSchool } from "../../core/school";
+import { school } from "../../core/school";
 import { maybeAutoTitle } from "../../core/session-titles";
 import { tokenUsageSnapshot } from "../../core/token-usage";
 import { PANEL_IDS } from "../../core/tools/panel";
@@ -199,9 +199,9 @@ interface ScoredNewsSnapshot {
 }
 
 /**
- * 教务处通知的评分视图。官网抓取与 5 分钟 TTL 缓存在适配器的
+ * 学校通知源的评分视图。抓取与 5 分钟 TTL 缓存在适配器的
  * fetchNewsMemo 里（get_news 工具与这里共用同一份快照，面板刚看过、
- * 对话里再问不会重复抓三页）；这里只负责按同学年级打相关性分。
+ * 对话里再问不会重复抓取）；这里只负责按同学年级打相关性分。
  * 走 fetchNews（吞错版）的旧路径会让「抓取失败」显示成「无通知」，
  * 现在失败会如实抛给 /api/news 的 catch 上报。
  */
@@ -627,10 +627,9 @@ function openPanelIdOf(name: string | undefined, input: unknown): string | undef
   if (name !== "open_panel") return undefined;
   const id = (input as { panel?: unknown } | null | undefined)?.panel;
   if (typeof id !== "string" || !(PANEL_IDS as readonly string[]).includes(id)) return undefined;
-  /* 教务通知门禁：与设置页 newsReady 同口径——本校没接入（hebau/custom）或
-   * 教务账号未保存时，对话里点名要看通知也不推面板（宫格本就没有这张卡） */
+  /* 教务通知门禁：与设置页 newsReady 同口径——本校没接入通知源（手动课表
+   *  模式恒未接入）时，对话里点名要看通知也不推面板（宫格本就没有这张卡） */
   if (id === "news" && !school().notices) return undefined;
-  if (id === "news" && !(config.jwglUsername && config.jwglPassword)) return undefined;
   return id;
 }
 
@@ -687,7 +686,7 @@ function decodeSessionSegment(url: string): string | null {
   }
 }
 
-// ── 设置：教务账号 + DeepSeek Key（复用 /key 的「校验→热生效→加密落盘」）──
+// ── 设置：模型 Key + QQ（复用 /key 的「校验→热生效→加密落盘」）──
 
 const SOURCE_LABEL: Record<string, string> = {
   env: "来自 .env",
@@ -695,32 +694,12 @@ const SOURCE_LABEL: Record<string, string> = {
   unset: "未配置",
 };
 
-/** 学校下拉选项的能力说明：按适配器 capabilities 生成，接了什么说什么 */
-function schoolOptionNote(capabilities: readonly string[]): string {
-  const labels: Array<[string, string]> = [
-    ["schedule", "课表"],
-    ["grades", "成绩"],
-    ["exams", "考试"],
-    ["notices", "通知"],
-    ["courseSelection", "选课"],
-  ];
-  const have = labels.filter(([cap]) => capabilities.includes(cap)).map(([, label]) => label);
-  return have.length ? `教务系统已适配：${have.join(" / ")}` : "教务系统已适配";
-}
-
 /** 给设置弹窗的状态：只有脱敏摘要，永远不回显密码与完整 Key */
 function settingsPayload() {
   const ds = getDeepSeekKeyStatus();
   const qq = getQQBotStatus();
   const creds = loadCredentialsStore();
   return {
-    jwgl: {
-      configured: !!(config.jwglUsername && config.jwglPassword),
-      username: config.jwglUsername || "",
-      sourceLabel: SOURCE_LABEL[config.credentialsSource] ?? config.credentialsSource,
-      /** 教务账号保存时的学校 id：与当前学校不一致时前端要提醒更新账号 */
-      savedSchoolId: creds?.jwglSchoolId,
-    },
     deepseek: { ...ds, sourceLabel: SOURCE_LABEL[ds.source] ?? ds.source },
     qq: { ...qq, sourceLabel: SOURCE_LABEL[qq.source] ?? qq.source },
     /** 供应商选择（AI 模型栏第一行）：当前 + 候选 + custom 端点 */
@@ -737,28 +716,19 @@ function settingsPayload() {
     models: cachedModelOptions(config.providerId),
     /** 输入框上方「提示词」模板的当前生效清单（未自定义时为默认） */
     quickQuestions: effectiveQuickQuestions(creds?.webQuickQuestions),
-    /** 学校选择（设置第一栏）：当前学校 + 可选清单 + 手动课表状态 */
+    /** 学校状态（设置第一栏）：手动课表模式 + 导入状态 */
     school: {
       current: school().info.id,
-      /** 手动课表模式下教务账号栏隐藏、各面板给「未适配」空态 */
+      /** 手动课表模式：课表来自用户导入的本地缓存 */
       manual: school().info.manual === true,
-      /** 教务通知卡门槛：本校接入教务通知且教务账号已保存才显示；
-       *  没接入的学校（hebau/custom）宫格直接不出「教务通知」卡 */
-      newsReady: !!school().notices && !!(config.jwglUsername && config.jwglPassword),
+      /** 通知卡门槛：接入通知源才显示；手动课表模式宫格不出「教务通知」卡 */
+      newsReady: !!school().notices,
       /** 已有导入课表缓存（「去导入课表」与「重新导入」的文案分叉） */
       scheduleCached: !!loadScheduleCache(),
       custom: {
         name: creds?.customSchoolName ?? "",
         city: creds?.customCity ?? "",
       },
-      options: listSchoolOptions().map((a) => ({
-        id: a.info.id,
-        name: a.info.name,
-        shortName: a.info.shortName,
-        manual: a.info.manual === true,
-        /** 能力说明按本校 capabilities 如实生成（hebau 没接通知就不写通知） */
-        note: a.info.manual ? undefined : schoolOptionNote(a.capabilities),
-      })),
     },
   };
 }
@@ -769,21 +739,6 @@ function providerKeyPreview(providerId: string): string {
 }
 
 async function runDiagnostic(target: unknown): Promise<SettingResult> {
-  if (target === "jwgl") {
-    if (!config.jwglUsername || !config.jwglPassword) {
-      return { field: "jwgl", ok: false, message: "请先保存完整的教务账号" };
-    }
-    try {
-      await school().auth.getCookie(true);
-      return { field: "jwgl", ok: true, message: "教务系统连接正常，账号可以使用" };
-    } catch (error) {
-      return {
-        field: "jwgl",
-        ok: false,
-        message: `教务连接失败：${oneLine(error instanceof Error ? error.message : String(error), 120)}`,
-      };
-    }
-  }
   if (target === "deepseek") {
     if (!config.deepseekApiKey) {
       return { field: "deepseek", ok: false, message: "请先保存 API Key" };
@@ -877,64 +832,11 @@ function applySettings(body: Record<string, unknown>): {
   results: SettingResult[];
   status: ReturnType<typeof settingsPayload>;
   modelChanged: boolean;
-  schoolChanged: boolean;
   providerChanged: boolean;
 } {
   const results: SettingResult[] = [];
-  let schoolChanged = false;
   let providerChanged = false;
-  // 学校切换（设置第一栏）：保存偏好 + 运行期换适配器；工具集跟 agent 重建换新
-  const schoolId = typeof body.schoolId === "string" ? body.schoolId.trim() : "";
-  if (schoolId) {
-    const currentSchoolId = school().info.id;
-    if (schoolId === currentSchoolId) {
-      results.push({ field: "school", ok: true, message: "所选学校已是当前学校，无需切换" });
-    } else if (selectSchool(schoolId)) {
-      const name = listSchoolOptions().find((a) => a.info.id === schoolId)?.info.name ?? schoolId;
-      // 教务账号按学校分槽：旧学校的账号存回它名下（不删，切回来还在），
-      // 新学校有自己的账号就载入，没有就清空等用户填——绝不能拿 A 校账号去登 B 校
-      const store = loadCredentialsStore();
-      const accounts: Record<string, { username: string; password: string }> = {
-        ...(store?.jwglAccounts ?? {}),
-      };
-      const hadActive = !!(config.jwglUsername && config.jwglPassword);
-      const fromEnv = config.credentialsSource === "env";
-      if (hadActive && !fromEnv) {
-        accounts[currentSchoolId] = {
-          username: config.jwglUsername,
-          password: config.jwglPassword,
-        };
-      }
-      const next = accounts[schoolId] ?? null;
-      saveCredentialsStore({
-        schoolId,
-        jwglAccounts: accounts,
-        username: next?.username ?? "",
-        password: next?.password ?? "",
-        jwglSchoolId: next ? schoolId : undefined,
-      });
-      config.jwglUsername = next?.username ?? "";
-      config.jwglPassword = next?.password ?? "";
-      config.credentialsSource = next ? "encrypted" : hadActive && fromEnv ? "env" : "unset";
-      schoolChanged = true;
-      let message = `学校已切换为「${name}」：对话与各面板下一条起生效（终端界面重启后生效）`;
-      if (next) {
-        message += `。已载入本校保存的教务账号（学号 ${next.username.slice(0, 4)}****）`;
-      } else if (hadActive && fromEnv) {
-        message += `。⚠️ 当前教务账号来自 .env 配置（属原学校），查询${name}前请在下方保存本校学号与密码`;
-      } else {
-        message += `。本校还没有保存教务账号，请在下方填写${name}的学号与密码后保存`;
-      }
-      results.push({ field: "school", ok: true, message });
-    } else {
-      results.push({
-        field: "school",
-        ok: false,
-        message: `未知学校「${schoolId}」，请重新选择`,
-      });
-    }
-  }
-  // 自定义学校的显示名/城市（跟着学校切换一起保存也行，单独保存也行）
+  // 自定义学校的显示名/城市（天气默认城市等）
   if (body.customSchoolName !== undefined || body.customCity !== undefined) {
     const name = typeof body.customSchoolName === "string" ? body.customSchoolName.trim() : "";
     const city = typeof body.customCity === "string" ? body.customCity.trim() : "";
@@ -942,29 +844,7 @@ function applySettings(body: Record<string, unknown>): {
       customSchoolName: name.slice(0, 40),
       customCity: city.slice(0, 20),
     });
-    results.push({ field: "school", ok: true, message: "自定义学校信息已保存" });
-  }
-  const user = typeof body.jwglUsername === "string" ? body.jwglUsername.trim() : "";
-  const pass = typeof body.jwglPassword === "string" ? body.jwglPassword : "";
-  if (user || pass) {
-    if (!user || !pass) {
-      results.push({ field: "jwgl", ok: false, message: "学号与密码需要一起提交" });
-    } else {
-      // 按学校入槽：这份账号属于当前学校；username/password 镜像当前校供旧读取端
-      const sid = school().info.id;
-      const accounts = { ...(loadCredentialsStore()?.jwglAccounts ?? {}) };
-      accounts[sid] = { username: user, password: pass };
-      saveCredentialsStore({
-        username: user,
-        password: pass,
-        jwglSchoolId: sid,
-        jwglAccounts: accounts,
-      });
-      config.jwglUsername = user;
-      config.jwglPassword = pass;
-      config.credentialsSource = "encrypted";
-      results.push({ field: "jwgl", ok: true, message: "教务账号已加密保存，下次查询即生效" });
-    }
+    results.push({ field: "school", ok: true, message: "学校信息已保存" });
   }
   // ── 供应商 / 自定义端点 / API Key（AI 模型栏）──
   // 托管版：供应商由网关 users.json 管理（前端走网关 /api/provider），实例
@@ -1113,7 +993,6 @@ function applySettings(body: Record<string, unknown>): {
     results,
     status: settingsPayload(),
     modelChanged,
-    schoolChanged,
     providerChanged,
   };
 }
@@ -1225,12 +1104,12 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return;
     }
     if (url === "/api/grades") {
-      // 成绩面板走纯缓存（get_grades 查通一次即落盘），这里绝不登录教务
+      // 成绩面板走纯缓存（历史导入数据），不联网
       json(res, loadGradesCache() ?? { savedAt: null });
       return;
     }
     if (url === "/api/news") {
-      // 自定义学校没有教务处官网可抓：如实给「未适配」态，前端换引导文案
+      // 手动课表模式不接通知源：如实给「未支持」态，前端换引导文案
       if (!school().notices) {
         json(res, { items: [], unsupported: true });
         return;
@@ -1500,16 +1379,15 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         return;
       }
       const r = applySettings(body ?? {});
-      if (r.modelChanged || r.schoolChanged || r.providerChanged) {
-        // 串行重建：并发保存时不能让两个 agent 互相覆盖（换型号/换供应商与切学校同一条路）
+      if (r.modelChanged || r.providerChanged) {
+        // 串行重建：并发保存时不能让两个 agent 互相覆盖（换型号/换供应商同一条路）
         refreshChain = refreshChain
           .then(refreshChatAgent)
           .catch(() => "；即时切换失败，旧模型继续可用，重启后生效");
         const note = await refreshChain;
         const line =
           r.results.find((item) => item.field === "model") ??
-          r.results.find((item) => item.field === "provider") ??
-          r.results.find((item) => item.field === "school");
+          r.results.find((item) => item.field === "provider");
         if (line) line.message += note;
       }
       // QQ 凭证保存成功且已凑齐：顺手把桥拉起来（未在跑时），不用等重启
@@ -2046,7 +1924,7 @@ async function runTurn(
             id: p.toolCallId ?? "",
             name: p.toolName ?? "tool",
             brief: msg,
-            // 教务凭证等未配置导致的失败：网页端自动推出设置面板，用户补填后重试
+            // API Key 等未配置导致的失败：网页端自动推出设置面板，用户补填后重试
             ...(NEED_SETUP_RE.test(msg) ? { panel: "settings" } : {}),
           });
           break;

@@ -13,28 +13,30 @@ npm test
 npm run demo
 ```
 
-用虚构数据验证首次进入、快捷提问、会话切换与小屏布局。学校查询另用自己的账号人工抽查；离线测试通过不能证明校方接口和模型服务实时可用。
+用虚构数据验证首次进入、快捷提问、会话切换与小屏布局。离线测试通过不能证明模型服务实时可用；界面抽查建议用 `npm run demo` 与演示数据完成。
 
 ## 代码结构导览
 
 仓库按部署单元分顶层目录：`src/` 是公用核心（core + adapters + channels/web 网页界面，供本地版各入口共用）；`local/` 是本地版专属入口（TUI `cli/`、QQ 机器人 `qq/`、演示 `demo/`）；`landing/` 是项目介绍落地页（React+Vite，发 GitHub Pages，与运行时无关）。历史上另有线上托管版（`gateway/` 多用户网关 + `admin/` 管理台 + `update/` 更新分发后台），已于 2026-10 整体下线并从仓库移除（留档见仓库 git 历史）。
 
-依赖方向：channels → core ← adapters。core 定义 SchoolAdapter 端口（`src/core/school.ts`）并只依赖端口；adapters 实现端口并可自由使用 core；channels（终端/网页/QQ）只做装配与展示，不 import 任何学校适配器。core 与 channels 里 import `adapters/njtech` 视为架构违规。
+依赖方向：channels → core ← adapters。core 定义 SchoolAdapter 端口（`src/core/school.ts`）并只依赖端口；adapters 实现端口并可自由使用 core；channels（终端/网页/QQ）只做装配与展示，不 import 任何学校适配器。core 与 channels 里 import `adapters/<具体实现>` 视为架构违规。
+
+> 2026-10 起仓库不再内置任何学校的在线教务适配器（合规取舍：程序不保存教务密码、不代登录、不请求教务系统），`src/adapters/custom/` 的手动课表模式是唯一内置实现。历史适配器（南京工业大学、河北农业大学）的完整实现保留在仓库 git 历史与维护者本地 worktree 留档中；`SchoolAdapter` 端口不变，未来接合规数据源时照旧按端口接入。
 
 | 目录/模块 | 职责 |
 |---|---|
-| `local/cli/index.ts` | 终端主入口：装配学校适配器（`import "../../src/adapters"`）、凭证引导、拉起 QQ 桥 / 网页服务 / 待办调度、TUI 循环 |
+| `local/cli/index.ts` | 终端主入口：装配学校适配器（`import "../../src/adapters"`）、拉起 QQ 桥 / 网页服务 / 待办调度、TUI 循环 |
 | `src/channels/web/` | 网页服务与页面（聊天/大厅/日程/课表/待办/知识库） |
 | `local/qq/` | QQ 官方机器人桥 |
-| `src/core/agent.ts` | agent 组装：core 通用工具 + 学校适配器贡献的教务工具合并；提示词骨架在 `src/core/prompt.ts`，教务段由适配器提供（校历段运行时渲染自 `data/term-dates.json`，不在代码里硬编码） |
+| `src/core/agent.ts` | agent 组装：core 通用工具 + 学校适配器贡献的课表工具合并；提示词骨架在 `src/core/prompt.ts`，课表段由适配器提供（校历段运行时渲染自导入记录，不在代码里硬编码） |
 | `src/core/tools/` | 通用工具聚合（文件/文档/记忆/待办/知识库/番茄钟/设置/天气/时间） |
-| `src/adapters/njtech/` | 南京工业大学适配器：登录/课表/成绩/考试/学籍/选课/通知抓取与教务工具（`index.ts` 组装成 SchoolAdapter；`session.ts` 是登录 cookie / 选课会话缓存，经端口供 UI 使用） |
-| `src/adapters/index.ts` | 装配点：按 `RAPTOR_SCHOOL` 注册默认适配器；新增学校在这里登记 |
+| `src/adapters/custom/` | 手动课表模式：课表/放假/日历/课表图工具，数据来自用户导入的本地缓存（`index.ts` 组装成 SchoolAdapter） |
+| `src/adapters/index.ts` | 装配点：注册内置实现（当前仅 custom）；接新数据源在这里登记 |
 | `src/core/memory/` | 两层记忆（短期 session.json / 长期 memory.json） |
 | `src/core/paths.ts` | 项目根、`dataDir()`、`isInsideDir()` 路径护栏、`migratedDataPath()` 状态文件归位——**全项目唯一实现，不要在别处重写** |
-| `src/core/json-cache.ts` | 免登录 JSON 缓存骨架（schedule/exam-cache 的公共约定） |
+| `src/core/json-cache.ts` | 本地 JSON 缓存骨架（schedule/exam-cache 的公共约定） |
 | `src/core/repo-publish.ts` | Gitee/GitHub 日历发布三步流程骨架，平台差异在各自 publish 模块 |
-| `src/core/fetch-result.ts` | 统一抓取结果类型（教务适配器与 weather 共用） |
+| `src/core/fetch-result.ts` | 统一抓取结果类型（适配器与 weather 共用） |
 | `src/core/workspace-data.ts` | 待办 / 上传文件的跨层共享存储 |
 
 状态文件（session.json、memory.json、qq-allowlist.json、qq-bridge.log）统一放 `data/` 下；旧版本散在项目根的文件会在首次运行时自动搬过去。`credentials.enc` 仍留在项目根（安全考量，支持 `RAPTOR_CREDENTIALS_FILE` 重定向）。
@@ -43,7 +45,7 @@ npm run demo
 
 `scripts/package-policy.mjs` 定义包内容：应用源码、入口、脚本、测试、依赖锁文件与选定的公开文档/素材。新增需要随包分发的文档时同步更新该清单。
 
-`data/`、`outputs/`、下载、日志、环境文件和根目录凭证不进入安装包。公共校历基础值在各校适配器目录内（`src/adapters/njtech/term-dates.ts`、`src/adapters/hebau/term-dates.ts`）；学生自己的校历修正保存在本地并在升级时保留。如果需要全体同步校历，后续应设计专用的公共校历数据源，不能直接分发个人 `data/term-dates.json`。
+`data/`、`outputs/`、下载、日志、环境文件和根目录凭证不进入安装包。开学日期等课表真值来自每个用户自己的导入记录（加密保存在本机 credentials），源码不携带任何学校校历；用户自己的校历修正保存在本地并在升级时保留。
 
 发版前检查最终 zip 的文件清单，确认没有私密文件；不要直接压缩已使用的项目目录转发给同学。历史安装包若由旧打包脚本生成，应由维护者检查是否夹带个人文件，再决定撤回或替换。
 

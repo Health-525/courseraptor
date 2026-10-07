@@ -2,35 +2,15 @@
  * 学校适配器装配点
  *
  * 入口文件（channels/cli、channels/qq、需要 school() 的测试）在顶部
- * `import "../../adapters"`（按相对深度调整）即可完成学校注册；
- * RAPTOR_SCHOOL 环境变量可强制指定实现。新增一所学校：在 adapters/ 下建
- * 目录实现 SchoolAdapter，然后加进下面的 OPTIONS 登记。
+ * `import "../../adapters"`（按相对深度调整）即可完成学校注册。
  *
- * 默认学校的取舍顺序：RAPTOR_SCHOOL 环境变量 > 设置里保存的 schoolId
- * （加密凭证，托管版每人一份、互不影响）> "njtech"。运行期切换走
- * core/school 的 selectSchool（设置页「学校」栏目），不必重启。
+ * 2026-10 起仓库不再内置任何学校的在线教务适配器（合规取舍：程序不保存
+ * 教务密码、不代登录、不请求教务系统），唯一注册的是手动课表模式
+ * （custom）：课表等数据全部由用户自行导入本地缓存。
+ * SchoolAdapter 端口保持开放，自定义实现的学校仍可按端口接入。
  */
 
-import { loadCredentialsStore } from "../core/credentials";
-import { listSchoolOptions, registerSchoolOption, selectSchool } from "../core/school";
+import { registerSchool } from "../core/school";
 import { customSchool } from "./custom";
-import { hebauSchool } from "./hebau";
-import { njtechSchool } from "./njtech";
 
-/** 登记顺序即设置页的学校列表顺序：真实学校在前，「其他学校」垫底 */
-registerSchoolOption(njtechSchool);
-registerSchoolOption(hebauSchool);
-registerSchoolOption(customSchool);
-
-export function installDefaultSchool(): void {
-  const id = process.env.RAPTOR_SCHOOL ?? loadCredentialsStore()?.schoolId ?? "njtech";
-  if (!selectSchool(id)) {
-    throw new Error(
-      `未知学校适配器「${id}」：可用 ${listSchoolOptions()
-        .map((a) => a.info.id)
-        .join("、")}（RAPTOR_SCHOOL 环境变量指定）`,
-    );
-  }
-}
-
-installDefaultSchool();
+registerSchool(customSchool);

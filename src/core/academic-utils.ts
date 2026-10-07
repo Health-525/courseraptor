@@ -1,10 +1,8 @@
 /**
- * 跨校通用的学期 / 周次 / 课表分组工具
+ * 通用的学期 / 周次 / 课表分组工具
  *
- * 从 njtech/academics.ts 抽出的学校无关部分（「其他学校手动课表」适配器
- * 也要用同一套）：周次表达式展开、学期编码与候选探测、按周分组与假期
- * 叠加。节次作息表是学校规则，不在这里——各适配器给出后经 timeRange
- * 参数注入。njtech/academics.ts 对本文件做薄封装再导出，旧调用点不动。
+ * 周次表达式展开、学期编码与候选探测、按周分组与假期叠加。节次作息表
+ * 是学校规则，不在这里——适配器给出后经 timeRange 参数注入。
  */
 
 import { specialDaysOfWeek, type WeekSpecialDay } from "./calendar/holidays";

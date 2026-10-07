@@ -1,8 +1,8 @@
 /**
- * 附件/文件获取、缓存与解析（通知附件与本地文件共用一条流水线）
+ * 附件/文件缓存与解析（本地文件与缓存附件共用一条流水线）
  *
  * 与旧版「整本转文本、12000 字符掐断」的区别：
- * - 下载一次即缓存（attachment-store）：重复读取不再走网络与验证码链路；
+ * - 本地文件读取一次即缓存（attachment-store）：重复读取不再走磁盘与解析；
  * - 表格（xlsx/xls/csv/tsv）不再吐大文本，返回 sheet 概览（表头+前几行），
  *   具体行靠 spreadsheet.ts 引擎按 关键词/条件筛选/排序/去重/分页 取；
  * - 长文本（docx/pdf/txt/md）支持 offset 分页续读与 keyword 定位，
@@ -19,7 +19,6 @@ import {
   type AttachmentMeta,
   attachmentIdForSource,
   findByLocalPath,
-  findByUrl,
   getMeta,
   parsedCacheGet,
   parsedCachePut,
@@ -28,7 +27,6 @@ import {
   touchAttachment,
 } from "./attachment-store";
 import { config } from "./config";
-import { RaptorError } from "./errors";
 import { isTableFilename, loadWorkbook, sheetOverview, type TableSheet } from "./spreadsheet";
 import { decodeTextBuffer } from "./text-decode";
 
@@ -423,214 +421,7 @@ async function firecrawlScrape(url: string): Promise<string> {
   return data.data.markdown;
 }
 
-// ── 下载（含 jwc 验证码自动识别，可整体停用）──────────────────
-
-// 验证码是网站明确表达的「此处不欢迎自动化」。这个能力默认开启是为了
-// 自己下载本人有权访问的通知附件，但它不该被当成卖点——所以留了总开关。
-const CAPTCHA_OCR_ENABLED = process.env.RAPTOR_DISABLE_CAPTCHA_OCR !== "1";
-/** 重试上限。之前是 6 次且每次重建 tesseract worker（重复加载 4MB 模型），收敛为 3 次 + worker 常驻 */
-const CAPTCHA_MAX_TRIES = 3;
-
-const CAPTCHA_DISABLED_MSG =
-  "附件下载被图形验证码拦截，且验证码自动识别已关闭（RAPTOR_DISABLE_CAPTCHA_OCR=1）。" +
-  "请在浏览器登录后手动下载该附件，或提供直链地址。";
-
-/** tesseract worker 常驻复用：首次调用时加载一次模型，之后所有识别共享 */
-let ocrWorkerPromise: Promise<Awaited<ReturnType<typeof createTesseractWorker>>> | null = null;
-
-function createTesseractWorker() {
-  const { createWorker } = require("tesseract.js") as typeof import("tesseract.js");
-  return createWorker("eng");
-}
-
-async function getOcrWorker() {
-  if (!ocrWorkerPromise) {
-    ocrWorkerPromise = createTesseractWorker()
-      .then(async (worker) => {
-        await worker.setParameters({
-          tessedit_char_whitelist: "0123456789abcdefghijklmnopqrstuvwxyz",
-        } as Parameters<typeof worker.setParameters>[0]);
-        return worker;
-      })
-      .catch((e) => {
-        // 创建失败必须把缓存清掉：留着 rejected Promise 会让后续每一次
-        // OCR 都直接 reject，附件下载从此静默失败且毫无提示
-        ocrWorkerPromise = null;
-        throw e;
-      });
-  }
-  return ocrWorkerPromise;
-}
-
-/**
- * jwc 附件下载带图片验证码（webplus createimage.jsp）：
- * 首次请求返回验证码页 -> 拉验证码图 -> OCR 识别 -> 带 codeValue 重试。
- * 验证码存于 session，全程必须复用同一 cookie。识别失败自动换新码重试。
- */
-/**
- * 下载限流读体：边读边计数，超过 MAX_FILE_BYTES 立即断开（与本地文件同限）。
- * 此前 res.arrayBuffer() 拉多大算多大——恶意或误给的大 URL 会全量进内存，
- * 既是性能坑也是 DoS 面（MAX_FILE_BYTES 只在 openLocalFile 检查过）。
- */
-async function readBodyLimited(res: Response): Promise<Buffer> {
-  if (!res.body) return Buffer.from(await res.arrayBuffer());
-  const chunks: Buffer[] = [];
-  let size = 0;
-  const reader = res.body.getReader();
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > MAX_FILE_BYTES) {
-      await reader.cancel().catch(() => {});
-      throw new Error(
-        `附件过大（超过 ${Math.round(MAX_FILE_BYTES / 1024 / 1024)} MB），已中止下载`,
-      );
-    }
-    chunks.push(Buffer.from(value));
-  }
-  return Buffer.concat(chunks);
-}
-
-async function downloadWithCaptcha(url: string): Promise<{ buf: Buffer; contentType: string }> {
-  if (!CAPTCHA_OCR_ENABLED) {
-    throw new Error(CAPTCHA_DISABLED_MSG);
-  }
-  let cookie = "";
-
-  const get = async (u: string): Promise<{ buf: Buffer; type: string }> => {
-    const res = await fetch(u, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        ...(cookie ? { Cookie: cookie } : {}),
-      },
-      redirect: "manual",
-      signal: AbortSignal.timeout(60000),
-    });
-    for (const c of res.headers.getSetCookie?.() ?? []) {
-      const kv = c.split(";")[0];
-      const key = kv.split("=")[0];
-      cookie = cookie
-        .split("; ")
-        .filter((x) => x && !x.startsWith(`${key}=`))
-        .concat(kv)
-        .join("; ");
-    }
-    return {
-      buf: await readBodyLimited(res),
-      type: res.headers.get("content-type") || "",
-    };
-  };
-
-  for (let attempt = 1; attempt <= CAPTCHA_MAX_TRIES; attempt++) {
-    const page = await get(url);
-    if (!page.type.includes("html")) {
-      return { buf: page.buf, contentType: page.type }; // 直链文件
-    }
-    const html = page.buf.toString("utf8");
-    // 2026-09 起教务处官网限制校外 IP：匿名访问只剩拦截页，别当文件解析
-    if (html.includes("本网站只能被校内IP地址访问")) {
-      throw new RaptorError(
-        "CAMPUS_ONLY",
-        "教务处官网已限制校外 IP 访问，附件暂无法在校外直接下载，请在校园网内获取",
-      );
-    }
-    if (!html.includes("createimage.jsp")) {
-      return { buf: page.buf, contentType: page.type }; // 非验证码页，走后续逻辑
-    }
-
-    // 验证码页：拉图 + OCR（worker 常驻，不重复加载模型）
-    const imgUrl = new URL(
-      `/system/resource/js/filedownload/createimage.jsp?randnum=${Date.now()}`,
-      url,
-    ).href;
-    const img = await get(imgUrl);
-    const code = await ocrCaptcha(img.buf);
-    if (!code) continue;
-
-    const file = await get(
-      `${url + (url.includes("?") ? "&" : "?")}codeValue=${encodeURIComponent(code)}`,
-    );
-    if (!file.type.includes("html")) {
-      return { buf: file.buf, contentType: file.type };
-    }
-    // 识别错误 -> 下一轮换新验证码
-  }
-  throw new Error(
-    `验证码识别失败（已重试 ${CAPTCHA_MAX_TRIES} 次）。可在浏览器中下载后手动提供文件；` +
-      `或确认该附件确属本人有权获取的内容后重试。`,
-  );
-}
-
-/** tesseract OCR 验证码（数字+小写字母），worker 由 getOcrWorker 常驻复用。 */
-export async function ocrCaptcha(buf: Buffer): Promise<string> {
-  try {
-    const worker = await getOcrWorker();
-    const { data } = await worker.recognize(buf);
-    return data.text.replace(/[^0-9a-zA-Z]/g, "").toLowerCase();
-  } catch {
-    return "";
-  }
-}
-
 // ── 主入口 ────────────────────────────────────────────────────
-
-/** 下载文件名只收敛危险字符，保留扩展名（格式识别依赖它） */
-function sanitizeFilenameKeepExt(name: string): string {
-  return name.replace(/[\\/:*?"<>|]/g, "_").slice(0, 120) || "attachment.bin";
-}
-
-/**
- * 获取附件：缓存命中直接分析 -> 下载 -> 缓存 -> 分析
- * @param url  附件下载地址（webplus download.jsp 或直链）
- * @param name 附件文件名（含扩展名，来自 read_notice 的 attachments[].name；
- *             下载 URL 通常无后缀，格式识别依赖文件名）
- */
-export async function fetchAttachment(
-  url: string,
-  name?: string,
-  opts: AnalyzeOpts = {},
-): Promise<AttachmentResult> {
-  // 0. 缓存优先：同一 URL 不重复下载（jwc 验证码链路尤其省）
-  if (!opts.refresh) {
-    const cached = findByUrl(url);
-    if (cached) {
-      const buf = readStoredBuffer(cached.id);
-      if (buf) {
-        touchAttachment(cached.id);
-        return analyzeBuffer(buf, cached.filename, { type: "url", url }, opts);
-      }
-    }
-  }
-
-  // jwc 的 download.jsp 带验证码，走专门链路；其余直链
-  const isJwcDownload = /jwc\.njtech\.edu\.cn\/system\/_content\/download\.jsp/.test(url);
-  let buf: Buffer;
-  try {
-    if (isJwcDownload) {
-      buf = (await downloadWithCaptcha(url)).buf;
-    } else {
-      const res = await fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0" },
-        signal: AbortSignal.timeout(60000),
-      });
-      if (!res.ok) throw new Error(`下载失败 HTTP ${res.status}`);
-      buf = await readBodyLimited(res);
-    }
-  } catch (e) {
-    // 下载失败但历史缓存还在 -> 用旧缓存继续干活（读得出比下得动重要）
-    const stale = findByUrl(url);
-    const staleBuf = stale ? readStoredBuffer(stale.id) : null;
-    if (stale && staleBuf) {
-      touchAttachment(stale.id);
-      return analyzeBuffer(staleBuf, stale.filename, { type: "url", url }, opts);
-    }
-    throw e;
-  }
-
-  const filename = name || decodeURIComponent(new URL(url).pathname.split("/").pop() || "");
-  return analyzeBuffer(buf, sanitizeFilenameKeepExt(filename), { type: "url", url }, opts);
-}
 
 /**
  * 托管（无终端）实例的文件读取边界：RAPTOR_LOCAL_FILE_ROOT 设置后，
@@ -704,7 +495,7 @@ export async function viewCachedAttachment(
 ): Promise<AttachmentResult | { error: string }> {
   const meta = getMeta(id);
   if (!meta)
-    return { error: `缓存中不存在附件 ${id}（可能已清理）。用 fetch_attachment 重新获取。` };
+    return { error: `缓存中不存在附件 ${id}（可能已清理）。用 read_local_file 重新读取。` };
   const buf = readStoredBuffer(meta.id);
   if (!buf) return { error: `缓存文件 ${id} 读取失败。` };
   touchAttachment(meta.id);

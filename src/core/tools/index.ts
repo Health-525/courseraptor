@@ -1,8 +1,8 @@
 /**
  * core 工具集（学校无关部分）
  *
- * 与教务相关的工具（课表/成绩/学籍/选课/通知/日历）由学校适配器贡献
- * （src/adapters/njtech/tools），agent.ts 在装配时把两边合并。
+ * 与学校数据相关的工具（课表/日历）由学校适配器贡献
+ * （src/adapters 各校目录下的 tools），agent.ts 在装配时把两边合并。
  * 这里只聚合 12 个通用模块：
  * - files.ts      本地文件 / 表格查询 / 沙箱 JS / 附件管理（4）
  * - document.ts   文档生成 / 格式转换（2，Word/Excel/PDF；PPT 见 ppt.ts）

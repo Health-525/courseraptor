@@ -1,15 +1,13 @@
 {
   "name": "courseraptor",
   "version": "0.3.3",
-  "description": "开源本地教务 Agent：对话直查课表、成绩、考试、通知；也是 Vercel AI SDK + 端口-适配器架构的本地 Agent 工程样例",
+  "description": "开源本地学习助理：自行导入课表后一句话直查，配待办/文档/知识库/学习教练等通用能力；也是 Vercel AI SDK + 端口-适配器架构的本地 Agent 工程样例",
   "scripts": {
     "dev": "tsx local/cli/index.ts",
     "start": "tsx local/cli/index.ts",
     "demo": "tsx local/demo/entry.ts",
     "demo:live": "tsx local/demo/entry.ts --live",
-    "njtech": "tsx skills/njtech-jwgl/scripts/query.ts",
     "doctor": "node scripts/doctor.mjs",
-    "fetch:ocr": "node scripts/fetch-ocr-model.mjs",
     "preview:readme": "node scripts/preview-readme.mjs",
     "qq": "tsx local/qq/bridge.ts",
     "typecheck": "tsc --noEmit",
@@ -36,11 +34,11 @@
     "url": "https://github.com/Health-525/courseraptor/issues"
   },
   "keywords": [
-    "njtech",
     "agent",
     "cli",
     "deepseek",
-    "教务"
+    "学习助理",
+    "课表"
   ],
   "author": "jiangshu",
   "license": "LicenseRef-MIT-Restrictions",
@@ -64,7 +62,6 @@
     "pdfkit": "^0.20.2",
     "pptxgenjs": "^4.0.1",
     "qrcode": "^1.5.4",
-    "tesseract.js": "^7.0.0",
     "tsx": "^4.23.15",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.6.5"

@@ -21,10 +21,10 @@ const distPath = fileURLToPath(pathToFileURL(require.resolve("@ai-sdk/tui")));
 
 const dim = (s) => `\x1b[2m${s}\x1b[0m`;
 const fallbackLines = [
-  dim("欢迎使用 CourseRaptor 🦖 — NJTECH 教务 Agent"),
+  dim("欢迎使用 CourseRaptor 🦖 — 本地学习助理"),
   "",
   dim("可以直接问："),
-  dim("  这周课表 · 最近通知 · 我的成绩 · 通识还差哪几类"),
+  dim("  这周课表 · 我的待办 · 我记过哪些知识 · 有哪些要注意的"),
   "",
   dim("快捷键：滚轮/↑↓ 滚动 · ESC 打断回复 · Ctrl+C 退出 · 输入 / 唤出命令菜单"),
 ];

@@ -14,7 +14,7 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
     assert.match(html, /虚构示例，会话仅保留在内存/);
     assert.doesNotMatch(html, /demo-banner/);
     assert.match(html, /id="hallSettings"/, "设置面板常驻在功能大厅抽屉里");
-    assert.match(html, /id="sUser"[^>]+disabled/);
+    assert.match(html, /id="sKey"[^>]+disabled/);
     // 型号改用卡片单选：hidden input 载值，无 disabled 属性可挂，演示拦截由脚本守卫实现
     assert.match(html, /id="sModel"/);
     assert.match(html, /dataset\.demo === "true"\) return;/);

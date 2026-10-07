@@ -1,154 +1,17 @@
 /**
- * 首次运行凭证引导：交互式录入学号/密码 -> 真实登录验证 -> 加密保存
- * 触发条件：.env 与 credentials.enc 都没有教务凭证时
+ * 凭证设置流程
  *
- * 主入口（local/cli/index.ts）已不再做终端首次引导（用户 2026-10-04 指示
- * 「新手引导不要了」）：凭证一律在网页「设置」里补填，本引导仅剩独立
- * QQ 入口（local/qq/bridge.ts 直跑）在用。
- *
- * 引导不强制：学号密码都留空回车即跳过，直接进入应用；验证连续失败也
- * 不拦启动，由用户选择保存未验证账号或跳过。跳过后教务功能报「尚未
- * 配置」，网页「设置 → 教务账号」里随时补填。
+ * 2026-10 起不再有教务账号引导（程序不保存教务密码，课表数据由用户
+ * 自行导入）；本文件保留 API Key 设置流程（终端 /key、设置面板）与
+ * QQ 机器人凭证的保存/状态逻辑。
  */
 
 import readline from "node:readline/promises";
 
 import { config, type DeepSeekApiKeySource, maskDeepSeekApiKey } from "./config";
-import { loadCredentialsStore, saveCredentialsStore, saveStoredCredentials } from "./credentials";
-import { isCredentialError } from "./errors";
+import { loadCredentialsStore, saveCredentialsStore } from "./credentials";
 import { getProviderDef, validateProviderApiKey } from "./providers";
-import { school } from "./school";
 import { createMutedTerminalOutput } from "./secret-input";
-
-/** 引导结果：configured=已保存（含用户确认的未验证保存）；skipped=跳过，稍后在设置里补填 */
-export type CredentialSetupOutcome = "configured" | "skipped";
-
-/** 凭证引导唯一需要的终端能力；测试可注入内存实现，不读真实 stdin。 */
-export interface CredentialSetupIO {
-  write(message: string): void;
-  ask(prompt: string): Promise<string>;
-  askSecret(prompt: string): Promise<string>;
-  close?(): void;
-}
-
-interface CredentialSetupServices {
-  isConfigured(): boolean;
-  login(username: string, password: string): Promise<void>;
-  save(username: string, password: string): void;
-}
-
-const credentialServices: CredentialSetupServices = {
-  isConfigured: () => !!(config.jwglUsername && config.jwglPassword),
-  login: async (username, password) => {
-    await school().auth.login(username, password);
-  },
-  save: (username, password) => saveStoredCredentials(username, password),
-};
-
-export async function ensureCredentials(
-  io?: CredentialSetupIO,
-  services: CredentialSetupServices = credentialServices,
-): Promise<CredentialSetupOutcome> {
-  if (services.isConfigured()) return "configured";
-
-  const terminal = io ?? createTerminalCredentialIO();
-  try {
-    terminal.write("🦖 首次使用：第 1 步，共 2 步——配置教务系统账号");
-    terminal.write("   账号和密码将 AES-256-GCM 加密保存在本机，不会明文落盘。");
-    terminal.write(
-      "   暂时不填也可以：学号处直接回车跳过，之后在网页「设置 → 教务账号」里补填。\n",
-    );
-
-    for (let attempt = 1; ; attempt++) {
-      const username = (await terminal.ask("学号（输入后按回车，留空跳过）: ")).trim();
-      const password = await terminal.askSecret("教务系统密码（输入不回显，输入后按回车）: ");
-
-      if (!username && !password) {
-        terminal.write("⏭️ 已跳过教务账号配置：聊天、待办、通知等功能照常使用。");
-        terminal.write(
-          "   需要查课表/成绩时，在网页对话窗口右上角「设置 → 教务账号」里补填即可。\n",
-        );
-        return "skipped";
-      }
-      if (!username || !password) {
-        terminal.write("❌ 学号和密码需要一起填写；都不填则跳过");
-        continue;
-      }
-
-      try {
-        // 真实登录验证：密码错误当场重输，避免存入无效凭证
-        await services.login(username, password);
-        services.save(username, password);
-        applyConfiguredCredentials(username, password);
-        terminal.write("✅ 教务账号验证通过，已加密保存。\n");
-        return "configured";
-      } catch (e) {
-        const msg = (e as Error).message;
-        if (isCredentialError(e)) {
-          terminal.write(`❌ ${msg.slice(0, 60)}，请重试`);
-        } else {
-          terminal.write(`⚠️ 登录异常（${msg.slice(0, 50)}）——多为网络抖动，请重试`);
-        }
-        if (attempt >= 5) {
-          // 不拦启动：验证连不过（网络/教务系统不可达等）时由用户决定存不存
-          const keep = /^(y|yes)$/i.test(
-            (await terminal.ask("连续 5 次验证未通过。仍要保存刚输入的账号吗？[y/N] ")).trim(),
-          );
-          if (keep) {
-            services.save(username, password);
-            applyConfiguredCredentials(username, password);
-            terminal.write(
-              "✅ 已保存教务账号（本次未验证）；如填错了，之后可在网页「设置」里修改。\n",
-            );
-            return "configured";
-          }
-          terminal.write(
-            "⏭️ 未保存教务账号，不影响进入应用；之后可在网页「设置 → 教务账号」里补填。\n",
-          );
-          return "skipped";
-        }
-      }
-    }
-  } finally {
-    terminal.close?.();
-  }
-}
-
-/** 保存成功后热生效：本进程内立即用上新账号，不必重启 */
-function applyConfiguredCredentials(username: string, password: string): void {
-  config.jwglUsername = username;
-  config.jwglPassword = password;
-  config.credentialsSource = "encrypted";
-}
-
-function createTerminalCredentialIO(): CredentialSetupIO {
-  const out = createMutedTerminalOutput();
-  // terminal: true 不能省：output 是自定义 Writable（没有 isTTY），省了它
-  // readline 就判定为非终端、不给 stdin 开 raw mode，终端自身的回显会把密码
-  // 直接打在屏幕上——「输入不回显」就成了空话。开了之后提示符与回显都走
-  // out.stream，由 setMuted 统一开关。
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: out.stream,
-    terminal: true,
-  });
-  return {
-    write: (message) => console.log(message),
-    ask: (prompt) => rl.question(prompt),
-    askSecret: async (prompt) => {
-      // 提示必须在开启静音前直接写出；否则用户只看到空白行，不知道该填什么。
-      process.stdout.write(prompt);
-      out.setMuted(true);
-      try {
-        return await rl.question("");
-      } finally {
-        out.setMuted(false);
-        process.stdout.write("\n");
-      }
-    },
-    close: () => rl.close(),
-  };
-}
 
 export interface DeepSeekKeyStatus {
   configured: boolean;

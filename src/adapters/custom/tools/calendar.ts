@@ -1,5 +1,8 @@
 /**
  * 日历与课表图工具：export_calendar（本机 .ics）/ export_schedule_image（课表 PNG/SVG 图）
+ *
+ * 手动课表模式：数据全部来自本地导入的缓存（schedule-cache / exam-cache），
+ * 不联网、不依赖学校教务系统。
  */
 
 import fsp from "node:fs/promises";
@@ -14,7 +17,9 @@ import {
   sanitizeFileBase,
   uniquePath,
 } from "../../../core/document/save";
+import { loadExamCache } from "../../../core/exam-cache";
 import type { CourseData, ExamData } from "../../../core/model";
+import { loadScheduleCache } from "../../../core/schedule-cache";
 import { scheduleSvgToPng } from "../../../core/schedule-png";
 import {
   renderTermScheduleSVG,
@@ -22,71 +27,61 @@ import {
   type ScheduleStyle,
 } from "../../../core/schedule-svg";
 import { school } from "../../../core/school";
-import {
-  fetchExamsSmart,
-  fetchScheduleSmart,
-  parseSemesterString,
-  resolveWeek1Monday,
-} from "../academics";
-import { getCookie } from "../session";
+import { parseSemesterString, resolveWeek1Monday } from "../academics";
 
-/** 课表+考试的抓取与对齐（两个日历工具共用）：学期解析、渠道握手、交界期不串台 */
-async function gatherCalendar(
+/** 课表+考试的对齐读取（两个日历工具共用）：学期解析、交界期不串台 */
+function gatherCalendar(
   semester: string | undefined,
   include: "all" | "schedule" | "exams",
-): Promise<
+):
   | {
       ok: true;
       term: { year: number; semester: number; label: string };
       courses: CourseData[];
       exams: ExamData[];
     }
-  | { ok: false; error: string }
-> {
+  | { ok: false; error: string } {
   const parsed = semester ? parseSemesterString(semester) : null;
   if (semester && !parsed) {
     return { ok: false, error: `学期格式无法解析：「${semester}」，应为「2026-2027-1」这类格式` };
   }
 
-  const cookie = await getCookie();
-  const failures: string[] = [];
-
-  let courses: CourseData[] = [];
-  let exams: ExamData[] = [];
-  let term: { year: number; semester: number; label: string } | null = null;
-
-  if (include !== "exams") {
-    const r = await fetchScheduleSmart(cookie, parsed?.year, parsed?.semester);
-    if (!r.ok) {
-      failures.push(r.error);
-    } else {
-      term = r.data;
-      courses = r.data.courses;
+  const cached = loadScheduleCache();
+  if (semester && parsed) {
+    if (!cached) {
+      return { ok: false, error: "尚未导入课表（设置 → 导入课表），先导入再导出日历" };
+    }
+    if (cached.schedule.year !== parsed.year || cached.schedule.semester !== parsed.semester) {
+      return {
+        ok: false,
+        error: `本地只有「${cached.schedule.label}」的导入课表，没有 ${semester}；需要其他学期请先导入`,
+      };
     }
   }
-
-  if (include !== "schedule") {
-    // 考试与课表对齐同一学期（自动探测时以课表结果为准，交界期不串台）
-    const r = await fetchExamsSmart(
-      cookie,
-      term?.year ?? parsed?.year,
-      term?.semester ?? parsed?.semester,
-    );
-    if (!r.ok) {
-      failures.push(r.error);
-    } else {
-      term = term ?? r.data;
-      exams = r.data.exams;
-    }
+  if (!cached) {
+    return { ok: false, error: "尚未导入课表（设置 → 导入课表），先导入再导出日历" };
   }
 
-  if (!term || failures.length === (include === "all" ? 2 : 1)) {
-    return {
-      ok: false,
-      error: `查询失败：${failures.join("；")}。请检查网络或稍后重试，不要凭空生成日历内容。`,
-    };
-  }
-  return { ok: true, term, courses, exams };
+  // 考试与课表对齐同一学期：手动课表模式的考试缓存来自历史数据，学期对不上就不用
+  const examCached = loadExamCache();
+  const exams =
+    include === "schedule" ||
+    !examCached ||
+    examCached.exams.year !== cached.schedule.year ||
+    examCached.exams.semester !== cached.schedule.semester
+      ? []
+      : examCached.exams.exams;
+
+  return {
+    ok: true,
+    term: {
+      year: cached.schedule.year,
+      semester: cached.schedule.semester,
+      label: cached.schedule.label,
+    },
+    courses: include === "exams" ? [] : cached.schedule.courses,
+    exams,
+  };
 }
 
 export const calendarTools = {
@@ -98,14 +93,14 @@ export const calendarTools = {
       semester: z
         .string()
         .optional()
-        .describe("指定学期，格式如「2026-2027-1」；不填则自动探测最新学期"),
+        .describe("指定学期，格式如「2026-2027-1」；不填则用当前导入的学期"),
       include: z
         .enum(["all", "schedule", "exams"])
         .default("all")
         .describe("导出内容：all=课表+考试（默认），schedule=仅课表，exams=仅考试"),
     }),
     execute: async ({ semester, include }) => {
-      const g = await gatherCalendar(semester, include);
+      const g = gatherCalendar(semester, include);
       if (!g.ok) return { error: `日历导出失败：${g.error}` };
 
       const week1Monday = resolveWeek1Monday(g.term.year, g.term.semester).week1Monday;
@@ -144,7 +139,7 @@ export const calendarTools = {
           "把 .ics 文件发到手机后用日历 App 打开导入（iPhone 直接点开、安卓选日历应用）。整学期一次导入即可，重复导入不会产生重复事件。",
         note:
           !g.courses.length && !g.exams.length
-            ? "课表与考试均已查通但本学期无数据，日历里只有假期标记（如有）"
+            ? "本学期暂无导入的课表与考试数据，日历里只有假期标记（如有）"
             : undefined,
       };
     },
@@ -185,10 +180,10 @@ export const calendarTools = {
       semester: z
         .string()
         .optional()
-        .describe("指定学期，格式如「2026-2027-1」；不填则自动探测最新学期"),
+        .describe("指定学期，格式如「2026-2027-1」；不填则用当前导入的学期"),
     }),
     execute: async ({ mode, format, style, filename, week, semester }) => {
-      const g = await gatherCalendar(semester, "schedule");
+      const g = gatherCalendar(semester, "schedule");
       if (!g.ok) return { error: `课表图导出失败：${g.error}` };
 
       const semPart = `${g.term.year}-${g.term.semester === 3 ? 1 : 2}`;

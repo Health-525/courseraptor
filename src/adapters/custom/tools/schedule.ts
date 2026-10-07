@@ -1,7 +1,7 @@
 /**
- * 自定义学校的课表工具：get_schedule（本地缓存）+ set_holidays（通用）
+ * 手动课表模式的课表工具：get_schedule（本地缓存）+ set_holidays（通用）
  *
- * 与 njtech 的差别：没有教务在线链路——课表来自用户在设置页导入的
+ * 没有教务在线链路——课表来自用户在设置页导入的
  * data/schedule-cache.json，查不到就抛「请先配置」口径的错（网页端
  * NEED_SETUP_RE 命中后自动推出设置面板，用户顺着「学校」栏目去导入）。
  */
