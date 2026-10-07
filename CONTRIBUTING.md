@@ -1,6 +1,6 @@
 # 参与 CourseRaptor
 
-两类贡献都欢迎：**正在用它查教务的同学**——[反馈问题](https://github.com/Health-525/courseraptor/issues/new?template=bug_report.yml)、[提出学生场景](https://github.com/Health-525/courseraptor/issues/new?template=feature_request.yml)；**正在写 Agent 的开发者**——把仓库当[工程样例](README.md#-给开发者一套可整体搬走的本地-agent-工程)参考，修 bug、改文档，或为自己的学校写一个适配器（合入后你就是该校的署名维护者，见[学校适配指南](docs/adapter-guide.md)）。
+两类贡献都欢迎：**正在用它查教务的同学**——[反馈问题](https://github.com/Health-525/courseraptor/issues/new?template=bug_report.yml)、[提出学生场景](https://github.com/Health-525/courseraptor/issues/new?template=feature_request.yml)；**正在写 Agent 的开发者**——把仓库当[工程样例](README.md#-给开发者一套可整体搬走的本地-agent-工程)参考，修 bug、改文档。
 
 交流时请遵守[社区约定](CODE_OF_CONDUCT.md)；用法讨论可前往 [Discussions](https://github.com/Health-525/courseraptor/discussions)。
 
@@ -25,7 +25,7 @@ npm test
 
 ## 代码约定
 
-- 学校 HTTP 接口与教务规则放在 `src/adapters/<学校目录>/`（新学校适配见[学校适配指南](docs/adapter-guide.md)），数据计算优先写成可独立测试的纯函数，Agent 参数和返回说明放在 `src/core/tools/`。
+- 学校 HTTP 接口与教务规则放在 `src/adapters/<学校目录>/`，数据计算优先写成可独立测试的纯函数，Agent 参数和返回说明放在 `src/core/tools/`。
 - 新功能先描述学生场景，复用现有课表、日历、成绩和文件能力；避免仅为增加工具数量而拆新接口。
 - 遵循现有中文注释和 Biome 格式。数据查询失败不能转换为“没有数据”，估算值必须标明来源。
 - 修改学分、单双周、调休、文件路径、凭证和更新行为时增加有效边界测试。

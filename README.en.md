@@ -123,7 +123,7 @@ Share the repository URL or an inspected clean installation package, never your 
 | [Nanjing Tech University](src/adapters/njtech/) (NJTECH) | All online capabilities | [@Health-525](https://github.com/Health-525) |
 | [Hebei Agricultural University](src/adapters/hebau/) (HEBAU) | Timetable / grades / exams (CAS SSO + Zhengfang URP; dynamic-code second factor) | [@gzxb001-sketch](https://github.com/gzxb001-sketch) |
 
-Other schools work through the manual timetable mode (paste or upload a timetable and let the AI parse it). Your school not listed? [Request an adapter](https://github.com/Health-525/courseraptor/issues/new?template=request-school.yml) with a few details, or [write one yourself](docs/adapter-guide.md) — adapters are self-contained, Zhengfang-based systems have a full reference implementation to copy from, and merged PRs carry your name as that school's maintainer.
+Other schools work through the manual timetable mode (paste or upload a timetable and let the AI parse it). Your school not listed? [Request an adapter](https://github.com/Health-525/courseraptor/issues/new?template=request-school.yml) with a few details.
 
 ## Build with us
 
@@ -136,7 +136,7 @@ Beyond the student tool, the repo is a working reference for local-first agents 
 - **Local-first security**: AES-256-GCM credentials bound to the machine fingerprint, loopback-only web with Origin/CSRF checks, network-less sandboxed JS — [`src/core/credentials.ts`](src/core/credentials.ts)
 - **Engineering floor**: TypeScript `strict`, node:test with a coverage floor, Biome, dual-OS CI — [`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 
-**The adapter flywheel has already turned once**: the Hebei Agricultural University adapter was written and merged by an outside contributor ([PR #204](https://github.com/Health-525/courseraptor/pull/204)), who is now that school's credited maintainer. Your school missing? Follow the [adapter guide](docs/adapter-guide.md) (Chinese) — Zhengfang-based systems have a full reference implementation to copy from.
+**The adapter flywheel has already turned once**: the Hebei Agricultural University adapter was written and merged by an outside contributor ([PR #204](https://github.com/Health-525/courseraptor/pull/204)), who is now that school's credited maintainer.
 
 ```bash
 npm run typecheck
