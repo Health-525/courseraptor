@@ -278,95 +278,14 @@ export function demoTodayBrief(): TodayBrief {
     next,
     week: { mondayISO: iso(monday), days },
     exams: {
-      available: true,
-      cachedAt: Date.now() - 6 * 3600_000,
-      upcoming: demoExams(now).slice(0, 1),
-      note: "演示只展示一场虚构考试",
+      available: false,
+      cachedAt: null,
+      upcoming: [],
+      note: "暂无考试数据（不接入教务系统；演示同样如实给空态）",
     },
     todos: { items: todos.items, done: todos.done },
     knowledge: { total: demoKnowledge(now).length, recent: demoKnowledge(now).slice(0, 5) },
   };
 }
 
-/** 演示成绩：与离线剧本文案同数字（GPA 3.30 / 42 学分 / 58 分未过 / 缓考） */
-export function demoGrades() {
-  return {
-    term: "2026-2027学年第一学期（示例）",
-    gpa: 3.3,
-    creditsEarned: 42,
-    courses: [
-      { name: "示例高等数学", category: "必修", credits: 4, score: 86 },
-      { name: "示例大学英语", category: "必修", credits: 3, score: 78 },
-      { name: "示例程序设计", category: "必修", credits: 4, score: 92 },
-      { name: "示例体育课", category: "必修", credits: 1, score: 90 },
-      { name: "示例通识选修（人文）", category: "通识·人文类", credits: 2, score: 88 },
-      { name: "示例通识选修（自然）", category: "通识·自然类", credits: 2, score: 81 },
-      { name: "示例课程 A", category: "必修", credits: 3, score: 58, status: "未通过" },
-      { name: "示例课程 B", category: "必修", credits: 2, status: "缓考（待出分）" },
-    ],
-    general: { 人文类: 2, 自然类: 2, 公共艺术类: 0 },
-    note: "全部为虚构示例；未通过与缓考课程不计入已获学分",
-  };
-}
-
-/** 演示考试：日期相对今天生成，任何时刻打开都是「即将到来」 */
-export function demoExams(now: Date) {
-  const padDate = (offset: number) => {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  };
-  return [
-    {
-      subject: "示例课程 A",
-      date: padDate(5),
-      time: "09:00-11:00",
-      location: "示例教学楼 101",
-      seatNumber: "12",
-      inDays: 5,
-      isToday: false,
-    },
-    {
-      subject: "示例课程 B",
-      date: padDate(7),
-      time: "14:00-16:00",
-      location: "示例教学楼 202",
-      seatNumber: "05",
-      inDays: 7,
-      isToday: false,
-    },
-  ];
-}
-
-/** 演示通知：3 条虚构条目，不含任何真实链接 */
-export function demoNews(now: Date) {
-  const padDate = (daysAgo: number) => {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo);
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  };
-  return [
-    {
-      id: "demo-news-1",
-      title: "关于本学期选修课教学班调整的通知（虚构示例）",
-      date: padDate(1),
-      summary: "部分选修课教学班时间与地点微调，请同学们核对课表并确认学分归属。",
-      content:
-        "因教室调度原因，部分选修课教学班的上课时间或地点有小幅调整，具体以教务系统课表为准。请于本周内完成核对，涉及学分归属问题的同学可咨询所在学院教务老师。（虚构示例，无真实链接）",
-    },
-    {
-      id: "demo-news-2",
-      title: "大学英语四六级考试报名通知（虚构示例）",
-      date: padDate(3),
-      summary: "报名即日开始，逾期不再补报；考试时间以下发准考证为准。",
-      content:
-        "本次报名采取线上方式，报名前请确认学籍状态正常。报名成功后请留意准考证下发通知，按时参加考试。（虚构示例，无真实链接）",
-    },
-    {
-      id: "demo-news-3",
-      title: "期末考试考场安排发布（虚构示例）",
-      date: padDate(6),
-      summary: "考场与座位号可在教务系统查询，请提前熟悉考场位置。",
-      content:
-        "期末考试考场安排已发布，考生可凭学号查询所在考场与座位号。请携带有效证件按时参加考试，遵守考场纪律。（虚构示例，无真实链接）",
-    },
-  ];
-}
+/** 演示通知：已随教务适配器移除（产品不再接入教务通知源） */
