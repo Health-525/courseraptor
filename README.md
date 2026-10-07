@@ -153,14 +153,6 @@ raptor             # 启动；项目内也可 npm run dev
 
 ## 🧩 项目架构
 
-<p align="center">
-  <!-- GitHub 按用户主题自动换图：暗色模式看深底版，浅色模式看白底版 -->
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/courseraptor-architecture.png">
-    <img src="docs/courseraptor-architecture-white.png" width="880" alt="CourseRaptor 项目架构图：交互入口（终端 TUI / 本地网页 / QQ）、Agent 内核、两层记忆与知识库全部本机运行，天气等外部服务按需访问">
-  </picture>
-</p>
-
 **本地优先（Local-first）**：交互入口、Agent 内核、两层记忆与知识库全部跑在本机，数据不出电脑；天气等外部服务仅在查询时按需访问。
 
 **技术栈**：[Vercel AI SDK v7](https://ai-sdk.dev)（`ToolLoopAgent` + `runAgentTUI`）· 模型层：DeepSeek（默认 `deepseek-flash`，即 V4.1-Flash）+ 通义千问 / 智谱 GLM / Kimi / 豆包 / 混元 / MiniMax / 阶跃 / 文心 / 讯飞 / 硅基流动 / 移动云 + 自定义 OpenAI 兼容端点（供应商注册表纯数据、模型工厂统一装配）· TypeScript + Node 内置 HTTP（网页端零框架）· Biome + node:test
