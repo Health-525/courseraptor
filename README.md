@@ -88,7 +88,7 @@ Agent 共装备 **31 个工具**（南工大默认配置；其他学校按已接
 | 本地优先安全 | 凭证 AES-256-GCM 绑定本机指纹；Web 仅回环监听 + Host/Origin/CSRF 校验；沙箱 JS 无网络无磁盘 | [`src/core/credentials.ts`](src/core/credentials.ts) · [`src/core/sandbox-js.ts`](src/core/sandbox-js.ts) |
 | 工程化底盘 | TypeScript `strict` + node:test（覆盖率门槛只升不降）+ Biome + 双 OS 矩阵 CI | [`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
 
-**适配器飞轮已经转过一圈**：河北农业大学适配器由外部贡献者 [@gzxb001-sketch](https://github.com/gzxb001-sketch) 按[适配指南](docs/adapter-guide.md)独立完成并合入（PR [#204](https://github.com/Health-525/courseraptor/pull/204)），他就是这所学校的署名维护者。你的学校还没人适配？照着[指南](docs/adapter-guide.md)写一个——正方系学校有完整参考实现可抄，PR 合并后上方学校表里写你的名字。
+**适配器飞轮已经转过一圈**：河北农业大学适配器由外部贡献者 [@gzxb001-sketch](https://github.com/gzxb001-sketch) 独立完成并合入（PR [#204](https://github.com/Health-525/courseraptor/pull/204)），他是这所学校的署名维护者。想为自己学校适配？先开 issue 聊聊。
 
 ---
 
@@ -176,7 +176,7 @@ npm run njtech -- search-courses 高等数学
 
 设置第一栏先选学校：已适配学校填教务账号即可自动抓取；**其他学校走「手动课表」模式**——粘贴或上传课表，AI 解析成结构化课表，课表 / 今日日程 / 周次推算照常可用。
 
-你的学校不在列表？三条路：先用**手动课表**顶着，**[请求适配](https://github.com/Health-525/courseraptor/issues/new?template=request-school.yml)**（把学校信息留给社区），或**[自己动手写一个](docs/adapter-guide.md)**——适配层完全自包含，正方系学校的登录与查询逻辑有现成参考实现，PR 合并后你就是这所学校的署名维护者。
+你的学校不在列表？先用**手动课表**顶着，或**[请求适配](https://github.com/Health-525/courseraptor/issues/new?template=request-school.yml)**（把学校信息留给社区）。
 
 ---
 
@@ -239,7 +239,6 @@ npm run njtech -- search-courses 高等数学
 | 查工具参数、耗时、环境变量、教务模块覆盖 | [能力文档](docs/capabilities.md) |
 | 我是同学，想看图文上手指南 | [同学使用指南](docs/student-guide.md) |
 | 查环境变量、凭证、QQ 机器人等配置项 | [配置参考](docs/configuration.md) |
-| 给自己的学校写适配层 | [适配指南](docs/adapter-guide.md) |
 | 看做了什么、接下来做什么 | [路线图](docs/roadmap.md) |
 | 参与贡献 / 报安全问题 / 行为准则 | [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md) · [行为准则](CODE_OF_CONDUCT.md) |
 | 提问、交流、反馈 | [GitHub Discussions](https://github.com/Health-525/courseraptor/discussions) |
