@@ -4,18 +4,16 @@
 
 # CourseRaptor
 
-**Still in an early testing stage. For personal use and learning exchange only — must not be used for personal profit.**
-
 ### Less time navigating academic portals. More time for student life.
 
-**An open-source conversational academic agent — fully adapted for Nanjing Tech University (NJTECH), usable at any other school via manual timetable import.**
+**An open-source conversational academic agent — built-in academic-system adapters plus a manual timetable mode that works at any school.**
 
 **Also a production-grade local-first Agent engineering reference**: Vercel AI SDK v7 · ports-and-adapters `SchoolAdapter` architecture · three entrances, one kernel · everything auditable.
 
 [简体中文](README.md) · **English**
 
 [![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
-[![License: MIT + Restrictions](https://img.shields.io/badge/License-MIT_with_restrictions-8f2b21)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node 24+](https://img.shields.io/badge/Node.js-24%2B-8f2b21?logo=nodedotjs&logoColor=white)](https://nodejs.org/en/download)
 [![GitHubDaily](https://img.shields.io/badge/GitHubDaily-Featured-1DA1F2?logo=x&logoColor=white)](https://x.com/github_daily/status/2105560876132757969)
 [![Indie Dev List](https://img.shields.io/badge/China_Indie_Dev_List-Featured-9B59B6)](https://github.com/1c7/chinese-independent-developer/blob/master/.github/pages/README-Programmer-Edition.md)
@@ -28,7 +26,7 @@ CourseRaptor brings timetables, grades, exams, academic announcements, and calen
 
 If you are building agents yourself, the repo doubles as a reference implementation: how a `ToolLoopAgent` loop organizes 31 tools, how external systems sit behind a ports-and-adapters boundary (a new school is one self-contained directory, zero kernel changes), and how a multi-provider model layer is assembled from a plain-data registry. See [Build with us](#build-with-us) below.
 
-> ⚠️ **The online academic-system integration supports Nanjing Tech University (full).** Any other school can start immediately with manual timetable import. This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project. The [Chinese README](README.md) is the authoritative, fully detailed version.
+> ⚠️ **The online academic-system integration ships built-in adapters (see [`src/adapters/`](src/adapters/)); any school can start immediately with manual timetable import.** This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project. The [Chinese README](README.md) is the authoritative, fully detailed version.
 
 ## What it does
 
@@ -41,9 +39,9 @@ If you are building agents yourself, the repo doubles as a reference implementat
 | What does this announcement require me to do? | Announcement lists with per-grade relevance, full text, and cached attachments (spreadsheet filtering, paginated document reading) |
 | Can I use my phone calendar? | Local `.ics` export, import once into your calendar app |
 | Can I turn this material into a document? | Local document/table reading and Word, Excel, PowerPoint, and PDF generation with cross-format conversion |
-| My school is not NJTECH | Manual timetable mode: paste timetable text or upload Excel/CSV/PDF/Word/TXT, and the AI parses it into a structured timetable |
+| My school's system is not adapted | Manual timetable mode: paste timetable text or upload Excel/CSV/PDF/Word/TXT, and the AI parses it into a structured timetable |
 
-The agent ships **31 tools** (Nanjing Tech's default set, auto-trimmed per school). See [capabilities](docs/capabilities.md) for the full table. A headless CLI ([`skills/njtech-jwgl/`](skills/njtech-jwgl/SKILL.md)) exposes the same academic queries for scripting without touching the LLM.
+The agent ships **31 tools** (full set for schools with an online adapter, auto-trimmed per school). See [capabilities](docs/capabilities.md) for the full table. A headless CLI skill (in [`skills/`](skills/)) exposes the same academic queries for scripting without touching the LLM.
 
 Both screenshots below use fictional demo data.
 
@@ -83,7 +81,7 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 
 - **Agent runtime**: Vercel AI SDK v7 (`ToolLoopAgent` + `runAgentTUI` for terminal)
 - **LLM**: DeepSeek by default (`deepseek-flash` / V4.1-Flash), switchable to 11 more Chinese providers or a custom OpenAI-compatible endpoint — each provider's key stored and hot-swapped independently
-- **Academic protocol**: Custom NJTECH 正方新版 adapter (RSA + CSRF login; course selection reverse-engineered from official frontend)
+- **Academic protocol**: built-in academic-system adapters (RSA + CSRF login; course selection reverse-engineered from the official frontend)
 - **Web UI**: Single-page Node server (`src/channels/web/`) with push-panel layout, session history, and real-time tool result sync
 - **Ports and adapters**: `src/core/school.ts` defines the `SchoolAdapter` port; core never imports adapters, so adding a school means adding one self-contained directory under `src/adapters/`
 - **Data storage**: Local JSON files only (`data/`, `session.json`, `memory.json`, `credentials.enc`); no database, no cloud sync
@@ -93,14 +91,13 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 ```
 ├── bin/raptor.cjs        # Global CLI entry (npm link)
 ├── docs/                 # Assets & extended docs
-├── skills/njtech-jwgl/   # Headless academic-query skill (no LLM, no tokens)
+├── skills/               # Bundled skill packages: headless academic queries,
+│                         # timetable image export, meta-learning
 ├── src/
 │   ├── core/             # School-agnostic kernel: agent, memory, calendar,
 │   │                     # documents, attachments, knowledge + generic tools
-│   ├── adapters/
-│   │   ├── njtech/       # NJTECH implementation: login, schedule, grades,
-│   │   │                 # exams, course selection, notices + school tools
-│   │   └── custom/       # Other schools (manual timetable mode)
+│   ├── adapters/         # School adapters: one self-contained directory
+│   │                     # per school (SchoolAdapter port)
 │   └── channels/web/     # Web UI: chat, hall, /today, /todos, /knowledge
 └── local/                # Entrypoints: cli (TUI), qq (bot bridge), demo
 ```
@@ -117,10 +114,10 @@ Share the repository URL or an inspected clean installation package, never your 
 
 ## Build with us
 
-Beyond the student tool, the repo is a working reference for local-first agents — every pattern below ships in daily use, backed by tests, free to lift under the MIT license with additional restrictions (academic submissions and competition entries are not permitted — see [LICENSE](LICENSE)):
+Beyond the student tool, the repo is a working reference for local-first agents — every pattern below ships in daily use, backed by tests, free to lift under the MIT license (see [LICENSE](LICENSE)):
 
 - **Agent loop**: Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI` driving 31 tools across multi-turn loops — [`src/core/agent.ts`](src/core/agent.ts)
-- **Ports & adapters**: the `SchoolAdapter` port (`src/core/school.ts`) keeps the kernel free of any school import; Zhengfang-new and CAS+URP differences never leak past an adapter — [`src/adapters/`](src/adapters/)
+- **Ports & adapters**: the `SchoolAdapter` port (`src/core/school.ts`) keeps the kernel free of any school import; per-school protocol differences never leak past an adapter — [`src/adapters/`](src/adapters/)
 - **Multi-provider model layer**: a plain-data provider registry plus one model factory; 12 Chinese providers + custom OpenAI-compatible endpoints, keys encrypted independently and hot-swapped — [`src/core/providers.ts`](src/core/providers.ts)
 - **Two-tier memory**: cross-restart session continuity plus self-maintained long-term facts, local JSON only — [`src/core/memory/`](src/core/memory/)
 - **Local-first security**: AES-256-GCM credentials bound to the machine fingerprint, loopback-only web with Origin/CSRF checks, network-less sandboxed JS — [`src/core/credentials.ts`](src/core/credentials.ts)
@@ -132,8 +129,8 @@ npm run lint
 npm test
 ```
 
-[Contributing](CONTRIBUTING.md) · [Adapter guide](docs/adapter-guide.md) · [Roadmap](docs/roadmap.md) · [Capabilities](docs/capabilities.md) · [Student guide](docs/student-guide.md)
+[Contributing](CONTRIBUTING.md) · [Roadmap](docs/roadmap.md) · [Capabilities](docs/capabilities.md) · [Student guide](docs/student-guide.md)
 
 Found it useful? A star, a reproducible issue, or a concrete student use case helps the project improve. Built something of your own on these patterns? Share it in [Discussions](https://github.com/Health-525/courseraptor/discussions).
 
-Released under the [MIT License](LICENSE) with additional restrictions: using this software for academic submissions (theses, coursework) or competition entries is not permitted (see [LICENSE](LICENSE)). No official affiliation with or endorsement by Nanjing Tech University.
+Released under the [MIT License](LICENSE). This is an independent, unofficial project with no affiliation with or endorsement by any university.

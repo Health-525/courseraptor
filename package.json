@@ -43,7 +43,7 @@
     "教务"
   ],
   "author": "jiangshu",
-  "license": "LicenseRef-MIT-Restrictions",
+  "license": "MIT",
   "engines": {
     "node": ">=24.0.0"
   },

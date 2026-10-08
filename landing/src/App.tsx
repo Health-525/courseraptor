@@ -154,7 +154,7 @@ function App() {
     <>
       <a className="skip" href="#main">跳到正文</a>
       <header className="header"><div className="wrap header-inner">
-        <a className="brand" href="#" aria-label="CourseRaptor 首页"><img src={logoHeader} alt="" width="36" height="36" />CourseRaptor<span className="brand-tag">FOR NJTECH</span></a>
+        <a className="brand" href="#" aria-label="CourseRaptor 首页"><img src={logoHeader} alt="" width="36" height="36" />CourseRaptor</a>
         <nav aria-label="主导航"><a href="#features">能做什么</a><a href="#try">看看示例</a><a href="#start">开始使用</a><a className="github-link" href="https://github.com/Health-525/courseraptor">GitHub ↗</a></nav></div>
       </header>
       <main id="main">
@@ -198,7 +198,7 @@ function App() {
                   <p className="eyebrow">FULL TOOLBELT / 全景能力</p>
                   <h3>36 个内置工具，从教务到备考，一套内核全包。</h3>
                 </div>
-                <p className="capability-note">以南工大全量配置计；其他学校按已接入能力自动裁剪 · <a href="https://github.com/Health-525/courseraptor/blob/main/docs/capabilities.md">完整清单与使用边界 ↗</a></p>
+                <p className="capability-note">接入在线教务的学校按全量配置计；其他学校按已接入能力自动裁剪 · <a href="https://github.com/Health-525/courseraptor/blob/main/docs/capabilities.md">完整清单与使用边界 ↗</a></p>
               </div>
               <div className="capability-grid">
                 <div className="capability"><span>教务查询 <em>×13</em></span><p>课表（自动叠加放假调休）、成绩与 GPA、考试安排、学籍打码、选课冲突只读对比、搜课与可重修。</p></div>
@@ -225,7 +225,7 @@ function App() {
           </div>
         </section>
         <section className="start-section screen" id="start" aria-labelledby="start-title"><div className="wrap start-grid"><div><p className="eyebrow">04 / YOUR FIRST CONVERSATION</p><h2 id="start-title">五分钟，<br />认识小恐龙。</h2><p>先体验，再决定要不要配置。<br />演示无需教务账号、API Key，也不会调用 AI。</p><div className="actions"><a className="button primary" href="https://github.com/Health-525/courseraptor/releases/latest">下载最新版单文件 exe · 约 115MB <span aria-hidden="true">↓</span></a><a className="button ghost" href="https://github.com/Health-525/courseraptor/releases">绿色 zip · 全部版本 <span aria-hidden="true">↗</span></a></div><p className="small muted">exe 双击即用、内置 Node 运行时；升级把新版 exe 放进原文件夹再双击即可，账号与数据不动。</p></div><div className="setup"><ol><li><span>1</span><div><h3>下载并启动</h3><p>最新版 <a href="https://github.com/Health-525/courseraptor/releases/latest">见 Releases 页↗</a>：单文件 exe 双击即用，或绿色 zip 解压后双击 start.bat。</p></div></li><li><span>2</span><div><h3>按引导完成配置</h3><p>录入教务账号与模型 API Key——默认 DeepSeek，也内置通义千问、Kimi、智谱 GLM 等 12 家国内厂商可选，每家 Key 独立加密保存、切换不丢；开发者可克隆源码，免账号先跑离线演示。</p><div className="codebox"><div><span className="lights" aria-hidden="true"><i></i><i></i><i></i></span><span>Terminal</span><button type="button" id="copy-command" onClick={copyCommands}>{copied ? '✓ 已复制' : '复制命令'}</button></div><pre><code id="commands" ref={commandsRef}>{START_COMMANDS.map((cmd) => <span key={cmd}><span className="ps1" aria-hidden="true">$ </span>{cmd}{'\n'}</span>)}</code></pre></div><p id="copy-status" className="small" role="status">{copyStatus}</p></div></li><li><span>3</span><div><h3>打开终端显示的地址</h3><p>网页版默认 <code>http://localhost:3210</code>；终端、网页都能用，QQ 机器人可选开启。</p></div></li></ol><div className="next-step">准备正式使用？按引导配置教务账号与任一家厂商的模型 API Key 即可开始对话，日常成本个位数人民币；其他学校开箱可用「手动课表」模式，粘贴课表文字 AI 解析即可。<a href="https://github.com/Health-525/courseraptor/blob/main/docs/student-guide.md">阅读同学使用指南 ↗</a></div></div></div></section>
-        <section className="section wrap faq screen" aria-labelledby="faq-title"><div><p className="eyebrow">BEFORE YOU START</p><h2 id="faq-title">先说清楚，<br />用起来更安心。</h2></div><div className="faq-list"><details><summary>这是学校官方产品吗？</summary><p>不是。CourseRaptor 是非官方开源项目，已适配南京工业大学（全量），其他学校开箱可用「手动课表」模式（粘贴或上传课表，AI 解析成结构化课表）；没有学校官方隶属或背书。</p></details><details><summary>使用需要付费吗？数据会发到哪里？</summary><p>项目以 MIT 附加限制条款开源（仅作学习交流：可自由使用与修改，禁学术提交、参赛与任何商业用途），安装与使用免费。离线演示不调用 AI；正式对话会把提问与所需查询结果发送到你配置的模型服务（默认 DeepSeek，可换通义千问、Kimi、移动云等 12 家国内厂商），日常成本约个位数人民币每月。教务凭证 AES-256-GCM 加密保存在你自己的电脑；不上报任何遥测（历史安装包的匿名装机统计服务已下线，RAPTOR_NO_TELEMETRY=1 可关旧包上报），请勿分享已使用的项目目录。</p></details><details><summary>手机能直接打开这个网页查教务吗？</summary><p>这个网站是项目介绍页，不是在线教务服务。正式助手运行在你的电脑上；可把生成的 .ics 日历文件导入手机，或自行配置公开的 GitHub / Gitee 订阅源。公开订阅可能暴露课程与地点，发布前需确认。</p></details><details><summary>会自动提醒我吗？</summary><p>待办与关键日期支持桌面通知 + QQ 双通道主动提醒；考试、放假等日程可导出日历订阅。</p></details><details><summary>我是开发者，这个项目对我有什么用？</summary><p>它同时是一套跑在真实使用里的本地 Agent 工程样例：Vercel AI SDK v7 的 <code>ToolLoopAgent</code> 多轮工具循环、<code>SchoolAdapter</code> 端口-适配器架构（新增一所学校 = 新增一个自包含目录，内核零改动）、12 家厂商的模型注册表装配，以及本地优先的凭证加密与沙箱设计。模式可自由复用（MIT + 附加限制），也欢迎<a href="https://github.com/Health-525/courseraptor/blob/main/docs/adapter-guide.md">为你的学校写一个适配器</a>，合入后你就是该校的署名维护者。</p></details><details><summary>安装遇到问题，去哪里反馈？</summary><p>先看同学使用指南与仓库 README 的部署说明。可复现错误请提交 <a href="https://github.com/Health-525/courseraptor/issues/new/choose">Issue</a>，使用想法可到 <a href="https://github.com/Health-525/courseraptor/discussions">Discussions</a> 交流。请勿上传学号、成绩单、密码、API Key 或完整日志。</p></details></div></section>
+        <section className="section wrap faq screen" aria-labelledby="faq-title"><div><p className="eyebrow">BEFORE YOU START</p><h2 id="faq-title">先说清楚，<br />用起来更安心。</h2></div><div className="faq-list"><details><summary>这是学校官方产品吗？</summary><p>不是。CourseRaptor 是非官方开源项目，教务查询走内置协议适配，其他学校开箱可用「手动课表」模式（粘贴或上传课表，AI 解析成结构化课表）；没有学校官方隶属或背书。</p></details><details><summary>使用需要付费吗？数据会发到哪里？</summary><p>项目以 MIT 许可证开源，安装与使用免费。离线演示不调用 AI；正式对话会把提问与所需查询结果发送到你配置的模型服务（默认 DeepSeek，可换通义千问、Kimi、移动云等 12 家国内厂商），日常成本约个位数人民币每月。教务凭证 AES-256-GCM 加密保存在你自己的电脑；不上报任何遥测（历史安装包的匿名装机统计服务已下线，RAPTOR_NO_TELEMETRY=1 可关旧包上报），请勿分享已使用的项目目录。</p></details><details><summary>手机能直接打开这个网页查教务吗？</summary><p>这个网站是项目介绍页，不是在线教务服务。正式助手运行在你的电脑上；可把生成的 .ics 日历文件导入手机，或自行配置公开的 GitHub / Gitee 订阅源。公开订阅可能暴露课程与地点，发布前需确认。</p></details><details><summary>会自动提醒我吗？</summary><p>待办与关键日期支持桌面通知 + QQ 双通道主动提醒；考试、放假等日程可导出日历订阅。</p></details><details><summary>我是开发者，这个项目对我有什么用？</summary><p>它同时是一套跑在真实使用里的本地 Agent 工程样例：Vercel AI SDK v7 的 <code>ToolLoopAgent</code> 多轮工具循环、<code>SchoolAdapter</code> 端口-适配器架构（新增一所学校 = 新增一个自包含目录，内核零改动）、12 家厂商的模型注册表装配，以及本地优先的凭证加密与沙箱设计。模式可自由复用（MIT），也欢迎为你的学校写适配器。</p></details><details><summary>安装遇到问题，去哪里反馈？</summary><p>先看同学使用指南与仓库 README 的部署说明。可复现错误请提交 <a href="https://github.com/Health-525/courseraptor/issues/new/choose">Issue</a>，使用想法可到 <a href="https://github.com/Health-525/courseraptor/discussions">Discussions</a> 交流。请勿上传学号、成绩单、密码、API Key 或完整日志。</p></details></div></section>
         <section className="community wrap screen" aria-labelledby="community-title">
           <div className="community-inner">
             <div className="community-mascot">
@@ -235,7 +235,7 @@ function App() {
               <p className="eyebrow">BUILT IN THE OPEN</p>
               <h2 id="community-title">让更多同学，<br /><em>遇见小恐龙。</em></h2>
               <p>如果它帮你省下了一点时间，欢迎给个 Star，<br />也欢迎把真实需求带回来，一起让它更好用。</p>
-              <p className="small muted">开发者：工程模式可整体搬走做自己的 Agent（MIT + 附加限制，禁商用）；<br />也欢迎为你的学校写适配器，成为署名维护者。</p>
+              <p className="small muted">开发者：工程模式可整体搬走做自己的 Agent（MIT）；<br />也欢迎为你的学校写适配器，成为署名维护者。</p>
               <dl className="community-stats">
                 <Stat value={36} label="内置工具" />
                 <Stat value={3} label="终端 · 网页 · QQ" />
@@ -247,7 +247,7 @@ function App() {
           </div>
         </section>
       </main>
-      <footer className="wrap footer"><a className="brand" href="#">CourseRaptor<span>🦖</span></a><span>Made for students. A reference for agent builders.</span><div><a href="https://github.com/Health-525/courseraptor/blob/main/LICENSE">MIT · 附加条款</a><a href="https://github.com/Health-525/courseraptor/blob/main/SECURITY.md">安全说明</a><a href="https://github.com/Health-525/courseraptor/blob/main/README.en.md" lang="en">English docs ↗</a></div></footer>
+      <footer className="wrap footer"><a className="brand" href="#">CourseRaptor<span>🦖</span></a><span>Made for students. A reference for agent builders.</span><div><a href="https://github.com/Health-525/courseraptor/blob/main/LICENSE">MIT License</a><a href="https://github.com/Health-525/courseraptor/blob/main/SECURITY.md">安全说明</a><a href="https://github.com/Health-525/courseraptor/blob/main/README.en.md" lang="en">English docs ↗</a></div></footer>
     </>
   )
 }
