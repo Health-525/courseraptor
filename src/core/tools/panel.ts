@@ -58,7 +58,7 @@ export const panelTools = {
       "直接用查询工具在对话里回答；终端（TUI）/QQ 等没有网页面板的环境同样别调，直接给内容。",
     inputSchema: z.object({ panel: z.enum(PANEL_IDS).describe("要打开的面板 id") }),
     execute: async ({ panel }) => {
-      /* 教务通知门禁：本校没接入通知能力（如河北农大）时不推面板，如实劝退，
+      /* 教务通知门禁：本校没接入通知能力（如手动课表模式）时不推面板，如实劝退，
        * 不谎称「已推出」——前端宫格本就不显示这张卡 */
       if (panel === "news" && !registeredSchool()?.notices) {
         return (

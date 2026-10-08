@@ -1514,7 +1514,7 @@ function schoolManual() {
   return !!(schoolState && schoolState.manual);
 }
 /* 教务通知卡的门槛（与设置页 newsReady 同口径）：本校接入教务通知且教务
-   账号已保存才亮卡；没接入的学校（如河北农大）宫格直接不出这张卡。
+   账号已保存才亮卡；没接入的学校宫格直接不出这张卡。
    演示页没有 /api/settings，保持展示（点开是演示空态） */
 function newsAvailable() {
   if (HALL_DEMO) return true;

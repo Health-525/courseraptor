@@ -14,12 +14,10 @@
 import { loadCredentialsStore } from "../core/credentials";
 import { listSchoolOptions, registerSchoolOption, selectSchool } from "../core/school";
 import { customSchool } from "./custom";
-import { hebauSchool } from "./hebau";
 import { njtechSchool } from "./njtech";
 
 /** 登记顺序即设置页的学校列表顺序：真实学校在前，「其他学校」垫底 */
 registerSchoolOption(njtechSchool);
-registerSchoolOption(hebauSchool);
 registerSchoolOption(customSchool);
 
 export function installDefaultSchool(): void {

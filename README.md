@@ -31,7 +31,7 @@ Vercel AI SDK v7 · `SchoolAdapter` 端口-适配器架构 · 三端入口 · �
 
 把散落在教务系统各处的信息收进一句对话：问「这周课表」「我的 GPA」「最近的考试」「通识学分还缺哪几类」，agent 自动登录教务、抓取、结构化后回答。**终端敲 `raptor`、浏览器开 `localhost:3210`、QQ 里 @机器人**——三个入口共用同一个 Agent 内核与同一份记忆。
 
-一切都在你自己的电脑上运行：凭证 AES-256-GCM 加密落盘、教务数据不经第三方、不上报任何遥测（历史安装包的匿名装机统计服务已下线，旧包可用 `RAPTOR_NO_TELEMETRY=1` 关闭其上报尝试）；接的是你自己的模型 API Key——默认 DeepSeek，共 **12 家国内厂商**可选：**通义千问、智谱 GLM、Kimi、豆包、混元、MiniMax、阶跃、文心、讯飞、硅基流动、移动云**，外加自定义 OpenAI 兼容端点，按量计费、用量透明。已对**南京工业大学全量适配**、**河北农业大学社区适配**，**其他学校开箱可用「手动课表」模式**。
+一切都在你自己的电脑上运行：凭证 AES-256-GCM 加密落盘、教务数据不经第三方、不上报任何遥测（历史安装包的匿名装机统计服务已下线，旧包可用 `RAPTOR_NO_TELEMETRY=1` 关闭其上报尝试）；接的是你自己的模型 API Key——默认 DeepSeek，共 **12 家国内厂商**可选：**通义千问、智谱 GLM、Kimi、豆包、混元、MiniMax、阶跃、文心、讯飞、硅基流动、移动云**，外加自定义 OpenAI 兼容端点，按量计费、用量透明。已对**南京工业大学全量适配**，**其他学校开箱可用「手动课表」模式**。
 
 正在写 Agent 的人，可以直接把它当参考实现读：`ToolLoopAgent` 多轮工具循环怎么组织 31 个工具、外部系统怎么用端口-适配器隔离（新增一所学校 = 新增一个自包含目录，内核零改动）、12 家厂商的模型层怎么用纯数据注册表装配——见下方 [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程) 一节。
 
@@ -87,8 +87,6 @@ Agent 共装备 **31 个工具**（南工大默认配置；其他学校按已接
 | 多入口单内核 | 终端 TUI / 本地网页 / QQ 机器人共享同一内核与记忆；另有无头 CLI 不经 LLM、零 token | [`src/channels/`](src/channels/) · [`local/`](local/) · [`skills/njtech-jwgl/`](skills/njtech-jwgl/) |
 | 本地优先安全 | 凭证 AES-256-GCM 绑定本机指纹；Web 仅回环监听 + Host/Origin/CSRF 校验；沙箱 JS 无网络无磁盘 | [`src/core/credentials.ts`](src/core/credentials.ts) · [`src/core/sandbox-js.ts`](src/core/sandbox-js.ts) |
 | 工程化底盘 | TypeScript `strict` + node:test（覆盖率门槛只升不降）+ Biome + 双 OS 矩阵 CI | [`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
-
-**适配器飞轮已经转过一圈**：河北农业大学适配器由外部贡献者 [@gzxb001-sketch](https://github.com/gzxb001-sketch) 独立完成并合入（PR [#204](https://github.com/Health-525/courseraptor/pull/204)），他是这所学校的署名维护者。想为自己学校适配？先开 issue 聊聊。
 
 ---
 
@@ -209,7 +207,6 @@ npm run njtech -- search-courses 高等数学
 │   ├── core/           # 学校无关内核：agent/记忆/日历/文档/附件/知识库等 + 通用工具
 │   ├── adapters/       # 学校适配层：core/school.ts 定义的 SchoolAdapter 端口
 │   │   ├── njtech/     # 南京工业大学实现（登录/课表/成绩/考试/选课/通知 + 教务工具）
-│   │   ├── hebau/      # 河北农业大学实现（CAS 统一认证 + 正方 URP，差异见能力文档）
 │   │   └── custom/     # 其他学校（手动课表模式）
 │   └── channels/       # 输出渠道：web（网页版）
 └── local/              # 本地版入口：cli（终端 TUI）、qq（机器人）、demo（离线演示）

@@ -59,7 +59,7 @@ export function isCredentialError(e: unknown): boolean {
 }
 
 /**
- * 动作结果协议里的会话失效哨兵值（hebau/academics 等消费）：
+ * 动作结果协议里的会话失效哨兵值（njtech/academics 等消费）：
  * 与 code "SESSION_EXPIRED" 同名同值，两套协议一个语义。
  */
 export const SESSION_EXPIRED_MESSAGE = "SESSION_EXPIRED";

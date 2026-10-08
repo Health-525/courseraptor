@@ -5,10 +5,10 @@ import path from "node:path";
 import test from "node:test";
 
 /* 装配学校适配器（open_panel 的教务通知门禁要看当前学校能力）：
-   临时目录隔离凭证，RAPTOR_SCHOOL=hebau 起步（没接通知的学校） */
+   临时目录隔离凭证，RAPTOR_SCHOOL=custom 起步（没接通知的学校） */
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-panel-"));
 process.env.RAPTOR_CREDENTIALS_FILE = path.join(process.env.RAPTOR_DATA_DIR, "credentials.enc");
-process.env.RAPTOR_SCHOOL = "hebau";
+process.env.RAPTOR_SCHOOL = "custom";
 await import("../src/adapters");
 
 /** open_panel 只是「请前端弹出指定面板」的信号：可执行、白名单把关、返回引导文案 */
@@ -39,7 +39,7 @@ test("教务通知门禁：未接入的学校 open_panel(news) 劝退，不谎�
     }
   ).execute;
 
-  // hebau（装配默认）：教务通知没有端点 → 劝退，不能说「已推出」
+  // custom（装配默认）：教务通知没有端点 → 劝退，不能说「已推出」
   const denied = await execute({ panel: "news" });
   assert.match(String(denied), /尚未接入教务通知/);
   assert.doesNotMatch(String(denied), /已请网页端推出/);

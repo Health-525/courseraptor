@@ -8,7 +8,7 @@
 
 ### Less time navigating academic portals. More time for student life.
 
-**An open-source conversational academic agent — fully adapted for Nanjing Tech University (NJTECH), community-adapted for Hebei Agricultural University (HEBAU), usable at any other school via manual timetable import.**
+**An open-source conversational academic agent — fully adapted for Nanjing Tech University (NJTECH), usable at any other school via manual timetable import.**
 
 **Also a production-grade local-first Agent engineering reference**: Vercel AI SDK v7 · ports-and-adapters `SchoolAdapter` architecture · three entrances, one kernel · everything auditable.
 
@@ -28,7 +28,7 @@ CourseRaptor brings timetables, grades, exams, academic announcements, and calen
 
 If you are building agents yourself, the repo doubles as a reference implementation: how a `ToolLoopAgent` loop organizes 31 tools, how external systems sit behind a ports-and-adapters boundary (a new school is one self-contained directory, zero kernel changes), and how a multi-provider model layer is assembled from a plain-data registry. See [Build with us](#build-with-us) below.
 
-> ⚠️ **The online academic-system integration supports Nanjing Tech University (full) and Hebei Agricultural University (community adapter, PR #204).** Any other school can start immediately with manual timetable import. This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project. The [Chinese README](README.md) is the authoritative, fully detailed version.
+> ⚠️ **The online academic-system integration supports Nanjing Tech University (full).** Any other school can start immediately with manual timetable import. This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project. The [Chinese README](README.md) is the authoritative, fully detailed version.
 
 ## What it does
 
@@ -100,7 +100,6 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 │   ├── adapters/
 │   │   ├── njtech/       # NJTECH implementation: login, schedule, grades,
 │   │   │                 # exams, course selection, notices + school tools
-│   │   ├── hebau/        # HEBAU implementation: CAS SSO + Zhengfang URP
 │   │   └── custom/       # Other schools (manual timetable mode)
 │   └── channels/web/     # Web UI: chat, hall, /today, /todos, /knowledge
 └── local/                # Entrypoints: cli (TUI), qq (bot bridge), demo
@@ -112,7 +111,7 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 - Category coverage is not a graduation audit. Check requirements for your own program and enrollment year.
 - QQ users share the configured university identity; the allowlist is not multi-student account isolation.
 - Academic tools are read-only queries; no course-enrollment or form-submission operations are included.
-- Curriculum audits are **not yet implemented**. (Reminders, schedule-change detection, and a second university integration — HEBAU — have all shipped.)
+- Curriculum audits are **not yet implemented**. (Reminders and schedule-change detection have shipped.)
 
 Share the repository URL or an inspected clean installation package, never your used project directory. See [privacy and security](SECURITY.md).
 
@@ -126,8 +125,6 @@ Beyond the student tool, the repo is a working reference for local-first agents 
 - **Two-tier memory**: cross-restart session continuity plus self-maintained long-term facts, local JSON only — [`src/core/memory/`](src/core/memory/)
 - **Local-first security**: AES-256-GCM credentials bound to the machine fingerprint, loopback-only web with Origin/CSRF checks, network-less sandboxed JS — [`src/core/credentials.ts`](src/core/credentials.ts)
 - **Engineering floor**: TypeScript `strict`, node:test with a coverage floor, Biome, dual-OS CI — [`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
-
-**The adapter flywheel has already turned once**: the Hebei Agricultural University adapter was written and merged by an outside contributor ([PR #204](https://github.com/Health-525/courseraptor/pull/204)), who is now that school's credited maintainer.
 
 ```bash
 npm run typecheck
