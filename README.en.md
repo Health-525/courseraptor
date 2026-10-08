@@ -4,8 +4,6 @@
 
 # CourseRaptor
 
-**Still in an early testing stage. For personal use and learning exchange only — must not be used for personal profit.**
-
 ### Less time navigating academic portals. More time for student life.
 
 **An open-source conversational academic agent — built-in academic-system adapters plus a manual timetable mode that works at any school.**
@@ -15,7 +13,7 @@
 [简体中文](README.md) · **English**
 
 [![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
-[![License: MIT + Restrictions](https://img.shields.io/badge/License-MIT_with_restrictions-8f2b21)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node 24+](https://img.shields.io/badge/Node.js-24%2B-8f2b21?logo=nodedotjs&logoColor=white)](https://nodejs.org/en/download)
 [![GitHubDaily](https://img.shields.io/badge/GitHubDaily-Featured-1DA1F2?logo=x&logoColor=white)](https://x.com/github_daily/status/2105560876132757969)
 [![Indie Dev List](https://img.shields.io/badge/China_Indie_Dev_List-Featured-9B59B6)](https://github.com/1c7/chinese-independent-developer/blob/master/.github/pages/README-Programmer-Edition.md)
@@ -116,7 +114,7 @@ Share the repository URL or an inspected clean installation package, never your 
 
 ## Build with us
 
-Beyond the student tool, the repo is a working reference for local-first agents — every pattern below ships in daily use, backed by tests, free to lift under the MIT license with additional restrictions (academic submissions and competition entries are not permitted — see [LICENSE](LICENSE)):
+Beyond the student tool, the repo is a working reference for local-first agents — every pattern below ships in daily use, backed by tests, free to lift under the MIT license (see [LICENSE](LICENSE)):
 
 - **Agent loop**: Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI` driving 31 tools across multi-turn loops — [`src/core/agent.ts`](src/core/agent.ts)
 - **Ports & adapters**: the `SchoolAdapter` port (`src/core/school.ts`) keeps the kernel free of any school import; per-school protocol differences never leak past an adapter — [`src/adapters/`](src/adapters/)
@@ -135,4 +133,4 @@ npm test
 
 Found it useful? A star, a reproducible issue, or a concrete student use case helps the project improve. Built something of your own on these patterns? Share it in [Discussions](https://github.com/Health-525/courseraptor/discussions).
 
-Released under the [MIT License](LICENSE) with additional restrictions: using this software for academic submissions (theses, coursework) or competition entries is not permitted (see [LICENSE](LICENSE)). This is an independent, unofficial project with no affiliation with or endorsement by any university.
+Released under the [MIT License](LICENSE). This is an independent, unofficial project with no affiliation with or endorsement by any university.
