@@ -15,6 +15,7 @@
  * 3. 重定向有上限。正方失效时会 302 回登录页，无跳数限制的递归迟早出事。
  */
 
+import http from "node:http";
 import https from "node:https";
 
 import { config } from "./config";
@@ -123,6 +124,22 @@ export function createClient(baseURL: string, initialCookie = ""): HttpClient {
     }
   }
 
+  /**
+   * baseURL 的「目录形式」，用于解析请求路径与相对 Location。
+   * 正方常把教务系统部署在子路径下（如通达学院 http://jwxt.nytdc.edu.cn/jwglxt），
+   * 此时 baseURL 自带上下文路径，直接 new URL("/xtgl/x", base) 会把 /jwglxt 丢掉、
+   * 请求打到站点根目录（实测返回 404 空响应）。
+   */
+  function baseDir(): string {
+    return baseURL.endsWith("/") ? baseURL : `${baseURL}/`;
+  }
+
+  /** 请求路径一律接在部署上下文之后；绝对 URL（重定向目标）原样使用 */
+  function resolveRequestUrl(urlPath: string): URL {
+    if (/^https?:\/\//i.test(urlPath)) return new URL(urlPath);
+    return new URL(urlPath.replace(/^\//, ""), baseDir());
+  }
+
   /** 单次请求（不含重定向跟随） */
   function once(url: URL, opts: HttpOptions & { method: string }): Promise<HttpResponse> {
     return new Promise((resolve) => {
@@ -133,10 +150,19 @@ export function createClient(baseURL: string, initialCookie = ""): HttpClient {
         resolve(r);
       };
 
-      const q = https.request(
+      // 传输层协议跟随 URL，不写死 https：正方存在只开 HTTP 的部署
+      // （如南京邮电大学通达学院 jwxt.nytdc.edu.cn），写死 https 会连登录页都取不到。
+      // 其余行为（Cookie / 超时 / 重定向 / 令牌桶）与 https 完全一致。
+      const transport: (
+        options: http.RequestOptions,
+        cb: (res: http.IncomingMessage) => void,
+      ) => http.ClientRequest = url.protocol === "http:" ? http.request : https.request;
+      const q = transport(
         {
           method: opts.method,
           hostname: url.hostname,
+          // url.hostname 不含端口：不带上的话非默认端口（如 :1009）会打到 80/443
+          port: url.port || undefined,
           path: url.pathname + url.search,
           headers: {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -185,7 +211,7 @@ export function createClient(baseURL: string, initialCookie = ""): HttpClient {
     await acquireToken();
 
     const method = opts.method || "GET";
-    const resp = await once(new URL(urlPath, baseURL), { ...opts, method });
+    const resp = await once(resolveRequestUrl(urlPath), { ...opts, method });
 
     const status = resp.status;
     if (status >= 300 && status < 400) {
@@ -208,7 +234,9 @@ export function createClient(baseURL: string, initialCookie = ""): HttpClient {
           errorRetryable: false,
         };
       }
-      const next = target.startsWith("http") ? target : baseURL + target;
+      // Location 按 base 的目录解析：以 / 开头的是站点绝对路径（自带子路径），
+      // 直接字符串拼接会在子路径部署下拼出 /jwglxt/jwglxt/... 这种双前缀
+      const next = target.startsWith("http") ? target : new URL(target, baseDir()).href;
       // 重定向后按浏览器行为降为 GET
       return req(next, { method: "GET" }, hops + 1);
     }

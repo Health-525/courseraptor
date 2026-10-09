@@ -14,6 +14,9 @@ import { test } from "node:test";
 // 必须在导入被测模块之前指向临时数据目录，避免读写真实 data/
 const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-today-"));
 process.env.RAPTOR_DATA_DIR = tmpData;
+// 凭证同样隔离：本机跑过 app 时 credentials.enc 会带着上次选的 schoolId，
+// 学校一变节次表/开学日期就变，今日课程断言会误报
+process.env.RAPTOR_CREDENTIALS_FILE = path.join(tmpData, "credentials.enc");
 
 await import("../src/adapters");
 const { buildTodayBrief } = await import("../src/channels/web/today-brief");

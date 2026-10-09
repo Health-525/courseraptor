@@ -16,10 +16,12 @@ import { listSchoolOptions, registerSchoolOption, selectSchool } from "../core/s
 import { customSchool } from "./custom";
 import { hebauSchool } from "./hebau";
 import { njtechSchool } from "./njtech";
+import { nytdcSchool } from "./nytdc";
 
 /** 登记顺序即设置页的学校列表顺序：真实学校在前，「其他学校」垫底 */
 registerSchoolOption(njtechSchool);
 registerSchoolOption(hebauSchool);
+registerSchoolOption(nytdcSchool);
 registerSchoolOption(customSchool);
 
 export function installDefaultSchool(): void {

@@ -65,9 +65,9 @@ test("GET /api/settings：school 块带清单与手动课表标记，默认 njte
   assert.equal(r.school.manual, false);
   assert.deepEqual(
     r.school.options.map((o: { id: string }) => o.id),
-    ["njtech", "hebau", "custom"],
+    ["njtech", "hebau", "nytdc", "custom"],
   );
-  assert.equal(r.school.options[2].manual, true);
+  assert.equal(r.school.options[3].manual, true);
   // 教务通知卡门槛：njtech 接入通知后随教务账号状态走（本机 .env 可能带
   // 账号，初值别硬编码；「没接入的学校不亮」在下面的切换链路里硬断言）
   assert.equal(r.school.newsReady, !!r.jwgl?.configured);

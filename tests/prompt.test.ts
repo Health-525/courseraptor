@@ -13,6 +13,9 @@ import { test } from "node:test";
 // 每个测试文件是独立进程，不会污染其他用例）
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-prompt-"));
 process.env.RAPTOR_DATA_DIR = dataDir;
+// 凭证也要隔离：本机跑过 app 时 credentials.enc 里存着上次选的学校，
+// 会把默认学校换成别校、带着另一套节次表与开学日期渲染提示词
+process.env.RAPTOR_CREDENTIALS_FILE = path.join(dataDir, "credentials.enc");
 
 await import("../src/adapters");
 const { writeFileAtomicSync } = await import("../src/core/atomic-write");

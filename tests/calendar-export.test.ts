@@ -18,6 +18,9 @@ import { test } from "node:test";
 
 // 必须在导入被测模块之前指向临时数据目录（term-holidays 真值源落在这里）
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-ics-"));
+// 本机凭证里可能存着别的 schoolId（跑过一次 app 就会有）：默认学校变了，
+// 节次表与开学日期跟着变，断言会莫名其妙地失败——测试一律用自己的空凭证
+process.env.RAPTOR_CREDENTIALS_FILE = path.join(process.env.RAPTOR_DATA_DIR, "credentials.enc");
 
 await import("../src/adapters");
 const { buildTermICS } = await import("../src/core/calendar/export");
