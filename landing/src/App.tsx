@@ -234,7 +234,7 @@ function App() {
               <p className="eyebrow">BUILT IN THE OPEN</p>
               <h2 id="community-title">让更多同学，<br /><em>遇见小恐龙。</em></h2>
               <p>如果它帮你省下了一点时间，欢迎给个 Star，<br />也欢迎把真实需求带回来，一起让它更好用。</p>
-              <p className="small muted">开发者：工程模式可整体搬走做自己的 Agent（MIT）；<br />也欢迎为你的学校写适配器，成为署名维护者。</p>
+              <p className="small muted">开发者：工程模式可整体搬走做自己的 Agent（MIT）；<br />也欢迎修 bug、改文档，或到 Discussions 交流。</p>
               <dl className="community-stats">
                 <Stat value={36} label="内置工具" />
                 <Stat value={3} label="终端 · 网页 · QQ" />
