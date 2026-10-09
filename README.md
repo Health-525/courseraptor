@@ -1,3 +1,18 @@
+> ### 南京邮电大学通达学院适配版（个人 fork）
+>
+> 本仓库基于上游 [Health-525/courseraptor](https://github.com/Health-525/courseraptor) **v0.3.3**，额外接入了通达学院的三套系统：
+>
+> | 系统 | 接入内容 |
+> |---|---|
+> | 正方教务 `jwxt.nytdc.edu.cn` | 课表 / 成绩与平均学分绩点 / 考试 / 日历导出 / 课表图片 |
+> | 教务处官网 `jwc.nytdc.edu.cn` | 通知四个板块 + 正文全文 + 附件 |
+> | 学工系统（奥蓝学生版）`xgstu.nytdc.edu.cn` | 信息汇总消息 + 资料下载（均只读） |
+>
+> **说明**：上游自 v0.4.0 起已移除全部学校适配器、改为手动导入模式，因此本仓库停留在 0.3.3 架构上独立维护。
+> 使用者需自备教务账号与 AI 模型 API Key；仓库内不含任何个人凭证或数据（`credentials.enc` / `data/` 均已被 .gitignore 排除）。
+>
+> 适配细节与实机验证记录见 [docs/capabilities.md](docs/capabilities.md) 的「南京邮电大学通达学院适配差异」一节。
+
 <div align="center">
 
 <img src="docs/courseraptor-logo.png" width="200" alt="CourseRaptor logo" />
