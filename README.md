@@ -62,10 +62,6 @@ Agent 共装备 **21 个工具**。完整参数表、耗时与环境变量见 [�
 
 <p align="center"><img src="docs/screenshots/gui.png" width="800" alt="网页对话首屏：欢迎页、快捷提问与历史会话侧栏（虚构示例数据）"></p>
 
-**动态演示** —— 从欢迎页、快捷提问到一句话发起查询的完整流程（虚构示例数据）：
-
-<p align="center"><img src="docs/screenshots/gui-demo.gif" width="800" alt="网页端动态演示：快捷提问与一句话查询全流程（虚构示例数据）"></p>
-
 ---
 
 ## 🧰 给开发者：一套可整体搬走的本地 Agent 工程
