@@ -34,22 +34,22 @@ test("addMemory：新增条目进提示词，返回未合并", async () => {
 });
 
 test("addMemory：完全重复刷新时间不新增；近似重复以新表述覆盖", async () => {
-  const first = await addMemory("用户不喜欢被提及抢课", "偏好");
-  const exact = await addMemory("用户不喜欢被提及抢课", "偏好");
+  const first = await addMemory("用户不喜欢被提及社团纳新", "偏好");
+  const exact = await addMemory("用户不喜欢被提及社团纳新", "偏好");
   assert.equal(exact.merged, true);
   assert.equal(exact.total, first.total, "完全重复不增条目");
 
-  const near = await addMemory("用户不喜欢被提到抢课这件事", "偏好");
+  const near = await addMemory("用户不喜欢被提到社团纳新这件事", "偏好");
   assert.equal(near.merged, true, "换个说法再说一遍要命中近似去重");
   assert.equal(near.total, first.total);
 });
 
 test("archiveMemory：归档后留在文件但不再注入提示词", async () => {
-  const { entry } = await addMemory("已执行完的抢课计划：高等数学", "任务状态");
+  const { entry } = await addMemory("已执行完的复习计划：高等数学", "任务状态");
   assert.ok(await archiveMemory(entry.id));
   const prompt = await formatMemoryForPrompt();
-  assert.doesNotMatch(prompt, /抢课计划：高等数学/);
-  assert.ok((await loadMemory()).some((e) => e.content.includes("抢课计划：高等数学")));
+  assert.doesNotMatch(prompt, /复习计划：高等数学/);
+  assert.ok((await loadMemory()).some((e) => e.content.includes("复习计划：高等数学")));
 });
 
 test("过期条目（expiresAt 已过）不再注入提示词", async () => {

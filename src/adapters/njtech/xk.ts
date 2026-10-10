@@ -25,7 +25,7 @@ const XK_DISPLAY = "/xsxk/zzxkyzb_cxZzxkYzbDisplay.html";
 const XK_COURSE_LIST = "/xsxk/zzxkyzb_cxZzxkYzbPartDisplay.html";
 /** 某门课程的教学班列表（含余量，jxb 展开时调用） */
 const XK_JXB_LIST = "/xsxk/zzxkyzbjk_cxJxbWithKchZzxkYzb.html";
-/** 本轮已选课程列表（数据源；njtech_grabber 确认参数仅 xkxnm/xkxqm） */
+/** 本轮已选课程列表（数据源；早期协议实测确认参数仅 xkxnm/xkxqm） */
 const XK_CHOOSED_LIST = "/xsxk/zzxkyzb_cxZzxkYzbChoosedDisplay.html";
 
 // ── 类型 ──────────────────────────────────────────────────────
@@ -204,7 +204,7 @@ export function parseCourseList(json: unknown): XkCourse[] {
     return {
       jxbId: pickString(merged, ["jxb_id", "jxbid", "do_jxb_id", "do_jxbid"]),
       courseCode: pickString(merged, ["kch", "kch_id", "courseCode"]),
-      // jxbmc（教学班名称）是旧版平铺行的主名称字段（njtech_grabber 实测），
+      // jxbmc（教学班名称）是旧版平铺行的主名称字段（早期协议实测），
       // 不认它的话这类响应课程名为空串、目标匹配全部落空
       courseName: pickString(merged, ["kcmc", "kcm", "jxbmc", "courseName"]),
       teacher: pickString(merged, ["jsxx", "jgxm", "teacher"]),
@@ -266,7 +266,7 @@ export interface ChoosedCourse {
 /**
  * 解析本轮已选课程列表（ChoosedDisplay）。
  * 响应形状：裸数组或 {tmpList:[]}（zzxkyzb 族两见）。
- * 行字段以 njtech_grabber 实测为准：jxbmc（名称）/ kch_id（课程号）；
+ * 行字段以早期协议实测为准：jxbmc（名称）/ kch_id（课程号）；
  * do_jxb_id 若有则直接是退课 key，没有时由调用方经教学班列表补齐。
  */
 export function parseChoosedList(json: unknown): ChoosedCourse[] {

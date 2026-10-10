@@ -499,7 +499,7 @@ function buildScheduleSvg(opts: {
     `<rect width="${width}" height="${height}" fill="${s.bg}"/>`,
   );
   if (s.brandBar) {
-    // color 风格的品牌小节①：顶部一条朱砂细条（信笺口条），不抢课表主体
+    // color 风格的品牌小节①：顶部一条朱砂细条（信笺口条），不喧宾夺主
     p.push(`<rect x="0" y="0" width="${width}" height="2" fill="${s.accent}"/>`);
   }
   if (s.seal) {

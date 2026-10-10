@@ -1,10 +1,9 @@
 /**
  * 选课模块纯函数测试
  *
- * 背景：njtech_grabber（2021-2022 年代实测的同校 Python 脚本）确认的响应
- * 形状此前没有 fixture 钉住——parseCourseList 不认 jxbmc（教学班名称），
- * 旧版平铺行的课程名会解析成空串、目标匹配全部落空。这里用 grabber 实测
- * 形状 + 本项目校准过的形状双轨钉住。
+ * 背景：早期协议实测确认的响应形状此前没有 fixture 钉住——parseCourseList
+ * 不认 jxbmc（教学班名称），旧版平铺行的课程名会解析成空串、目标匹配全部
+ * 落空。这里用实测形状 + 本项目校准过的形状双轨钉住。
  */
 
 import assert from "node:assert/strict";
@@ -12,7 +11,7 @@ import { test } from "node:test";
 
 const { parseCourseList, parseChoosedList } = await import("../src/adapters/njtech/xk");
 
-test("parseCourseList：jxbmc 平铺行（njtech_grabber 实测的 PartDisplay 形状）", () => {
+test("parseCourseList：jxbmc 平铺行（协议实测的 PartDisplay 形状）", () => {
   const courses = parseCourseList({
     tmpList: [
       {
