@@ -1,6 +1,6 @@
 {
   "name": "courseraptor",
-  "version": "0.5.0",
+  "version": "0.5.5",
   "description": "开源本地教务 Agent：对话直查课表、成绩、考试、通知；也是 Vercel AI SDK + 端口-适配器架构的本地 Agent 工程样例",
   "scripts": {
     "dev": "tsx local/cli/index.ts",
