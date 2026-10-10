@@ -12,6 +12,8 @@
 > 使用者需自备教务账号与 AI 模型 API Key；仓库内不含任何个人凭证或数据（`credentials.enc` / `data/` 均已被 .gitignore 排除）。
 >
 > 适配细节与实机验证记录见 [docs/capabilities.md](docs/capabilities.md) 的「南京邮电大学通达学院适配差异」一节。
+>
+> 如果这份适配版帮到了你，欢迎顺手给上游原仓库 [Health-525/courseraptor](https://github.com/Health-525/courseraptor) 点个 ⭐，支持一下原作者的持续维护～
 
 <div align="center">
 
