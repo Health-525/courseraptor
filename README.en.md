@@ -133,4 +133,11 @@ npm test
 
 Found it useful? A star, a reproducible issue, or a concrete student use case helps the project improve. Built something of your own on these patterns? Share it in [Discussions](https://github.com/Health-525/courseraptor/discussions).
 
-Released under the [MIT License](LICENSE). This is an independent, unofficial project with no affiliation with or endorsement by any university.
+## Disclaimer
+
+- CourseRaptor is released under the [MIT License](LICENSE) and provided **"as is"**, without warranty of any kind, express or implied. This is an independent, unofficial project with no affiliation with or endorsement by any university or its academic systems.
+- Use it **for personal learning, research, and technical exchange only** — not for any commercial purpose. Users assume all risks arising from use of this tool; follow your school's rules and the academic system's terms of service.
+- Academic data shown by the agent may lag behind the official system; for decisions that matter (course enrollment, exam arrangements, graduation audits), always verify against the official academic portal.
+- Avoid bulk or high-frequency requests and respect the academic system's capacity (a global rate-limiting token bucket is built in; `RAPTOR_MAX_RPS` can only be lowered).
+
+Released under the [MIT License](LICENSE).
