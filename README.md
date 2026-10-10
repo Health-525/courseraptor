@@ -1,14 +1,13 @@
 <div align="center">
 
-<img src="docs/courseraptor-logo.png" width="200" alt="CourseRaptor logo" />
+<img src="docs/courseraptor-logo.png" width="160" alt="CourseRaptor logo" />
 
 # 🦖 CourseRaptor
 
 **大学教务对话式 Agent**
 课表 · 成绩 · 考试 · 教务通知 · 待办 · 知识库 · 记忆，一句话搞定。
 
-**也是一套可整体搬走的本地 Agent 工程样例**
-Vercel AI SDK v7 · `SchoolAdapter` 端口-适配器架构 · 三端入口 · 本地优先。
+也是一套可整体搬走的本地 Agent 工程样例：Vercel AI SDK v7 · `SchoolAdapter` 端口-适配器架构 · 三端入口 · 本地优先。
 
 [![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
 [![下载最新版](https://img.shields.io/github/v/release/Health-525/courseraptor?label=%E4%B8%8B%E8%BD%BD%E6%9C%80%E6%96%B0%E7%89%88&color=orange)](https://github.com/Health-525/courseraptor/releases/latest)
@@ -19,36 +18,47 @@ Vercel AI SDK v7 · `SchoolAdapter` 端口-适配器架构 · 三端入口 · �
 [![GitHubDaily](https://img.shields.io/badge/GitHubDaily-%E5%B7%B2%E6%8E%A8%E8%8D%90-1DA1F2?logo=x&logoColor=white)](https://x.com/github_daily/status/2105560876132757969)
 [![独立开发者列表](https://img.shields.io/badge/%E7%8B%AC%E7%AB%8B%E5%BC%80%E5%8F%91%E8%80%85%E5%88%97%E8%A1%A8-%E5%B7%B2%E6%94%B6%E5%BD%95-9B59B6)](https://github.com/1c7/chinese-independent-developer/blob/master/.github/pages/README-Programmer-Edition.md)
 
-**[简体中文](README.md) · [English](README.en.md)**
+[简体中文](README.md) · [English](README.en.md)
 
-**[✨ 核心特性](#-核心特性) · [🖥️ 界面预览](#️-界面预览) · [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程) · [🚀 快速开始](#-快速开始) · [🔒 隐私与安全](#-隐私与安全) · [🧩 项目架构](#-项目架构) · [📚 文档](#-文档) · [❓ 常见问题](#-常见问题)**
+[✨ 核心特性](#-核心特性) · [🖥️ 界面预览](#️-界面预览) · [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程) · [🚀 快速开始](#-快速开始)
+[🔒 隐私与安全](#-隐私与安全) · [🧩 项目架构](#-项目架构) · [📚 文档](#-文档) · [❓ 常见问题](#-常见问题)
 
 </div>
 
 ---
 
-把散落在教务系统各处的信息收进一句对话：问「这周课表」「我的 GPA」「最近的考试」「通识学分还缺哪几类」，agent 自动登录教务、抓取、结构化后回答。**终端敲 `raptor`、浏览器开 `localhost:3210`、QQ 里 @机器人**——三个入口共用同一个 Agent 内核与同一份记忆。
+散落在教务系统各处的信息，收进一句对话。
 
-一切都在你自己的电脑上运行：凭证 AES-256-GCM 加密落盘、教务数据不经第三方、不上报任何遥测（历史安装包的匿名装机统计服务已下线，旧包可用 `RAPTOR_NO_TELEMETRY=1` 关闭其上报尝试）；接的是你自己的模型 API Key——默认 DeepSeek，共 **12 家国内厂商**可选：**通义千问、智谱 GLM、Kimi、豆包、混元、MiniMax、阶跃、文心、讯飞、硅基流动、移动云**，外加自定义 OpenAI 兼容端点，按量计费、用量透明。教务查询走内置协议适配（[`src/adapters/`](src/adapters/)），未适配的学校开箱可用「手动课表」模式。
+问「这周课表」「我的 GPA」「最近的考试」「通识学分还缺哪几类」，agent 自动登录教务、抓取、结构化后回答。
 
-正在写 Agent 的人，可以直接把它当参考实现读：`ToolLoopAgent` 多轮工具循环怎么组织 31 个工具、外部系统怎么用端口-适配器隔离（新增一所学校 = 新增一个自包含目录，内核零改动）、12 家厂商的模型层怎么用纯数据注册表装配——见下方 [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程) 一节。
+- **三端一个内核** —— 终端敲 `raptor`、浏览器开 `localhost:3210`、QQ 里 @机器人，共用同一份记忆
+- **一切都在本机** —— 凭证 AES-256-GCM 加密落盘，教务数据不经第三方，不上报遥测（历史装机统计服务已下线；旧包可设 `RAPTOR_NO_TELEMETRY=1` 关闭上报尝试）
+- **模型接你自己的 Key** —— 默认 DeepSeek，12 家国内厂商可选（通义千问 / 智谱 GLM / Kimi / 豆包 / 混元 / MiniMax / 阶跃 / 文心 / 讯飞 / 硅基流动 / 移动云），或填自定义 OpenAI 兼容端点，按量计费、用量透明
+- **未适配的学校也能用** —— 教务查询走内置协议适配（[`src/adapters/`](src/adapters/)），其他学校开箱用「手动课表」模式
+
+正在写 Agent 的朋友可以直接把它当参考实现读：`ToolLoopAgent` 多轮工具循环怎么组织 31 个工具、外部系统怎么用端口-适配器隔离（新增一所学校 = 新增一个自包含目录，内核零改动）、多厂商模型层怎么用纯数据注册表装配——见下方 [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程)。
 
 ---
 
 ## ✨ 核心特性
 
-Agent 共装备 **31 个工具**（接入在线教务的学校默认配置；其他学校按已接入能力自动裁剪）。完整参数表、耗时、环境变量与教务模块覆盖见 [📖 能力文档](docs/capabilities.md)。
+Agent 共装备 **31 个工具**（接入在线教务的学校默认配置；其他学校按已接入能力自动裁剪）。完整参数、耗时、环境变量与教务模块覆盖见 [能力文档](docs/capabilities.md)。
 
-- **教务核心查询** —— 课表、成绩与 GPA（重修取最高、通识六类统计）、考试，一句话直查；学期交界自动探测候选学期，不靠日历猜
-- **选课分析（只读）** —— 搜课搜班看余量；多门课自动查各教学班明细，与已选课程做时间冲突检测，覆盖单双周与部分周重叠
-- **通知情报** —— 教务处通知按你的年级标相关度，正文全文直读；附件下载一次即缓存，表格按问题筛选、文档分页续读或关键词定位
-- **日历导出** —— 整学期 `.ics`（假期自动跳过、调休按周几补课、考试带提醒）导入手机日历；课表变化后重新导出即可
+**教务侧**
+
+- **课表 / 成绩 / 考试** —— 一句话直查；GPA 重修取最高、通识六类统计；学期交界自动探测候选学期，不靠日历猜
+- **选课分析（只读）** —— 搜课搜班看余量；多门课自动查教学班明细，与已选做时间冲突检测，覆盖单双周与部分周重叠
+- **通知情报** —— 教务处通知按年级标相关度、正文全文直读；附件下载一次即缓存，表格按问题筛、文档分页续读或关键词定位
+- **日历导出** —— 整学期 `.ics` 导入手机日历：假期自动跳过、调休按周几补课、考试带提醒
+- **手动课表（其他学校）** —— 粘贴课表文字或传 Excel / CSV / PDF / Word / TXT，AI 解析成结构化课表，拿不准会追问，预览里逐行确认
+
+**通用侧**
+
 - **文件与文档** —— 读本地 Word / PDF / Excel / TXT，千行大表按条件取行而非整本塞给模型；沙箱 JS 计算；生成 Word / Excel / PPT / PDF 及跨格式互转，中文原生
-- **记忆 · 知识 · 待办** —— 两层记忆（会话跨重启延续 + 长期事实自主维护）；知识点对话自动沉淀、按课表真实课程归类；待办三端同步，到期桌面通知 + QQ 推送双提醒
-- **手动课表（其他学校）** —— 粘贴课表文字（教务网页表格、Excel、其他课表 App 导出都行）或上传 Excel / CSV / PDF / Word / TXT，AI 解析成结构化课表，拿不准会追问，预览里逐行确认
-- **三端入口** —— 终端 TUI（首屏即今日课表、待办、考试、通知速览）、本地网页「功能大厅」（十大面板、会话管理、文件上传）、QQ 官方机器人（白名单制、零封号）
-- **多厂商模型** —— 12 家国内厂商 + 自定义 OpenAI 兼容端点任选：每家 Key 独立加密保存、切换不丢，型号列表实时拉取，网页端下拉即切
-- **学习教练** —— 学习类对话自动切换教练模式：直觉先于形式、答错先给提示，备考按「模板 → 变式 → 整卷」编排，先查真实考试安排与历史成绩再定计划
+- **记忆 · 知识 · 待办** —— 两层记忆（会话跨重启延续 + 长期事实自主维护）；知识点对话自动沉淀、按课表真实课程归类；待办三端同步，到期桌面通知 + QQ 推送
+- **学习教练** —— 学习类对话自动切换：直觉先于形式、答错先给提示；备考按「模板 → 变式 → 整卷」编排，先查真实考试与历史成绩再定计划
+- **三端入口** —— 终端 TUI（首屏即今日课表 / 待办 / 考试 / 通知速览）、本地网页「功能大厅」（十大面板、会话管理、文件上传）、QQ 官方机器人（白名单制、零封号）
+- **多厂商模型** —— 12 家国内厂商 + 自定义 OpenAI 兼容端点任选：Key 独立加密保存、切换不丢，型号列表实时拉取，网页端下拉即切
 - **更多** —— 用量统计（一年热力图）、番茄钟、天气与穿衣建议、自动更新；另有无头 CLI 可脚本化直查教务，不经模型、不耗 token
 
 ---
@@ -141,7 +151,10 @@ raptor             # 启动；项目内也可 npm run dev
 
 另附 [`skills/export-schedule/`](skills/export-schedule/) 独立技能包：把课表渲染成图片供下载，适配各平台聊天里直接发图看课表的场景。
 
-另有 [`skills/meta-learning/`](skills/meta-learning/) 学习教练技能：认知科学驱动的元学习引擎（深度教学 / 知识结构诊断 / 考试型刻意练习编排），辅助期末备考，原作者 [changer-changer](https://github.com/changer-changer)（MIT-0，见文末[致谢](#-致谢)）。**raptor agent 已内置触发**——对话里说「帮我复习高数」「讲解一下傅里叶变换」自动进入学习教练模式（备考先查真实考试安排与历史成绩，方法论经 `read_learning_reference` 按需加载，详见 [docs/capabilities.md](docs/capabilities.md)）；`skills/` 目录这份是给其它 agent 工具（`~/.claude/skills/`、`~/.zcode/skills/` 等）的独立技能包形态，整目录拷走即用，或从 [Releases](https://github.com/Health-525/courseraptor/releases?q=meta-learning) 下载 zip（`npm run package:skill -- meta-learning` 构建）。
+另有 [`skills/meta-learning/`](skills/meta-learning/) 学习教练技能——认知科学驱动的元学习引擎（深度教学 / 知识结构诊断 / 考试型刻意练习编排），辅助期末备考，原作者 [changer-changer](https://github.com/changer-changer)（MIT-0，见文末[致谢](#-致谢)）。
+
+- **raptor agent 已内置触发**：对话里说「帮我复习高数」「讲解一下傅里叶变换」自动进入学习教练模式；备考先查真实考试安排与历史成绩，方法论经 `read_learning_reference` 按需加载（详见 [能力文档](docs/capabilities.md)）
+- **也可作为独立技能包给别的 agent 用**：`~/.claude/skills/`、`~/.zcode/skills/` 等目录整份拷走即用，或从 [Releases](https://github.com/Health-525/courseraptor/releases?q=meta-learning) 下载 zip（`npm run package:skill -- meta-learning` 构建）
 
 <details>
 <summary><b>💻 系统要求</b>（点开查看）</summary>
@@ -188,7 +201,7 @@ raptor             # 启动；项目内也可 npm run dev
 
 **本地优先（Local-first）**：交互入口、Agent 内核、两层记忆与知识库全部跑在本机，数据不出电脑；教务系统、天气等外部服务仅在查询时按需访问。
 
-**技术栈**：[Vercel AI SDK v7](https://ai-sdk.dev)（`ToolLoopAgent` + `runAgentTUI`）· 模型层：DeepSeek（默认 `deepseek-flash`，即 V4.1-Flash）+ 通义千问 / 智谱 GLM / Kimi / 豆包 / 混元 / MiniMax / 阶跃 / 文心 / 讯飞 / 硅基流动 / 移动云 + 自定义 OpenAI 兼容端点（供应商注册表纯数据、模型工厂统一装配）· TypeScript + Node 内置 HTTP（网页端零框架）· Biome + node:test
+**技术栈**：[Vercel AI SDK v7](https://ai-sdk.dev)（`ToolLoopAgent` + `runAgentTUI`）· 模型层 DeepSeek 默认（`deepseek-flash`，即 V4.1-Flash）+ 11 家国内厂商 + 自定义 OpenAI 兼容端点，供应商注册表纯数据、模型工厂统一装配 · TypeScript + Node 内置 HTTP（网页端零框架）· Biome + node:test
 
 **项目结构**（完整树见 [能力文档](docs/capabilities.md#-项目结构完整树)）：
 
