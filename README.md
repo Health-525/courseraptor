@@ -151,7 +151,7 @@ raptor             # 启动；项目内也可 npm run dev
 
 另附 [`skills/export-schedule/`](skills/export-schedule/) 独立技能包：把课表渲染成图片供下载，适配各平台聊天里直接发图看课表的场景。
 
-另有 [`skills/meta-learning/`](skills/meta-learning/) 学习教练技能——认知科学驱动的元学习引擎（深度教学 / 知识结构诊断 / 考试型刻意练习编排），辅助期末备考，原作者 [changer-changer](https://github.com/changer-changer)（MIT-0，见文末[致谢](#-致谢)）。
+另有 [`skills/meta-learning/`](skills/meta-learning/) 学习教练技能——认知科学驱动的元学习引擎（深度教学 / 知识结构诊断 / 考试型刻意练习编排），辅助期末备考，原作者 [changer-changer](https://github.com/changer-changer)（MIT-0）。
 
 - **raptor agent 已内置触发**：对话里说「帮我复习高数」「讲解一下傅里叶变换」自动进入学习教练模式；备考先查真实考试安排与历史成绩，方法论经 `read_learning_reference` 按需加载（详见 [能力文档](docs/capabilities.md)）
 - **也可作为独立技能包给别的 agent 用**：`~/.claude/skills/`、`~/.zcode/skills/` 等目录整份拷走即用，或从 [Releases](https://github.com/Health-525/courseraptor/releases?q=meta-learning) 下载 zip（`npm run package:skill -- meta-learning` 构建）
@@ -265,12 +265,6 @@ raptor             # 启动；项目内也可 npm run dev
 走腾讯官方机器人路线（零封号）：网页「功能大厅 → 设置」填 AppID / AppSecret / 激活暗号即可上线，QQ 里发暗号完成授权；细节见[能力文档](docs/capabilities.md)「QQ 接入」一节。
 
 更多问题欢迎到 [GitHub Discussions](https://github.com/Health-525/courseraptor/discussions) 提问。
-
----
-
-## 🙏 致谢
-
-- **[changer-changer](https://github.com/changer-changer)** — 学习教练技能 [meta-learning](skills/meta-learning/) 的原作者（MIT-0）。感谢他的无私开放，本项目的「学习教练」能力（深度教学 / 知识结构诊断 / 考试型刻意练习编排，辅助同学期末备考）正是建立在他的认知科学方法论之上。
 
 ---
 
