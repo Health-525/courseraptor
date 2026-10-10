@@ -284,7 +284,7 @@ function loadConfig(): RaptorConfig {
   // 旧格式（无槽位）的 username/password 只在其归属校装载：带 jwglSchoolId
   // 按标记判；无标记的存量账号只可能属于历史默认校 njtech
   if (!config.jwglUsername || !config.jwglPassword) {
-    const selectedSchool = env("RAPTOR_SCHOOL") ?? stored?.schoolId ?? "njtech";
+    const selectedSchool = env("RAPTOR_SCHOOL") ?? stored?.schoolId ?? "custom";
     const slot = stored?.jwglAccounts?.[selectedSchool];
     const legacyStamped =
       stored?.username && stored.password && stored.jwglSchoolId === selectedSchool

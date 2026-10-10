@@ -68,7 +68,7 @@ node scripts/export.mjs --help                         # 完整参数说明
 本包根目录可放 `.env`（参考 `.env.example`）：
 
 - `RAPTOR_DATA_DIR`：缓存目录（默认本包 `data/`）；
-- `RAPTOR_SCHOOL`：学校适配器（默认 `njtech`，一般不用动）。
+- `RAPTOR_SCHOOL`：学校适配器（默认按缓存记录的学校自动选择，一般不用动）。
 
 ## 常见问题
 

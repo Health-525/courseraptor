@@ -13,6 +13,8 @@ import { test } from "node:test";
 // 每个测试文件是独立进程，不会污染其他用例）
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-prompt-"));
 process.env.RAPTOR_DATA_DIR = dataDir;
+// 本文件钉的是南工大校历/教学周语义：默认学校已改为 custom（不接入任何学校），显式选校
+process.env.RAPTOR_SCHOOL = "njtech";
 
 await import("../src/adapters");
 const { writeFileAtomicSync } = await import("../src/core/atomic-write");

@@ -21,6 +21,8 @@ import { test } from "node:test";
 
 // 必须在导入被测模块之前指向临时数据目录，避免读写真实 data/
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-time-"));
+// 本文件钉的是南工大校历/教学周语义：默认学校已改为 custom（不接入任何学校），显式选校
+process.env.RAPTOR_SCHOOL = "njtech";
 
 await import("../src/adapters");
 const { getTimeReport, schoolTimezone } = await import("../src/core/time");

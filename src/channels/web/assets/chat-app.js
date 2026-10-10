@@ -4166,7 +4166,7 @@ function jwglCurText(d) {
 }
 /* 学校相关 UI 的可见性/文案随「选中态」走：保存前预览，保存后即为现状 */
 function syncSchoolUi(preview) {
-  const picked = schoolPicked || (schoolState && schoolState.current) || "njtech";
+  const picked = schoolPicked || (schoolState && schoolState.current) || "custom";
   const manual =
     preview && schoolPicked
       ? !!((schoolState && schoolState.options) || []).find((o) => o.id === picked && o.manual)

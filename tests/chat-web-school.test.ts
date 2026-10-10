@@ -59,21 +59,31 @@ setScheduleParser(async () => FAKE_MODEL_OUTPUT);
 
 const base = async () => (await startChatWeb())!;
 
-test("GET /api/settings：school 块带清单与手动课表标记，默认 njtech", async () => {
+test("GET /api/settings：school 块带清单与手动课表标记，默认 custom（不接入任何学校）", async () => {
   const r = await (await fetch(`${await base()}/api/settings`)).json();
-  assert.equal(r.school.current, "njtech");
-  assert.equal(r.school.manual, false);
+  assert.equal(r.school.current, "custom");
+  assert.equal(r.school.manual, true);
   assert.deepEqual(
     r.school.options.map((o: { id: string }) => o.id),
     ["njtech", "custom"],
   );
   assert.equal(r.school.options[1].manual, true);
-  // 教务通知卡门槛：njtech 接入通知后随教务账号状态走（本机 .env 可能带
-  // 账号，初值别硬编码；「没接入的学校不亮」在下面的切换链路里硬断言）
-  assert.equal(r.school.newsReady, !!r.jwgl?.configured);
+  // 默认 custom 没接教务通知：通知卡不亮（与本机 .env 是否带账号无关）
+  assert.equal(r.school.newsReady, false);
 });
 
 test("切学校教务账号跟着切：旧校存回名下、新校空则清空待填、切回自动恢复", async () => {
+  // ⓪ 默认 custom 起步：先显式切到 njtech 才有教务账号可言。
+  //     本机 .env 可能带账号，切校结果文案两种都合法，只钉「已切换」
+  const toNjtech = await wfetch(`${await base()}/api/settings`, {
+    method: "POST",
+    body: JSON.stringify({ schoolId: "njtech" }),
+  });
+  assert.equal(toNjtech.status, 200);
+  const td = await toNjtech.json();
+  assert.equal(td.status.school.current, "njtech");
+  assert.match(td.results.find((x: { field: string }) => x.field === "school").message, /已切换/);
+
   // ① njtech 下保存教务账号 → 入 njtech 槽位
   const save = await wfetch(`${await base()}/api/settings`, {
     method: "POST",

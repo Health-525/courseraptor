@@ -14,6 +14,9 @@ import { test } from "node:test";
 // 必须在导入被测模块之前指向临时数据目录，避免读写真实 data/
 const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-today-"));
 process.env.RAPTOR_DATA_DIR = tmpData;
+// 本文件钉的是南工大校历语义（njtech 学期种子/调休/节次表），显式选校：
+// 默认学校已改为 custom（不接入任何学校），不钉会跑在手动课表模式下
+process.env.RAPTOR_SCHOOL = "njtech";
 
 await import("../src/adapters");
 const { buildTodayBrief } = await import("../src/channels/web/today-brief");

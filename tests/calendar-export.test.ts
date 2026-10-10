@@ -18,6 +18,8 @@ import { test } from "node:test";
 
 // 必须在导入被测模块之前指向临时数据目录（term-holidays 真值源落在这里）
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-ics-"));
+// 本文件钉的是南工大校历/教学周语义：默认学校已改为 custom（不接入任何学校），显式选校
+process.env.RAPTOR_SCHOOL = "njtech";
 
 await import("../src/adapters");
 const { buildTermICS } = await import("../src/core/calendar/export");

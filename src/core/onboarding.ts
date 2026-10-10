@@ -17,7 +17,7 @@ import { config, type DeepSeekApiKeySource, maskDeepSeekApiKey } from "./config"
 import { loadCredentialsStore, saveCredentialsStore, saveStoredCredentials } from "./credentials";
 import { isCredentialError } from "./errors";
 import { getProviderDef, validateProviderApiKey } from "./providers";
-import { school } from "./school";
+import { registeredSchool, school } from "./school";
 import { createMutedTerminalOutput } from "./secret-input";
 
 /** 引导结果：configured=已保存（含用户确认的未验证保存）；skipped=跳过，稍后在设置里补填 */
@@ -53,6 +53,15 @@ export async function ensureCredentials(
 
   const terminal = io ?? createTerminalCredentialIO();
   try {
+    // 默认不接入任何学校（手动课表模式）：没有教务账号可配，直接放行。
+    // 想接入教务的同学先在网页「设置 → 学校」里选校，选完这里自然不再命中。
+    // 未装配适配器（纯单测环境）时无从判断，按老流程走
+    if (registeredSchool()?.info.manual) {
+      terminal.write("🦖 当前未接入任何学校（手动课表模式），无需教务账号。");
+      terminal.write("   要接入教务系统：在网页「设置 → 学校」里选择你的学校并填写账号即可。\n");
+      return "skipped";
+    }
+
     terminal.write("🦖 首次使用：第 1 步，共 2 步——配置教务系统账号");
     terminal.write("   账号和密码将 AES-256-GCM 加密保存在本机，不会明文落盘。");
     terminal.write(
