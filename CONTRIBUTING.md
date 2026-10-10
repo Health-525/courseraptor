@@ -1,6 +1,6 @@
 # 参与 CourseRaptor
 
-两类贡献都欢迎：**正在用它查教务的同学**——[反馈问题](https://github.com/Health-525/courseraptor/issues/new?template=bug_report.yml)、[提出学生场景](https://github.com/Health-525/courseraptor/issues/new?template=feature_request.yml)；**正在写 Agent 的开发者**——把仓库当[工程样例](README.md#-给开发者一套可整体搬走的本地-agent-工程)参考，修 bug、改文档。
+两类贡献都欢迎：**正在用它查教务的同学**——[反馈问题](https://github.com/Health-525/courseraptor/issues/new?template=bug_report.yml)、[提出学生场景](https://github.com/Health-525/courseraptor/issues/new?template=feature_request.yml)；**正在写 Agent 的开发者**——把仓库当[工程样例](README.md#给开发者一套可整体搬走的本地-agent-工程)参考，修 bug、改文档。
 
 交流时请遵守[社区约定](CODE_OF_CONDUCT.md)；用法讨论可前往 [Discussions](https://github.com/Health-525/courseraptor/discussions)。
 
