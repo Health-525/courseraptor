@@ -12,7 +12,6 @@
 | `DEEPSEEK_BASE_URL` | 可选，自定义模型服务地址；对话内容会发往这个服务 |
 | `RAPTOR_WEB_PORT` | 正式网页首选端口，默认 3210，占用后自动选择空闲端口 |
 | `RAPTOR_TUI_INLINE` | `1` 使用终端行内模式；默认全屏卡片模式 |
-| `RAPTOR_DISABLE_CAPTCHA_OCR` | `1` 停用通知附件下载时的本地验证码识别 |
 | `RAPTOR_MAX_RPS` | 请求频率上限，1-3 的整数（默认 3，只允许下调，启动时校验）；尊重学校服务容量 |
 | `RAPTOR_BURST` | 限速令牌桶突发容量，1-64 的整数（默认 8，启动时校验） |
 | `FIRECRAWL_API_KEY` | 可选，公开通知附件的云解析兜底；本地解析无需此项 |
@@ -26,8 +25,6 @@
 | `RAPTOR_NO_TODO_REMINDERS` | `1` 关闭待办到期自动提醒（默认开启：距到期 ≤ 7 天每天一次，Windows 桌面通知 + QQ 推送） |
 | `RAPTOR_UPDATE_SERVER` | 维护者本地覆盖 HTTPS 更新服务地址；分发包可内置地址 |
 | `UPDATE_SERVER_URL` / `UPDATE_ADMIN_TOKEN` | 仅维护者发版需要，见[维护指南](maintainers.md) |
-
-验证码识别用的英文 OCR 模型（`eng.traineddata`，约 5MB）由 tesseract.js 首次识别时自动下载缓存在项目根，属运行数据、不入库；安装包会把它带进去供离线使用。维护者在干净机器上打包前可运行 `npm run fetch:ocr` 预取（`--force` 强制重取），下载地址与 tesseract.js 默认 CDN 一致。
 
 `RAPTOR_DEMO_PORT` 默认 3211。演示入口不加载 `.env`，需在终端环境变量中指定，例如 Windows PowerShell：
 

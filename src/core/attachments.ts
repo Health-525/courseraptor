@@ -423,50 +423,11 @@ async function firecrawlScrape(url: string): Promise<string> {
   return data.data.markdown;
 }
 
-// ── 下载（含 jwc 验证码自动识别，可整体停用）──────────────────
+// ── 下载 ──────────────────────────────────────────────────────
 
-// 验证码是网站明确表达的「此处不欢迎自动化」。这个能力默认开启是为了
-// 自己下载本人有权访问的通知附件，但它不该被当成卖点——所以留了总开关。
-const CAPTCHA_OCR_ENABLED = process.env.RAPTOR_DISABLE_CAPTCHA_OCR !== "1";
-/** 重试上限。之前是 6 次且每次重建 tesseract worker（重复加载 4MB 模型），收敛为 3 次 + worker 常驻 */
-const CAPTCHA_MAX_TRIES = 3;
+// 教务附件偶尔受图形验证码保护。验证码是网站明确表达的「此处不欢迎自动化」，
+// 本项目不做验证码识别——遇到验证码页就直接失败并说清楚，由用户去浏览器下载。
 
-const CAPTCHA_DISABLED_MSG =
-  "附件下载被图形验证码拦截，且验证码自动识别已关闭（RAPTOR_DISABLE_CAPTCHA_OCR=1）。" +
-  "请在浏览器登录后手动下载该附件，或提供直链地址。";
-
-/** tesseract worker 常驻复用：首次调用时加载一次模型，之后所有识别共享 */
-let ocrWorkerPromise: Promise<Awaited<ReturnType<typeof createTesseractWorker>>> | null = null;
-
-function createTesseractWorker() {
-  const { createWorker } = require("tesseract.js") as typeof import("tesseract.js");
-  return createWorker("eng");
-}
-
-async function getOcrWorker() {
-  if (!ocrWorkerPromise) {
-    ocrWorkerPromise = createTesseractWorker()
-      .then(async (worker) => {
-        await worker.setParameters({
-          tessedit_char_whitelist: "0123456789abcdefghijklmnopqrstuvwxyz",
-        } as Parameters<typeof worker.setParameters>[0]);
-        return worker;
-      })
-      .catch((e) => {
-        // 创建失败必须把缓存清掉：留着 rejected Promise 会让后续每一次
-        // OCR 都直接 reject，附件下载从此静默失败且毫无提示
-        ocrWorkerPromise = null;
-        throw e;
-      });
-  }
-  return ocrWorkerPromise;
-}
-
-/**
- * jwc 附件下载带图片验证码（webplus createimage.jsp）：
- * 首次请求返回验证码页 -> 拉验证码图 -> OCR 识别 -> 带 codeValue 重试。
- * 验证码存于 session，全程必须复用同一 cookie。识别失败自动换新码重试。
- */
 /**
  * 下载限流读体：边读边计数，超过 MAX_FILE_BYTES 立即断开（与本地文件同限）。
  * 此前 res.arrayBuffer() 拉多大算多大——恶意或误给的大 URL 会全量进内存，
@@ -492,85 +453,29 @@ async function readBodyLimited(res: Response): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
-async function downloadWithCaptcha(url: string): Promise<{ buf: Buffer; contentType: string }> {
-  if (!CAPTCHA_OCR_ENABLED) {
-    throw new Error(CAPTCHA_DISABLED_MSG);
-  }
-  let cookie = "";
-
-  const get = async (u: string): Promise<{ buf: Buffer; type: string }> => {
-    const res = await fetch(u, {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        ...(cookie ? { Cookie: cookie } : {}),
-      },
-      redirect: "manual",
-      signal: AbortSignal.timeout(60000),
-    });
-    for (const c of res.headers.getSetCookie?.() ?? []) {
-      const kv = c.split(";")[0];
-      const key = kv.split("=")[0];
-      cookie = cookie
-        .split("; ")
-        .filter((x) => x && !x.startsWith(`${key}=`))
-        .concat(kv)
-        .join("; ");
-    }
-    return {
-      buf: await readBodyLimited(res),
-      type: res.headers.get("content-type") || "",
-    };
-  };
-
-  for (let attempt = 1; attempt <= CAPTCHA_MAX_TRIES; attempt++) {
-    const page = await get(url);
-    if (!page.type.includes("html")) {
-      return { buf: page.buf, contentType: page.type }; // 直链文件
-    }
-    const html = page.buf.toString("utf8");
-    // 2026-09 起教务处官网限制校外 IP：匿名访问只剩拦截页，别当文件解析
-    if (html.includes("本网站只能被校内IP地址访问")) {
-      throw new RaptorError(
-        "CAMPUS_ONLY",
-        "教务处官网已限制校外 IP 访问，附件暂无法在校外直接下载，请在校园网内获取",
-      );
-    }
-    if (!html.includes("createimage.jsp")) {
-      return { buf: page.buf, contentType: page.type }; // 非验证码页，走后续逻辑
-    }
-
-    // 验证码页：拉图 + OCR（worker 常驻，不重复加载模型）
-    const imgUrl = new URL(
-      `/system/resource/js/filedownload/createimage.jsp?randnum=${Date.now()}`,
-      url,
-    ).href;
-    const img = await get(imgUrl);
-    const code = await ocrCaptcha(img.buf);
-    if (!code) continue;
-
-    const file = await get(
-      `${url + (url.includes("?") ? "&" : "?")}codeValue=${encodeURIComponent(code)}`,
+async function downloadAttachment(url: string): Promise<Buffer> {
+  const res = await fetch(url, {
+    headers: { "User-Agent": "Mozilla/5.0" },
+    signal: AbortSignal.timeout(60000),
+  });
+  if (!res.ok) throw new Error(`下载失败 HTTP ${res.status}`);
+  const buf = await readBodyLimited(res);
+  // 只看开头一小段：拦截页与验证码页都是 HTML，别把文件正文当页面扫
+  const head = buf.subarray(0, 2048).toString("utf8");
+  // 2026-09 起教务处官网限制校外 IP：匿名访问只剩拦截页，别当文件解析
+  if (head.includes("本网站只能被校内IP地址访问")) {
+    throw new RaptorError(
+      "CAMPUS_ONLY",
+      "教务处官网已限制校外 IP 访问，附件暂无法在校外直接下载，请在校园网内获取",
     );
-    if (!file.type.includes("html")) {
-      return { buf: file.buf, contentType: file.type };
-    }
-    // 识别错误 -> 下一轮换新验证码
   }
-  throw new Error(
-    `验证码识别失败（已重试 ${CAPTCHA_MAX_TRIES} 次）。可在浏览器中下载后手动提供文件；` +
-      `或确认该附件确属本人有权获取的内容后重试。`,
-  );
-}
-
-/** tesseract OCR 验证码（数字+小写字母），worker 由 getOcrWorker 常驻复用。 */
-export async function ocrCaptcha(buf: Buffer): Promise<string> {
-  try {
-    const worker = await getOcrWorker();
-    const { data } = await worker.recognize(buf);
-    return data.text.replace(/[^0-9a-zA-Z]/g, "").toLowerCase();
-  } catch {
-    return "";
+  if (head.includes("createimage.jsp")) {
+    throw new RaptorError(
+      "CAPTCHA_REQUIRED",
+      "该附件被图形验证码保护，本项目不做验证码识别。请在浏览器里登录后手动下载，再把文件给我",
+    );
   }
+  return buf;
 }
 
 // ── 主入口 ────────────────────────────────────────────────────
@@ -603,20 +508,9 @@ export async function fetchAttachment(
     }
   }
 
-  // jwc 的 download.jsp 带验证码，走专门链路；其余直链
-  const isJwcDownload = /jwc\.njtech\.edu\.cn\/system\/_content\/download\.jsp/.test(url);
   let buf: Buffer;
   try {
-    if (isJwcDownload) {
-      buf = (await downloadWithCaptcha(url)).buf;
-    } else {
-      const res = await fetch(url, {
-        headers: { "User-Agent": "Mozilla/5.0" },
-        signal: AbortSignal.timeout(60000),
-      });
-      if (!res.ok) throw new Error(`下载失败 HTTP ${res.status}`);
-      buf = await readBodyLimited(res);
-    }
+    buf = await downloadAttachment(url);
   } catch (e) {
     // 下载失败但历史缓存还在 -> 用旧缓存继续干活（读得出比下得动重要）
     const stale = findByUrl(url);
