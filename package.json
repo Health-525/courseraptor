@@ -9,7 +9,6 @@
     "demo:live": "tsx local/demo/entry.ts --live",
     "njtech": "tsx skills/njtech-jwgl/scripts/query.ts",
     "doctor": "node scripts/doctor.mjs",
-    "fetch:ocr": "node scripts/fetch-ocr-model.mjs",
     "preview:readme": "node scripts/preview-readme.mjs",
     "qq": "tsx local/qq/bridge.ts",
     "typecheck": "tsc --noEmit",
@@ -64,7 +63,6 @@
     "pdfkit": "^0.20.2",
     "pptxgenjs": "^4.0.1",
     "qrcode": "^1.5.4",
-    "tesseract.js": "^7.0.0",
     "tsx": "^4.23.15",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.6.5"
