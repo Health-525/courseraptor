@@ -13,7 +13,7 @@
 >
 > 适配细节与实机验证记录见 [docs/capabilities.md](docs/capabilities.md) 的「南京邮电大学通达学院适配差异」一节。
 >
-> 如果这份适配版帮到了你，欢迎顺手给上游原仓库 [Health-525/courseraptor](https://github.com/Health-525/courseraptor) 点个 ⭐，支持一下原作者的持续维护～
+> 如果这份适配版帮到了你，欢迎顺手给上游原仓库 [Health-525/courseraptor](https://github.com/Health-525/courseraptor) 点个 ⭐，支持一下原作者的持续维护；也随时欢迎把通达学院适配以 PR 的形式回馈上游，一起把 CourseRaptor 做得更好～
 
 <div align="center">
 
