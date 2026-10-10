@@ -9,7 +9,7 @@ import { fetchAttachment } from "../../../core/attachments";
 import { config } from "../../../core/config";
 import { loadUserGrade } from "../../../core/memory/longterm";
 import { relevanceOf } from "../../../core/notices";
-import { clearNewsMemo, fetchJwcArticle, fetchJwcNewsMemo } from "../news";
+import { fetchJwcArticle, fetchJwcNewsMemo } from "../news";
 
 // ── 通知相关性 ────────────────────────────────────────────────
 // 教务处一次发十几条，其中大半跟具体某个学生无关。过去全靠模型逐条判断，
@@ -21,7 +21,7 @@ export const newsTools = {
   /** 教务处官网通知 */
   get_news: tool({
     description:
-      "抓取南京工业大学教务处官网（jwc.njtech.edu.cn）的最新通知，涵盖三个板块：公告通知（含选课/考试/学籍等重要安排）、教学动态、考试排课。仅校内网络可直连；官网限制仅校内 IP 后，校外直连会失败，此时回退上次成功抓取的缓存快照并在 note 里注明抓取时间。**5 分钟内命中进程内快照不重取**（校外失败 60 秒负缓存）；用户明确说「刷一下通知 / 有没有新的 / 重新抓一次」时传 refresh=true 清缓存强制重取。用户问「最近有什么教务通知」「选课什么时候开始」「有没有关于××的通知」时调用。每条带 relevance：high=需本人行动（点名本年级或全校性必办）、medium=视个人情况（补修/重修/转专业等）、low=基本无关（其他年级或行政公示）。回答时优先讲 high 的，low 的一句带过，不要平铺全部。",
+      "查询南京工业大学教务处官网（jwc.njtech.edu.cn）的通知，涵盖三个板块：公告通知（含选课/考试/学籍等重要安排）、教学动态、考试排课。**默认走本地磁盘缓存不联网**（缓存由上一次显式刷新或首次运行建立）——反复直连官网既有被 WAF 盯上的风险、校外还会撞「限校内 IP」拦截。仅当用户明确说「刷新通知 / 有没有新的 / 重新抓一次 / 最新的通知」时才传 refresh=true 强制联网重抓并写回磁盘。用户问「最近有什么教务通知」「选课什么时候开始」「有没有关于××的通知」时调用。返回带 staleAt 时说明数据来自本地缓存快照，如实转述抓取时间。每条带 relevance：high=需本人行动（点名本年级或全校性必办）、medium=视个人情况（补修/重修/转专业等）、low=基本无关（其他年级或行政公示）。回答时优先讲 high 的，low 的一句带过，不要平铺全部。",
     inputSchema: z.object({
       category: z
         .enum(["公告通知", "教学动态", "考试排课"])
@@ -32,15 +32,13 @@ export const newsTools = {
         .boolean()
         .optional()
         .describe(
-          "true=清进程内快照强制重新抓官网（仅在用户明确说「刷新/有没有新的/重新抓」时传）；不传或 false=优先用 5 分钟内的进程快照",
+          "true=清进程内快照并强制联网重抓官网三页（仅在用户明确说「刷新/有没有新的/重新抓/最新」时传）；不传或 false=优先返回本地磁盘缓存快照，缓存缺失才联网一次",
         ),
     }),
     execute: async ({ category, limit, refresh }) => {
-      // refresh=true 时清掉进程内快照（含负缓存），强制重抓三页
-      if (refresh) clearNewsMemo();
-      // 5 分钟进程内快照：网页通知面板刚看过的话，这里直接复用，
-      // 不再重复抓官网三页（对所有人相同的公共数据）；校外失败也进 60 秒负缓存
-      const { items: fetched, staleAt } = await fetchJwcNewsMemo(30);
+      // refresh=true 透传给 fetchJwcNewsMemo，内部会清 memo 强制联网；
+      // 默认路径下 memo 未命中会先读磁盘缓存，磁盘缺失才联网抓一次并写盘
+      const { items: fetched, staleAt } = await fetchJwcNewsMemo(30, refresh === true);
       const filtered = category ? fetched.filter((i) => i.category === category) : fetched;
       const grade = await loadUserGrade();
       const scored = filtered.slice(0, limit).map((i) => {
@@ -58,17 +56,20 @@ export const newsTools = {
         };
       });
       const mustSee = scored.filter((i) => i.relevance === "high").length;
-      // 通道说明：校外网络下学校官网被拦，直连失败时回退历史快照——
-      // 时间必须如实告知，不能当新鲜数据
+      // 通道说明：staleAt 表示本次返回的是磁盘缓存快照（默认路径或直连失败降级），
+      // 抓取时间必须如实告知，不能当新鲜数据；用户明确要最新时应传 refresh=true
       const channelNote =
         staleAt !== undefined
-          ? `⚠️ 本次为缓存快照：教务处官网直连失败（官网限制仅校内 IP，校外无法访问），以下内容抓取于 ${new Date(staleAt).toLocaleString("zh-CN")}，可能已过期。`
+          ? `ℹ️ 本次未联网，返回本地缓存的通知快照（抓取于 ${new Date(staleAt).toLocaleString("zh-CN")}），可能已过期。用户若明确说「刷新通知 / 有没有新的 / 最新的」，重新调用并传 refresh=true。`
           : "";
       return {
         total: filtered.length,
         /** 年级依据；取不到就退化成纯关键词判断 */
         gradeBasis: grade ?? undefined,
         mustSeeCount: mustSee,
+        /** true = 本次未联网，数据来自本地磁盘缓存快照 */
+        fromCache: staleAt !== undefined ? true : undefined,
+        savedAt: staleAt,
         items: scored,
         note:
           filtered.length === 0

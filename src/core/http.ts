@@ -255,9 +255,14 @@ export function httpError(resp: HttpResponse): RaptorError | null {
 // ── 统一重试 ──────────────────────────────────────────────────
 // 之前重试散在 session（5 次线性）/ grades（3 次线性）各写各的循环；
 // 退避曲线与「什么值得重试」无法统一调整。
+//
+// 2026-10 收紧：默认 attempts 从 3 降到 2（首次 + 一次重试），失败即上抛。
+// 用户明确表态「获取信息 2 次失败直接报错」——线路真挂了 3~5 次退避只是
+// 白等，早失败让模型早点告诉用户「查不到」比转圈强。登录/选课会话也一并
+// 收敛到 2 次（session.ts RETRY_MAX），保持全局一致。
 
 export interface RetryOptions {
-  /** 总尝试次数（含首次），默认 3 */
+  /** 总尝试次数（含首次），默认 2 */
   attempts?: number;
   /** 退避基数（毫秒），默认 1000 */
   baseDelayMs?: number;
@@ -285,7 +290,7 @@ export function backoffDelay(
  * （凭证错误/结构变化立即上抛），裸 Error（http 层网络异常）视为瞬时故障重试。
  */
 export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
-  const attempts = options.attempts ?? 3;
+  const attempts = options.attempts ?? 2;
   const backoff = {
     baseDelayMs: options.baseDelayMs ?? 1000,
     maxDelayMs: options.maxDelayMs ?? 8000,

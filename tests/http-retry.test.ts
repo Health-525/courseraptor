@@ -31,6 +31,37 @@ test("withRetry：瞬时故障重试到成功，调用次数如实记录", async
   assert.equal(calls, 3);
 });
 
+// 2026-10 收紧：默认 attempts 从 3 降到 2（首次 + 一次重试），失败即上抛。
+// 用户明确表态「获取信息 2 次失败直接报错」——线路真挂了 3~5 次退避只是白等。
+test("withRetry：默认 attempts=2（首次 + 一次重试），第二次仍失败即上抛", async () => {
+  let calls = 0;
+  await assert.rejects(
+    withRetry(
+      async () => {
+        calls++;
+        throw new RaptorError("NETWORK", "线路抖动");
+      },
+      { baseDelayMs: 1 }, // 不传 attempts，走默认
+    ),
+    /线路抖动/,
+  );
+  assert.equal(calls, 2, "默认必须只尝试 2 次（首次 + 1 次重试）");
+});
+
+test("withRetry：默认 attempts=2 下第二次成功仍算通过", async () => {
+  let calls = 0;
+  const out = await withRetry(
+    async () => {
+      calls++;
+      if (calls < 2) throw new RaptorError("NETWORK", "首次抖动");
+      return "recovered";
+    },
+    { baseDelayMs: 1 },
+  );
+  assert.equal(out, "recovered");
+  assert.equal(calls, 2, "第二次成功即返回，不多试");
+});
+
 test("withRetry：不可重试的 RaptorError（凭证错误）立即上抛，不空转", async () => {
   let calls = 0;
   await assert.rejects(
