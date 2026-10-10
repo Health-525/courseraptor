@@ -19,6 +19,7 @@ export type RaptorErrorCode =
   | "UPSTREAM" // 上游 5xx/异常响应 → 可重试
   | "PARSE" // 页面或数据结构变化 → 不可重试
   | "CAMPUS_ONLY" // 校外 IP 被拦 → 提示校园网内获取（或回退缓存快照）
+  | "CAPTCHA_REQUIRED" // 附件受图形验证码保护 → 不做识别，提示用户手动下载
   | "BUSINESS_REJECT" // 上游业务拒绝（课程满员等），非故障
   | "UNKNOWN";
 
