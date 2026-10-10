@@ -281,24 +281,80 @@ function isValidNewsCache(parsed: unknown): parsed is NewsCacheEnvelope {
   );
 }
 
-// ── 进程内 5 分钟快照：get_news 工具与网页通知面板共用 ────────────
+// ── 进程内快照：get_news 工具与网页通知面板共用 ────────────────
 // 通知是公共数据（对所有人相同），「面板刚看过 + 对话里又问一次」不该
-// 触发两轮全量抓取（直连一轮就是三个板块三页请求）。只缓存新鲜
-// 结果；降级快照（staleAt）不进缓存——下次调用照常重试真实通道。
+// 触发两轮全量抓取（直连一轮就是三个板块三页请求）。
+//
+// 2026-10 语义收紧：**默认走磁盘缓存不联网**。用户明确表态「教务通知不
+// 要一直获取，有风险」——官网反复直连既可能被 WAF 盯上、也会在校外触发
+// 无意义的失败重试。想看最新通知的用户必须在对话里明确说「刷新通知」，
+// 由模型识别后传 refresh=true → 本函数 forceRefresh=true 才联网重抓。
+//
+// 三档 memo TTL：
+// - 磁盘命中（默认路径）：5 分钟，避免频繁读盘；staleAt 携带磁盘 fetchedAt
+// - 联网成功（forceRefresh=true 或磁盘缺失首次抓取）：5 分钟，同一份快照
+//   供面板 + 工具复用
+// - 联网失败（三板块挂）：60 秒负缓存，把同一个错误抛给窗口内所有调用者，
+//   不反复重试
 
-const NEWS_MEMO_TTL_MS = 5 * 60_000;
-let newsMemo: { result: JwcNewsResult; at: number } | null = null;
+const NEWS_MEMO_TTL_FRESH_MS = 5 * 60_000;
+const NEWS_MEMO_TTL_STALE_MS = 60_000;
+
+type NewsMemoEntry =
+  | { kind: "ok"; result: JwcNewsResult; at: number; ttl: number }
+  | { kind: "err"; error: Error; at: number; ttl: number };
+
+let newsMemo: NewsMemoEntry | null = null;
 let newsMemoInflight: Promise<JwcNewsResult> | null = null;
 
-export async function fetchJwcNewsMemo(maxItems = 20): Promise<JwcNewsResult> {
-  if (newsMemo && Date.now() - newsMemo.at < NEWS_MEMO_TTL_MS) {
-    return newsMemo.result;
+/**
+ * 直接读磁盘通知缓存（jwc-news-cache.json），不联网。
+ * 供 fetchJwcNewsMemo 默认路径与测试断言使用；文件缺失或损坏返回 null。
+ */
+export function readNewsDiskCache(): JwcNewsResult | null {
+  const cached = readJsonCache(NEWS_CACHE_FILE, isValidNewsCache);
+  if (!cached) return null;
+  return { items: cached.items, staleAt: cached.fetchedAt };
+}
+
+export async function fetchJwcNewsMemo(
+  maxItems = 20,
+  forceRefresh = false,
+): Promise<JwcNewsResult> {
+  // forceRefresh=true：清 memo 强制走联网路径（用户明确要「刷新通知」）
+  if (forceRefresh) {
+    newsMemo = null;
+  } else {
+    // memo 命中（含负缓存）：直接返回，不联网、不读盘
+    if (newsMemo && Date.now() - newsMemo.at < newsMemo.ttl) {
+      if (newsMemo.kind === "ok") return newsMemo.result;
+      throw newsMemo.error;
+    }
+    // memo 未命中：优先读磁盘缓存快照，有就返回并进入 5min memo
+    // （避免每次调用都读盘；staleAt 如实携带磁盘 fetchedAt 让上层知道数据新鲜度）
+    const disk = readNewsDiskCache();
+    if (disk) {
+      newsMemo = { kind: "ok", result: disk, at: Date.now(), ttl: NEWS_MEMO_TTL_FRESH_MS };
+      return disk;
+    }
+    // 磁盘缺失（首次运行 / 缓存被清）：fallthrough 联网抓一次，成功后自然写盘
   }
   if (newsMemoInflight) return newsMemoInflight;
   newsMemoInflight = (async () => {
-    const result = await fetchJwcNewsDetailed([], maxItems);
-    if (result.staleAt === undefined) newsMemo = { result, at: Date.now() };
-    return result;
+    try {
+      const result = await fetchJwcNewsDetailed([], maxItems);
+      const ttl = result.staleAt === undefined ? NEWS_MEMO_TTL_FRESH_MS : NEWS_MEMO_TTL_STALE_MS;
+      newsMemo = { kind: "ok", result, at: Date.now(), ttl };
+      return result;
+    } catch (e) {
+      newsMemo = {
+        kind: "err",
+        error: e as Error,
+        at: Date.now(),
+        ttl: NEWS_MEMO_TTL_STALE_MS,
+      };
+      throw e;
+    }
   })();
   try {
     return await newsMemoInflight;

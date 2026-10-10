@@ -173,6 +173,8 @@ process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-jwgl
 // ── 进程内 5 分钟快照：面板与 get_news 工具共享，不双抓 ──────────
 test("fetchJwcNewsMemo：TTL 内重复调用共享同一份快照（面板+工具不双抓三页）", async () => {
   clearNewsMemo();
+  // 前置测试（fetchJwcArticle 系列）会顺带写盘；这里清掉，让第一次调用真联网
+  deleteJsonCache("jwc-news-cache.json", "test");
   let fetches = 0;
   const restore = installFetch(() => {
     fetches += 1;
@@ -182,12 +184,114 @@ test("fetchJwcNewsMemo：TTL 内重复调用共享同一份快照（面板+工�
     const a = await fetchJwcNewsMemo(30);
     const b = await fetchJwcNewsMemo(30);
     assert.ok(a.items.length > 0);
-    assert.equal(a.staleAt, undefined, "新鲜结果不携带 staleAt");
+    assert.equal(a.staleAt, undefined, "首次联网成功的新鲜结果不携带 staleAt");
     assert.equal(b.items.length, a.items.length);
+    assert.equal(b.staleAt, undefined, "memo 命中同一份新鲜快照，仍不带 staleAt");
     assert.equal(fetches, 3, "三个板块只抓一轮；第二次调用应命中进程内快照");
   } finally {
     restore();
     clearNewsMemo();
+    deleteJsonCache("jwc-news-cache.json", "test");
+  }
+});
+
+// ── tools-cache-first 语义（2026-10）：默认走磁盘缓存不联网 ─────
+// 用户明确表态「教务通知不要一直获取，有风险」。默认路径先读磁盘快照，
+// 只有 forceRefresh=true 或磁盘缺失时才联网。
+
+test("fetchJwcNewsMemo：磁盘缓存命中时零直连官网（默认路径）", async () => {
+  clearNewsMemo();
+  deleteJsonCache("jwc-news-cache.json", "test");
+  writeJsonCache(
+    "jwc-news-cache.json",
+    {
+      tag: "jwc-news",
+      items: [
+        {
+          title: "磁盘上的旧通知标题",
+          url: "https://jwc.njtech.edu.cn/info/1/1.htm",
+          date: "2026-09-01",
+        },
+      ],
+      fetchedAt: Date.now() - 3600_000,
+    },
+    "test",
+  );
+  let fetches = 0;
+  const restore = installFetch(() => {
+    fetches += 1;
+    return LIST_HTML;
+  });
+  try {
+    const r = await fetchJwcNewsMemo(30);
+    assert.equal(fetches, 0, "磁盘命中路径不得发起任何 fetch");
+    assert.ok(r.staleAt, "必须携带 staleAt 标记磁盘快照身份");
+    assert.equal(r.items[0].title, "磁盘上的旧通知标题");
+  } finally {
+    restore();
+    clearNewsMemo();
+    deleteJsonCache("jwc-news-cache.json", "test");
+  }
+});
+
+test("fetchJwcNewsMemo：forceRefresh=true 强制联网重抓三板块并覆盖磁盘", async () => {
+  clearNewsMemo();
+  deleteJsonCache("jwc-news-cache.json", "test");
+  writeJsonCache(
+    "jwc-news-cache.json",
+    {
+      tag: "jwc-news",
+      items: [
+        {
+          title: "磁盘上的旧通知标题",
+          url: "https://jwc.njtech.edu.cn/info/1/1.htm",
+          date: "2026-09-01",
+        },
+      ],
+      fetchedAt: Date.now() - 3600_000,
+    },
+    "test",
+  );
+  let fetches = 0;
+  const restore = installFetch(() => {
+    fetches += 1;
+    return LIST_HTML;
+  });
+  try {
+    const r = await fetchJwcNewsMemo(30, true);
+    assert.ok(fetches >= 3, `forceRefresh 必须联网抓三板块，实际 fetches=${fetches}`);
+    assert.equal(r.staleAt, undefined, "联网成功后返回新鲜结果，不带 staleAt");
+    assert.ok(
+      r.items.some((i) => i.title.includes("英语")),
+      "抓到的新条目（LIST_HTML 里的四六级报名通知）应替换磁盘旧内容",
+    );
+    assert.ok(
+      !r.items.some((i) => i.title === "磁盘上的旧通知标题"),
+      "磁盘旧条目不该出现在联网成功后的结果里",
+    );
+  } finally {
+    restore();
+    clearNewsMemo();
+    deleteJsonCache("jwc-news-cache.json", "test");
+  }
+});
+
+test("fetchJwcNewsMemo：磁盘缺失时默认路径也会联网一次（首次运行）", async () => {
+  clearNewsMemo();
+  deleteJsonCache("jwc-news-cache.json", "test");
+  let fetches = 0;
+  const restore = installFetch(() => {
+    fetches += 1;
+    return LIST_HTML;
+  });
+  try {
+    const r = await fetchJwcNewsMemo(30);
+    assert.ok(fetches >= 3, `磁盘缺失时必须联网，实际 fetches=${fetches}`);
+    assert.equal(r.staleAt, undefined, "联网成功后不带 staleAt");
+  } finally {
+    restore();
+    clearNewsMemo();
+    deleteJsonCache("jwc-news-cache.json", "test");
   }
 });
 

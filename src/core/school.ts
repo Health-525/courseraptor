@@ -105,14 +105,23 @@ export interface SchoolNotices {
    * 带通道与降级信息、进程内短 TTL 快照的列表抓取：网页通知面板与
    * get_news 工具共用同一份快照，一轮里「面板看过 + 对话又问」不重复
    * 抓官网三页。可选端口：适配器不实现时调用方回退 fetchNews。
+   *
+   * 2026-10 语义收紧：默认（forceRefresh 未传或 false）**优先返回磁盘缓存快照**，
+   * 只有磁盘缓存缺失时才联网一次；forceRefresh=true 才强制清进程内快照重抓官网。
+   * 这样通知面板与工具调用都不会「一直获取」，避免校外反复直连失败风暴与
+   * 校内高频抓官网被 WAF 盯上的风险。用户想看最新通知需明确说「刷新通知」，
+   * 由模型识别后在 get_news 上传 refresh=true。
    */
-  fetchNewsMemo?(maxItems?: number): Promise<SchoolNewsSnapshot>;
+  fetchNewsMemo?(maxItems?: number, forceRefresh?: boolean): Promise<SchoolNewsSnapshot>;
 }
 
 /** fetchNewsMemo 的返回形状：items 之外如实说明新鲜度 */
 export interface SchoolNewsSnapshot {
   items: NewsItem[];
-  /** 非空表示本次返回的是落盘缓存快照（直连失败时的兜底） */
+  /**
+   * 非空表示本次返回的是落盘缓存快照，可能是「直连失败降级」或「默认走磁盘」；
+   * 值为该快照的抓取时间戳（ms）。调用方应如实转述这个时间，别当新鲜数据。
+   */
   staleAt?: number;
 }
 

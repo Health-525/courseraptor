@@ -1,6 +1,10 @@
 /**
  * 共享会话管理：教务登录 cookie 与选课会话的缓存 + 失效重建
  * 教务线路间歇抖动，全部带指数退避重试
+ *
+ * 2026-10 收紧：RETRY_MAX 从 5 降到 2（首次 + 一次重试），与 core/http
+ * 的默认 attempts=2 对齐。用户明确表态「获取信息 2 次失败直接报错」——
+ * 正方登录抖动时宁可让用户手动重试，也不要在客户端空转十几秒。
  */
 
 import { config } from "../../core/config";
@@ -9,7 +13,7 @@ import { withRetry } from "../../core/http";
 import { loginJwgl } from "./auth";
 import { openXkSession, type XkSession } from "./xk";
 
-const RETRY_MAX = 5;
+const RETRY_MAX = 2;
 
 // ── 普通登录 cookie（课表/成绩/考试用）────────────────────────
 
