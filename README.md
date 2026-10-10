@@ -21,7 +21,7 @@ Vercel AI SDK v7 · `SchoolAdapter` 端口-适配器架构 · 三端入口 · �
 
 **[简体中文](README.md) · [English](README.en.md)**
 
-**[✨ 核心特性](#-核心特性) · [🖥️ 界面预览](#️-界面预览) · [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程) · [🚀 快速开始](#-快速开始) · [🔒 隐私与安全](#-隐私与安全) · [🧩 项目架构](#-项目架构) · [📚 文档](#-文档) · [❓ 常见问题](#-常见问题)**
+**[✨ 核心特性](#-核心特性) · [🖥️ 界面预览](#️-界面预览) · [🧰 工程样例](#-给开发者一套可整体搬走的本地-agent-工程) · [🚀 快速开始](#-快速开始) · [🔒 隐私与安全](#-隐私与安全) · [📚 文档](#-文档) · [❓ 常见问题](#-常见问题)**
 
 </div>
 
@@ -60,7 +60,7 @@ Agent 共装备 **21 个工具**。完整参数表、耗时与环境变量见 [�
 
 **网页对话** —— 浏览器打开 `http://localhost:3210` 即聊，思考过程与工具调用全程可见：
 
-<p align="center"><img src="docs/screenshots/gui.png" width="800" alt="网页对话：思考卡片、工具调用与课表回复（虚构示例数据）"></p>
+<p align="center"><img src="docs/screenshots/gui.png" width="800" alt="网页对话首屏：欢迎页、快捷提问与历史会话侧栏（虚构示例数据）"></p>
 
 **动态演示** —— 从欢迎页、快捷提问到一句话发起查询的完整流程（虚构示例数据）：
 
@@ -164,38 +164,6 @@ raptor             # 启动；项目内也可 npm run dev
 - 沙箱 JS 无网络无磁盘、超时截断；所有工具均为只读查询或本机文件生成，不含任何提交类操作
 - `.env`、`session.json`、`memory.json`、`data/chat-sessions.json` 等含个人数据的文件已被 `.gitignore` 排除，**切勿提交或分享**
 - 「本地运行」不等于完全离线：提示词与相关查询结果会发给你配置的模型服务商；附件云解析（Firecrawl，需自行配置 Key）仅用于公开网页
-
----
-
-## 🧩 项目架构
-
-<p align="center">
-  <!-- GitHub 按用户主题自动换图：暗色模式看深底版，浅色模式看白底版 -->
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/courseraptor-architecture.png">
-    <img src="docs/courseraptor-architecture-white.png" width="880" alt="CourseRaptor 项目架构图：交互入口（终端 TUI / 本地网页 / QQ）、Agent 内核、两层记忆与知识库全部本机运行，天气等外部服务按需访问">
-  </picture>
-</p>
-
-**本地优先（Local-first）**：交互入口、Agent 内核、两层记忆与知识库全部跑在本机，数据不出电脑；天气等外部服务仅在查询时按需访问。
-
-**技术栈**：[Vercel AI SDK v7](https://ai-sdk.dev)（`ToolLoopAgent` + `runAgentTUI`）· 模型层：DeepSeek（默认 `deepseek-flash`，即 V4.1-Flash）+ 通义千问 / 智谱 GLM / Kimi / 豆包 / 混元 / MiniMax / 阶跃 / 文心 / 讯飞 / 硅基流动 / 移动云 + 自定义 OpenAI 兼容端点（供应商注册表纯数据、模型工厂统一装配）· TypeScript + Node 内置 HTTP（网页端零框架）· Biome + node:test
-
-**项目结构**（完整树见 [能力文档](docs/capabilities.md#-项目结构完整树)）：
-
-```
-├── bin/raptor.cjs      # 全局命令入口
-├── docs/               # 文档与素材
-├── skills/             # 独立技能包（export-schedule 课表图导出 / meta-learning 学习教练）
-├── src/                # 公用核心（与运行形态无关）
-│   ├── core/           # 学校无关内核：agent/记忆/日历/文档/附件/知识库等 + 通用工具
-│   ├── adapters/       # 学校数据层：core/school.ts 定义的 SchoolAdapter 端口
-│   │   └── custom/     # 手动课表模式（用户导入，唯一内置实现）
-│   └── channels/       # 输出渠道：web（网页版）
-└── local/              # 本地版入口：cli（终端 TUI）、qq（机器人）、demo（离线演示）
-```
-
-核心与适配层以 `SchoolAdapter` 端口解耦：`src/core/` 永不反向依赖任何学校实现，接新的数据源 = 新增一个自包含的 `src/adapters/<school>/` 目录。
 
 ---
 
