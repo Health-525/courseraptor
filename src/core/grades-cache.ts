@@ -8,6 +8,7 @@
  */
 
 import { readJsonCache, writeJsonCache } from "./json-cache";
+import type { GradeCourse } from "./model";
 import { registeredSchool } from "./school";
 
 export interface CachedGradeCourse {
@@ -33,6 +34,19 @@ export interface CachedGrades {
   /** 最近学期（按学期号排序最大者）的课程，成绩面板速览用 */
   recentSemester?: string;
   recentCourses: CachedGradeCourse[];
+  /**
+   * 全部学期的课程明细（GradeCourse 完整结构，含 courseCode/category/courseClass）。
+   * 引入目的：get_grades 走缓存模式时也能返回完整明细与派生量
+   * （academicSummary/generalElectives/failedTerms），不必再登录教务。
+   * 老缓存没有此字段：调用方降级为只返回摘要 + staleHint 提示 refresh=true。
+   */
+  allCourses?: GradeCourse[];
+  /** 计入 GPA 的必修课门数（GradeResult.requiredCourses） */
+  requiredCourses?: number;
+  /** 通过型（合格/免修）必修课学分：有学分、不计 GPA */
+  passFailCredits?: number;
+  /** 彻底拿不到数据的学期；空数组才代表完整 */
+  failedTerms?: string[];
 }
 
 function isCachedGrades(parsed: unknown): parsed is CachedGrades {

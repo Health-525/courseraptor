@@ -281,24 +281,48 @@ function isValidNewsCache(parsed: unknown): parsed is NewsCacheEnvelope {
   );
 }
 
-// ── 进程内 5 分钟快照：get_news 工具与网页通知面板共用 ────────────
+// ── 进程内快照：get_news 工具与网页通知面板共用 ────────────────
 // 通知是公共数据（对所有人相同），「面板刚看过 + 对话里又问一次」不该
-// 触发两轮全量抓取（直连一轮就是三个板块三页请求）。只缓存新鲜
-// 结果；降级快照（staleAt）不进缓存——下次调用照常重试真实通道。
+// 触发两轮全量抓取（直连一轮就是三个板块三页请求）。
+//
+// 三档 TTL：
+// - 新鲜结果（校内直连成功）：5 分钟，同一份快照供面板 + 工具复用
+// - 降级快照（校外直连失败 → 回退磁盘缓存）：60 秒负缓存，避免每次
+//   点面板都重发三页直连再走一遍失败回退（校外用户的主要痛点）
+// - 完全失败（三板块挂 + 无磁盘缓存）：60 秒负缓存，把同一个错误抛给
+//   窗口内的所有调用者，不反复重试
 
-const NEWS_MEMO_TTL_MS = 5 * 60_000;
-let newsMemo: { result: JwcNewsResult; at: number } | null = null;
+const NEWS_MEMO_TTL_FRESH_MS = 5 * 60_000;
+const NEWS_MEMO_TTL_STALE_MS = 60_000;
+
+type NewsMemoEntry =
+  | { kind: "ok"; result: JwcNewsResult; at: number; ttl: number }
+  | { kind: "err"; error: Error; at: number; ttl: number };
+
+let newsMemo: NewsMemoEntry | null = null;
 let newsMemoInflight: Promise<JwcNewsResult> | null = null;
 
 export async function fetchJwcNewsMemo(maxItems = 20): Promise<JwcNewsResult> {
-  if (newsMemo && Date.now() - newsMemo.at < NEWS_MEMO_TTL_MS) {
-    return newsMemo.result;
+  if (newsMemo && Date.now() - newsMemo.at < newsMemo.ttl) {
+    if (newsMemo.kind === "ok") return newsMemo.result;
+    throw newsMemo.error;
   }
   if (newsMemoInflight) return newsMemoInflight;
   newsMemoInflight = (async () => {
-    const result = await fetchJwcNewsDetailed([], maxItems);
-    if (result.staleAt === undefined) newsMemo = { result, at: Date.now() };
-    return result;
+    try {
+      const result = await fetchJwcNewsDetailed([], maxItems);
+      const ttl = result.staleAt === undefined ? NEWS_MEMO_TTL_FRESH_MS : NEWS_MEMO_TTL_STALE_MS;
+      newsMemo = { kind: "ok", result, at: Date.now(), ttl };
+      return result;
+    } catch (e) {
+      newsMemo = {
+        kind: "err",
+        error: e as Error,
+        at: Date.now(),
+        ttl: NEWS_MEMO_TTL_STALE_MS,
+      };
+      throw e;
+    }
   })();
   try {
     return await newsMemoInflight;

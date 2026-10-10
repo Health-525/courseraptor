@@ -9,7 +9,7 @@ import { fetchAttachment } from "../../../core/attachments";
 import { config } from "../../../core/config";
 import { loadUserGrade } from "../../../core/memory/longterm";
 import { relevanceOf } from "../../../core/notices";
-import { fetchJwcArticle, fetchJwcNewsMemo } from "../news";
+import { clearNewsMemo, fetchJwcArticle, fetchJwcNewsMemo } from "../news";
 
 // ── 通知相关性 ────────────────────────────────────────────────
 // 教务处一次发十几条，其中大半跟具体某个学生无关。过去全靠模型逐条判断，
@@ -21,17 +21,25 @@ export const newsTools = {
   /** 教务处官网通知 */
   get_news: tool({
     description:
-      "抓取南京工业大学教务处官网（jwc.njtech.edu.cn）的最新通知，涵盖三个板块：公告通知（含选课/考试/学籍等重要安排）、教学动态、考试排课。仅校内网络可直连；官网限制仅校内 IP 后，校外直连会失败，此时回退上次成功抓取的缓存快照并在 note 里注明抓取时间。用户问「最近有什么教务通知」「选课什么时候开始」「有没有关于××的通知」时调用。每条带 relevance：high=需本人行动（点名本年级或全校性必办）、medium=视个人情况（补修/重修/转专业等）、low=基本无关（其他年级或行政公示）。回答时优先讲 high 的，low 的一句带过，不要平铺全部。",
+      "抓取南京工业大学教务处官网（jwc.njtech.edu.cn）的最新通知，涵盖三个板块：公告通知（含选课/考试/学籍等重要安排）、教学动态、考试排课。仅校内网络可直连；官网限制仅校内 IP 后，校外直连会失败，此时回退上次成功抓取的缓存快照并在 note 里注明抓取时间。**5 分钟内命中进程内快照不重取**（校外失败 60 秒负缓存）；用户明确说「刷一下通知 / 有没有新的 / 重新抓一次」时传 refresh=true 清缓存强制重取。用户问「最近有什么教务通知」「选课什么时候开始」「有没有关于××的通知」时调用。每条带 relevance：high=需本人行动（点名本年级或全校性必办）、medium=视个人情况（补修/重修/转专业等）、low=基本无关（其他年级或行政公示）。回答时优先讲 high 的，low 的一句带过，不要平铺全部。",
     inputSchema: z.object({
       category: z
         .enum(["公告通知", "教学动态", "考试排课"])
         .optional()
         .describe("只看某个板块（可选，默认全部）"),
       limit: z.number().int().min(1).max(30).default(10).describe("返回条数（默认 10）"),
+      refresh: z
+        .boolean()
+        .optional()
+        .describe(
+          "true=清进程内快照强制重新抓官网（仅在用户明确说「刷新/有没有新的/重新抓」时传）；不传或 false=优先用 5 分钟内的进程快照",
+        ),
     }),
-    execute: async ({ category, limit }) => {
+    execute: async ({ category, limit, refresh }) => {
+      // refresh=true 时清掉进程内快照（含负缓存），强制重抓三页
+      if (refresh) clearNewsMemo();
       // 5 分钟进程内快照：网页通知面板刚看过的话，这里直接复用，
-      // 不再重复抓官网三页（对所有人相同的公共数据）
+      // 不再重复抓官网三页（对所有人相同的公共数据）；校外失败也进 60 秒负缓存
       const { items: fetched, staleAt } = await fetchJwcNewsMemo(30);
       const filtered = category ? fetched.filter((i) => i.category === category) : fetched;
       const grade = await loadUserGrade();

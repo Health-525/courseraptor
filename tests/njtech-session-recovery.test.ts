@@ -295,7 +295,7 @@ test("fetchAllGrades：TTL 内重复调用零新增教务请求（大四一年 ~
   }
 });
 
-test("get_schedule：教务在线失败时回退最后已知课表，如实标注不新鲜", async () => {
+test("get_schedule：refresh=true 时教务在线失败回退最后已知课表，如实标注不新鲜", async () => {
   looseRate();
   invalidateAuthCache();
   saveScheduleCache({
@@ -317,17 +317,19 @@ test("get_schedule：教务在线失败时回退最后已知课表，如实标�
   const queue = [...loginQueue("s1")];
   const mock = installMock(() => queue.shift() ?? { status: 0, networkError: "教务线路不可达" });
   try {
-    const out = await asTool(scheduleTools.get_schedule).execute({});
+    // refresh=true 强制联网；失败时按现有降级路径回退到缓存
+    const out = await asTool(scheduleTools.get_schedule).execute({ refresh: true });
     assert.match(String(out.staleNote ?? ""), /本地缓存/, "必须带「本地缓存」的如实提示");
     assert.equal(out.total, 1);
     assert.equal(out.term, "2025-2026-2");
+    assert.equal(out.fromCache, true, "降级路径也应标记 fromCache");
   } finally {
     mock.restore();
     invalidateAuthCache();
   }
 });
 
-test("get_exams：教务在线失败时回退最后已知考试安排，如实标注不新鲜", async () => {
+test("get_exams：refresh=true 时教务在线失败回退最后已知考试安排，如实标注不新鲜", async () => {
   looseRate();
   invalidateAuthCache();
   saveExamCache({
@@ -347,10 +349,11 @@ test("get_exams：教务在线失败时回退最后已知考试安排，如实�
   const queue = [...loginQueue("s1")];
   const mock = installMock(() => queue.shift() ?? { status: 0, networkError: "教务线路不可达" });
   try {
-    const out = await asTool(gradesTools.get_exams).execute({});
+    const out = await asTool(gradesTools.get_exams).execute({ refresh: true });
     assert.match(String(out.staleNote ?? ""), /本地缓存/);
     assert.equal(out.total, 1);
     assert.equal(out.term, "2026-2027-1");
+    assert.equal(out.fromCache, true);
   } finally {
     mock.restore();
     invalidateAuthCache();
