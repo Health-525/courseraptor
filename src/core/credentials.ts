@@ -66,7 +66,7 @@ export interface CredentialsStore {
   qqBotPasscode?: string;
   /** 网页「提示词」模板（用户在提示词模板面板自选；空/缺失即回默认清单） */
   webQuickQuestions?: string[];
-  /** 设置里选定的学校适配器 id（"njtech" / "custom"）；未存过按 RAPTOR_SCHOOL / 默认 njtech */
+  /** 设置里选定的学校适配器 id（"njtech" / "custom"）；未存过按 RAPTOR_SCHOOL / 默认 custom（不接入任何学校） */
   schoolId?: string;
   /**
    * 教务账号（username/password）保存时所在的学校 id。教务凭证字段本身

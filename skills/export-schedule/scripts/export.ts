@@ -22,7 +22,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import "../../../src/adapters"; // 学校适配器装配（school() / terms 周期依赖它）
 import { loadScheduleCache } from "../../../src/core/schedule-cache";
-import { school } from "../../../src/core/school";
+import { readJsonCache } from "../../../src/core/json-cache";
+import { registeredSchool, school, selectSchool } from "../../../src/core/school";
 import { renderTermScheduleSVG, renderWeekScheduleSVG } from "../../../src/core/schedule-svg";
 import { scheduleSvgToPng } from "../../../src/core/schedule-png";
 
@@ -287,6 +288,18 @@ if (args.cache) {
     process.exit(1);
   }
   process.env.RAPTOR_DATA_DIR = path.dirname(abs);
+}
+
+// 缓存记录了来源学校（schoolId）：本技能默认「不接入任何学校」（custom）起步，
+// 若缓存来自真实学校（如 njtech），先显式切过去再读——否则 loadScheduleCache
+// 的分校校验会把别校缓存判为 null，周次推算也会用错校历。RAPTOR_SCHOOL
+// 显式指定时尊重之，不做自动切换
+if (!process.env.RAPTOR_SCHOOL) {
+  const raw = readJsonCache("schedule-cache.json", (p): p is { schoolId?: unknown } => true);
+  const cacheSchoolId = typeof raw?.schoolId === "string" ? raw.schoolId : null;
+  if (cacheSchoolId && cacheSchoolId !== registeredSchool()?.info.id) {
+    selectSchool(cacheSchoolId); // 未知 id 返回 false，保持现状（后面自然报「还没有课表缓存」）
+  }
 }
 
 const cached = loadScheduleCache();

@@ -16,10 +16,11 @@ delete process.env.RAPTOR_SCHOOL;
 
 const { saveCredentialsStore } = await import("../src/core/credentials");
 
-test("未存过 schoolId 时默认 njtech；登记序即清单序（真实学校在前）", async () => {
+test("未存过 schoolId 时默认 custom（不接入任何学校）；登记序即清单序（真实学校在前）", async () => {
   const { school, listSchoolOptions } = await import("../src/core/school");
   await import("../src/adapters");
-  assert.equal(school().info.id, "njtech");
+  assert.equal(school().info.id, "custom");
+  assert.equal(school().info.manual, true);
   const ids = listSchoolOptions().map((a) => a.info.id);
   assert.deepEqual(ids, ["njtech", "custom"]);
   // 手动课表标记：custom 有、真实学校没有
@@ -28,7 +29,7 @@ test("未存过 schoolId 时默认 njtech；登记序即清单序（真实学校
 });
 
 test("凭证里保存 schoolId=custom：新进程默认落在自定义学校", async () => {
-  // 上面已在本进程装配过 njtech；用子进程模拟「新进程启动」最贴近真实路径
+  // 上面已在本进程装配过 custom；用子进程模拟「新进程启动」最贴近真实路径
   const root = path.resolve(import.meta.dirname, "..");
   const { pathToFileURL } = await import("node:url");
   const entry = `

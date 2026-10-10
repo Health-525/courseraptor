@@ -41,7 +41,7 @@ If you are building agents yourself, the repo doubles as a reference implementat
 | Can I turn this material into a document? | Local document/table reading and Word, Excel, PowerPoint, and PDF generation with cross-format conversion |
 | My school's system is not adapted | Manual timetable mode: paste timetable text or upload Excel/CSV/PDF/Word/TXT, and the AI parses it into a structured timetable |
 
-The agent ships **31 tools** (full set for schools with an online adapter, auto-trimmed per school). See [capabilities](docs/capabilities.md) for the full table. A headless CLI skill (in [`skills/`](skills/)) exposes the same academic queries for scripting without touching the LLM.
+The agent ships **31 tools** (full set for schools with an online adapter). **No school is connected by default**: it starts in manual timetable mode (19 tools, zero contact with any academic system) — pick your school in the browser settings page to unlock the adapter toolset. See [capabilities](docs/capabilities.md) for the full table. A headless CLI skill (in [`skills/`](skills/)) exposes the same academic queries for scripting without touching the LLM.
 
 Both screenshots below use fictional demo data.
 

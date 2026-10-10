@@ -29,7 +29,7 @@ npm run demo
 | `src/core/agent.ts` | agent 组装：core 通用工具 + 学校适配器贡献的教务工具合并；提示词骨架在 `src/core/prompt.ts`，教务段由适配器提供（校历段运行时渲染自 `data/term-dates.json`，不在代码里硬编码） |
 | `src/core/tools/` | 通用工具聚合（文件/文档/记忆/待办/知识库/番茄钟/设置/天气/时间） |
 | `src/adapters/njtech/` | 南京工业大学适配器：登录/课表/成绩/考试/学籍/选课/通知抓取与教务工具（`index.ts` 组装成 SchoolAdapter；`session.ts` 是登录 cookie / 选课会话缓存，经端口供 UI 使用） |
-| `src/adapters/index.ts` | 装配点：按 `RAPTOR_SCHOOL` 注册默认适配器；新增学校在这里登记 |
+| `src/adapters/index.ts` | 装配点：RAPTOR_SCHOOL > 设置页保存的 schoolId > custom（默认不接入任何学校）；新增学校在这里登记 |
 | `src/core/memory/` | 两层记忆（短期 session.json / 长期 memory.json） |
 | `src/core/paths.ts` | 项目根、`dataDir()`、`isInsideDir()` 路径护栏、`migratedDataPath()` 状态文件归位——**全项目唯一实现，不要在别处重写** |
 | `src/core/json-cache.ts` | 免登录 JSON 缓存骨架（schedule/exam-cache 的公共约定） |
