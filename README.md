@@ -78,16 +78,14 @@ Agent 共装备 31 个工具（接入在线教务的学校满配）。**默认�
 
 > 在找「Vercel AI SDK 的生产级完整例子」，或者「Agent 怎么接一堆外部系统而不失控」？这个仓库是一份答案：三端入口跑在真实用户的日常使用里，每个设计都有源码可查、有测试兜底，以 MIT 许可证开源，欢迎拆走复用（详见 [LICENSE](LICENSE)）。
 
-| 你要解决的问题 | 这里的做法 | 源码 |
-|---|---|---|
-| Agent 主循环 | Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI`：31 个工具的多轮循环，思考与工具调用全程透出 | [`src/core/agent.ts`](src/core/agent.ts) |
-| 给 Agent 接外部系统 | `SchoolAdapter` 端口 + 每校一个自包含适配器目录；内核永不反向依赖实现，各校教务协议的差异全部被适配器吃掉 | [`src/core/school.ts`](src/core/school.ts) · [`src/adapters/`](src/adapters/) |
-| 多模型厂商接入 | 供应商注册表纯数据 + 模型工厂统一装配：12 家国内厂商 + 自定义 OpenAI 兼容端点，Key 独立加密、运行时热切 | [`src/core/providers.ts`](src/core/providers.ts) · [`src/core/models.ts`](src/core/models.ts) |
-| 工具层设计 | 31 个工具的参数与返回契约，覆盖教务、通知、文件、文档、日历、记忆六域，可渐进式挂载 | [`src/core/tools/`](src/core/tools/) |
-| 两层记忆 | 会话跨重启续聊 + 长期事实自主维护，全部本地 JSON、无数据库 | [`src/core/memory/`](src/core/memory/) |
-| 多入口单内核 | 终端 TUI / 本地网页 / QQ 机器人共享同一内核与记忆；另有无头 CLI 不经 LLM、零 token | [`src/channels/`](src/channels/) · [`local/`](local/) · [`skills/`](skills/) |
-| 本地优先安全 | 凭证 AES-256-GCM 绑定本机指纹；Web 仅回环监听 + Host/Origin/CSRF 校验；沙箱 JS 无网络无磁盘 | [`src/core/credentials.ts`](src/core/credentials.ts) · [`src/core/sandbox-js.ts`](src/core/sandbox-js.ts) |
-| 工程化底盘 | TypeScript `strict` + node:test（覆盖率门槛只升不降）+ Biome + 双 OS 矩阵 CI | [`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml) |
+- **Agent 主循环** —— Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI`：31 个工具的多轮循环，思考与工具调用全程透出（[`src/core/agent.ts`](src/core/agent.ts)）
+- **给 Agent 接外部系统** —— `SchoolAdapter` 端口 + 每校一个自包含适配器目录；内核永不反向依赖实现，各校教务协议的差异全部被适配器吃掉（[`src/core/school.ts`](src/core/school.ts) · [`src/adapters/`](src/adapters/)）
+- **多模型厂商接入** —— 供应商注册表纯数据 + 模型工厂统一装配：12 家国内厂商 + 自定义 OpenAI 兼容端点，Key 独立加密、运行时热切（[`src/core/providers.ts`](src/core/providers.ts) · [`src/core/models.ts`](src/core/models.ts)）
+- **工具层设计** —— 31 个工具的参数与返回契约，覆盖教务、通知、文件、文档、日历、记忆六域，可渐进式挂载（[`src/core/tools/`](src/core/tools/)）
+- **两层记忆** —— 会话跨重启续聊 + 长期事实自主维护，全部本地 JSON、无数据库（[`src/core/memory/`](src/core/memory/)）
+- **多入口单内核** —— 终端 TUI / 本地网页 / QQ 机器人共享同一内核与记忆；另有无头 CLI 不经 LLM、零 token（[`src/channels/`](src/channels/) · [`local/`](local/) · [`skills/`](skills/)）
+- **本地优先安全** —— 凭证 AES-256-GCM 绑定本机指纹；Web 仅回环监听 + Host/Origin/CSRF 校验；沙箱 JS 无网络无磁盘（[`src/core/credentials.ts`](src/core/credentials.ts) · [`src/core/sandbox-js.ts`](src/core/sandbox-js.ts)）
+- **工程化底盘** —— TypeScript `strict` + node:test（覆盖率门槛只升不降）+ Biome + 双 OS 矩阵 CI（[`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml)）
 
 ---
 
@@ -152,13 +150,11 @@ raptor             # 启动；项目内也可 npm run dev
 <details>
 <summary><b>系统要求</b>（点开查看）</summary>
 
-| 项目 | 要求 |
-|------|------|
-| **操作系统** | Windows 10/11、macOS 12+、Linux (glibc 2.28+) |
-| **Node.js** | ≥ 24（安装包已内置 Node 运行时，**无需预装**） |
-| **内存** | ≥ 512 MB 可用（运行时约 150-300 MB） |
-| **磁盘** | ≥ 300 MB（含运行时、依赖、本地数据） |
-| **网络** | 首次配置需联网拉取模型 API（默认 DeepSeek，可换厂商）、教务系统；之后可离线使用已缓存数据 |
+- **操作系统** —— Windows 10/11、macOS 12+、Linux (glibc 2.28+)
+- **Node.js** —— ≥ 24（安装包已内置 Node 运行时，无需预装）
+- **内存** —— ≥ 512 MB 可用（运行时约 150-300 MB）
+- **磁盘** —— ≥ 300 MB（含运行时、依赖、本地数据）
+- **网络** —— 首次配置需联网拉取模型 API（默认 DeepSeek，可换厂商）、教务系统；之后可离线使用已缓存数据
 
 </details>
 
@@ -210,14 +206,12 @@ raptor             # 启动；项目内也可 npm run dev
 
 ## 文档
 
-| 想做什么 | 去哪里 |
-|------|------|
-| 查工具参数、耗时、环境变量、教务模块覆盖 | [能力文档](docs/capabilities.md) |
-| 我是同学，想看图文上手指南 | [同学使用指南](docs/student-guide.md) |
-| 查环境变量、凭证、QQ 机器人等配置项 | [配置参考](docs/configuration.md) |
-| 看做了什么、接下来做什么 | [路线图](docs/roadmap.md) |
-| 参与贡献 / 报安全问题 / 行为准则 | [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md) · [行为准则](CODE_OF_CONDUCT.md) |
-| 提问、交流、反馈 | [GitHub Discussions](https://github.com/Health-525/courseraptor/discussions) |
+- [能力文档](docs/capabilities.md) —— 查工具参数、耗时、环境变量、教务模块覆盖
+- [同学使用指南](docs/student-guide.md) —— 我是同学，想看图文上手指南
+- [配置参考](docs/configuration.md) —— 查环境变量、凭证、QQ 机器人等配置项
+- [路线图](docs/roadmap.md) —— 看做了什么、接下来做什么
+- [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md) · [行为准则](CODE_OF_CONDUCT.md) —— 参与贡献 / 报安全问题 / 行为准则
+- [GitHub Discussions](https://github.com/Health-525/courseraptor/discussions) —— 提问、交流、反馈
 
 ---
 
