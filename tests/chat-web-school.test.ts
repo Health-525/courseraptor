@@ -147,7 +147,13 @@ test("POST /api/settings 切换学校：运行期生效并落凭证", async () =
   assert.equal(d.status.school.manual, true);
   // 自定义学校没有教务处官网可抓：通知卡同样不亮
   assert.equal(d.status.school.newsReady, false);
-  assert.match(d.results.find((x: { field: string }) => x.field === "school").message, /已切换/);
+  // 装了 njtech 时，上一用例把当前学校留在 njtech，切 custom 会「已切换」；
+  // 公开仓库 / CI 无 njtech、上一用例被跳过，当前本就是 custom → 「无需切换」。
+  // 两种都是成功态（status 200 已单独钉住），故放行两种文案。
+  assert.match(
+    d.results.find((x: { field: string }) => x.field === "school").message,
+    /已切换|无需切换/,
+  );
   const creds = loadCredentialsStore();
   assert.equal(creds?.schoolId, "custom");
   assert.equal(creds?.customSchoolName, "某某大学");
