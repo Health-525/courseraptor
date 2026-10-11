@@ -19,7 +19,7 @@ const ANSWERS: Record<ExampleKey, { question: string; steps: string[]; body: Rea
         <div className="schedule-row"><span>周一<small>1–2 节</small></span><div>示例高等数学<small>示例教学楼 101</small></div></div>
         <div className="schedule-row"><span>周三<small>3–4 节</small></span><div>示例大学英语<small>示例教学楼 202</small></div></div>
         <div className="schedule-row"><span>周五<small>7–8 节</small></span><div>示例程序设计<small>示例机房</small></div></div>
-        <p className="answer-note">以上全部为虚构数据。正式查询会自动登录教务、按教学周整理，并叠加已记录的放假与调休安排。</p>
+        <p className="answer-note">以上全部为虚构数据。写好本校适配器后，正式查询会自动登录教务、按教学周整理，并叠加放假与调休；没写适配器，手动导入的课表同样驱动今日页、周课表与日历导出。</p>
       </>
     ),
   },
@@ -31,7 +31,7 @@ const ANSWERS: Record<ExampleKey, { question: string; steps: string[]; body: Rea
         <h3>查到了，日历和提醒一并办好。</h3>
         <div className="schedule-row"><span>示例高等数学<small>第 13 周 · 周三</small></span><div>14:00–16:00<small>示例教学楼 A301 · 045 号</small></div></div>
         <div className="schedule-row"><span>示例大学英语<small>第 14 周 · 周一</small></span><div>09:00–11:00<small>示例教学楼 B102 · 118 号</small></div></div>
-        <p className="answer-note">虚构数据演示。正式使用时，登录教务、查考试、导出 .ics、设提醒由 Agent 一次链式完成，考前一天主动提醒你。</p>
+        <p className="answer-note">虚构数据演示。写好适配器后，登录教务、查考试、导出 .ics、设提醒由 Agent 一次链式完成，考前一天主动提醒你。</p>
       </>
     ),
   },
@@ -159,7 +159,7 @@ function App() {
       </header>
       <main id="main">
         <section className="hero wrap" aria-labelledby="hero-title">
-          <p className="eyebrow"><span className="status-dot"></span> 开源 · 本地运行 · 给同学的助手 · 给开发者的样例</p>
+          <p className="eyebrow"><span className="status-dot"></span> 开源 · 本地运行 · 任何学校开箱即用 · 写适配器解锁在线直查</p>
           <div className="hero-head">
             <div>
               <h1 id="hero-title">教务琐事，<span className="hl">一句话。</span></h1>
