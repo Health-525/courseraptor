@@ -1689,10 +1689,12 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
           return;
         }
         const candidates = school().terms.candidates();
-        const year = Number.isInteger(body.year) ? Number(body.year) : candidates[0].year;
+        const fallbackTerm = candidates[0];
+        if (!fallbackTerm) throw new Error("没有可用学期，无法确定默认学年学期");
+        const year = Number.isInteger(body.year) ? Number(body.year) : fallbackTerm.year;
         const semester = Number.isInteger(body.semester)
           ? Number(body.semester)
-          : candidates[0].semester;
+          : fallbackTerm.semester;
         const label = school().terms.label(year, semester);
         // 开学日期（选填）：必须是周一，写进 custom 学期真值，周次从此有据
         const termStart = typeof body.termStart === "string" ? body.termStart.trim() : "";

@@ -135,6 +135,8 @@ export const filesTools = {
       } else {
         sheet = sheets[0];
       }
+      // 走到这里 sheet 必已定位（sheets 非空由 loadWorkbook 保证），守卫只为类型收窄
+      if (!sheet) return { error: "未能定位目标 sheet" };
       const sheetNote =
         sheets.length > 1
           ? `当前 sheet=「${sheet.name}」（全部：${sheets.map((s) => s.name).join("、")}）`

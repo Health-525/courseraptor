@@ -76,7 +76,7 @@ test("xlsx 生成：多 sheet 可被表格引擎回读", async () => {
   assert.deepEqual(sheets!.map((s) => s.name).sort(), ["备注", "成绩"]);
   const grade = sheets!.find((s) => s.name === "成绩")!;
   assert.deepEqual(grade.headers, ["课程", "分"]);
-  assert.equal(grade.rows[0][0], "高数");
+  assert.equal(grade.rows[0]![0], "高数");
 });
 
 test("pptx 生成：zip 魔数 + 非空", async () => {
@@ -241,10 +241,10 @@ test("drainGeneratedRound：按 roundId 精确隔离，取后即清", async () =
   // A 先取：只拿回 A 的，B 的留在流水里
   const a = drainGeneratedRound("round-A");
   assert.equal(a.length, 1);
-  assert.match(a[0].filename, /A报告/);
+  assert.match(a[0]!.filename, /A报告/);
   const b = drainGeneratedRound("round-B");
   assert.equal(b.length, 1);
-  assert.match(b[0].filename, /B报告/);
+  assert.match(b[0]!.filename, /B报告/);
   // 再取为空（已清）
   assert.equal(drainGeneratedRound("round-A").length, 0);
   // 非任何 round 生成的（如前面测试直接 generateAndSave 不在 round 内）不会被误捞

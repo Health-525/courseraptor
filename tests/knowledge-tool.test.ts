@@ -135,13 +135,13 @@ test("list：默认全量、category/keyword 可筛、带分类统计", async ()
   const math = await manage.execute({ action: "list", category: "高等数学" });
   const items = math.knowledge as Array<{ title: string }>;
   assert.equal(items.length, 1);
-  assert.equal(items[0].title, "洛必达法则");
+  assert.equal(items[0]!.title, "洛必达法则");
 
   const none = await manage.execute({ action: "list", category: "" });
   assert.equal((none.knowledge as unknown[]).length, 1, "空字符串表示只看未分类");
 
   const kw = await manage.execute({ action: "list", keyword: "过去分词" });
-  assert.equal((kw.knowledge as Array<{ title: string }>)[0].title, "现在完成时");
+  assert.equal((kw.knowledge as Array<{ title: string }>)[0]!.title, "现在完成时");
 
   const miss = await manage.execute({ action: "list", keyword: "不存在的关键词" });
   assert.match(String(miss.note), /空/);

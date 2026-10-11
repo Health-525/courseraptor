@@ -116,7 +116,7 @@ describe("行内模式斜杠菜单", { concurrency: 1 }, () => {
       assert.ok(frame.includes(MENU_TOP), "换选中项应触发菜单重绘");
       const rows = selectedRows(frame);
       assert.equal(rows.length, 1, "有且只有一项处于选中态");
-      assert.ok(rows[0].includes("/key"), "↓ 后应选中第二项 /key");
+      assert.ok(rows[0]!.includes("/key"), "↓ 后应选中第二项 /key");
     });
   });
 
@@ -140,7 +140,7 @@ describe("行内模式斜杠菜单", { concurrency: 1 }, () => {
       // 按两次 = 重绘两次，这一帧里会有两份菜单；看最后一份的选中项
       const rows = selectedRows(frame);
       assert.equal(rows.length, 2, "每按一次 ↓ 都应重绘一次");
-      assert.ok(rows[rows.length - 1].includes("/update"), "两次 ↓ 后应选中第三项 /update");
+      assert.ok(rows[rows.length - 1]!.includes("/update"), "两次 ↓ 后应选中第三项 /update");
     });
   });
 

@@ -43,19 +43,19 @@ test("runPptCode：循环/变量/主题色录成 op 程序", () => {
   assert.equal(r.ok, true, r.error ?? "runPptCode 应成功");
   const ops = r.program!.ops;
   assert.equal(ops.length, 5);
-  assert.deepEqual(ops[0], { op: "cover", title: "期末复习", author: "小明" });
-  assert.equal(ops[1].op, "section");
-  if (ops[2].op === "bullets") {
-    assert.deepEqual(ops[2].points, ["定义", "计算"]);
-    assert.equal(ops[2].notes, "讲 极限");
+  assert.deepEqual(ops[0]!, { op: "cover", title: "期末复习", author: "小明" });
+  assert.equal(ops[1]!.op, "section");
+  if (ops[2]!.op === "bullets") {
+    assert.deepEqual(ops[2]!.points, ["定义", "计算"]);
+    assert.equal(ops[2]!.notes, "讲 极限");
   } else assert.fail("第 3 页应为 bullets");
-  if (ops[4].op === "table") {
+  if (ops[4]!.op === "table") {
     assert.deepEqual(
-      ops[4].rows,
+      ops[4]!.rows,
       [["e", "2.718"]],
       "数字单元格应归一为字符串（渲染层同款 String 化）",
     );
-    assert.deepEqual(ops[4].headers, ["式", "值"]);
+    assert.deepEqual(ops[4]!.headers, ["式", "值"]);
   } else assert.fail("第 5 页应为 table");
 });
 
@@ -70,7 +70,7 @@ test("runPptCode：blank 自由页元素、主题色名解析、W/H 常量", () 
     console.log("画布", pptx.W + "x" + pptx.H);
   `);
   assert.equal(r.ok, true, r.error ?? "runPptCode 应成功");
-  const op = r.program!.ops[0];
+  const op = r.program!.ops[0]!;
   assert.equal(op.op, "blank");
   assert.equal(op.title, "时间线");
   assert.equal(op.notes, "流程讲解");
@@ -111,12 +111,12 @@ test("runPptCode：上限 warnings + 越界裁回", () => {
     `pptx.bullets({ title: "多", points: Array.from({length: ${PPT_LIMITS.bullets + 5}}, (_, i) => "点" + i) })`,
   );
   assert.equal(manyBullets.ok, true);
-  if (manyBullets.program!.ops[0].op === "bullets")
-    assert.equal(manyBullets.program!.ops[0].points.length, PPT_LIMITS.bullets);
+  if (manyBullets.program!.ops[0]!.op === "bullets")
+    assert.equal(manyBullets.program!.ops[0]!.points.length, PPT_LIMITS.bullets);
 
   const out = runPptCode('const s = pptx.blank(); s.text("越界", { x: 9.5, y: 5.5, w: 3, h: 1 });');
   assert.equal(out.ok, true);
-  const el = (out.program!.ops[0].op === "blank" ? out.program!.ops[0].elements[0] : null) as any;
+  const el = (out.program!.ops[0]!.op === "blank" ? out.program!.ops[0]!.elements[0] : null) as any;
   assert.equal(el.x + el.w, 10, "右边越界应裁回画布右缘");
   assert.equal(el.y + el.h, 5.625, "下边越界应裁回画布下缘");
   assert.ok(out.warnings?.some((w) => w.includes("超出画布")));
@@ -217,7 +217,7 @@ test("buildProgramPreview：free 页元素镜像 + 截断上限 + 校验闸", ()
   assert.equal(r.ok, true, r.error ?? "runPptCode 应成功");
   const pv = buildProgramPreview(r.program!);
   assert.equal(pv.count, 2);
-  const free = pv.slides[1];
+  const free = pv.slides[1]!;
   assert.equal(free.kind, "free");
   assert.equal(free.elements!.length, PREVIEW_ELEM_CAP, "预览元素封顶");
   assert.equal(free.elemCut, 5);
@@ -225,7 +225,7 @@ test("buildProgramPreview：free 页元素镜像 + 截断上限 + 校验闸", ()
   // 校验闸：合法 free 载荷放行（SSE 链路），畸形元素拒绝
   const good = pptPreviewOfToolOutput({ ppt: { count: 1, slides: [free] } });
   assert.ok(good, "合法 free 页应过闸");
-  assert.equal(good!.slides[0].elements!.length, PREVIEW_ELEM_CAP);
+  assert.equal(good!.slides[0]!.elements!.length, PREVIEW_ELEM_CAP);
   assert.equal(
     pptPreviewOfToolOutput({
       ppt: {

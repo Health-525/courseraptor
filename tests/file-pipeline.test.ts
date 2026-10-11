@@ -55,9 +55,9 @@ test("openLocalFile: 大表回概览不回全文，带可查询的 id", async ()
   assert.equal(r.totalDataRows, 300, "标题/空行噪声行不算数据行");
   assert.equal(r.sheets.length, 2);
   const [main] = r.sheets;
-  assert.deepEqual(main.headers, ["课程号", "课程名称", "学院", "学分", "上课时间"]);
-  assert.equal(main.preview.length, 16, "表头+15 行预览，而不是 300 行");
-  assert.equal(main.moreRows, 285);
+  assert.deepEqual(main!.headers, ["课程号", "课程名称", "学院", "学分", "上课时间"]);
+  assert.equal(main!.preview.length, 16, "表头+15 行预览，而不是 300 行");
+  assert.equal(main!.moreRows, 285);
   assert.match(r.hint, /query_table/, "概览必须自带下一步指引");
   // 用户原文件分毫未动
   assert.ok(fs.existsSync(file));
@@ -154,7 +154,7 @@ test("长文本：分页续读 + keyword 定位（读得完，也不谎称没读
   assert.equal(hit.mode, "search");
   if (hit.mode !== "search") return;
   assert.equal(hit.matchCount, 1);
-  assert.match(hit.matches[0], /运动会因故取消/);
+  assert.match(hit.matches[0]!, /运动会因故取消/);
 
   const miss = await openLocalFile(file, { keyword: "游泳比赛" });
   assert.equal(miss.mode, "search");
@@ -221,8 +221,8 @@ test("GBK 编码的 txt/csv 不再乱码（教务处 Windows 导出的常态）"
   fs.writeFileSync(csvFile, gbkBytes);
   const sheets = loadWorkbook(fs.readFileSync(csvFile), "成绩单GBK.csv");
   assert.ok(sheets, "GBK csv 应解析成表格");
-  assert.deepEqual(sheets![0].headers, ["学院", "课程"]);
-  assert.equal(sheets![0].rows[0][1], "高等数学", "GBK csv 单元格内容正确");
+  assert.deepEqual(sheets![0]!.headers, ["学院", "课程"]);
+  assert.equal(sheets![0]!.rows[0]![1], "高等数学", "GBK csv 单元格内容正确");
 });
 
 test("pptx 附件可抽出幻灯片文本（此前上传白名单收、解析端不认）", async () => {

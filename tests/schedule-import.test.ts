@@ -41,12 +41,12 @@ test("sanitizeCourses：宽进严出——缺字段拒收并给原因，周次�
   ]);
   assert.equal(r.courses.length, 2);
   const [a, b] = r.courses;
-  assert.equal(a.title, "高数");
-  assert.deepEqual(a.periods, [3, 4]);
-  assert.equal(b.title, "英语");
-  assert.equal(b.weekday, 3);
-  assert.deepEqual(b.periods, [5, 6]);
-  assert.equal(b.weeks, DEFAULT_WEEKS);
+  assert.equal(a!.title, "高数");
+  assert.deepEqual(a!.periods, [3, 4]);
+  assert.equal(b!.title, "英语");
+  assert.equal(b!.weekday, 3);
+  assert.deepEqual(b!.periods, [5, 6]);
+  assert.equal(b!.weeks, DEFAULT_WEEKS);
   // 拒收行逐条有原因
   const reasons = r.rejected.map((x) => x.reason).join("|");
   assert.match(reasons, /缺少课程名/);
@@ -73,7 +73,7 @@ test("findConflicts：同星期+节次+周次交集才算冲突，单双周不�
   ]);
   // 高数×线代 周一 3-4 节 8-16 周重叠；单双周错开不算；周五不撞
   assert.equal(conflicts.length, 1);
-  assert.match(conflicts[0], /高数.*线代|线代.*高数/);
+  assert.match(conflicts[0]!, /高数.*线代|线代.*高数/);
 });
 
 test("parseScheduleImport：替身解析器 → JSON 收口（容忍围栏），追问透传", async () => {

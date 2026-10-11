@@ -124,8 +124,10 @@ async function fetchLatestViaGitTag(): Promise<string | null> {
       cwd: PROJECT_ROOT,
       timeout: GIT_TIMEOUT_MS,
     }); // 凭证缺失时直接 reject 走兜底，不会卡住启动
-    const versions = [...stdout.matchAll(/refs\/tags\/v(\d+\.\d+\.\d+)\s*$/gm)].map((m) => m[1]);
-    return versions.length ? versions.sort(compareVersions)[versions.length - 1] : null;
+    const versions = [...stdout.matchAll(/refs\/tags\/v(\d+\.\d+\.\d+)\s*$/gm)].map(
+      (m) => m[1] ?? "",
+    );
+    return versions.length ? (versions.sort(compareVersions)[versions.length - 1] ?? null) : null;
   } catch {
     return null;
   }

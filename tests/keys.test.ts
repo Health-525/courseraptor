@@ -15,6 +15,7 @@ import {
   coalesceText,
   commandsForMode,
   SLASH_COMMANDS,
+  type SlashCommandName,
   splitKeys,
 } from "../local/cli/tui/slash-menu";
 import { emitSoftInterrupt, onSoftInterrupt } from "../local/cli/tui/soft-interrupt";
@@ -342,7 +343,7 @@ test("命令文案单一来源：菜单候选的 desc 全部取自 SLASH_COMMAND
     for (const c of commandsForMode(mode)) {
       assert.equal(
         c.desc,
-        SLASH_COMMANDS[c.name].desc,
+        SLASH_COMMANDS[c.name as SlashCommandName]!.desc,
         `${c.name} 的 desc 应来自 SLASH_COMMANDS，不能各自硬编码一份`,
       );
     }

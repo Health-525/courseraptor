@@ -25,9 +25,9 @@ test("appendRound 自动建档：标题取首问，列表按最近活跃返回",
   const s = S.getSession("aaaa1111");
   assert.ok(s);
   assert.equal(s.messages.length, 2);
-  assert.equal(s.messages[0].role, "user");
-  assert.equal(s.messages[1].role, "assistant");
-  assert.equal(s.messages[1].text, "回答一");
+  assert.equal(s.messages[0]!.role, "user");
+  assert.equal(s.messages[1]!.role, "assistant");
+  assert.equal(s.messages[1]!.text, "回答一");
 });
 
 test("空回答只存提问；空白回答不落库", () => {
@@ -42,9 +42,9 @@ test("思考挂在本轮 assistant 消息上：不单独成条，没正文时也
   const s = S.getSession("eeee5555");
   assert.ok(s);
   assert.equal(s.messages.length, 2, "思考不额外占一条消息");
-  assert.equal(s.messages[1].role, "assistant");
-  assert.equal(s.messages[1].text, "回答");
-  assert.equal(s.messages[1].think, "先查课表再对比周次");
+  assert.equal(s.messages[1]!.role, "assistant");
+  assert.equal(s.messages[1]!.text, "回答");
+  assert.equal(s.messages[1]!.think, "先查课表再对比周次");
 
   // 半截轮次（无正文）：照旧只存提问，思考不能把空轮次带进历史
   S.appendRound("ffff6666", "没答上来的一问", null, "想了一堆但没输出");
@@ -55,7 +55,7 @@ test("思考挂在本轮 assistant 消息上：不单独成条，没正文时也
 
   // 超长思考截断，别把档案文件撑肥
   S.appendRound("gggg7777", "长思考", "答", "思".repeat(S.MAX_THINK_CHARS + 500));
-  const long = S.getSession("gggg7777")?.messages[1].think ?? "";
+  const long = S.getSession("gggg7777")?.messages[1]?.think ?? "";
   assert.ok(long.length < S.MAX_THINK_CHARS + 30, "应截到上限附近");
   assert.match(long, /已截断）$/);
 });
@@ -69,18 +69,18 @@ test("思考绝不回流进模型上下文：contextMessages 只读 text", () =>
 test("contextMessages 输出 ModelMessage 形状（user 纯串 / assistant 块数组）", () => {
   const ctx = S.contextMessages("aaaa1111");
   assert.equal(ctx.length, 2);
-  assert.equal(ctx[0].role, "user");
+  assert.equal(ctx[0]!.role, "user");
   const asst = ctx[1] as { role: string; content: unknown };
   assert.ok(Array.isArray(asst.content));
-  assert.equal((asst.content as { type: string }[])[0].type, "text");
+  assert.equal((asst.content as { type: string }[])[0]!.type, "text");
 });
 
 test("会话支持改名与置顶，置顶档案排在普通档案之前", () => {
   const updated = S.updateSession("aaaa1111", { title: "  我的本周安排  ", pinned: true });
   assert.equal(updated?.title, "我的本周安排");
   assert.equal(updated?.pinned, true);
-  assert.equal(S.listSessions()[0].id, "aaaa1111");
-  assert.equal(S.listSessions()[0].pinned, true);
+  assert.equal(S.listSessions()[0]!.id, "aaaa1111");
+  assert.equal(S.listSessions()[0]!.pinned, true);
   assert.equal(S.updateSession("not-found", { pinned: true }), null);
 });
 
@@ -89,7 +89,7 @@ test("网页附件路径只进入模型上下文", () => {
     attachments: [{ id: "u1", name: "课程表.xlsx", storedPath: "C:/safe/cache/u1.xlsx" }],
   });
   const session = S.getSession("upload111");
-  assert.equal(session?.messages[0].attachments?.[0].name, "课程表.xlsx");
+  assert.equal(session?.messages[0]?.attachments?.[0]?.name, "课程表.xlsx");
   const context = JSON.stringify(S.contextMessages("upload111"));
   assert.match(context, /课程表\.xlsx/);
   assert.match(context, /C:\/safe\/cache\/u1\.xlsx/);

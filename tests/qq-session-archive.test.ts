@@ -157,9 +157,9 @@ test("端到端：QQ 写进档案后，网页历史接口列得出来、点得�
   const detail = (await (await fetch(`${url}/api/sessions/${slot.id}`)).json()) as {
     messages: { role: string; text: string }[];
   };
-  assert.equal(detail.messages[0].role, "user");
-  assert.equal(detail.messages[0].text, "QQ 里问的课表");
-  assert.equal(detail.messages[1].text, "网页这边能看到这段回答");
+  assert.equal(detail.messages[0]!.role, "user");
+  assert.equal(detail.messages[0]!.text, "QQ 里问的课表");
+  assert.equal(detail.messages[1]!.text, "网页这边能看到这段回答");
 });
 
 test("桥的落盘入口 archiveQQRound：写对档案，认不出归属时一条都不加", async () => {

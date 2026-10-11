@@ -13,6 +13,12 @@
 
 import { CYAN, DIM, INVERT, RESET } from "./color";
 
+/**
+ * 命令名收成字面量联合而非 string：注册表是封闭集合，静态键取 desc 不该
+ * 拿到 undefined（noUncheckedIndexedAccess 下 Record<string, T> 的键访问全可空）。
+ */
+export type SlashCommandName = "/inline" | "/card" | "/key" | "/update" | "/exit";
+
 export interface SlashCommand {
   name: string;
   desc: string;
@@ -29,7 +35,7 @@ export type SlashCommandDefinition = Omit<SlashCommand, "name">;
  * commandsForMode()。两边都取同一份说明和参数行为，避免菜单里写的说明、
  * 补全规则和回车后的真实执行逻辑漂移。
  */
-export const SLASH_COMMANDS: Readonly<Record<string, SlashCommandDefinition>> = {
+export const SLASH_COMMANDS: Readonly<Record<SlashCommandName, SlashCommandDefinition>> = {
   "/inline": { desc: "切换到行内模式（滚轮/复制可用）" },
   "/card": { desc: "切换到全屏卡片模式" },
   "/key": { desc: "管理 DeepSeek API Key（查看或覆盖）" },
@@ -38,7 +44,7 @@ export const SLASH_COMMANDS: Readonly<Record<string, SlashCommandDefinition>> = 
 };
 
 export function commandsForMode(mode: "card" | "inline"): SlashCommand[] {
-  const names =
+  const names: SlashCommandName[] =
     mode === "card"
       ? ["/inline", "/key", "/update", "/exit"]
       : ["/card", "/key", "/update", "/exit"];

@@ -25,8 +25,9 @@ function readDemoEnvKeys(path: string, keys: string[]): Record<string, string> {
   }
   for (const line of text.split(/\r?\n/)) {
     const match = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/);
-    if (!match) continue;
-    const [, key, raw] = match;
+    const key = match?.[1];
+    const raw = match?.[2];
+    if (!key || raw === undefined) continue;
     if (!keys.includes(key)) continue;
     const value = raw.replace(/^(['"])(.*)\1$/, "$2").trim();
     if (value) found[key] = value;

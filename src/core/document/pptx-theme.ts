@@ -489,7 +489,9 @@ async function dedupeMedia(buf: Buffer): Promise<Buffer> {
   const rename = new Map<string, string>(); // 待删名 → 保留名
   for (const name of Object.keys(zip.files)) {
     if (!/^ppt\/media\/[^/]+$/.test(name)) continue;
-    const data = await zip.files[name].async("nodebuffer");
+    const file = zip.files[name];
+    if (!file) continue;
+    const data = await file.async("nodebuffer");
     const hash = createHash("md5").update(data).digest("hex");
     const keep = keepByHash.get(hash);
     if (keep) rename.set(name, keep);
@@ -498,7 +500,9 @@ async function dedupeMedia(buf: Buffer): Promise<Buffer> {
   if (rename.size === 0) return buf;
   for (const name of Object.keys(zip.files)) {
     if (!name.endsWith(".rels")) continue;
-    let xml = await zip.files[name].async("string");
+    const file = zip.files[name];
+    if (!file) continue;
+    let xml = await file.async("string");
     for (const [dup, keep] of rename) {
       xml = xml
         .split(`media/${dup.slice("ppt/media/".length)}`)

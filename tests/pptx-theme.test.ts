@@ -87,15 +87,15 @@ test("planPptSlides：封面/章节页/内容页归类 + 字号自适应", () =>
     plan.map((s) => s.kind),
     ["cover", "section", "content", "content", "content"],
   );
-  assert.equal(plan[0].author, "小明");
-  assert.equal(plan[2].bodySize, 16, "2 条要点应给最大字号");
-  assert.equal(plan[3].bodySize, 13, "表格 1 行给表格档最大字号");
+  assert.equal(plan[0]!.author, "小明");
+  assert.equal(plan[2]!.bodySize, 16, "2 条要点应给最大字号");
+  assert.equal(plan[3]!.bodySize, 13, "表格 1 行给表格档最大字号");
 
   const many = planPptSlides({
     format: "pptx",
     slides: [{ title: "多要点", bullets: Array.from({ length: 15 }, (_, i) => `点${i}`) }],
   });
-  assert.equal(many[0].bodySize, 13, "15 条要点收缩到最小档");
+  assert.equal(many[0]!.bodySize, 13, "15 条要点收缩到最小档");
 });
 
 test("planPptSlides：blocks 自动分页（标题切页、有序列表带前缀）", () => {
@@ -110,8 +110,8 @@ test("planPptSlides：blocks 自动分页（标题切页、有序列表带前缀
     ],
   });
   assert.equal(plan.length, 2);
-  assert.deepEqual(plan[0].bullets, ["1. 一", "2. 二"]);
-  assert.deepEqual(plan[1].bullets, ["一句话"]);
+  assert.deepEqual(plan[0]!.bullets, ["1. 一", "2. 二"]);
+  assert.deepEqual(plan[1]!.bullets, ["一句话"]);
 });
 
 test("renderPptx：品牌样式在 XML 字节层可验证", async () => {
@@ -179,8 +179,8 @@ test("buildPptPreview：与版式计划同源，截断有上限", () => {
   // 总页数 = 封面 + 35 页；预览数组封顶 30
   assert.equal(pv.count, PREVIEW_SLIDE_CAP + 6);
   assert.equal(pv.slides.length, PREVIEW_SLIDE_CAP);
-  assert.equal(pv.slides[0].kind, "cover");
-  const s = pv.slides[1];
+  assert.equal(pv.slides[0]!.kind, "cover");
+  const s = pv.slides[1]!;
   assert.equal(s.bullets?.length, 12, "要点截到 12 条");
   assert.equal(s.bulletCut, 8);
 });
@@ -203,8 +203,8 @@ test("pptPreviewOfToolOutput：合法载荷放行、畸形载荷拒绝", () => {
   });
   assert.ok(good);
   assert.equal(good.count, 2);
-  assert.deepEqual(good.slides[1].bullets, ["一"], "非字符串要点应被滤掉");
-  assert.equal(good.slides[1].table?.rows.length, 1);
+  assert.deepEqual(good.slides[1]!.bullets, ["一"], "非字符串要点应被滤掉");
+  assert.equal(good.slides[1]!.table?.rows.length, 1);
 
   // free 页（代码工具 blank 页）：标题可缺省，元素逐个校验
   const free = pptPreviewOfToolOutput({
@@ -223,9 +223,9 @@ test("pptPreviewOfToolOutput：合法载荷放行、畸形载荷拒绝", () => {
     },
   });
   assert.ok(free, "合法 free 页应过闸");
-  assert.equal(free!.slides[0].elements!.length, 3);
+  assert.equal(free!.slides[0]!.elements!.length, 3);
   assert.equal(
-    pptPreviewOfToolOutput({ ppt: { count: 1, slides: [{ kind: "free" }] } })?.slides[0].elements,
+    pptPreviewOfToolOutput({ ppt: { count: 1, slides: [{ kind: "free" }] } })?.slides[0]?.elements,
     undefined,
     "无元素的 free 页也合法",
   );

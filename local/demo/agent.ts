@@ -175,7 +175,7 @@ export function demoLiveTools() {
       execute: async () => {
         const exams = demoExams(new Date());
         return {
-          summary: `${exams.length} 场考试，最近一场 ${exams[0].inDays} 天后（虚构示例）`,
+          summary: `${exams.length} 场考试，最近一场 ${exams[0]?.inDays ?? "?"} 天后（虚构示例）`,
           exams,
           note: "虚构示例考试安排",
         };
@@ -275,8 +275,9 @@ export function demoLiveTools() {
           return { ok: true, summary: "已更新", todo: todoView(target, new Date()) };
         }
         const index = todos.findIndex((t) => t.id === id);
-        if (index < 0) return { error: `待办不存在：${id}` };
-        const [removed] = todos.splice(index, 1);
+        const removed = todos.find((t) => t.id === id);
+        if (!removed) return { error: `待办不存在：${id}` };
+        todos.splice(index, 1);
         return { ok: true, summary: `已删除「${removed.title}」` };
       },
     }),
@@ -371,8 +372,9 @@ export function demoLiveTools() {
           };
         }
         const index = knowledge.findIndex((e) => e.id === id);
-        if (index < 0) return { error: `知识条目不存在：${id}` };
-        const [removed] = knowledge.splice(index, 1);
+        const removed = knowledge.find((e) => e.id === id);
+        if (!removed) return { error: `知识条目不存在：${id}` };
+        knowledge.splice(index, 1);
         return { ok: true, summary: `已删除「${removed.title}」` };
       },
     }),

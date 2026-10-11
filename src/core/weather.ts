@@ -200,6 +200,7 @@ const ADMIN_RANK: Record<string, number> = {
 export function pickCandidate(list: GeoCandidate[]): GeoCandidate | null {
   if (list.length === 0) return null;
   let best = list[0];
+  if (!best) return null;
   let bestPop = best.population ?? 0;
   let bestRank = ADMIN_RANK[best.featureCode ?? ""] ?? 9;
   for (const c of list.slice(1)) {

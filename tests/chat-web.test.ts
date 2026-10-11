@@ -176,7 +176,7 @@ test("SSE 流式回传文本与工具状态，历史逐轮累积", async () => {
     secondCall.map((m) => m.role),
     ["user", "assistant", "user"],
   );
-  assert.equal(secondCall[0].content, "查课表");
+  assert.equal(secondCall[0]!.content, "查课表");
   assert.match(String(r2.events.at(-1)?.t), /end/);
 });
 
@@ -533,7 +533,7 @@ test("知识库：页面可打开、接口可列表删除、数据概览与导�
   assert.match(html, /api\/knowledge/, "页面应从 /api/knowledge 取数据");
   assert.match(html, /const DEMO_DATA = null;/, "正式页不内嵌数据");
   // knowledgePage 同样是外层模板串：对求值产物做语法检查
-  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
   assert.ok(blocks.length >= 1);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-knowledge-page-"));
   for (const [i, code] of blocks.entries()) {
@@ -1011,7 +1011,7 @@ test("渲染产物语法自检 + 思考卡片与齿轮图标锚点", async () =>
   const html = await (await fetch(url)).text();
 
   // chatPage 是外层模板串：必须对「求值后的页面」做语法检查，源码切片会漏判
-  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
   assert.ok(blocks.length >= 1, "页面应有内联脚本");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-page-"));
   blocks.forEach((code, i) => {
@@ -1055,7 +1055,7 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
   assert.match(html, /返回对话/, "应有返回对话页的链接");
   assert.match(html, /const DEMO_DATA = null;/, "正式页不内嵌数据，运行时从 /api/today 取");
   // todayPage 同样是外层模板串：对求值产物做语法检查（源码切片会漏判）
-  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
   assert.ok(blocks.length >= 1, "页面应有内联脚本");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-today-page-"));
   blocks.forEach((code, i) => {
@@ -1110,7 +1110,7 @@ test("GET /schedule 返回独立课表页：语法自检 + 教学周导航", asy
   assert.match(html, /返回对话/, "应有返回对话页的链接");
   assert.match(html, /const DEMO_DATA = null;/, "正式页不内嵌数据，运行时从 /api/today 取");
   // schedulePage 同样是外层模板串：对求值产物做语法检查（源码切片会漏判）
-  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
   assert.ok(blocks.length >= 1, "页面应有内联脚本");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-schedule-page-"));
   blocks.forEach((code, i) => {
@@ -1133,7 +1133,7 @@ test("GET /todos 返回独立待办页：语法自检 + 勾选删除走 /api/rem
   assert.match(html, /返回对话/, "应有返回对话页的链接");
   assert.match(html, /const DEMO_DATA = null;/, "正式页不内嵌数据，运行时从 /api/today 取");
   // todosPage 同样是外层模板串：对求值产物做语法检查（源码切片会漏判）
-  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
   assert.ok(blocks.length >= 1, "页面应有内联脚本");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-todos-page-"));
   blocks.forEach((code, i) => {
@@ -1253,7 +1253,7 @@ test("页面注入 CSRF 引导：meta 携带 token 且 fetch 包装脚本语法�
   }
   // 包装脚本是合法 JS（与其他内联脚本一起过 node --check）
   const html = await (await fetch(url)).text();
-  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
+  const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-csrf-page-"));
   blocks.forEach((code, i) => {
     const f = path.join(dir, `chunk-${i}.js`);
@@ -1266,7 +1266,7 @@ test("注入的 fetch 包装：写请求自动带 token，GET 不带且保留原
   const url = (await startChatWeb())!;
   const html = await (await fetch(url)).text();
   const block = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
-    .map((m) => m[1])
+    .map((m) => m[1]!)
     .find((code) => code.includes("x-csrf-token"));
   assert.ok(block, "应能找到注入的包装脚本");
 
@@ -1294,8 +1294,8 @@ test("注入的 fetch 包装：写请求自动带 token，GET 不带且保留原
   await wrapped("/api/sessions");
 
   assert.equal(calls.length, 3);
-  const postInit = calls[0].init ?? {};
-  const delInit = calls[1].init ?? {};
+  const postInit = calls[0]!.init ?? {};
+  const delInit = calls[1]!.init ?? {};
   assert.equal((postInit.headers as Headers).get("x-csrf-token"), token, "POST 自动带上 token");
   assert.equal(
     (postInit.headers as Headers).get("content-type"),
@@ -1303,7 +1303,7 @@ test("注入的 fetch 包装：写请求自动带 token，GET 不带且保留原
     "原有 headers 必须保留",
   );
   assert.equal((delInit.headers as Headers).get("x-csrf-token"), token, "DELETE 自动带上 token");
-  assert.equal(calls[2].init?.headers, undefined, "GET 不应被改写");
+  assert.equal(calls[2]!.init?.headers, undefined, "GET 不应被改写");
 });
 
 // ── 畸形 URL 健壮性：半截百分号编码不得杀掉服务 ───────────────────
@@ -1481,10 +1481,10 @@ test("真实对话链路：ppt_save 产 pptx 时 SSE 带 ppt 预览与下载行"
   // 下载行：文件名来自真实落盘产物
   const files = toolEnd.files as Array<{ name: string }> | undefined;
   assert.ok(files?.length, "SSE 应带 files 下载行");
-  assert.match(String(files![0].name), /链路课件.*\.pptx/);
+  assert.match(String(files![0]!.name), /链路课件.*\.pptx/);
   // 预览载荷：封面在前、count 与工具输出一致
   const ppt = toolEnd.ppt as { count: number; slides: Array<{ kind: string }> } | undefined;
   assert.ok(ppt, "SSE 应带 ppt 预览载荷");
   assert.equal(ppt!.count, 2);
-  assert.equal(ppt!.slides[0].kind, "cover");
+  assert.equal(ppt!.slides[0]!.kind, "cover");
 });

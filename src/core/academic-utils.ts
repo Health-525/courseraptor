@@ -59,11 +59,11 @@ export function candidateTerms(now: Date = new Date()): TermCandidate[] {
 export function parseSemesterString(s: string): TermCandidate | null {
   let m = s.match(/(\d{4})\D+(\d{4})\D*(1|2|一|二)(?!\d)/);
   if (m) {
-    return { year: parseInt(m[1], 10), semester: m[3] === "1" || m[3] === "一" ? 3 : 12 };
+    return { year: parseInt(m[1] ?? "", 10), semester: m[3] === "1" || m[3] === "一" ? 3 : 12 };
   }
   m = s.match(/(\d{4})\D(1|2|一|二)(?!\d)/);
   if (m) {
-    return { year: parseInt(m[1], 10), semester: m[2] === "1" || m[2] === "一" ? 3 : 12 };
+    return { year: parseInt(m[1] ?? "", 10), semester: m[2] === "1" || m[2] === "一" ? 3 : 12 };
   }
   return null;
 }
@@ -81,7 +81,7 @@ export function expandWeeks(spec: string): number[] {
   for (const seg of spec.split(",")) {
     const m = seg.match(/(\d+)\s*[-~]\s*(\d+)|(\d+)/);
     if (!m) continue;
-    const start = parseInt(m[1] ?? m[3], 10);
+    const start = parseInt(m[1] ?? m[3] ?? "", 10);
     const end = m[2] ? parseInt(m[2], 10) : start;
     if (!Number.isFinite(start) || !Number.isFinite(end)) continue;
     for (let w = Math.min(start, end); w <= Math.max(start, end); w++) {
@@ -177,14 +177,16 @@ function mergeHolidayRuns(days: WeekSpecialDay[]): string[] {
   let run: WeekSpecialDay[] = [];
 
   const flush = () => {
-    if (!run.length) return;
+    const first = run[0];
+    const last = run[run.length - 1];
+    if (!first || !last) return;
     const names = [...new Set(run.map((d) => d.name).filter(Boolean))] as string[];
     const label =
       run.length === 1
-        ? `${shortDate(run[0].date)}（${WEEKDAY_NAMES[run[0].weekday]}）`
-        : `${shortDate(run[0].date)}（${WEEKDAY_NAMES[run[0].weekday]}）～${shortDate(
-            run[run.length - 1].date,
-          )}（${WEEKDAY_NAMES[run[run.length - 1].weekday]}）`;
+        ? `${shortDate(first.date)}（${WEEKDAY_NAMES[first.weekday]}）`
+        : `${shortDate(first.date)}（${WEEKDAY_NAMES[first.weekday]}）～${shortDate(
+            last.date,
+          )}（${WEEKDAY_NAMES[last.weekday]}）`;
     runs.push(`${label}放假${names.length ? `：${names.join("、")}` : ""}`);
     run = [];
   };

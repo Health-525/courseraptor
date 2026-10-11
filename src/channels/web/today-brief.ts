@@ -189,21 +189,21 @@ function datePlus(base: Date, days: number): Date {
 function periodStartMin(period: number): number | null {
   const t = terms.periodTime(period);
   if (!t) return null;
-  const [h, m] = t.split("-")[0].split(":").map(Number);
+  const [h = 0, m = 0] = t.split("-")[0]?.split(":").map(Number) ?? [];
   return h * 60 + m;
 }
 
 function periodEndMin(period: number): number | null {
   const t = terms.periodTime(period);
   if (!t) return null;
-  const [h, m] = t.split("-")[1].split(":").map(Number);
+  const [h = 0, m = 0] = t.split("-")[1]?.split(":").map(Number) ?? [];
   return h * 60 + m;
 }
 
 function toBriefCourse(c: CourseData, nowMin: number): BriefCourse {
+  const lastPeriod = c.periods[c.periods.length - 1];
   const start = c.periods[0] != null ? periodStartMin(c.periods[0]) : null;
-  const end =
-    c.periods[c.periods.length - 1] != null ? periodEndMin(c.periods[c.periods.length - 1]) : null;
+  const end = lastPeriod != null ? periodEndMin(lastPeriod) : null;
   let status: BriefCourse["status"] = "upcoming";
   if (start != null && end != null) {
     if (nowMin > end) status = "done";

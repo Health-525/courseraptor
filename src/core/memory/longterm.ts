@@ -48,11 +48,12 @@ function similarity(a: string, b: string): number {
   for (let i = 1; i <= A.length; i++) {
     const cur = new Array<number>(B.length + 1).fill(0);
     for (let j = 1; j <= B.length; j++) {
-      cur[j] = A[i - 1] === B[j - 1] ? prev[j - 1] + 1 : Math.max(prev[j], cur[j - 1]);
+      cur[j] =
+        A[i - 1] === B[j - 1] ? (prev[j - 1] ?? 0) + 1 : Math.max(prev[j] ?? 0, cur[j - 1] ?? 0);
     }
     prev = cur;
   }
-  return prev[B.length] / Math.min(A.length, B.length);
+  return (prev[B.length] ?? 0) / Math.min(A.length, B.length);
 }
 
 /** 超过该阈值视为同一条记忆的重复表述（实测：真重复 0.81，需区分的 0.54） */
@@ -190,7 +191,7 @@ export async function loadUserGrade(): Promise<string | null> {
   if (!pool) return null;
 
   const direct = pool.match(/(\d{4})\s*级/);
-  if (direct) return direct[1];
+  if (direct) return direct[1] ?? null;
 
   // 班号如「大数据2401班」-> 前两位即入学年
   const bj = pool.match(/(\d{2})\d{2}\s*班/);

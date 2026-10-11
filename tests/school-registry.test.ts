@@ -27,9 +27,9 @@ test("未存过 schoolId 时默认 custom（不接入任何学校）；登记序
   // njtech 是本地可选插件、不进公开仓库：装了才有真实学校垫在 custom 之前
   assert.deepEqual(ids, HAS_NJTECH ? ["njtech", "custom"] : ["custom"]);
   // 手动课表标记：custom 有、真实学校没有；custom 恒为清单末位
-  assert.equal(opts[opts.length - 1].info.manual, true);
+  assert.equal(opts[opts.length - 1]!.info.manual, true);
   if (HAS_NJTECH) {
-    assert.notEqual(opts[0].info.manual, true);
+    assert.notEqual(opts[0]!.info.manual, true);
   }
 });
 
