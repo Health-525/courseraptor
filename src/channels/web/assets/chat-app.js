@@ -4103,18 +4103,16 @@ function renderSetDots(d) {
   mark("qq", !!(d.qq && d.qq.configured), true);
 }
 
-/* ── Obsidian 插件栏目：展示本地 API 令牌（即看即用，不参与「保存设置」）──
-   令牌由 GET /api/localapi 下发；演示服务没有这个接口，降级成说明文字 */
+/* ── Obsidian 插件栏目：确认连接状态（即看即用，不参与「保存设置」）──
+   插件默认自动连接，这里只显示一行状态；地址与令牌收进排障折叠块 */
 let obsidianLoaded = false;
 async function loadObsidianPane() {
   const urlInput = document.getElementById("obsidianUrl");
   const tokenInput = document.getElementById("obsidianToken");
   const cur = document.getElementById("curObsidian");
   if (!urlInput || !tokenInput || !cur) return;
-  if (document.body.dataset.demo) {
-    urlInput.value = "";
-    tokenInput.value = "";
-    cur.textContent = "演示模式不涉及本机连接：正式版在这里显示服务地址与令牌。";
+  if (document.body.dataset.demo === "true") {
+    cur.textContent = "演示模式不涉及本机连接：正式版在这里显示插件连接状态。";
     return;
   }
   if (obsidianLoaded) return;
@@ -4126,10 +4124,10 @@ async function loadObsidianPane() {
     urlInput.value = location.origin;
     tokenInput.value = data.token;
     cur.textContent = data.port
-      ? `服务正监听 127.0.0.1:${data.port}。默认端口下插件自动连接、无需填写；端口不是 3210 时把这里显示的地址填进插件设置，令牌可留空自动获取。`
-      : "默认端口下插件自动连接、无需填写；端口变化时才需要把地址填进插件设置。";
+      ? `Obsidian 插件可自动连接（服务正监听 127.0.0.1:${data.port}），无需复制任何信息。`
+      : "Obsidian 插件可自动连接，无需复制任何信息。";
   } catch (e) {
-    cur.textContent = `读取失败：${e instanceof Error ? e.message : "请确认本服务正在运行"}`;
+    cur.textContent = `状态读取失败：${e instanceof Error ? e.message : "请确认本服务正在运行"}`;
   }
 }
 const obsidianCopyBtn = document.getElementById("copyObsidianToken");

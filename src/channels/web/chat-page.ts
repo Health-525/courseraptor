@@ -790,6 +790,17 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .set-main { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding-right: 6px; }
   .set-pane { display: none; }
   .set-pane.on { display: block; }
+  /* Obsidian 栏目的排障折叠块：默认收起——自动连接是常态，地址与令牌
+     只在端口漂移等排障场合才需要看，不该占着栏目主位 */
+  .set-pane details.set-manual { margin-top: 10px; }
+  .set-pane details.set-manual > summary {
+    cursor: pointer; user-select: none; list-style: none;
+    font-family: var(--mono); font-size: 12px; letter-spacing: .08em;
+    color: var(--ink-3); padding: 6px 0;
+  }
+  .set-pane details.set-manual > summary::before { content: "▸ "; }
+  .set-pane details.set-manual[open] > summary::before { content: "▾ "; }
+  .set-pane details.set-manual > summary:hover { color: var(--ink-2); }
   /* 栏目内动作行：替代原 panel 头行右侧挂动作的做法 */
 
   /* 字段：标签在上、输入在下，全宽对齐；不再用 72px 边栏配 82px 缩进魔数 */
@@ -1581,10 +1592,13 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             <div class="cur" id="curQQ">未配置；到 q.qq.com 创建机器人后填入，保存后即可在 QQ 里使用</div>
           </section>
           <section class="set-pane" id="setPaneObsidian" role="tabpanel" aria-labelledby="setTabObsidian" data-pane="obsidian">
-            <p class="dlg-intro">在 Obsidian 里也能问课表、成绩、考试，并把今日日程与待办一键插进笔记。装好插件即自动连接（默认地址自动取令牌），无需复制；只有端口不是默认值时，才需要把下面的地址填进插件设置。此栏目即看即用，无需保存。</p>
-            <label class="fld"><span>服务地址</span><input id="obsidianUrl" type="text" readonly autocomplete="off" spellcheck="false"></label>
-            <label class="fld"><span>本地 API 令牌</span><span class="fld-row"><input id="obsidianToken" type="text" readonly autocomplete="off" spellcheck="false"><button class="fld-eye" type="button" id="copyObsidianToken">复制</button></span></label>
+            <p class="dlg-intro">在 Obsidian 里也能问课表、成绩、考试，并把今日日程与待办一键插进笔记。装好插件即自动连接——这里不需要复制任何东西，也不用点「保存设置」。</p>
             <div class="cur" id="curObsidian">加载中…</div>
+            <details class="set-manual" id="obsidianManual">
+              <summary>手动连接信息（仅排障时需要）</summary>
+              <label class="fld"><span>服务地址</span><input id="obsidianUrl" type="text" readonly autocomplete="off" spellcheck="false"></label>
+              <label class="fld"><span>本地 API 令牌</span><span class="fld-row"><input id="obsidianToken" type="text" readonly autocomplete="off" spellcheck="false"><button class="fld-eye" type="button" id="copyObsidianToken">复制</button></span></label>
+            </details>
           </section>
           <section class="set-pane" id="setPaneData" role="tabpanel" aria-labelledby="setTabData" data-pane="data">
             <p class="dlg-intro">会话、附件、生成文件与待办都保存在本机，可导出或按需清理。此栏目的操作即时生效，无需点「保存设置」。</p>
