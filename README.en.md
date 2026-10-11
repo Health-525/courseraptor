@@ -11,7 +11,9 @@
 [简体中文](README.md) · **English**
 
 [![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Health-525/courseraptor?label=release&color=orange)](https://github.com/Health-525/courseraptor/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social)](https://github.com/Health-525/courseraptor)
 [![Node 24+](https://img.shields.io/badge/Node.js-24%2B-8f2b21?logo=nodedotjs&logoColor=white)](https://nodejs.org/en/download)
 [![GitHubDaily](https://img.shields.io/badge/GitHubDaily-Featured-1DA1F2?logo=x&logoColor=white)](https://x.com/github_daily/status/2105560876132757969)
 [![Indie Dev List](https://img.shields.io/badge/China_Indie_Dev_List-Featured-9B59B6)](https://github.com/1c7/chinese-independent-developer/blob/master/.github/pages/README-Programmer-Edition.md)
@@ -25,6 +27,12 @@ CourseRaptor brings timetables, grades, exams, academic announcements, and calen
 If you are building agents yourself, the repo doubles as a reference implementation: how a `ToolLoopAgent` loop organizes dozens of tools, how external systems sit behind a ports-and-adapters boundary (a new school is one self-contained directory dropped into `src/adapters/`, auto-discovered at startup, zero kernel changes), and how a multi-provider model layer is assembled from a plain-data registry. See [Build with us](#build-with-us) below.
 
 > ⚠️ **The framework ships no real-school academic protocols: it starts in manual timetable mode everywhere, and online queries require writing a `SchoolAdapter` plugin for your school ([adapter guide](src/adapters/README.md)).** This is an independent, unofficial project. The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project. The [Chinese README](README.md) is the authoritative, fully detailed version.
+
+<p align="center">
+  <img src="docs/screenshots/gui-demo.gif" width="800" alt="Web UI demo: quick prompts and one-line queries (fictional demo data)">
+</p>
+
+> Demo and screenshots use fictional sample data (demo mode), never real academic records.
 
 ## What it does
 
@@ -42,7 +50,7 @@ If you are building agents yourself, the repo doubles as a reference implementat
 | Can it help me study? | Study-coach mode: intuition before formalism, hints before answers; exam prep follows a "template → variation → full paper" arc |
 | My school's system is not adapted | Manual timetable mode works everywhere out of the box: paste timetable text or upload Excel/CSV/PDF/Word/TXT, and the AI parses it into a structured timetable (it asks up to 3 clarifying questions instead of guessing) |
 
-The kernel ships **17 school-agnostic tools** (files and tables, document generation, sandboxed computation, memory, knowledge base, todos, study coach, pomodoro, weather), plus 2 from the built-in manual-timetable adapter (timetable and holiday/makeup handling) — 19 tools out of the box, with zero contact with any academic system. Online academic queries (timetable / grades / exams / notices / course selection) are provided by **school adapter plugins**: the framework supplies only the `SchoolAdapter` port and an auto-discovery loader — you write the adapter for your school's protocol (the reference NJTECH implementation brings the total to 31 tools), and the corresponding academic tools mount automatically once selected in the browser settings page. See [capabilities](docs/capabilities.md) for the full table. A headless CLI wrapping academic queries ships **with the adapter**, not with the framework.
+The kernel ships **17 school-agnostic tools** (files and tables, document generation, sandboxed computation, memory, knowledge base, todos, study coach, pomodoro, weather), plus 2 from the built-in manual-timetable adapter (timetable and holiday/makeup handling) — 19 tools out of the box, with zero contact with any academic system. Online academic queries (timetable / grades / exams / notices / course selection) mount from your school adapter plugin — the reference NJTECH implementation brings the total to 31. See [capabilities](docs/capabilities.md) for the full table.
 
 Both screenshots below use fictional demo data.
 
@@ -74,7 +82,7 @@ To showcase real AI analysis with the same fictional data, run `npm run demo:liv
 
 ## Use your own academic account
 
-Windows users can grab a self-contained installer (bundled Node runtime, ~116 MB) from [Releases](https://github.com/Health-525/courseraptor/releases/latest) — no development environment needed. From source, run `npm start` (or double-click `start.bat` on Windows). Follow the prompts to configure your university credentials and model API key (DeepSeek by default; other providers can be switched in the web Settings panel). You can also skip the campus account with an empty Enter and fill it in later via the web Settings panel. Provider API usage may incur charges.
+Windows users can grab a self-contained installer (bundled Node runtime, ~100 MB download) from [Releases](https://github.com/Health-525/courseraptor/releases/latest) — no development environment needed. From source, run `npm start` (or double-click `start.bat` on Windows). Follow the prompts to configure your university credentials and model API key (DeepSeek by default; other providers can be switched in the web Settings panel). You can also skip the campus account with an empty Enter and fill it in later via the web Settings panel. Provider API usage may incur charges.
 
 The browser UI usually runs at `http://localhost:3210`; follow the actual startup address if that port is busy. Keep the terminal running. To change your API key securely, enter `/key` without arguments in the terminal.
 
