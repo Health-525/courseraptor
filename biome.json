@@ -38,15 +38,6 @@
   },
   "overrides": [
     {
-      "includes": ["src/channels/web/assets/**"],
-      "linter": {
-        "enabled": false
-      },
-      "formatter": {
-        "enabled": false
-      }
-    },
-    {
       "includes": ["tests/**"],
       "linter": {
         "rules": {

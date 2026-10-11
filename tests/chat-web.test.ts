@@ -82,10 +82,13 @@ test("GET / 返回对话页面（含 marked 引用与快捷提问）", async () 
   const res = await fetch(url);
   const html = await res.text();
   assert.match(html, /CourseRaptor 对话|CourseRaptor</);
-  assert.match(html, /api\/chat/);
-  // Markdown 渲染脚本与快捷提问气泡必须就位
+  // 对话主脚本已外置：页面挂 /app.js 引用，API 调用都在资产里
+  assert.match(html, /<script src="\/app\.js"><\/script>/);
+  const appjs = await (await fetch(`${url}/app.js`)).text();
+  assert.match(appjs, /api\/chat/);
+  // Markdown 渲染脚本与快捷提问气泡必须就位（气泡文案由脚本渲染）
   assert.match(html, /\/vendor\/marked\.min\.js/);
-  assert.match(html, /这周课表/);
+  assert.match(appjs, /这周课表/);
   // 页面内嵌进程级 CSRF token，绝不能被浏览器缓存：否则重启后旧 token
   // 让全部写请求 403
   assert.equal(res.headers.get("cache-control"), "no-store");
@@ -1009,31 +1012,36 @@ test("中文文件名下载与穿越/不存在一律处理正确", async () => {
 test("渲染产物语法自检 + 思考卡片与齿轮图标锚点", async () => {
   const url = (await startChatWeb())!;
   const html = await (await fetch(url)).text();
+  // 对话主脚本已外置：/app.js 资产本体也要语法自检
+  const appjs = await (await fetch(`${url}/app.js`)).text();
+  assert.match(appjs, /function thinkNew/);
 
-  // chatPage 是外层模板串：必须对「求值后的页面」做语法检查，源码切片会漏判
+  // chatPage 的内联脚本（CSRF bootstrap 等）仍是模板串：对「求值后的页面」
+  // 做语法检查（源码切片会漏判）；外置资产整文件 --check
   const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]!);
-  assert.ok(blocks.length >= 1, "页面应有内联脚本");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-page-"));
   blocks.forEach((code, i) => {
     const f = path.join(dir, `chunk-${i}.js`);
     fs.writeFileSync(f, code, "utf8");
     execFileSync(process.execPath, ["--check", f], { stdio: "pipe" });
   });
+  const appFile = path.join(dir, "app.js");
+  fs.writeFileSync(appFile, appjs, "utf8");
+  execFileSync(process.execPath, ["--check", appFile], { stdio: "pipe" });
 
   // 思考独立建模：有自己的样式块（楷体草稿区，与黑体正文分层）与绘图函数
   assert.match(html, /\.think \{/, "缺少 .think 卡片样式");
   assert.match(html, /\.think \.thbody[\s\S]{0,200}var\(--kai\)/, "思考区应为楷体");
-  assert.match(html, /function thinkNew/, "缺少思考卡片渲染函数");
-  assert.match(html, /"思考"/, "思考卡片要有常驻文字标记");
+  assert.match(appjs, /"思考"/, "思考卡片要有常驻文字标记");
   // 工具卡片行首是内联 SVG 齿轮，不再用勾叉字形表达状态
-  assert.match(html, /<svg viewBox="0 0 24 24"/, "工具行首应为内联 SVG 图标");
-  assert.match(html, /function toolDone[\s\S]{0,400}"完成"/, "完成状态用文字表达");
-  assert.ok(!html.includes('"✓"') && !html.includes("'✓'"), "工具状态不再用勾号");
+  assert.match(appjs, /<svg viewBox="0 0 24 24"/, "工具行首应为内联 SVG 图标");
+  assert.match(appjs, /function toolDone[\s\S]{0,400}"完成"/, "完成状态用文字表达");
+  assert.ok(!html.includes('"✓"') && !appjs.includes('"✓"'), "工具状态不再用勾号");
   // 会话操作是浮层菜单卡片：置顶/改名/删除不再撑开列表行
   assert.match(html, /\.smenu \{/, "缺少浮层菜单样式");
-  assert.match(html, /class="smenu"|el\("smenu"\)/, "菜单应渲染成浮层卡片");
+  assert.match(appjs, /el\("smenu"\)/, "菜单应渲染成浮层卡片");
   assert.ok(!html.includes("sactions"), "旧的内联操作行应已移除");
-  assert.match(html, /setAttribute\("aria-haspopup", "menu"\)/, "⋯ 按钮应声明弹出菜单语义");
+  assert.match(appjs, /setAttribute\("aria-haspopup", "menu"\)/, "⋯ 按钮应声明弹出菜单语义");
 });
 
 test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", async () => {
@@ -1066,35 +1074,41 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
   // 聊天页入口已收敛为「功能大厅」：窄屏顶栏只有 ☰ 与 ＋，大厅入口在左抽屉里
   // （豆包式单抽屉导航——顶栏再放一枚左滑面板按钮会被当成功能重复）
   const chat = await (await fetch(url)).text();
+  // 面板注册表、工具映射等运行时接线都在外置的 chat-app.js 里
+  const appjs = await (await fetch(`${url}/app.js`)).text();
   assert.match(chat, /id="openHall"[^>]*>功能大厅</, "左抽屉应有功能大厅入口");
   assert.ok(!chat.includes('id="openHallM"'), "窄屏顶栏不应再有独立大厅按钮（避免与 ☰ 抽屉重复）");
   assert.match(chat, /class="hall" id="hall"/, "功能大厅抽屉应存在");
   assert.match(chat, /id="hallSettings"/, "设置面板应常驻在功能大厅抽屉里");
   assert.ok(!chat.includes('id="openSettings"'), "侧栏不应再有独立的设置按钮");
-  assert.match(chat, /today: \(\) => briefOf\(\)\.then\(buildToday\)/, "面板注册表应包含今日日程");
-  assert.match(chat, /const TOOL_PANEL = \{/, "应有工具→面板刷新映射");
-  assert.match(chat, /get_schedule: "schedule"/, "课表工具应映射课表面板（开着才刷新）");
-  assert.match(chat, /open_settings: "settings"/, "agent 应可通过 open_settings 工具打开设置");
-  assert.match(chat, /get_grades: "grades"/, "成绩工具应映射成绩面板（开着才刷新）");
-  assert.match(chat, /get_news: "news"/, "通知工具应映射通知面板（开着才刷新）");
+  assert.match(appjs, /today: \(\) => briefOf\(\)\.then\(buildToday\)/, "面板注册表应包含今日日程");
+  assert.match(appjs, /const TOOL_PANEL = \{/, "应有工具→面板刷新映射");
+  assert.match(appjs, /get_schedule: "schedule"/, "课表工具应映射课表面板（开着才刷新）");
+  assert.match(appjs, /open_settings: "settings"/, "agent 应可通过 open_settings 工具打开设置");
+  assert.match(appjs, /get_grades: "grades"/, "成绩工具应映射成绩面板（开着才刷新）");
+  assert.match(appjs, /get_news: "news"/, "通知工具应映射通知面板（开着才刷新）");
   assert.match(
-    chat,
+    appjs,
     /panel === "settings" && !hallAutoMuted\) openHall/,
     "数据查询工具不得自动推出：只有 open_settings 才允许对话联动打开",
   );
-  assert.ok(!chat.includes("对应面板会自动从右边推出"), "大厅文案不应再承诺查询自动推出");
-  assert.match(chat, /\{ id: "grades"/, "宫格应有成绩卡片");
-  assert.match(chat, /\{ id: "news"/, "宫格应有通知卡片");
+  assert.ok(
+    !chat.includes("对应面板会自动从右边推出") && !appjs.includes("对应面板会自动从右边推出"),
+    "大厅文案不应再承诺查询自动推出",
+  );
+  assert.match(appjs, /\{ id: "grades"/, "宫格应有成绩卡片");
+  assert.match(appjs, /\{ id: "news"/, "宫格应有通知卡片");
   assert.match(
-    chat,
+    appjs,
     /ev\.panel && !hallAutoMuted\) openHall/,
     "未配置等场景应据 ev.panel 自动推出设置",
   );
   assert.ok(
-    !chat.includes("看今日日程：下一节课在哪 · 今天还有什么"),
+    !chat.includes("看今日日程：下一节课在哪 · 今天还有什么") &&
+      !appjs.includes("看今日日程：下一节课在哪 · 今天还有什么"),
     "首屏不应再展示今日日程 chip",
   );
-  assert.match(chat, /默认进入新的空会话/, "每次打开网页应默认新建空会话");
+  assert.match(appjs, /默认进入新的空会话/, "每次打开网页应默认新建空会话");
 });
 
 test("GET /schedule 返回独立课表页：语法自检 + 教学周导航", async () => {
@@ -1141,16 +1155,16 @@ test("GET /todos 返回独立待办页：语法自检 + 勾选删除走 /api/rem
     fs.writeFileSync(f, code, "utf8");
     execFileSync(process.execPath, ["--check", f], { stdio: "pipe" });
   });
-  // 大厅面板的「完整页」应指向各自独立页，不再挤在 /today
-  const chat = await (await fetch(url)).text();
+  // 大厅面板的「完整页」应指向各自独立页，不再挤在 /today（接线在 chat-app.js）
+  const appjs = await (await fetch(`${url}/app.js`)).text();
   assert.match(
-    chat,
+    appjs,
     /panel === "schedule"\) return "\/schedule"/,
     "课表面板完整页应指向 /schedule",
   );
-  assert.match(chat, /panel === "todos"\) return "\/todos"/, "待办面板完整页应指向 /todos");
+  assert.match(appjs, /panel === "todos"\) return "\/todos"/, "待办面板完整页应指向 /todos");
   assert.match(
-    chat,
+    appjs,
     /panel === "knowledge"\) return "\/knowledge"/,
     "知识库面板完整页应指向 /knowledge",
   );

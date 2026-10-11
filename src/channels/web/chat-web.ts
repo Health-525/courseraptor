@@ -117,6 +117,7 @@ import {
   type WebUpload,
   workspaceStats,
 } from "../../core/workspace-data";
+import { appJsAsset } from "./app-asset";
 import { chatPage } from "./chat-page";
 import { knowledgePage } from "./knowledge-page";
 import { effectiveQuickQuestions, normalizeQuickQuestions } from "./quick-questions";
@@ -1171,6 +1172,22 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       await serveGeneratedFile(url.slice("/files/".length), res);
       return;
     }
+    // 前端应用脚本：assets/chat-app.js 独立伺服（不再内联进页面模板）。
+    // no-cache 而非长缓存：开发期改前端必须立刻生效，localhost 全量拉取无感
+    if (url === "/app.js") {
+      const buf = appJsAsset();
+      if (buf) {
+        res.writeHead(200, {
+          "content-type": "text/javascript; charset=utf-8",
+          "cache-control": "no-cache",
+        });
+        res.end(buf);
+      } else {
+        res.writeHead(404);
+        res.end('console.error("前端脚本缺失：src/channels/web/assets/chat-app.js 不可读");');
+      }
+      return;
+    }
     if (url === "/vendor/marked.min.js") {
       const buf = loadStaticOnce(MARKED_UMD);
       if (buf) {
@@ -2125,5 +2142,5 @@ async function runTurn(
 // HTML 特殊字符，保证最终 DOM 里只有 marked 生成的标签——模型输出里
 // 夹带的 <script> 之类会以纯文本形式出现，不构成注入面。
 //
-// ⚠ 整个页面是一个 TS 模板字符串：页面 JS 里的换行符必须写 \\n（如
-// buf.split("\\n")），页面代码禁用反引号模板串与 ${——它们会被外层解析。
+// ⚠ 页面 HTML 仍是 TS 模板字符串（模板里的内联 JS 同样受限）；对话主脚本
+// chat-app.js 已外置为 /app.js 静态资产，不受此约束（可自由用反引号/${}）。
