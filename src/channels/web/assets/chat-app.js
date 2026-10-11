@@ -4073,7 +4073,6 @@ function setTab(name) {
     pane.classList.toggle("on", pane.dataset.pane === name);
   }
   document.getElementById("saveSettings").hidden = !["school", "model", "qq"].includes(name);
-  if (name === "obsidian") void loadObsidianPane();
 }
 for (const tab of setTabs) tab.addEventListener("click", () => setTab(tab.dataset.pane));
 /* 方向键在栏目间移动焦点：大厅里目录是横排（左右）+ 窄屏也是横排，竖排同样支持上下 */
@@ -4102,46 +4101,6 @@ function renderSetDots(d) {
   mark("model", !!(d.deepseek && d.deepseek.configured), false);
   mark("qq", !!(d.qq && d.qq.configured), true);
 }
-
-/* ── Obsidian 插件栏目：确认连接状态（即看即用，不参与「保存设置」）──
-   插件默认自动连接，这里只显示一行状态；地址与令牌收进排障折叠块 */
-let obsidianLoaded = false;
-async function loadObsidianPane() {
-  const urlInput = document.getElementById("obsidianUrl");
-  const tokenInput = document.getElementById("obsidianToken");
-  const cur = document.getElementById("curObsidian");
-  if (!urlInput || !tokenInput || !cur) return;
-  if (document.body.dataset.demo === "true") {
-    cur.textContent = "演示模式不涉及本机连接：正式版在这里显示插件连接状态。";
-    return;
-  }
-  if (obsidianLoaded) return;
-  try {
-    const res = await fetch("/api/localapi");
-    const data = await res.json();
-    if (!res.ok || !data.token) throw new Error(data.error || "接口返回异常");
-    obsidianLoaded = true;
-    urlInput.value = location.origin;
-    tokenInput.value = data.token;
-    cur.textContent = data.port
-      ? `Obsidian 插件可自动连接（服务正监听 127.0.0.1:${data.port}），无需复制任何信息。`
-      : "Obsidian 插件可自动连接，无需复制任何信息。";
-  } catch (e) {
-    cur.textContent = `状态读取失败：${e instanceof Error ? e.message : "请确认本服务正在运行"}`;
-  }
-}
-const obsidianCopyBtn = document.getElementById("copyObsidianToken");
-obsidianCopyBtn?.addEventListener("click", async () => {
-  const token = document.getElementById("obsidianToken")?.value ?? "";
-  if (!token) return;
-  try {
-    await navigator.clipboard.writeText(token);
-    obsidianCopyBtn.textContent = "已复制";
-    setTimeout(() => (obsidianCopyBtn.textContent = "复制"), 1500);
-  } catch {
-    /* 剪贴板不可用（旧内核等）：保持原样，令牌本身已可手动选中复制 */
-  }
-});
 
 /* ── 学校栏目：下拉框选学校 + 随选择出现的教务账号 / 导入课表 ── */
 const schoolSelect = document.getElementById("schoolSelect");
