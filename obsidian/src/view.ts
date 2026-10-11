@@ -16,16 +16,6 @@ export const VIEW_TYPE_COURSE_RAPTOR = "courseraptor-chat";
 
 const ICON = "bot";
 
-/** 打开本插件设置页：app.setting 存在于运行时但未进公开类型，收敛在这一个访问点 */
-function openPluginSettings(plugin: CourseRaptorPlugin): void {
-  const setting = (plugin.app as unknown as {
-    setting?: { open(): void; openTabById(id: string): void };
-  }).setting;
-  if (!setting) return;
-  setting.open();
-  setting.openTabById("courseraptor");
-}
-
 /** 一轮流式回复的动态部件：事件来了逐个挂进 root */
 interface TurnParts {
   root: HTMLElement;
@@ -230,11 +220,6 @@ export class ChatView extends ItemView {
     if (this.busy) return;
     const message = this.inputEl.value.trim();
     if (!message) return;
-    if (!this.plugin.settings.token) {
-      new Notice("尚未配置本地 API 令牌：请在 CourseRaptor 插件设置里粘贴（网页「设置 → Obsidian 插件」可复制）");
-      openPluginSettings(this.plugin);
-      return;
-    }
 
     this.busy = true;
     this.setStreamingUi(true);

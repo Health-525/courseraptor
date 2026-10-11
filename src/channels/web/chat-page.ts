@@ -1581,7 +1581,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             <div class="cur" id="curQQ">未配置；到 q.qq.com 创建机器人后填入，保存后即可在 QQ 里使用</div>
           </section>
           <section class="set-pane" id="setPaneObsidian" role="tabpanel" aria-labelledby="setTabObsidian" data-pane="obsidian">
-            <p class="dlg-intro">在 Obsidian 里也能问课表、成绩、考试，并把今日日程与待办一键插进笔记。装好 CourseRaptor 插件后，把下面的连接信息粘进插件设置（此栏目即看即用，无需保存）。</p>
+            <p class="dlg-intro">在 Obsidian 里也能问课表、成绩、考试，并把今日日程与待办一键插进笔记。装好插件即自动连接（默认地址自动取令牌），无需复制；只有端口不是默认值时，才需要把下面的地址填进插件设置。此栏目即看即用，无需保存。</p>
             <label class="fld"><span>服务地址</span><input id="obsidianUrl" type="text" readonly autocomplete="off" spellcheck="false"></label>
             <label class="fld"><span>本地 API 令牌</span><span class="fld-row"><input id="obsidianToken" type="text" readonly autocomplete="off" spellcheck="false"><button class="fld-eye" type="button" id="copyObsidianToken">复制</button></span></label>
             <div class="cur" id="curObsidian">加载中…</div>

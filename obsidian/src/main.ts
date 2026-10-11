@@ -92,11 +92,6 @@ export default class CourseRaptorPlugin extends Plugin {
   private async refreshStatusBar(): Promise<void> {
     const el = this.statusText;
     if (!el) return;
-    if (!this.settings.baseUrl || !this.settings.token) {
-      el.setText("🦖 未配置");
-      el.setAttribute("title", "CourseRaptor 未配置：填服务地址与令牌（设置 → CourseRaptor）");
-      return;
-    }
     const result = await this.client.check().catch(() => ({ ok: false as const, message: "连接失败" }));
     if (result.ok) {
       el.setText("🦖 已连接");

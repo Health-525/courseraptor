@@ -29,12 +29,31 @@ export interface RaptorClientConfig {
 export class RaptorError extends Error {}
 
 export class RaptorClient {
+  /** 自动模式下从服务取回的令牌（本进程内缓存；服务端持久化，重启不变） */
+  private autoToken: string | null = null;
+
   constructor(private getConfig: () => RaptorClientConfig) {}
 
   /** 拼当前服务根地址（去掉末尾斜杠）：设置页「打开网页」也用它 */
   base(): string {
     const { baseUrl } = this.getConfig();
     return baseUrl.replace(/\/+$/, "");
+  }
+
+  /**
+   * 写请求用的令牌：手动配置优先（留作覆盖与排障），否则自动向服务
+   * 取回——令牌防御的是「浏览器里的网页」（读不到本机响应），插件是
+   * 本机进程、本就在信任边界内，自动取回安全性不打折，省掉手粘一步。
+   */
+  private async writeToken(): Promise<string> {
+    const configured = this.getConfig().token;
+    if (configured) return configured;
+    if (!this.autoToken) {
+      const info = await this.getJson<LocalApiInfo>("/api/localapi");
+      if (!info?.token) throw new RaptorError("服务未返回本地 API 令牌");
+      this.autoToken = info.token;
+    }
+    return this.autoToken;
   }
 
   /** 渲染进程 fetch：可流式读 SSE，但跨源需要服务端 CORS 配合 */
@@ -45,8 +64,7 @@ export class RaptorClient {
     const headers: Record<string, string> = {};
     if (init.body !== undefined) {
       headers["content-type"] = "application/json";
-      const token = this.getConfig().token;
-      if (token) headers["x-raptor-token"] = token;
+      headers["x-raptor-token"] = await this.writeToken();
     }
     try {
       return await fetch(`${this.base()}${path}`, { ...init, headers });
@@ -81,7 +99,10 @@ export class RaptorClient {
     }
   }
 
-  /** 连接与令牌一次验完：服务可达 + 令牌与发牌方一致 */
+  /**
+   * 连接检测：服务可达 + 令牌一致。令牌留空即自动获取并缓存——所以
+   * 「未填令牌」不再算错误，默认装好即连。
+   */
   async check(): Promise<{ ok: true; info: LocalApiInfo } | { ok: false; message: string }> {
     let info: LocalApiInfo;
     try {
@@ -89,13 +110,14 @@ export class RaptorClient {
     } catch (e) {
       return { ok: false, message: e instanceof Error ? e.message : String(e) };
     }
-    if (!this.getConfig().token) return { ok: false, message: "尚未填写本地 API 令牌" };
-    if (info.token !== this.getConfig().token) {
+    const configured = this.getConfig().token;
+    if (configured && configured !== info.token) {
       return {
         ok: false,
-        message: "令牌不匹配：请到 CourseRaptor 网页「设置 → Obsidian 插件」重新复制",
+        message: "令牌不匹配：清空设置里的令牌即可自动获取，或到 CourseRaptor 网页「设置 → Obsidian 插件」重新复制",
       };
     }
+    this.autoToken = info.token;
     return { ok: true, info };
   }
 
@@ -133,17 +155,16 @@ export class RaptorClient {
     onEvent: (event: ChatEvent) => void,
     signal?: AbortSignal,
   ): Promise<void> {
-    let res: Response;
-    try {
-      res = await this.request("/api/chat", {
-        method: "POST",
-        body: JSON.stringify({ message, sessionId }),
-        signal,
-      });
-    } catch (e) {
-      if (signal?.aborted) throw e;
-      if (e instanceof RaptorError) throw e;
-      throw new RaptorError(e instanceof Error ? e.message : String(e));
+    const init = {
+      method: "POST",
+      body: JSON.stringify({ message, sessionId }),
+      signal,
+    };
+    let res = await this.request("/api/chat", init);
+    if (res.status === 403 && !this.getConfig().token) {
+      // 自动令牌失效（服务端重置过数据等）：重取一次再试，仅自动模式
+      this.autoToken = null;
+      res = await this.request("/api/chat", init);
     }
     if (!res.ok) {
       let detail = `HTTP ${res.status}`;

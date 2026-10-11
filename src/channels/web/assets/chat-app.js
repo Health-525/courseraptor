@@ -4126,8 +4126,8 @@ async function loadObsidianPane() {
     urlInput.value = location.origin;
     tokenInput.value = data.token;
     cur.textContent = data.port
-      ? `服务正监听 127.0.0.1:${data.port}。把服务地址与令牌粘进 Obsidian 插件设置即可连接；令牌等同本机访问凭证，请勿外发。`
-      : "把服务地址与令牌粘进 Obsidian 插件设置即可连接；令牌等同本机访问凭证，请勿外发。";
+      ? `服务正监听 127.0.0.1:${data.port}。默认端口下插件自动连接、无需填写；端口不是 3210 时把这里显示的地址填进插件设置，令牌可留空自动获取。`
+      : "默认端口下插件自动连接、无需填写；端口变化时才需要把地址填进插件设置。";
   } catch (e) {
     cur.textContent = `读取失败：${e instanceof Error ? e.message : "请确认本服务正在运行"}`;
   }

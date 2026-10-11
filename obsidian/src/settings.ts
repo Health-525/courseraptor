@@ -33,14 +33,14 @@ export class CourseRaptorSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName("CourseRaptor").setHeading();
 
     const intro = containerEl.createEl("p", {
-      text: "先在本机运行 CourseRaptor（终端敲 raptor，或双击安装包），再在它的网页「功能大厅 → 设置 → Obsidian 插件」里复制服务地址与令牌。",
+      text: "一般无需配置：只要本机在运行 CourseRaptor（终端敲 raptor，或双击安装包），插件就会用默认地址自动连接。仅当默认端口 3210 被占用、服务换了端口时，才需要到它的网页「功能大厅 → 设置 → Obsidian 插件」里查看实际地址。",
       cls: "setting-item-description",
     });
     intro.style.marginBottom = "12px";
 
     new Setting(containerEl)
       .setName("服务地址")
-      .setDesc("CourseRaptor 网页服务的地址，默认 http://127.0.0.1:3210（端口被占用时会自动换，以网页设置里显示的为准）")
+      .setDesc("默认 http://127.0.0.1:3210（端口被占用时会自动换，以网页设置里显示的为准）")
       .addText((text) =>
         text
           .setPlaceholder("http://127.0.0.1:3210")
@@ -53,10 +53,10 @@ export class CourseRaptorSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("本地 API 令牌")
-      .setDesc("从 CourseRaptor 网页「设置 → Obsidian 插件」复制；令牌等同本机访问凭证，不要分享给别人")
+      .setDesc("留空即自动获取（推荐）。手动填写仅用于覆盖——从 CourseRaptor 网页「设置 → Obsidian 插件」复制")
       .addText((text) => {
         text
-          .setPlaceholder("64 位十六进制")
+          .setPlaceholder("留空自动获取")
           .setValue(this.plugin.settings.token)
           .onChange(async (value) => {
             this.plugin.settings.token = value.trim();
