@@ -47,42 +47,72 @@ export function isProtected(rel: string): boolean {
   return false;
 }
 
+/**
+ * 覆盖复制过滤器（安全边界的核心）：extractDir 下的本机数据路径一律跳过。
+ * 单独导出以便测试钉住——filter 改坏 = 同学凭证被新包冲掉。
+ */
+export function updateCopyFilter(extractDir: string): (src: string) => boolean {
+  return (src) => {
+    const rel = path.relative(extractDir, src).split(path.sep).join("/");
+    if (!rel) return true;
+    return !isProtected(rel);
+  };
+}
+
 const WORK_DIR = path.join(PROJECT_ROOT, "data", "update-download");
 const DOWNLOAD_TIMEOUT_MS = 120_000;
 const EXTRACT_TIMEOUT_MS = 60_000;
 const NPM_INSTALL_TIMEOUT_MS = 10 * 60_000;
 
 /**
+ * 边缘依赖注入（仅测试用，不传即用真实实现）：
+ * applyUpdate 的下载/解压/复制/装依赖都写真实仓库，测试无法直跑，
+ * 于是按端口-适配器惯例把这几步抽成可注入端口；默认实现即原行为。
+ */
+export interface UpdateDeps {
+  /** 更新后台地址；默认 requireSecureUpdateServerUrl（未配置/非 HTTPS 抛错） */
+  serverUrl?: () => string | null;
+  /** 版本对比；默认 checkForUpdate（null = 已是最新） */
+  checkUpdate?: () => Promise<{ latest: string; current?: string; notes?: string } | null>;
+  /** 下载新版 zip，返回本地 zip 路径；默认 downloadPackage */
+  download?: (server: string) => Promise<string>;
+  /** 解压 zip，返回解压目录；默认 extractZip */
+  extract?: (zipPath: string) => Promise<string>;
+  /** 覆盖复制（filter 为保护过滤器）；默认 fs.cp recursive */
+  copyDir?: (from: string, to: string, filter: (src: string) => boolean) => Promise<void>;
+  /** 安装依赖；默认 npm install */
+  npmInstall?: () => Promise<void>;
+}
+
+/**
  * 从后台下载新版并覆盖安装。
  * @param log 进度回调（每步一条，直接打到对话界面上）
+ * @param deps 边缘依赖（仅测试注入；不传即真实实现）
  * @returns 给用户看的最终结果文案
  */
-export async function applyUpdate(log: (msg: string) => void = () => {}): Promise<string> {
-  const server = requireSecureUpdateServerUrl();
+export async function applyUpdate(
+  log: (msg: string) => void = () => {},
+  deps: UpdateDeps = {},
+): Promise<string> {
+  const server = (deps.serverUrl ?? requireSecureUpdateServerUrl)();
   if (!server) {
     return "未配置更新后台地址（RAPTOR_UPDATE_SERVER），请找维护者要安装包手动覆盖。";
   }
-  const info = await checkForUpdate();
+  const info = await (deps.checkUpdate ?? checkForUpdate)();
   if (!info) return "当前已是最新版本，无需更新。";
 
   log(`发现新版本 v${info.latest}${info.notes ? `：${info.notes}` : ""}，下载中…`);
-  const zipPath = await downloadPackage(server);
+  const zipPath = await (deps.download ?? downloadPackage)(server);
 
   log("解压中…");
-  const extractDir = await extractZip(zipPath);
+  const extractDir = await (deps.extract ?? extractZip)(zipPath);
 
   log("覆盖安装中（你的凭证/记忆/会话不会被动）…");
-  await cp(extractDir, PROJECT_ROOT, {
-    recursive: true,
-    filter: (src) => {
-      const rel = path.relative(extractDir, src).split(path.sep).join("/");
-      if (!rel) return true;
-      return !isProtected(rel);
-    },
-  });
+  const copy = deps.copyDir ?? ((from, to, filter) => cp(from, to, { recursive: true, filter }));
+  await copy(extractDir, PROJECT_ROOT, updateCopyFilter(extractDir));
 
   log("安装依赖中，可能需要一两分钟…");
-  await runNpmInstall();
+  await (deps.npmInstall ?? runNpmInstall)();
 
   return `✅ 已更新到 v${info.latest}。重启 raptor（退出后重新运行）即可使用新版。`;
 }
