@@ -4,8 +4,8 @@
 
 # 🦖 CourseRaptor
 
-**散落在教务系统各处的信息，收进一句对话。**<br>
-学校无关、本地优先的教务 Agent 框架（Vercel AI SDK v7 · 端口-适配器 · 三端入口）：开箱即「手动课表」模式，任何学校都能用；要在线直查教务，为自己的学校写一个适配器插件即可，内核零改动。
+**大学教务对话式 Agent 框架** —— 课表 · 成绩 · 考试 · 教务通知 · 待办 · 知识库 · 记忆，一句话搞定。<br>
+学校无关的本地优先内核（Vercel AI SDK v7 · 端口-适配器 · 三端入口）：开箱即「手动课表」模式、任何学校都能用；要在线直查教务，为自己的学校写一个适配器插件即可，内核零改动。
 
 [![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
 [![下载最新版](https://img.shields.io/github/v/release/Health-525/courseraptor?label=%E4%B8%8B%E8%BD%BD%E6%9C%80%E6%96%B0%E7%89%88&color=orange)](https://github.com/Health-525/courseraptor/releases/latest)
@@ -23,12 +23,14 @@
 
 ---
 
-问「这周课表」「我的 GPA」「最近的考试」「通识学分还缺哪几类」——agent 一句话作答：写好适配器的学校自动登录教务、抓取、结构化后回答；还没写适配器也不影响起步，「手动课表」导入后今日页、待办与学习教练照常运转。
+散落在教务系统各处的信息，收进一句对话。
+
+问「这周课表」「我的 GPA」「最近的考试」「通识学分还缺哪几类」——为自己的学校写好适配器后，agent 自动登录教务、抓取、结构化后回答；还没写适配器也能用「手动课表」模式管课表、待办与学习。
 
 - **三端一个内核** —— 终端敲 `raptor`、浏览器开 `localhost:3210`、QQ 里 @机器人，共用同一份记忆
 - **一切都在本机** —— 凭证 AES-256-GCM 加密落盘，教务数据不经第三方，不上报遥测（历史装机统计服务已下线；旧包可设 `RAPTOR_NO_TELEMETRY=1` 关闭上报尝试）
-- **模型接你自己的 Key** —— 默认 DeepSeek，共 12 家国内厂商可选，或填自定义 OpenAI 兼容端点，按量计费、用量透明
-- **开箱即用，接教务只差一个插件** —— 开箱「手动课表」模式零教务联网；要在线直查，往 [`src/adapters/`](src/adapters/) 丢一个自包含插件目录，启动时自动发现、内核零改动（[学校适配器指南](src/adapters/README.md)）
+- **模型接你自己的 Key** —— 默认 DeepSeek，另有 11 家国内厂商可选（通义千问 / 智谱 GLM / Kimi / 豆包 / 混元 / MiniMax / 阶跃 / 文心 / 讯飞 / 硅基流动 / 移动云，共 12 家），或填自定义 OpenAI 兼容端点，按量计费、用量透明
+- **任何学校开箱即用** —— 默认「手动课表」模式（导入课表、零教务联网）；要在线直查教务，为你学校写一个适配器插件即可，框架已备好 `SchoolAdapter` 端口与自动发现加载器（[`src/adapters/`](src/adapters/)）
 
 正在写 Agent 的朋友可以直接把它当参考实现读：`ToolLoopAgent` 多轮工具循环怎么组织几十个工具、外部系统怎么用端口-适配器隔离（新增一所学校 = 往 `src/adapters/` 丢一个自包含插件目录，自动被发现、内核零改动）、多厂商模型层怎么用纯数据注册表装配——见下方 [工程样例](#给开发者一套可整体搬走的本地-agent-工程)。
 
