@@ -18,8 +18,9 @@ export interface CachedSchedule {
   /** 落盘时间戳（ms），仅调试用，不做过期判断 */
   savedAt: number;
   schedule: ScheduleResult;
-  /** 落盘时的学校 id：切换学校后（如 custom 切回 njtech）在线失败时，
-   *  不得回退到别校导入的课表冒充「最后已知课表」 */
+  /** 落盘时的学校 id：真实学校之间切换后（如 hebau 切回 njtech）在线失败时，
+   *  不得回退到别校导入的课表冒充「最后已知课表」。手动课表学校（custom）
+   *  例外：读时放行别校标记的缓存（见 loadScheduleCache） */
   schoolId?: string;
 }
 
@@ -32,9 +33,14 @@ function isCachedSchedule(parsed: unknown): parsed is CachedSchedule {
 export function loadScheduleCache(): CachedSchedule | null {
   const cached = readJsonCache("schedule-cache.json", isCachedSchedule);
   // 旧缓存没有学校标记：视为当前学校写入（向后兼容，不破坏存量用户）；
-  // 下一次保存会补上标记。未装配学校（纯工具层单测）时跳过分校判断
+  // 下一次保存会补上标记。未装配学校（纯工具层单测）时跳过分校判断。
+  // 手动课表学校（custom）例外放行：它不指向任何学校、也没有在线链路，
+  // 缓存就是唯一数据源，同一位用户的课表不因切到「无适配」而全体失明；
+  // 真实学校之间的守卫不变，custom 导入的课表依旧不会被真实学校读走
   const current = registeredSchool();
-  if (cached?.schoolId && current && cached.schoolId !== current.info.id) return null;
+  if (cached?.schoolId && current && cached.schoolId !== current.info.id && !current.info.manual) {
+    return null;
+  }
   return cached;
 }
 
