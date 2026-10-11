@@ -14,7 +14,8 @@ import { registeredSchool } from "./school";
 export interface CachedExams {
   /** 落盘时间戳（ms），仅展示用，不做过期判断 */
   savedAt: number;
-  /** 写入时的学校 id：切换学校后不得拿别校考试冒充缓存（与 schedule-cache 同约定） */
+  /** 写入时的学校 id：真实学校之间切换后不得拿别校考试冒充缓存。
+   *  手动课表学校（custom）例外：读时放行别校标记的缓存（与 schedule-cache 同约定） */
   schoolId?: string;
   exams: ExamResult;
 }
@@ -27,9 +28,13 @@ function isCachedExams(parsed: unknown): parsed is CachedExams {
 /** 读缓存；没有、读坏了或不是当前学校的都返回 null，调用方自行回退到在线拉取 */
 export function loadExamCache(): CachedExams | null {
   const cached = readJsonCache("exam-cache.json", isCachedExams);
-  // 旧缓存没有学校标记：视为当前学校写入（向后兼容）；与 schedule-cache 同款守卫
+  // 旧缓存没有学校标记：视为当前学校写入（向后兼容）；与 schedule-cache 同款守卫，
+  // 手动课表学校（custom）例外放行——custom 没有考试工具，缓存是今日页临近考试唯一
+  // 数据源，同一位用户的考试不因切到「无适配」而失明；真实学校之间守卫不变
   const current = registeredSchool();
-  if (cached?.schoolId && current && cached.schoolId !== current.info.id) return null;
+  if (cached?.schoolId && current && cached.schoolId !== current.info.id && !current.info.manual) {
+    return null;
+  }
   return cached;
 }
 

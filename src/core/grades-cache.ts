@@ -23,7 +23,8 @@ export interface CachedGradeCourse {
 export interface CachedGrades {
   /** 落盘时间戳（ms），仅展示用，不做过期判断 */
   savedAt: number;
-  /** 写入时的学校 id：切换学校后不得拿别校成绩冒充缓存（与 schedule-cache 同约定） */
+  /** 写入时的学校 id：真实学校之间切换后不得拿别校成绩冒充缓存。
+   *  手动课表学校（custom）例外：读时放行别校标记的缓存（与 schedule-cache 同约定） */
   schoolId?: string;
   /** 两位小数字符串（查询层 toFixed 口径） */
   gpa: number | string;
@@ -57,9 +58,13 @@ function isCachedGrades(parsed: unknown): parsed is CachedGrades {
 /** 读缓存；没有、读坏了或不是当前学校的都返回 null，调用方自行提示去对话里查 */
 export function loadGradesCache(): CachedGrades | null {
   const cached = readJsonCache("grades-cache.json", isCachedGrades);
-  // 旧缓存没有学校标记：视为当前学校写入（向后兼容）；与 schedule-cache 同款守卫
+  // 旧缓存没有学校标记：视为当前学校写入（向后兼容）；与 schedule-cache 同款守卫，
+  // 手动课表学校（custom）例外放行——custom 没有成绩工具，缓存是成绩面板唯一数据源，
+  // 同一位用户的成绩不因切到「无适配」而失明；真实学校之间守卫不变
   const current = registeredSchool();
-  if (cached?.schoolId && current && cached.schoolId !== current.info.id) return null;
+  if (cached?.schoolId && current && cached.schoolId !== current.info.id && !current.info.manual) {
+    return null;
+  }
   return cached;
 }
 
