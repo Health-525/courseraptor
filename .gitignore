@@ -44,6 +44,8 @@ semantic-review/
 # 随 njtech 插件本地化的专属单测（直接 import src/adapters/njtech 模块，
 # 缺源码会令 tsc typecheck 失败，故不入库；本地存在 njtech 时照常运行）
 /tests/academic-summary.test.ts
+/tests/course-compare.test.ts
+/tests/grades.test.ts
 /tests/jwgl-crypto.test.ts
 /tests/jwgl-news.test.ts
 /tests/njtech-session-recovery.test.ts
