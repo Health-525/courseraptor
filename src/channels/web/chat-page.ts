@@ -1531,6 +1531,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
           <button class="set-tab on" type="button" role="tab" id="setTabSchool" aria-controls="setPaneSchool" aria-selected="true" data-pane="school"><i class="sdot" aria-hidden="true"></i>学校</button>
           <button class="set-tab" type="button" role="tab" id="setTabModel" aria-controls="setPaneModel" aria-selected="false" data-pane="model"><i class="sdot" aria-hidden="true"></i>AI 模型</button>
           <button class="set-tab" type="button" role="tab" id="setTabQQ" aria-controls="setPaneQQ" aria-selected="false" data-pane="qq"><i class="sdot" aria-hidden="true"></i>QQ 机器人</button>
+          <button class="set-tab" type="button" role="tab" id="setTabObsidian" aria-controls="setPaneObsidian" aria-selected="false" data-pane="obsidian">Obsidian 插件</button>
           <button class="set-tab" type="button" role="tab" id="setTabData" aria-selected="false" data-pane="data">本地数据</button>
         </nav>
         <div class="set-main">
@@ -1578,6 +1579,12 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             <label class="fld"><span>AppSecret</span><span class="fld-row"><input id="sQQSecret" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyeQQSecret" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
             <label class="fld"><span>激活暗号</span><input id="sQQPass" type="text" autocomplete="off" placeholder="首次激活用的暗号（自定）" ${demo ? "disabled" : ""}></label>
             <div class="cur" id="curQQ">未配置；到 q.qq.com 创建机器人后填入，保存后即可在 QQ 里使用</div>
+          </section>
+          <section class="set-pane" id="setPaneObsidian" role="tabpanel" aria-labelledby="setTabObsidian" data-pane="obsidian">
+            <p class="dlg-intro">在 Obsidian 里也能问课表、成绩、考试，并把今日日程与待办一键插进笔记。装好插件即自动连接（默认地址自动取令牌），无需复制；只有端口不是默认值时，才需要把下面的地址填进插件设置。此栏目即看即用，无需保存。</p>
+            <label class="fld"><span>服务地址</span><input id="obsidianUrl" type="text" readonly autocomplete="off" spellcheck="false"></label>
+            <label class="fld"><span>本地 API 令牌</span><span class="fld-row"><input id="obsidianToken" type="text" readonly autocomplete="off" spellcheck="false"><button class="fld-eye" type="button" id="copyObsidianToken">复制</button></span></label>
+            <div class="cur" id="curObsidian">加载中…</div>
           </section>
           <section class="set-pane" id="setPaneData" role="tabpanel" aria-labelledby="setTabData" data-pane="data">
             <p class="dlg-intro">会话、附件、生成文件与待办都保存在本机，可导出或按需清理。此栏目的操作即时生效，无需点「保存设置」。</p>

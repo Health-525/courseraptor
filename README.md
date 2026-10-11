@@ -25,7 +25,7 @@
 
 问「这周课表」「我的 GPA」「最近的考试」——写好本校适配器，agent 联网直查；没写适配器，用手动课表也能管课表、待办与学习。
 
-- **三端一个内核** —— 终端敲 `raptor`、浏览器开 `localhost:3210`、QQ 里 @机器人，共用同一份记忆
+- **四端一个内核** —— 终端敲 `raptor`、浏览器开 `localhost:3210`、QQ 里 @机器人、Obsidian 侧栏里问，共用同一份记忆
 - **一切都在本机** —— 凭证加密存放，数据不经第三方，不上报遥测
 - **模型接你自己的 Key** —— 默认 DeepSeek，另有 11 家国内厂商可选，按量计费、用量透明
 - **任何学校开箱即用** —— 开箱即「手动课表」模式，零教务联网；要在线直查，写一个适配器插件即可（[学校适配器指南](src/adapters/README.md)）
@@ -48,7 +48,7 @@
 - **知识库** —— 知识点在对话里自动沉淀、按课表真实课程归类；flomo 式独立页：发布框 + 标签侧栏 + 16 周热力带
 - **待办** —— 三端同步，到期桌面通知 + QQ 主动推送，可导出 `.ics`
 - **学习教练** —— 学习类对话自动切换：直觉先于形式、答错先给提示；备考按「模板 → 变式 → 整卷」编排，方法论按需加载不占上下文
-- **三端入口** —— 终端 TUI（首屏即今日课表 / 待办速览）、本地网页、QQ 官方机器人（白名单制、零封号），共享同一内核与记忆
+- **三端入口 + Obsidian** —— 终端 TUI（首屏即今日课表 / 待办速览）、本地网页、QQ 官方机器人（白名单制、零封号）共享同一内核与记忆；Obsidian 插件提供侧栏对话与今日日程 / 待办插入笔记（[插件指南](obsidian/README.md)）
 - **网页功能大厅** —— 今日日程 / 课表 / 考试 / 成绩 / 通知 / 待办 / 知识库 / 番茄钟 / 提示词模板 / 用量统计十大面板，`/today` `/todos` `/knowledge` 独立页；会话搜索、改名、置顶；文件拖进输入框即上传；课表 / 成绩 / 考试 / 通知出结构化结果卡，手动刷新自动与上次快照对比变化
 - **多厂商模型** —— 12 家国内厂商 + 自定义 OpenAI 兼容端点任选：Key 独立加密保存、切换不丢，型号列表实时拉取，网页端下拉即切
 - **更多** —— 用量统计（一年 53 周热力图 + 各模型分布）、番茄钟、天气与带伞穿衣建议、课表图片导出、零凭证离线演示（`npm run demo`）、自动更新
@@ -90,7 +90,7 @@
 - **多模型厂商接入** —— 供应商注册表纯数据 + 模型工厂统一装配：12 家国内厂商 + 自定义 OpenAI 兼容端点，Key 独立加密、运行时热切（[`src/core/providers.ts`](src/core/providers.ts) · [`src/core/models.ts`](src/core/models.ts)）
 - **工具层设计** —— 内核通用工具 + 适配器教务工具的参数与返回契约，覆盖教务、通知、文件、文档、日历、记忆六域，可渐进式挂载（[`src/core/tools/`](src/core/tools/)）
 - **两层记忆** —— 会话跨重启续聊 + 长期事实自主维护，全部本地 JSON、无数据库（[`src/core/memory/`](src/core/memory/)）
-- **多入口单内核** —— 终端 TUI / 本地网页 / QQ 机器人共享同一内核与记忆；另有独立技能包（课表图导出 / 元学习）可整份拷给别的 agent 用（[`src/channels/`](src/channels/) · [`local/`](local/) · [`skills/`](skills/)）
+- **多入口单内核** —— 终端 TUI / 本地网页 / QQ 机器人共享同一内核与记忆，Obsidian 插件（`obsidian/`）同样直连本机服务；另有独立技能包（课表图导出 / 元学习）可整份拷给别的 agent 用（[`src/channels/`](src/channels/) · [`local/`](local/) · [`obsidian/`](obsidian/) · [`skills/`](skills/)）
 - **本地优先安全** —— 凭证 AES-256-GCM 绑定本机指纹；Web 仅回环监听 + Host/Origin/CSRF 校验；沙箱 JS 无网络无磁盘（[`src/core/credentials.ts`](src/core/credentials.ts) · [`src/core/sandbox-js.ts`](src/core/sandbox-js.ts)）
 - **工程化底盘** —— TypeScript `strict` + node:test（覆盖率门槛只升不降）+ Biome + 双 OS 矩阵 CI（[`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml)）
 
@@ -194,6 +194,7 @@ raptor             # 启动；项目内也可 npm run dev
 ├── bin/raptor.cjs      # 全局命令入口
 ├── docs/               # 文档与素材
 ├── skills/             # 独立技能包：课表图导出 / 元学习（教务无头查询随学校适配器提供）
+├── obsidian/           # Obsidian 插件（第四端入口：侧栏对话 + 日程/待办插入笔记，独立 npm 工程）
 ├── src/                # 公用核心（与运行形态无关）
 │   ├── core/           # 学校无关内核：agent/记忆/日历/文档/附件/知识库等 + 通用工具
 │   ├── adapters/       # 学校适配层：SchoolAdapter 端口 + 插件式自动发现；内置 custom（手动课表），真实学校适配器为本地插件（不入库）
@@ -209,6 +210,7 @@ raptor             # 启动；项目内也可 npm run dev
 
 - [能力文档](docs/capabilities.md) —— 查工具参数、耗时、环境变量、教务模块覆盖
 - [同学使用指南](docs/student-guide.md) —— 我是同学，想看图文上手指南
+- [Obsidian 插件指南](obsidian/README.md) —— 在 Obsidian 里侧栏对话、插入日程与待办
 - [配置参考](docs/configuration.md) —— 查环境变量、凭证、QQ 机器人等配置项
 - [路线图](docs/roadmap.md) —— 看做了什么、接下来做什么
 - [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md) · [行为准则](CODE_OF_CONDUCT.md) —— 参与贡献 / 报安全问题 / 行为准则

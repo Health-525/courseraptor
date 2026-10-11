@@ -35,6 +35,13 @@ hall-main.png
 # 本地语义评审临时产物，不入库
 semantic-review/
 
+# ── Obsidian 插件（obsidian/ 自带 npm 工程，产物不入库）──────────────
+# main.js 由 obsidian 的 npm run build 产出；data.json 是插件装进库后
+# Obsidian 写的本地设置；node_modules 已被上面的全局规则覆盖
+/obsidian/main.js
+/obsidian/data.json
+/obsidian/.tmp-*
+
 # ── 学校插件（真实学校适配器，本地私有，不进公开仓库）──────────────
 # 装配点 src/adapters/index.ts 启动时扫描 src/adapters/ 自动发现并登记插件；
 # 缺插件时只登记内置 custom，编译与测试照常通过。约定详见 src/adapters/README.md。
