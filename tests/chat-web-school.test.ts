@@ -136,7 +136,7 @@ testNjtech("切学校教务账号跟着切：旧校存回名下、新校空则�
   assert.equal(opts.find((o) => o.id === "custom")?.note, undefined);
 });
 
-test("POST /api/settings 切换学校：运行期生效并落凭证", async () => {
+testNjtech("POST /api/settings 切换学校：运行期生效并落凭证", async () => {
   const r = await wfetch(`${await base()}/api/settings`, {
     method: "POST",
     body: JSON.stringify({ schoolId: "custom", customSchoolName: "某某大学", customCity: "杭州" }),
@@ -147,13 +147,9 @@ test("POST /api/settings 切换学校：运行期生效并落凭证", async () =
   assert.equal(d.status.school.manual, true);
   // 自定义学校没有教务处官网可抓：通知卡同样不亮
   assert.equal(d.status.school.newsReady, false);
-  // 装了 njtech 时，上一用例把当前学校留在 njtech，切 custom 会「已切换」；
-  // 公开仓库 / CI 无 njtech、上一用例被跳过，当前本就是 custom → 「无需切换」。
-  // 两种都是成功态（status 200 已单独钉住），故放行两种文案。
-  assert.match(
-    d.results.find((x: { field: string }) => x.field === "school").message,
-    /已切换|无需切换/,
-  );
+  // 本用例由 testNjtech 守卫：仅在装了 njtech 时运行，此时上一用例把当前学校
+  // 留在 njtech，切 custom 是真实切换 → 「已切换」。
+  assert.match(d.results.find((x: { field: string }) => x.field === "school").message, /已切换/);
   const creds = loadCredentialsStore();
   assert.equal(creds?.schoolId, "custom");
   assert.equal(creds?.customSchoolName, "某某大学");
