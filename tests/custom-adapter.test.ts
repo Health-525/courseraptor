@@ -133,7 +133,7 @@ test("能力边界：无教务登录、无通知面；fetchSmart 即读缓存", 
   });
 });
 
-testNjtech("课表缓存分校：custom 的缓存在 njtech 下不可见，反之亦然", () => {
+testNjtech("课表缓存分校：真实学校不读 custom 导入的课表（反向放行见下一条）", () => {
   selectSchool("custom");
   saveScheduleCache({
     year: 2026,
@@ -161,4 +161,37 @@ testNjtech("课表缓存分校：custom 的缓存在 njtech 下不可见，反�
   selectSchool("njtech");
   const legacy = loadScheduleCache();
   assert.equal(legacy, null, "njtech 下 custom 标记的缓存仍不可见");
+});
+
+test("无适配（custom）放行别校标记的缓存：手动课表只认数据、不问出处", () => {
+  // 直接落一份「此前在真实学校（如 njtech）下写入」的缓存，绕开 saveScheduleCache 的分校盖章；
+  // 不依赖 njtech 插件（CI 无插件时同样覆盖此路径）
+  const file = path.join(process.env.RAPTOR_DATA_DIR!, "schedule-cache.json");
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      savedAt: Date.now(),
+      schoolId: "njtech",
+      schedule: {
+        year: 2026,
+        semester: 3,
+        label: "2026-2027学年第一学期",
+        courses: [
+          {
+            title: "高等数学",
+            weekday: 1,
+            periods: [1, 2],
+            weeks: "1-16",
+            location: "教A-101",
+            teacher: "张三",
+          },
+        ],
+      },
+    }),
+    "utf8",
+  );
+  assert.ok(selectSchool("custom"));
+  const loaded = loadScheduleCache();
+  assert.ok(loaded, "切到手动课表后，已有的课表缓存必须仍然可见");
+  assert.equal(loaded.schedule.courses[0].title, "高等数学");
 });
