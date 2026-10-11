@@ -4,8 +4,8 @@
 
 # 🦖 CourseRaptor
 
-**大学教务对话式 Agent** —— 课表 · 成绩 · 考试 · 教务通知 · 待办 · 知识库 · 记忆，一句话搞定。<br>
-也是一套可整体搬走的本地 Agent 工程样例：Vercel AI SDK v7 · 端口-适配器架构 · 三端入口 · 本地优先。
+**大学教务对话式 Agent 框架** —— 课表 · 成绩 · 考试 · 教务通知 · 待办 · 知识库 · 记忆，一句话搞定。<br>
+学校无关的本地优先内核（Vercel AI SDK v7 · 端口-适配器 · 三端入口）：开箱即「手动课表」模式、任何学校都能用；要在线直查教务，为自己的学校写一个适配器插件即可，内核零改动。
 
 [![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
 [![下载最新版](https://img.shields.io/github/v/release/Health-525/courseraptor?label=%E4%B8%8B%E8%BD%BD%E6%9C%80%E6%96%B0%E7%89%88&color=orange)](https://github.com/Health-525/courseraptor/releases/latest)
@@ -22,37 +22,38 @@
 
 散落在教务系统各处的信息，收进一句对话。
 
-问「这周课表」「我的 GPA」「最近的考试」「通识学分还缺哪几类」，agent 自动登录教务、抓取、结构化后回答。
+问「这周课表」「我的 GPA」「最近的考试」「通识学分还缺哪几类」——为自己的学校写好适配器后，agent 自动登录教务、抓取、结构化后回答；还没写适配器也能用「手动课表」模式管课表、待办与学习。
 
 - **三端一个内核** —— 终端敲 `raptor`、浏览器开 `localhost:3210`、QQ 里 @机器人，共用同一份记忆
 - **一切都在本机** —— 凭证 AES-256-GCM 加密落盘，教务数据不经第三方，不上报遥测（历史装机统计服务已下线；旧包可设 `RAPTOR_NO_TELEMETRY=1` 关闭上报尝试）
 - **模型接你自己的 Key** —— 默认 DeepSeek，另有 11 家国内厂商可选（通义千问 / 智谱 GLM / Kimi / 豆包 / 混元 / MiniMax / 阶跃 / 文心 / 讯飞 / 硅基流动 / 移动云，共 12 家），或填自定义 OpenAI 兼容端点，按量计费、用量透明
-- **未适配的学校也能用** —— 教务查询走内置协议适配（[`src/adapters/`](src/adapters/)），其他学校开箱用「手动课表」模式
+- **任何学校开箱即用** —— 默认「手动课表」模式（导入课表、零教务联网）；要在线直查教务，为你学校写一个适配器插件即可，框架已备好 `SchoolAdapter` 端口与自动发现加载器（[`src/adapters/`](src/adapters/)）
 
-正在写 Agent 的朋友可以直接把它当参考实现读：`ToolLoopAgent` 多轮工具循环怎么组织 31 个工具、外部系统怎么用端口-适配器隔离（新增一所学校 = 新增一个自包含目录，内核零改动）、多厂商模型层怎么用纯数据注册表装配——见下方 [工程样例](#给开发者一套可整体搬走的本地-agent-工程)。
+正在写 Agent 的朋友可以直接把它当参考实现读：`ToolLoopAgent` 多轮工具循环怎么组织几十个工具、外部系统怎么用端口-适配器隔离（新增一所学校 = 往 `src/adapters/` 丢一个自包含插件目录，自动被发现、内核零改动）、多厂商模型层怎么用纯数据注册表装配——见下方 [工程样例](#给开发者一套可整体搬走的本地-agent-工程)。
 
 ---
 
 ## 核心特性
 
-Agent 共装备 31 个工具（接入在线教务的学校满配）。**默认不接入任何学校**：开箱即「手动课表」模式（19 个工具、零教务联网），在浏览器「设置 → 学校」里自选学校后按该校已接入能力自动扩展。完整参数、耗时、环境变量与教务模块覆盖见 [能力文档](docs/capabilities.md)。
+内核自带一组学校无关工具（手动课表、文件文档、记忆知识待办、学习教练、番茄钟、天气等），开箱即用、零教务联网。在线教务直查（课表 / 成绩 / 考试 / 通知 / 选课）由「学校适配器」提供：框架只给 `SchoolAdapter` 端口与自动发现加载器，某所学校的教务协议要你自己写一个适配器插件，按实现的能力再挂载相应教务工具，写好后在浏览器「设置 → 学校」里选用。完整参数、耗时、环境变量与工具清单见 [能力文档](docs/capabilities.md)。
 
-**教务侧**
+**开箱即用（任何学校，无需适配器）**
+
+- **手动课表** —— 粘贴课表文字或传 Excel / CSV / PDF / Word / TXT，AI 解析成结构化课表，拿不准会追问，预览里逐行确认；今日页、日历导出、课表图都基于它
+- **文件与文档** —— 读本地 Word / PDF / Excel / TXT，千行大表按条件取行而非整本塞给模型；沙箱 JS 计算；生成 Word / Excel / PPT / PDF 及跨格式互转，中文原生
+- **记忆 · 知识 · 待办** —— 两层记忆（会话跨重启延续 + 长期事实自主维护）；知识点对话自动沉淀、按课表真实课程归类；待办三端同步，到期桌面通知 + QQ 推送
+- **学习教练** —— 学习类对话自动切换：直觉先于形式、答错先给提示；备考按「模板 → 变式 → 整卷」编排
+- **三端入口** —— 终端 TUI（首屏即今日课表 / 待办速览）、本地网页「功能大厅」（十大面板、会话管理、文件上传）、QQ 官方机器人（白名单制、零封号）
+- **多厂商模型** —— 12 家国内厂商 + 自定义 OpenAI 兼容端点任选：Key 独立加密保存、切换不丢，型号列表实时拉取，网页端下拉即切
+- **更多** —— 用量统计（一年热力图）、番茄钟、天气与穿衣建议、自动更新
+
+**写适配器后解锁（在线教务；具体能力取决于你实现的 `SchoolAdapter`）**
 
 - **课表 / 成绩 / 考试** —— 一句话直查；GPA 重修取最高、通识六类统计；学期交界自动探测候选学期，不靠日历猜
 - **选课分析（只读）** —— 搜课搜班看余量；多门课自动查教学班明细，与已选做时间冲突检测，覆盖单双周与部分周重叠
 - **通知情报** —— 教务处通知按年级标相关度、正文全文直读；附件下载一次即缓存，表格按问题筛、文档分页续读或关键词定位
-- **日历导出** —— 整学期 `.ics` 导入手机日历：假期自动跳过、调休按周几补课、考试带提醒
-- **手动课表（其他学校）** —— 粘贴课表文字或传 Excel / CSV / PDF / Word / TXT，AI 解析成结构化课表，拿不准会追问，预览里逐行确认
-
-**通用能力**
-
-- **文件与文档** —— 读本地 Word / PDF / Excel / TXT，千行大表按条件取行而非整本塞给模型；沙箱 JS 计算；生成 Word / Excel / PPT / PDF 及跨格式互转，中文原生
-- **记忆 · 知识 · 待办** —— 两层记忆（会话跨重启延续 + 长期事实自主维护）；知识点对话自动沉淀、按课表真实课程归类；待办三端同步，到期桌面通知 + QQ 推送
-- **学习教练** —— 学习类对话自动切换：直觉先于形式、答错先给提示；备考按「模板 → 变式 → 整卷」编排，先查真实考试与历史成绩再定计划
-- **三端入口** —— 终端 TUI（首屏即今日课表 / 待办 / 考试 / 通知速览）、本地网页「功能大厅」（十大面板、会话管理、文件上传）、QQ 官方机器人（白名单制、零封号）
-- **多厂商模型** —— 12 家国内厂商 + 自定义 OpenAI 兼容端点任选：Key 独立加密保存、切换不丢，型号列表实时拉取，网页端下拉即切
-- **更多** —— 用量统计（一年热力图）、番茄钟、天气与穿衣建议、自动更新；另有无头 CLI 可脚本化直查教务，不经模型、不耗 token
+- **日历导出（在线学期）** —— 整学期 `.ics` 导入手机日历：假期自动跳过、调休按周几补课、考试带提醒
+- **无头 CLI** —— 把本校教务查询封装成脚本化命令，不经模型、不耗 token（随适配器一并提供）
 
 ---
 
@@ -78,12 +79,12 @@ Agent 共装备 31 个工具（接入在线教务的学校满配）。**默认�
 
 > 在找「Vercel AI SDK 的生产级完整例子」，或者「Agent 怎么接一堆外部系统而不失控」？这个仓库是一份答案：三端入口跑在真实用户的日常使用里，每个设计都有源码可查、有测试兜底，以 MIT 许可证开源，欢迎拆走复用（详见 [LICENSE](LICENSE)）。
 
-- **Agent 主循环** —— Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI`：31 个工具的多轮循环，思考与工具调用全程透出（[`src/core/agent.ts`](src/core/agent.ts)）
-- **给 Agent 接外部系统** —— `SchoolAdapter` 端口 + 每校一个自包含适配器目录；内核永不反向依赖实现，各校教务协议的差异全部被适配器吃掉（[`src/core/school.ts`](src/core/school.ts) · [`src/adapters/`](src/adapters/)）
+- **Agent 主循环** —— Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI`：数十个工具的多轮循环，思考与工具调用全程透出（[`src/core/agent.ts`](src/core/agent.ts)）
+- **给 Agent 接外部系统** —— `SchoolAdapter` 端口 + 插件式自动发现：往 `src/adapters/` 丢一个自包含目录即被扫描登记，内核永不反向依赖实现，各校教务协议差异全被适配器吃掉（真实学校适配器是本地私有插件，不随仓库分发）（[`src/core/school.ts`](src/core/school.ts) · [`src/adapters/`](src/adapters/)）
 - **多模型厂商接入** —— 供应商注册表纯数据 + 模型工厂统一装配：12 家国内厂商 + 自定义 OpenAI 兼容端点，Key 独立加密、运行时热切（[`src/core/providers.ts`](src/core/providers.ts) · [`src/core/models.ts`](src/core/models.ts)）
-- **工具层设计** —— 31 个工具的参数与返回契约，覆盖教务、通知、文件、文档、日历、记忆六域，可渐进式挂载（[`src/core/tools/`](src/core/tools/)）
+- **工具层设计** —— 内核通用工具 + 适配器教务工具的参数与返回契约，覆盖教务、通知、文件、文档、日历、记忆六域，可渐进式挂载（[`src/core/tools/`](src/core/tools/)）
 - **两层记忆** —— 会话跨重启续聊 + 长期事实自主维护，全部本地 JSON、无数据库（[`src/core/memory/`](src/core/memory/)）
-- **多入口单内核** —— 终端 TUI / 本地网页 / QQ 机器人共享同一内核与记忆；另有无头 CLI 不经 LLM、零 token（[`src/channels/`](src/channels/) · [`local/`](local/) · [`skills/`](skills/)）
+- **多入口单内核** —— 终端 TUI / 本地网页 / QQ 机器人共享同一内核与记忆；另有独立技能包（课表图导出 / 元学习）可整份拷给别的 agent 用（[`src/channels/`](src/channels/) · [`local/`](local/) · [`skills/`](skills/)）
 - **本地优先安全** —— 凭证 AES-256-GCM 绑定本机指纹；Web 仅回环监听 + Host/Origin/CSRF 校验；沙箱 JS 无网络无磁盘（[`src/core/credentials.ts`](src/core/credentials.ts) · [`src/core/sandbox-js.ts`](src/core/sandbox-js.ts)）
 - **工程化底盘** —— TypeScript `strict` + node:test（覆盖率门槛只升不降）+ Biome + 双 OS 矩阵 CI（[`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml)）
 
@@ -134,18 +135,12 @@ raptor             # 启动；项目内也可 npm run dev
 
 ### 方式三：无头命令行（自动化 / 二次封装，不消耗 token）
 
-仓库在 `skills/` 目录内置教务无头查询技能：把教务查询（课表 / 成绩 / 考试 / 通知 / 选课）封装成无头 CLI——**不经过 LLM 对话、不消耗任何模型 token**。需按方式二克隆源码并配好教务账号（无需模型 Key）。
+把教务查询（课表 / 成绩 / 考试 / 通知 / 选课）封装成无头 CLI——**不经过 LLM 对话、不消耗任何模型 token**，输出结构化 JSON，适合脚本化调用与二次封装。这类无头查询技能**随学校适配器一起提供**：框架本身不含任何真实学校的教务协议，需先为本校写好适配器（见 [学校适配器指南](src/adapters/README.md)），再把它的查询封成 CLI 本地分发。
 
-- 子命令覆盖：课表 · 成绩 · 考试 · 通知列表 · 选课状态 · 搜课 · 搜班，共 7 个
-- 命令入口、参数与协议细节、安全红线见技能目录里的 `SKILL.md` 与其 `references/`
-- 输出为结构化 JSON，适合脚本化调用与二次封装
+下面两个独立技能包与学校无关、仓库已内置，可整份拷到 `~/.claude/skills/`、`~/.zcode/skills/` 等目录给别的 agent 用，或从 [Releases](https://github.com/Health-525/courseraptor/releases) 下载 zip：
 
-另附 [`skills/export-schedule/`](skills/export-schedule/) 独立技能包：把课表渲染成图片供下载，适配各平台聊天里直接发图看课表的场景。
-
-另有 [`skills/meta-learning/`](skills/meta-learning/) 学习教练技能——认知科学驱动的元学习引擎（深度教学 / 知识结构诊断 / 考试型刻意练习编排），辅助期末备考，原作者 [changer-changer](https://github.com/changer-changer)（MIT-0）。
-
-- **raptor agent 已内置触发**：对话里说「帮我复习高数」「讲解一下傅里叶变换」自动进入学习教练模式；备考先查真实考试安排与历史成绩，方法论经 `read_learning_reference` 按需加载（详见 [能力文档](docs/capabilities.md)）
-- **也可作为独立技能包给别的 agent 用**：`~/.claude/skills/`、`~/.zcode/skills/` 等目录整份拷走即用，或从 [Releases](https://github.com/Health-525/courseraptor/releases?q=meta-learning) 下载 zip（`npm run package:skill -- meta-learning` 构建）
+- [`skills/export-schedule/`](skills/export-schedule/) —— 把课表缓存渲染成图片供下载，适配各平台聊天里直接发图看课表的场景（`npm run package:skill -- export-schedule` 构建）
+- [`skills/meta-learning/`](skills/meta-learning/) —— 学习教练：认知科学驱动的元学习引擎（深度教学 / 知识结构诊断 / 考试型刻意练习编排），辅助期末备考，原作者 [changer-changer](https://github.com/changer-changer)（MIT-0）。raptor agent 已内置触发：说「帮我复习高数」「讲解一下傅里叶变换」自动进入学习教练模式，方法论经 `read_learning_reference` 按需加载（详见 [能力文档](docs/capabilities.md)）
 
 <details>
 <summary><b>系统要求</b>（点开查看）</summary>
@@ -192,15 +187,15 @@ raptor             # 启动；项目内也可 npm run dev
 ```
 ├── bin/raptor.cjs      # 全局命令入口
 ├── docs/               # 文档与素材
-├── skills/             # 独立技能包：教务无头查询 / 课表图导出 / 元学习（各含 SKILL.md）
+├── skills/             # 独立技能包：课表图导出 / 元学习（教务无头查询随学校适配器提供）
 ├── src/                # 公用核心（与运行形态无关）
 │   ├── core/           # 学校无关内核：agent/记忆/日历/文档/附件/知识库等 + 通用工具
-│   ├── adapters/       # 学校适配层：core/school.ts 定义的 SchoolAdapter 端口，每校一个自包含目录
+│   ├── adapters/       # 学校适配层：SchoolAdapter 端口 + 插件式自动发现；内置 custom（手动课表），真实学校适配器为本地插件（不入库）
 │   └── channels/       # 输出渠道：web（网页版）
 └── local/              # 本地版入口：cli（终端 TUI）、qq（机器人）、demo（离线演示）
 ```
 
-核心与适配层以 `SchoolAdapter` 端口解耦：`src/core/` 永不反向依赖任何学校实现，新增一所学校 = 新增一个自包含的 `src/adapters/<school>/` 目录。
+核心与适配层以 `SchoolAdapter` 端口解耦：`src/core/` 永不反向依赖任何学校实现，新增一所学校 = 往 `src/adapters/` 丢一个自包含的 `src/adapters/<school>/` 目录，启动时被自动发现并登记，内核零改动（怎么写见 [学校适配器指南](src/adapters/README.md)）。
 
 ---
 
@@ -242,6 +237,9 @@ raptor             # 启动；项目内也可 npm run dev
 
 **我的数据都存在哪，怎么彻底删除？**
 全部在本机：`data/`、`credentials.enc`、`session.json`、`memory.json` 等。安装包版删除 `CourseRaptor` 文件夹即净卸载；源码版先 `npm unlink` 再删项目目录，本地数据清理步骤见[能力文档](docs/capabilities.md)「卸载与清理」一节。
+
+**我的学校没有适配器，在线教务查不了怎么办？**
+开箱即用的「手动课表」模式不依赖适配器：粘贴课表文字或上传文件，AI 解析成结构化课表后，今日页、待办、日历导出、学习教练等能力照常可用。想在线直查教务，可以按 [学校适配器指南](src/adapters/README.md) 为自己的学校写一个适配器插件——仓库不内置任何真实学校的教务协议。
 
 **怎么把 agent 挂到 QQ 上？**
 走腾讯官方机器人路线（零封号）：网页「功能大厅 → 设置」填 AppID / AppSecret / 激活暗号即可上线，QQ 里发暗号完成授权；细节见[能力文档](docs/capabilities.md)「QQ 接入」一节。

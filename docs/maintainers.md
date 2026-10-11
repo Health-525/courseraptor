@@ -19,7 +19,7 @@ npm run demo
 
 仓库按部署单元分顶层目录：`src/` 是公用核心（core + adapters + channels/web 网页界面，供本地版各入口共用）；`local/` 是本地版专属入口（TUI `cli/`、QQ 机器人 `qq/`、演示 `demo/`）；`landing/` 是项目介绍落地页（React+Vite，发 GitHub Pages，与运行时无关）。历史上另有线上托管版（`gateway/` 多用户网关 + `admin/` 管理台 + `update/` 更新分发后台），已于 2026-10 整体下线并从仓库移除（留档见仓库 git 历史）。
 
-依赖方向：channels → core ← adapters。core 定义 SchoolAdapter 端口（`src/core/school.ts`）并只依赖端口；adapters 实现端口并可自由使用 core；channels（终端/网页/QQ）只做装配与展示，不 import 任何学校适配器。core 与 channels 里 import `adapters/njtech` 视为架构违规。
+依赖方向：channels → core ← adapters。core 定义 SchoolAdapter 端口（`src/core/school.ts`）并只依赖端口；adapters 实现端口并可自由使用 core；channels（终端/网页/QQ）只做装配与展示，不 import 任何学校适配器。core 与 channels 里 import 任何具体学校（如 `adapters/njtech`）视为架构违规。学校适配器为**插件式自动发现**：真实学校适配器（如 njtech）是本地私有插件，不入仓库——见 `src/adapters/README.md`。
 
 | 目录/模块 | 职责 |
 |---|---|
@@ -28,7 +28,7 @@ npm run demo
 | `local/qq/` | QQ 官方机器人桥 |
 | `src/core/agent.ts` | agent 组装：core 通用工具 + 学校适配器贡献的教务工具合并；提示词骨架在 `src/core/prompt.ts`，教务段由适配器提供（校历段运行时渲染自 `data/term-dates.json`，不在代码里硬编码） |
 | `src/core/tools/` | 通用工具聚合（文件/文档/记忆/待办/知识库/番茄钟/设置/天气/时间） |
-| `src/adapters/njtech/` | 南京工业大学适配器：登录/课表/成绩/考试/学籍/选课/通知抓取与教务工具（`index.ts` 组装成 SchoolAdapter；`session.ts` 是登录 cookie / 选课会话缓存，经端口供 UI 使用） |
+| `src/adapters/<school>/` | 真实学校适配器（本地私有插件，不入库；示例 `njtech/`：登录/课表/成绩/考试/学籍/选课/通知抓取与教务工具，`index.ts` 组装成 SchoolAdapter，`session.ts` 是登录 cookie / 选课会话缓存，经端口供 UI 使用） |
 | `src/adapters/index.ts` | 装配点：RAPTOR_SCHOOL > 设置页保存的 schoolId > custom（默认不接入任何学校）；新增学校在这里登记 |
 | `src/core/memory/` | 两层记忆（短期 session.json / 长期 memory.json） |
 | `src/core/paths.ts` | 项目根、`dataDir()`、`isInsideDir()` 路径护栏、`migratedDataPath()` 状态文件归位——**全项目唯一实现，不要在别处重写** |
@@ -43,7 +43,7 @@ npm run demo
 
 `scripts/package-policy.mjs` 定义包内容：应用源码、入口、脚本、测试、依赖锁文件与选定的公开文档/素材。新增需要随包分发的文档时同步更新该清单。
 
-`data/`、`outputs/`、下载、日志、环境文件和根目录凭证不进入安装包。公共校历基础值在各校适配器目录内（`src/adapters/njtech/term-dates.ts`）；学生自己的校历修正保存在本地并在升级时保留。如果需要全体同步校历，后续应设计专用的公共校历数据源，不能直接分发个人 `data/term-dates.json`。
+`data/`、`outputs/`、下载、日志、环境文件和根目录凭证不进入安装包。公共校历基础值在各校适配器目录内（如本地私有插件的 `src/adapters/njtech/term-dates.ts`）；学生自己的校历修正保存在本地并在升级时保留。如果需要全体同步校历，后续应设计专用的公共校历数据源，不能直接分发个人 `data/term-dates.json`。
 
 发版前检查最终 zip 的文件清单，确认没有私密文件；不要直接压缩已使用的项目目录转发给同学。历史安装包若由旧打包脚本生成，应由维护者检查是否夹带个人文件，再决定撤回或替换。
 
