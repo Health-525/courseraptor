@@ -33,9 +33,9 @@ test("批量 add：一次记多条、纯日期按当天 23:59 本地截止", asy
   const added = r.added as Array<{ title: string; dueAt: string; source?: string }>;
   assert.equal(added.length, 2);
   // 纯日期 2026-09-15 按本地 23:59 截止，而不是被当成 UTC 零点偏移到早 8 点
-  assert.equal(new Date(added[0].dueAt).getHours(), 23);
-  assert.equal(new Date(added[0].dueAt).getMinutes(), 59);
-  assert.equal(added[0].source, "对话");
+  assert.equal(new Date(added[0]!.dueAt).getHours(), 23);
+  assert.equal(new Date(added[0]!.dueAt).getMinutes(), 59);
+  assert.equal(added[0]!.source, "对话");
   assert.equal(listReminders().length, 2);
 });
 
@@ -60,7 +60,7 @@ test("list 默认只回未完成，includeDone 才带已完成", async () => {
   const first = await manage.execute({ action: "list", includeDone: true });
   assert.equal((first.todos as unknown[]).length, 2);
 
-  const updated = await manage.execute({ action: "update", id: todos[0].id, done: true });
+  const updated = await manage.execute({ action: "update", id: todos[0]!.id, done: true });
   assert.equal(updated.ok, true);
   const after = await manage.execute({ action: "list" });
   assert.equal((after.todos as unknown[]).length, 1);
@@ -73,7 +73,7 @@ test("update 改标题与截止、delete 按 id 删除", async () => {
   const [target] = listed.todos as Array<{ id: string }>;
   const updated = await manage.execute({
     action: "update",
-    id: target.id,
+    id: target!.id,
     title: "改名后的待办",
     dueAt: "2026-09-20",
   });
@@ -82,9 +82,9 @@ test("update 改标题与截止、delete 按 id 删除", async () => {
   assert.equal(changed.title, "改名后的待办");
   assert.equal(new Date(changed.dueAt).getHours(), 23, "纯日期更新同样按 23:59");
 
-  const del = await manage.execute({ action: "delete", id: target.id });
+  const del = await manage.execute({ action: "delete", id: target!.id });
   assert.equal(del.ok, true);
-  const again = await manage.execute({ action: "delete", id: target.id });
+  const again = await manage.execute({ action: "delete", id: target!.id });
   assert.match(String(again.error), /未找到/);
   assert.equal(listReminders().length, 1, "只剩已完成那条");
 });

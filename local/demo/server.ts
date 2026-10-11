@@ -82,7 +82,7 @@ function demoTokenUsage(): {
     const base = 2000 + rand() * 9000 + examWave * rand() * 26000;
     const model = demoModels[rand() < 0.7 ? 0 : 1];
     const usage = { in: Math.round(base * 4), out: Math.round(base) };
-    if (!usage.in && !usage.out) continue;
+    if (!model || (!usage.in && !usage.out)) continue;
     days[date] = { ...usage, total: usage.in + usage.out };
     const prev = models.get(model) ?? { in: 0, out: 0 };
     models.set(model, { in: prev.in + usage.in, out: prev.out + usage.out });

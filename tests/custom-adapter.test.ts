@@ -153,7 +153,7 @@ testNjtech("课表缓存分校：真实学校不读 custom 导入的课表（反
     ],
   });
   // custom 自己读得到
-  assert.ok(loadScheduleCache()?.schedule.courses[0].title === "某某大学课程");
+  assert.ok(loadScheduleCache()?.schedule.courses[0]?.title === "某某大学课程");
   // 切回 njtech：不得把别校导入的课表当「最后已知课表」回退
   selectSchool("njtech");
   assert.equal(loadScheduleCache(), null, "跨学校缓存必须失效");
@@ -195,7 +195,7 @@ test("无适配（custom）放行别校标记的缓存：手动课表只认数�
   assert.ok(selectSchool("custom"));
   const loaded = loadScheduleCache();
   assert.ok(loaded, "切到手动课表后，已有的课表缓存必须仍然可见");
-  assert.equal(loaded.schedule.courses[0].title, "高等数学");
+  assert.equal(loaded.schedule.courses[0]!.title, "高等数学");
 });
 
 test("无适配（custom）放行别校标记的成绩/考试缓存：面板与今日页同口径", () => {

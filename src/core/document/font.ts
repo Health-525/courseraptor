@@ -52,13 +52,13 @@ export function resolveCjkFontFamily(path: string): string | undefined {
     const collection = fontkit.openSync(path);
     const fonts = collection.fonts ?? [];
     if (fonts.length === 0) return undefined;
-    const preferred =
+    return (
       fonts.find((f) =>
         /sc|simhei|heiti|simsun|song|pingfang|yahei|uming/i.test(
           `${f.postscriptName} ${f.familyName ?? ""}`,
         ),
-      ) ?? fonts[0];
-    return preferred.postscriptName;
+      ) ?? fonts[0]
+    )?.postscriptName;
   } catch {
     return undefined;
   }

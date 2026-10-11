@@ -34,14 +34,14 @@ test("recordTokenUsage：同日多次累计、按模型分账，快照聚合今�
   const snap = await tokenUsageSnapshot();
   const days = Object.values(snap.days);
   assert.equal(days.length, 1, "只有今天一个日期");
-  assert.equal(days[0].total, 2160);
-  assert.equal(days[0].in, 1800);
-  assert.equal(days[0].out, 360);
+  assert.equal(days[0]!.total, 2160);
+  assert.equal(days[0]!.in, 1800);
+  assert.equal(days[0]!.out, 360);
   // 模型分布按总量降序
-  assert.equal(snap.models[0].model, "deepseek/deepseek-chat");
-  assert.equal(snap.models[0].total, 1800);
-  assert.equal(snap.models[1].model, "zhenze/glm-5.3");
-  assert.equal(snap.models[1].total, 360);
+  assert.equal(snap.models[0]!.model, "deepseek/deepseek-chat");
+  assert.equal(snap.models[0]!.total, 1800);
+  assert.equal(snap.models[1]!.model, "zhenze/glm-5.3");
+  assert.equal(snap.models[1]!.total, 360);
   assert.equal(snap.totals.today, 2160);
   assert.equal(snap.totals.week, 2160);
   assert.equal(snap.totals.month, 2160);
@@ -51,9 +51,9 @@ test("recordTokenUsage：同日多次累计、按模型分账，快照聚合今�
   const file = JSON.parse(fs.readFileSync(path.join(dir, "token-usage.json"), "utf8")) as {
     days: Record<string, Record<string, { in: number; out: number }>>;
   };
-  const day = Object.values(file.days)[0];
-  assert.equal(day["deepseek/deepseek-chat"].in, 1500);
-  assert.equal(day["zhenze/glm-5.3"].out, 60);
+  const day = Object.values(file.days)[0]!;
+  assert.equal(day["deepseek/deepseek-chat"]!.in, 1500);
+  assert.equal(day["zhenze/glm-5.3"]!.out, 60);
 });
 
 test("快照前强制冲刷 pending：记录后立刻可见（不等 2 秒防抖）", async (t) => {
@@ -138,9 +138,9 @@ test("模型中间件：流式 finish 的 V4 usage（inputTokens.total 对象形
 
   const snap = await tokenUsageSnapshot();
   assert.equal(snap.models.length, 1, "应记录当前模型一条");
-  assert.equal(snap.models[0].in, 21);
-  assert.equal(snap.models[0].out, 7);
-  assert.equal(snap.models[0].total, 28);
+  assert.equal(snap.models[0]!.in, 21);
+  assert.equal(snap.models[0]!.out, 7);
+  assert.equal(snap.models[0]!.total, 28);
 });
 
 test("模型中间件：旧数字形态的 usage 也兼容（防降级场景静默丢数）", async (t) => {
@@ -158,5 +158,5 @@ test("模型中间件：旧数字形态的 usage 也兼容（防降级场景静�
   }
 
   const snap = await tokenUsageSnapshot();
-  assert.equal(snap.models[0].total, 140);
+  assert.equal(snap.models[0]!.total, 140);
 });

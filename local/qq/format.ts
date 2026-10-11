@@ -38,7 +38,7 @@ export function mdToPlain(md: string): string {
       .replace(/^[-*]\s+/, "• ")
       .replace(/^>\s?/, "");
     // 【小标题】前补空行，段落感
-    if (/^【.+】$/.test(converted.trim()) && out.length && out[out.length - 1].trim()) {
+    if (/^【.+】$/.test(converted.trim()) && out.length && out[out.length - 1]?.trim()) {
       out.push("");
     }
     out.push(converted);

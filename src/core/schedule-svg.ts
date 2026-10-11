@@ -53,7 +53,7 @@ const COURSE_PALETTE = [
 function courseColorOf(title: string): string {
   let h = 5381;
   for (let i = 0; i < title.length; i++) h = ((h << 5) + h + title.charCodeAt(i)) | 0;
-  return COURSE_PALETTE[Math.abs(h) % COURSE_PALETTE.length];
+  return COURSE_PALETTE[Math.abs(h) % COURSE_PALETTE.length] ?? COURSE_PALETTE[0];
 }
 
 /** 两个整数日期串的紧凑区间（"10/12-10/18"），周模式副题用 */
@@ -250,7 +250,7 @@ function fitLines(
   const lines = wrapText(text, maxW, size, factor);
   if (lines.length <= maxLines) return lines;
   const out = lines.slice(0, maxLines);
-  let last = out[out.length - 1];
+  let last = out[out.length - 1] ?? "";
   while (last.length && measure(last, size, factor) + measure("…", size, factor) > maxW) {
     last = last.slice(0, -1);
   }

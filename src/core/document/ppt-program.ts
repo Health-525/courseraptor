@@ -189,6 +189,8 @@ export function validateProgram(
     .safeParse(raw);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
+    // safeParse 失败时 issues 必非空，守卫只为类型收窄
+    if (!issue) return { ok: false, error: "op 程序不合法：未知错误" };
     const at = issue.path.length ? `（${issue.path.join(".")}）` : "";
     return { ok: false, error: `op 程序不合法${at}：${issue.message}` };
   }

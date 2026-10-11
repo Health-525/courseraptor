@@ -117,7 +117,7 @@ export function createClient(baseURL: string, initialCookie = ""): HttpClient {
   function absorbCookies(sc: string[] | undefined, map: Map<string, string>): void {
     if (!sc) return;
     for (const c of sc) {
-      const kv = c.split(";")[0];
+      const kv = c.split(";")[0] ?? "";
       const eq = kv.indexOf("=");
       if (eq > 0) map.set(kv.slice(0, eq).trim(), kv.trim());
     }

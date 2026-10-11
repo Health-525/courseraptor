@@ -92,7 +92,7 @@ function shiftDate(ymd: string, days: number): string {
 
 /** 日历日期是周几（按 UTC 解析纯日期，不受本机时区影响） */
 function weekdayOf(ymd: string): string {
-  return WEEKDAY_NAMES[new Date(`${ymd}T00:00:00Z`).getUTCDay()];
+  return WEEKDAY_NAMES[new Date(`${ymd}T00:00:00Z`).getUTCDay()] ?? "";
 }
 
 /**
@@ -117,6 +117,7 @@ function termNow(now: Date): TermNow {
   }
   // 候选学期都不在学期内（长假/交界期）：给最近的候选学期与倒计时
   const first = terms.candidates(now)[0];
+  if (!first) throw new Error("学期候选列表为空");
   const info = terms.week1MondayOf(first.year, first.semester);
   const beijingDate = calendarParts(schoolTimezone(), now);
   const today = `${beijingDate.year}-${beijingDate.month}-${beijingDate.day}`;

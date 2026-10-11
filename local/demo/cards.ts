@@ -87,7 +87,7 @@ export function examsCard(): DemoCard {
     kind: "exams",
     title: "考试安排",
     badge: `${exams.length} 场 · 虚构示例`,
-    metrics: [{ label: "最近一场", value: `${exams[0].inDays} 天后` }],
+    metrics: [{ label: "最近一场", value: `${exams[0]?.inDays ?? "?"} 天后` }],
     rows: exams.map((e) => ({
       label: e.subject,
       value: `${Number(e.date.slice(5, 7))}月${Number(e.date.slice(8, 10))}日 · ${e.time.slice(0, 5)}`,

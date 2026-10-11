@@ -138,15 +138,16 @@ export function textToBlocks(text: string): NonNullable<DocumentSpec["blocks"]> 
       .filter(Boolean);
     if (!lines.length) continue;
     const listItems = lines.filter((l) => /^([-*•]|\d+[.)、])\s+/.test(l));
+    const head = lines.length === 1 ? lines[0] : undefined;
     if (listItems.length === lines.length) {
       blocks.push({
         type: "list",
         items: lines.map((l) => l.replace(/^([-*•]|\d+[.)、])\s+/, "")),
       });
-    } else if (lines.length === 1 && /^#{1,3}\s+/.test(lines[0])) {
-      const hashes = lines[0].match(/^#+/);
+    } else if (head && /^#{1,3}\s+/.test(head)) {
+      const hashes = head.match(/^#+/);
       const level = (hashes?.[0].length ?? 1) as 1 | 2 | 3;
-      blocks.push({ type: "heading", text: lines[0].replace(/^#+\s+/, ""), level });
+      blocks.push({ type: "heading", text: head.replace(/^#+\s+/, ""), level });
     } else {
       blocks.push({ type: "paragraph", text: chunk.trim() });
     }

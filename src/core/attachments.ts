@@ -135,7 +135,9 @@ export async function extractPptxText(buf: Buffer): Promise<string> {
     const text = xml
       .split(/<\/a:p>/)
       .map((p) =>
-        [...p.matchAll(/<a:t(?:\s[^>]*)?>([^<]*)<\/a:t>/g)].map((m) => unescapeXml(m[1])).join(""),
+        [...p.matchAll(/<a:t(?:\s[^>]*)?>([^<]*)<\/a:t>/g)]
+          .map((m) => unescapeXml(m[1] ?? ""))
+          .join(""),
       )
       .filter((t) => t.trim())
       .join("\n");

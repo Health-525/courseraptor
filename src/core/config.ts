@@ -192,8 +192,7 @@ function parseRateLimit(): { rps: number; burst: number } {
     burst: env("RAPTOR_BURST") ?? 8,
   });
   if (!parsed.success) {
-    const issue = parsed.error.issues[0];
-    const key = issue.path.join(".");
+    const key = parsed.error.issues[0]?.path.join(".") ?? "";
     throw new Error(
       `环境变量校验失败：${key === "rps" ? "RAPTOR_MAX_RPS" : "RAPTOR_BURST"} ` +
         `必须是 1-${key === "rps" ? "3" : "64"} 的整数（当前值：${

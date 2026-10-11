@@ -263,8 +263,9 @@ export function createKeyProxy(stdin: Readable, options: KeyProxyOptions = {}): 
         const cmdName = spaceIdx > 0 ? cmd.slice(0, spaceIdx) : cmd;
         // 菜单补全仍保持大小写敏感；但 /key 是秘密边界，任何大小写变体都必须本地处理。
         const commandName = cmdName.toLowerCase() === "/key" ? "/key" : cmdName;
-        if (commandName in commands) {
-          const entry = commands[commandName];
+        // 直接查表判空（不用 in：in 对原型链键也会命中，查表取值更严）
+        const entry = commands[commandName];
+        if (entry) {
           if (entry.rejectsArgument && spaceIdx > 0) {
             // 旧式 /key sk-xxx 已在输入框可见；立刻擦除并只显示无秘密的本地提示。
             for (let i = 0; i < cmd.length; i++) proxy.write("\x7f");

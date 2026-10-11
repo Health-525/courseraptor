@@ -194,12 +194,14 @@ export function findConflicts(courses: CourseData[]): string[] {
   const out: string[] = [];
   for (let i = 0; i < segments.length; i++) {
     for (let j = i + 1; j < segments.length; j++) {
-      if (segmentsOverlap(segments[i], segments[j])) {
-        const a = courses[i];
-        const b = courses[j];
-        const overlapWeeks = segments[i].expandedWeeks.filter((w) =>
-          segments[j].expandedWeeks.includes(w),
-        );
+      // i/j 均为有效下标（segments 由 courses 一一映射而来），守卫只为类型收窄
+      const sa = segments[i];
+      const sb = segments[j];
+      const a = courses[i];
+      const b = courses[j];
+      if (!sa || !sb || !a || !b) continue;
+      if (segmentsOverlap(sa, sb)) {
+        const overlapWeeks = sa.expandedWeeks.filter((w) => sb.expandedWeeks.includes(w));
         out.push(
           `「${a.title}」与「${b.title}」在${WEEKDAY_NAMES[a.weekday]}第 ${a.periods.join(",")} 节 ` +
             `与第 ${b.periods.join(",")} 节重叠（${overlapWeeks.slice(0, 5).join(",")}…周）；` +

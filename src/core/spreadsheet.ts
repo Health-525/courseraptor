@@ -80,7 +80,7 @@ export function loadWorkbook(buf: Buffer, filename: string): TableSheet[] | null
         while (c.length < cols) c.push("");
         return c;
       };
-      const headers = pad(grid[firstData]).map((h, i) => h || `列${i + 1}`);
+      const headers = pad(grid[firstData] ?? []).map((h, i) => h || `列${i + 1}`);
       const rows = grid
         .slice(firstData + 1)
         .filter((r) => r.some((c) => c !== ""))
@@ -128,7 +128,7 @@ export function resolveColumn(headers: string[], ref: string): number {
     .map((h, i) => [h.toLowerCase().includes(q), i] as const)
     .filter(([ok]) => ok)
     .map(([, i]) => i);
-  if (partial.length === 1) return partial[0];
+  if (partial.length === 1 && partial[0] !== undefined) return partial[0];
   if (partial.length > 1) {
     // 「教师」同时命中「教师」「教师工号」这类情况不算错，但要让用户看见歧义
     throw new Error(
@@ -286,7 +286,7 @@ export function querySheet(sheet: TableSheet, opts: QueryOpts = {}): QueryResult
     matched,
     offset,
     returned: page.length,
-    headers: keepIdx.map((i) => sheet.headers[i]),
+    headers: keepIdx.map((i) => sheet.headers[i] ?? ""),
     rows: page.map((r) => keepIdx.map((i) => r[i] ?? "")),
     truncated: offset + page.length < matched,
   };

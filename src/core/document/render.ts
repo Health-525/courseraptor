@@ -359,7 +359,7 @@ function drawPdfTable(
   const pad = 4;
 
   for (let ri = 0; ri < allRows.length; ri++) {
-    const cells = allRows[ri];
+    const cells = allRows[ri] ?? [];
     ensureRoom(doc, bottom, 24);
     const rowTop = doc.y;
     let maxBottom = rowTop;

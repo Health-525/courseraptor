@@ -84,8 +84,8 @@ test("首次上报：生成随机设备号并发出预期载荷；设备号随�
 
   await pingUsage("tui");
   assert.equal(fetchStub.calls.length, 1);
-  const body = JSON.parse(String(fetchStub.calls[0].init.body)) as Record<string, string>;
-  assert.match(body.id, /^[0-9a-f-]{36}$/, "设备号应是随机 UUID");
+  const body = JSON.parse(String(fetchStub.calls[0]!.init.body)) as Record<string, string>;
+  assert.match(body.id!, /^[0-9a-f-]{36}$/, "设备号应是随机 UUID");
   assert.equal(typeof body.version, "string");
   assert.equal(body.channel, "tui");
   assert.equal(body.platform, process.platform);

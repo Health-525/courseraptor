@@ -261,7 +261,11 @@ export function resolveProviderId(raw: string | undefined | null): string {
 }
 
 export function getProviderDef(id: string): ProviderDef {
-  return PROVIDER_MAP.get(resolveProviderId(id)) ?? BUILTIN_PROVIDERS[0];
+  // resolveProviderId 只会返回映射里存在的 id；BUILTIN_PROVIDERS[0] 兜底，
+  // 内置清单为空属不可达，守卫只为满足 noUncheckedIndexedAccess
+  const def = PROVIDER_MAP.get(resolveProviderId(id)) ?? BUILTIN_PROVIDERS[0];
+  if (!def) throw new Error("内置供应商清单为空");
+  return def;
 }
 
 export function isCustomProvider(id: string): boolean {

@@ -143,8 +143,8 @@ test("geocoding 响应能解析，坏 JSON 与无结果返回空列表", () => {
   });
   const list = parseGeoResponse(body);
   assert.equal(list.length, 2);
-  assert.equal(list[0].population, 9314685);
-  assert.equal(list[1].population, undefined); // 缺字段不能变成 NaN 参与排序
+  assert.equal(list[0]!.population, 9314685);
+  assert.equal(list[1]!.population, undefined); // 缺字段不能变成 NaN 参与排序
   assert.deepEqual(parseGeoResponse("not json"), []);
   assert.deepEqual(parseGeoResponse('{"results":[]}'), []);
 });
@@ -180,9 +180,9 @@ test("forecast 解析出实况与逐日预报", () => {
   assert.equal(r.now.text, "小毛毛雨");
   assert.equal(r.now.isDay, true);
   assert.equal(r.days.length, 3);
-  assert.equal(r.days[1].weekday, "周一");
-  assert.equal(r.days[1].text, "雷阵雨伴冰雹");
-  assert.equal(r.days[0].rainChance, 96);
+  assert.equal(r.days[1]!.weekday, "周一");
+  assert.equal(r.days[1]!.text, "雷阵雨伴冰雹");
+  assert.equal(r.days[0]!.rainChance, 96);
   assert.equal(r.localTime, "2026-08-30T15:15");
 });
 
@@ -237,7 +237,7 @@ test("近三天降水概率高 → 建议带伞并给出概率", () => {
     makeDay({ date: "2026-08-31", weekday: "周一", maxC: 29, minC: 24, rainChance: 10 }),
   ];
   const advice = buildAdvice(makeNow(), days);
-  assert.match(advice[0], /今天 96% 降水概率高，出门带伞/);
+  assert.match(advice[0]!, /今天 96% 降水概率高，出门带伞/);
 });
 
 test("第 4 天以后的雨不催带伞", () => {
@@ -261,7 +261,7 @@ test("昼夜温差大要提醒加衣，温差小就不啰嗦", () => {
   const small = [
     makeDay({ date: "2026-11-02", weekday: "周一", maxC: 18, minC: 14, rainChance: 0 }),
   ];
-  assert.match(buildAdvice(makeNow(), big)[0], /温差/);
+  assert.match(buildAdvice(makeNow(), big)[0]!, /温差/);
   assert.equal(
     buildAdvice(makeNow(), small).some((a) => a.includes("温差")),
     false,
@@ -274,7 +274,7 @@ test("干净的好天气不硬凑带伞建议", () => {
   ];
   const advice = buildAdvice({ ...makeNow(), feelsLikeC: 23, code: 0 }, days);
   assert.equal(advice.length, 1);
-  assert.match(advice[0], /穿长袖或薄外套/);
+  assert.match(advice[0]!, /穿长袖或薄外套/);
 });
 
 // ── fetchWeather：失败契约与缓存 ──────────────────────────────

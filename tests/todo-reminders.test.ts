@@ -40,7 +40,7 @@ test("窗口判定：7 天内未完成才进窗口，恰好 7 天含，逾期/�
     addReminder({ title: "昨天已逾期", dueAt: "2026-09-14T23:59:00" }),
     addReminder({ title: "已完成的两天内", dueAt: "2026-09-16T10:00:00" }),
   ];
-  updateReminder(created[4].id, { done: true });
+  updateReminder(created[4]!.id, { done: true });
 
   assert.deepEqual(
     dueWithinWindow(now).map((r) => r.title),

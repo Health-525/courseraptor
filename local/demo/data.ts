@@ -157,6 +157,11 @@ export function demoTodayBrief(): TodayBrief {
     new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
   const names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
   const short = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+  /** "HH:MM" → 当日分钟数；缺位按 0（仅演示数据兜底，正常键集下不会走到） */
+  const minutesOf = (hm: string | undefined): number => {
+    const [h, m] = hm?.split(":").map(Number) ?? [];
+    return (h ?? 0) * 60 + (m ?? 0);
+  };
 
   // 周内课程表（weekday-1 为下标）：每天都排一两门，任意日子打开演示页
   // 今日时间线都有内容；周六是调休补课，演示调休覆盖
@@ -186,11 +191,14 @@ export function demoTodayBrief(): TodayBrief {
     location?: string;
     teacher?: string;
   }): BriefCourse => {
-    const time = DEMO_CLASS_TIMES[c.periods];
-    const [sh, sm] = time.split("-")[0].split(":").map(Number);
-    const [eh, em] = time.split("-")[1].split(":").map(Number);
+    // 查表缺键时回退原始节次串（演示数据键集封闭，仅为类型完备兜底）
+    const time = DEMO_CLASS_TIMES[c.periods] ?? c.periods;
     const status: BriefCourse["status"] =
-      nowMin > eh * 60 + em ? "done" : nowMin >= sh * 60 + sm ? "current" : "upcoming";
+      nowMin > minutesOf(time.split("-")[1])
+        ? "done"
+        : nowMin >= minutesOf(time.split("-")[0])
+          ? "current"
+          : "upcoming";
     return {
       title: c.title,
       periods: c.periods,
@@ -201,7 +209,7 @@ export function demoTodayBrief(): TodayBrief {
     };
   };
 
-  const todayCourses = weekCourses[weekday - 1].map(toBrief);
+  const todayCourses = (weekCourses[weekday - 1] ?? []).map(toBrief);
 
   // 下一节课：今天未开始的，否则往后找（跨到下周一只示例周一的课）。
   // 注意未来日期不能用「当前时刻算出的 status」过滤——晚上打开时那天
@@ -209,13 +217,12 @@ export function demoTodayBrief(): TodayBrief {
   let next: TodayBrief["next"] = null;
   for (let look = 0; look <= 7 && !next; look++) {
     const idx = (weekday - 1 + look) % 7;
-    const list = look === 0 ? todayCourses : weekCourses[idx].map(toBrief);
+    const list = look === 0 ? todayCourses : (weekCourses[idx] ?? []).map(toBrief);
     const date = dayAt(weekday - 1 + look);
     for (const c of list) {
       if (look === 0 && c.status !== "upcoming") continue;
       if (!c.time) continue;
-      const [sh, sm] = c.time.split("-")[0].split(":").map(Number);
-      const startsInMin = look * 1440 + sh * 60 + sm - nowMin;
+      const startsInMin = look * 1440 + minutesOf(c.time.split("-")[0]) - nowMin;
       if (startsInMin <= 0) continue;
       next = {
         dateISO: iso(date),
@@ -224,7 +231,7 @@ export function demoTodayBrief(): TodayBrief {
             ? "今天"
             : look === 1
               ? "明天"
-              : `${date.getMonth() + 1}月${date.getDate()}日 ${names[idx]}`,
+              : `${date.getMonth() + 1}月${date.getDate()}日 ${names[idx] ?? ""}`,
         ...(idx === 5 ? { makeup: true } : {}),
         course: c,
         startsInMin,
@@ -238,13 +245,13 @@ export function demoTodayBrief(): TodayBrief {
     return {
       dateISO: iso(date),
       weekday: i + 1,
-      label: names[i],
+      label: names[i] ?? "",
       dateShort: short(date),
       isToday: i === weekday - 1,
       ...(i === 5 ? { makeup: true } : {}),
       courses: list.map((c) => ({
         title: c.title,
-        time: DEMO_CLASS_TIMES[c.periods],
+        time: DEMO_CLASS_TIMES[c.periods] ?? c.periods,
         location: c.location,
         teacher: c.teacher,
         weeks: "1-16",

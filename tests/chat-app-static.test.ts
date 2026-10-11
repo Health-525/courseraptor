@@ -125,22 +125,22 @@ test("chat-app.js 里被调用的函数都有定义或属浏览器内置", () =>
   const defs = new Set<string>(BUILTINS);
   // 函数与类声明
   for (const m of src.matchAll(/\b(?:function|class)\s+([A-Za-z_$][\w$]*)/g)) {
-    defs.add(m[1]);
+    defs.add(m[1]!);
   }
   // 顶层与块内 const/let/var；解构声明整体按名收集
   for (const m of src.matchAll(/\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g)) {
-    defs.add(m[1]);
+    defs.add(m[1]!);
   }
   for (const m of src.matchAll(/\b(?:const|let|var)\s*\{([^}]+)\}/g)) {
-    for (const part of m[1].split(",")) {
+    for (const part of m[1]!.split(",")) {
       const id = part.split(":").pop()?.trim().split(/[=\s]/)[0] ?? "";
       if (/^[A-Za-z_$][\w$]*$/.test(id)) defs.add(id);
     }
   }
   // 形参与箭头函数参数：回调里直接调用的局部函数不至于误报
   for (const m of src.matchAll(/\(([^(){}]*)\)\s*=>/g)) {
-    for (const p of m[1].split(",")) {
-      const id = p.trim().split(/[=:]/)[0].trim();
+    for (const p of m[1]!.split(",")) {
+      const id = p.trim().split(/[=:]/)[0]!.trim();
       if (/^[A-Za-z_$][\w$]*$/.test(id)) defs.add(id);
     }
   }
@@ -148,24 +148,24 @@ test("chat-app.js 里被调用的函数都有定义或属浏览器内置", () =>
   for (const m of src.matchAll(
     /\[\s*([A-Za-z_$][\w$]*(?:\s*,\s*[A-Za-z_$][\w$]*)*)\s*\]\s*\)\s*=>/g,
   )) {
-    for (const id of m[1].split(",")) defs.add(id.trim());
+    for (const id of m[1]!.split(",")) defs.add(id.trim());
   }
   for (const m of src.matchAll(/\bfunction\s*[A-Za-z_$][\w$]*\s*\(([^()]*)\)/g)) {
-    for (const p of m[1].split(",")) {
-      const id = p.trim().split(/[=:]/)[0].trim();
+    for (const p of m[1]!.split(",")) {
+      const id = p.trim().split(/[=:]/)[0]!.trim();
       if (/^[A-Za-z_$][\w$]*$/.test(id)) defs.add(id);
     }
   }
   // catch (e) 等
   for (const m of src.matchAll(/\bcatch\s*\(\s*([A-Za-z_$][\w$]*)\s*\)/g)) {
-    defs.add(m[1]);
+    defs.add(m[1]!);
   }
 
   const missing = new Map<string, number>();
   // 调用形如 name( —— 前一个字符不能是 . 或 $（属性调用/模板），
   // 也不能是标识符字符（如 fooBar 里的 Bar）
   for (const m of src.matchAll(/(?<![\w$.])([A-Za-z_$][\w$]*)\s*\(/g)) {
-    const name = m[1];
+    const name = m[1]!;
     // 关键字与流程语句不是调用
     if (
       /^(if|for|while|switch|catch|return|typeof|new|function|do|else|in|of|with|await|async|throw|delete|void|instanceof)$/.test(
