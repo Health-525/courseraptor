@@ -179,7 +179,7 @@ raptor             # 启动；项目内也可 npm run dev
   <!-- GitHub 按用户主题自动换图：暗色模式看深底版，浅色模式看白底版 -->
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/courseraptor-architecture.png">
-    <img src="docs/courseraptor-architecture-white.png" width="880" alt="CourseRaptor 项目架构图：交互入口（终端 TUI / 本地网页 / QQ）、Agent 内核、两层记忆与知识库全部本机运行，教务系统与天气等外部服务按需访问">
+    <img src="docs/courseraptor-architecture-white.png" width="880" alt="CourseRaptor 项目架构图：交互入口（终端 TUI / 本地网页 / QQ 桥接）、Agent 内核、工具与业务能力、学校集成与本地持久化全部本机运行，模型 API、天气与教务系统等外部服务按需联网">
   </picture>
 </p>
 
