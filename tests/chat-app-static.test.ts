@@ -1,9 +1,9 @@
 /**
- * 前端资产静态检查：chat-app.js 是内联进页面的单文件脚本，引用未定义
- * 的函数只有运行时才炸——历史 bug：hallItemAct 只有调用没有定义，教务
- * 通知面板一渲染就 ReferenceError，还被 Promise 链吃成「取数失败」，
- * 看起来像网络问题。这里静态扫描兜底：所有非属性调用的标识符必须在
- * 文件里有定义，或属于浏览器/JS 内置白名单。
+ * 前端资产静态检查：chat-app.js 是经 /app.js 端点伺服的独立脚本（浏览器
+ * 顶层脚本，无 import），引用未定义的函数只有运行时才炸——历史 bug：
+ * hallItemAct 只有调用没有定义，教务通知面板一渲染就 ReferenceError，
+ * 还被 Promise 链吃成「取数失败」，看起来像网络问题。这里静态扫描兜底：
+ * 所有非属性调用的标识符必须在文件里有定义，或属于浏览器/JS 内置白名单。
  */
 
 import assert from "node:assert/strict";
@@ -198,7 +198,7 @@ test("提示词模板换序钩子齐全：面板与输入框上方 chips 都可�
   assert.match(src, /item\.draggable = true/);
   assert.match(src, /按住拖动可调整顺序/);
   // 键盘/触屏兜底：↑↓ 按钮带 aria-label，首末条对应方向禁用
-  assert.match(src, /aria-label", verb \+ "："/);
+  assert.match(src, /aria-label", `\$\{verb\}：\$\{q\}`/);
   assert.match(src, /b\.disabled = dir < 0 \? i === 0 : i === quickDraft\.length - 1/);
   assert.match(src, /function moveQuick\(i, dir\)/);
   // 换序与增删走同一条即改即存管线：面板与 chips 同步刷新后落盘
@@ -216,7 +216,7 @@ test("教务通知卡按学校显隐：newsReady 门禁接线齐全，没接入�
   const fn = src.match(/function newsAvailable\(\) \{[\s\S]*?\n\}/);
   assert.ok(fn, "newsAvailable 函数存在");
   assert.match(fn[0], /HALL_DEMO/);
-  assert.match(fn[0], /schoolState && schoolState\.newsReady/);
+  assert.match(fn[0], /schoolState\?\.newsReady/);
   // 宫格过滤带上 news 门禁（没接入的学校宫格直接不出这张卡）
   assert.match(src, /c\.id !== "news" \|\| newsAvailable\(\)/);
   // 对话推送与 #hall=news 深链误触：schoolState 到位后不进无权限面板

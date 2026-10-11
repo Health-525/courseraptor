@@ -6,6 +6,7 @@
 import { readFileSync } from "node:fs";
 import http from "node:http";
 import type { ModelMessage } from "ai";
+import { appJsAsset } from "../../src/channels/web/app-asset";
 import { chatPage } from "../../src/channels/web/chat-page";
 import { knowledgePage } from "../../src/channels/web/knowledge-page";
 import { DEFAULT_QUESTIONS } from "../../src/channels/web/quick-questions";
@@ -279,6 +280,19 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
       if (req.method === "GET" && url === "/") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(chatPage({ demo: true }));
+      } else if (req.method === "GET" && url === "/app.js") {
+        // 前端应用脚本：与正式服务同一份资产（chat-page 引用 /app.js）
+        const buf = appJsAsset();
+        if (buf) {
+          res.writeHead(200, {
+            "content-type": "text/javascript; charset=utf-8",
+            "cache-control": "no-cache",
+          });
+          res.end(buf);
+        } else {
+          res.writeHead(404);
+          res.end('console.error("前端脚本缺失：src/channels/web/assets/chat-app.js 不可读");');
+        }
       } else if (req.method === "GET" && (url === "/today" || url === "/today/")) {
         // 独立日程页的演示版：数据内嵌虚构课表，不发任何请求
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });

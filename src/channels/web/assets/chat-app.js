@@ -37,7 +37,7 @@ function lsSet(k, v) {
 function uuid() {
   return crypto.randomUUID
     ? crypto.randomUUID()
-    : "s" + Date.now().toString(16) + Math.random().toString(16).slice(2, 10);
+    : `s${Date.now().toString(16)}${Math.random().toString(16).slice(2, 10)}`;
 }
 
 /* ── 小工具 ── */
@@ -76,20 +76,20 @@ function pad(x) {
 function clock(ts) {
   if (!ts) return "";
   const d = new Date(ts);
-  return pad(d.getHours()) + ":" + pad(d.getMinutes());
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 function fmtWhen(ts) {
   const d = new Date(ts),
     n = new Date();
   return d.toDateString() === n.toDateString()
     ? clock(ts)
-    : d.getMonth() + 1 + "月" + d.getDate() + "日";
+    : `${d.getMonth() + 1}月${d.getDate()}日`;
 }
 /* 档案行悬停时间戳：不做「今天/昨天」换算，一律全量标准格式，
    等宽字体定宽——悬停浮现时行内布局不跳 */
 function fmtStamp(ts) {
   const d = new Date(ts);
-  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()) + " " + clock(ts);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${clock(ts)}`;
 }
 
 /* ── 首屏问候：按当下时段换招呼语，配 mono 日期戳（TODAY · 9月22日 周二）。
@@ -102,11 +102,11 @@ function heroGreeting() {
     const h = n.getHours();
     const word =
       h < 6 ? "夜深了" : h < 11 ? "早上好" : h < 14 ? "中午好" : h < 18 ? "下午好" : "晚上好";
-    greet.textContent = "同学，" + word + "。";
+    greet.textContent = `同学，${word}。`;
   }
   if (kick) {
     const wd = ["日", "一", "二", "三", "四", "五", "六"][n.getDay()];
-    kick.textContent = "TODAY · " + (n.getMonth() + 1) + "月" + n.getDate() + "日 周" + wd;
+    kick.textContent = `TODAY · ${n.getMonth() + 1}月${n.getDate()}日 周${wd}`;
   }
 }
 heroGreeting();
@@ -164,7 +164,7 @@ const composerForm = document.getElementById("f");
 function syncJumpBottom() {
   document.documentElement.style.setProperty(
     "--jump-bottom",
-    composerForm.offsetHeight + 14 + "px",
+    `${composerForm.offsetHeight + 14}px`,
   );
 }
 if (typeof ResizeObserver !== "undefined") {
@@ -222,12 +222,14 @@ function scroll(force) {
 }
 
 function clearTurns() {
-  [...inner.querySelectorAll(".turn")].forEach((n) => n.remove());
+  [...inner.querySelectorAll(".turn")].forEach((n) => {
+    n.remove();
+  });
 }
 
 /* ── 消息渲染：一行题注（谁 · 时间 · 耗时）+ 正文 ── */
 function addTurn(cls) {
-  const sec = el("turn " + cls);
+  const sec = el(`turn ${cls}`);
   const cap = el("cap");
   cap.appendChild(el2("who", cls === "user" ? "你" : "助手"));
   const tm = el2("tm", "");
@@ -242,9 +244,11 @@ function addUser(text, ts, attachments) {
   const { sec, tm } = addTurn("user");
   tm.textContent = clock(ts || Date.now());
   sec.appendChild(el2("msg", text));
-  if (attachments && attachments.length) {
+  if (attachments?.length) {
     const row = el("upload-tray");
-    attachments.forEach((a) => row.appendChild(el2("upchip", "附件 · " + a.name)));
+    attachments.forEach((a) => {
+      row.appendChild(el2("upchip", `附件 · ${a.name}`));
+    });
     sec.appendChild(row);
   }
   inner.appendChild(sec);
@@ -295,7 +299,9 @@ function addBotMessage(raw, ts, thinkText, cards) {
     item.st.textContent = "已完成";
     item.det.open = false;
   }
-  (cards || []).forEach((card) => renderResultCard(shell.tl, card));
+  (cards || []).forEach((card) => {
+    renderResultCard(shell.tl, card);
+  });
   const html = renderMd(raw);
   if (html != null) shell.msg.innerHTML = html;
   else shell.msg.textContent = raw;
@@ -306,7 +312,7 @@ function addBotMessage(raw, ts, thinkText, cards) {
 
 /* ── 结构化结果卡：查询结果以红头档案卡片呈现（演示模式发送 card 事件） ── */
 function renderResultCard(host, card) {
-  if (!card || !card.title) return;
+  if (!card?.title) return;
   const box = el("result-card");
   const head = el("rc-head");
   head.appendChild(el2("rc-title", card.title));
@@ -315,7 +321,7 @@ function renderResultCard(host, card) {
   box.appendChild(head);
   const body = el("rc-body");
   if (card.summary) body.appendChild(el2("rc-summary", card.summary));
-  if (card.metrics && card.metrics.length) {
+  if (card.metrics?.length) {
     const metrics = el("rc-metrics");
     card.metrics.forEach((m) => {
       const item = el("rc-metric");
@@ -334,7 +340,7 @@ function renderResultCard(host, card) {
     if (row.meta) line.appendChild(el2("rc-meta", row.meta));
     body.appendChild(line);
   });
-  if (card.source) body.appendChild(el2("rc-source", "来源 · " + card.source));
+  if (card.source) body.appendChild(el2("rc-source", `来源 · ${card.source}`));
   box.appendChild(body);
   host.appendChild(box);
 }
@@ -383,7 +389,7 @@ function thinkClose(shell, stat) {
   if (!item) return;
   shell.think = null;
   item.st.textContent = stat || "已完成";
-  item.dur.textContent = ((Date.now() - item.at) / 1000).toFixed(1) + "s";
+  item.dur.textContent = `${((Date.now() - item.at) / 1000).toFixed(1)}s`;
   if (!item.manual) item.det.open = false;
 }
 
@@ -412,16 +418,17 @@ function toolCard(shell, ev) {
   det.appendChild(body);
   shell.tl.appendChild(det);
   const item = { det, body };
-  if (ev.id) shell.tools.set("id:" + ev.id, item);
+  if (ev.id) shell.tools.set(`id:${ev.id}`, item);
   const name = ev.name || "tool";
-  (shell.queue[name] = shell.queue[name] || []).push(item);
+  if (!shell.queue[name]) shell.queue[name] = [];
+  shell.queue[name].push(item);
   scroll(false);
   return item;
 }
 
 function toolTake(shell, ev) {
-  let item = ev.id ? shell.tools.get("id:" + ev.id) : null;
-  if (item) shell.tools.delete("id:" + ev.id);
+  let item = ev.id ? shell.tools.get(`id:${ev.id}`) : null;
+  if (item) shell.tools.delete(`id:${ev.id}`);
   if (!item) {
     const q = shell.queue[ev.name] || [];
     item = q.shift() || null;
@@ -433,11 +440,11 @@ function toolTake(shell, ev) {
 
 function toolDone(shell, ev, ok) {
   const item = toolTake(shell, ev);
-  item.det.className = "tool " + (ok ? "ok" : "bad");
+  item.det.className = `tool ${ok ? "ok" : "bad"}`;
   item.det.querySelector(".tstat").textContent = ok ? "完成" : "失败";
   item.det.querySelector(".tsum").textContent = String(ev.brief || "");
   item.det.querySelector(".tdur").textContent =
-    ev.dur != null ? (ev.dur / 1000).toFixed(1) + "s" : "";
+    ev.dur != null ? `${(ev.dur / 1000).toFixed(1)}s` : "";
   if (ev.out) appendPre(item.body, "结果", ev.out);
   scroll(false);
 }
@@ -455,18 +462,18 @@ function lineBad(tl, text, mark) {
 function fmtSize(n) {
   if (!n) return "";
   return n >= 1048576
-    ? (n / 1048576).toFixed(1) + " MB"
-    : Math.max(1, Math.round(n / 1024)) + " KB";
+    ? `${(n / 1048576).toFixed(1)} MB`
+    : `${Math.max(1, Math.round(n / 1024))} KB`;
 }
 function fileRows(tl, files) {
   files.forEach((f) => {
     const row = el("frow");
     row.appendChild(el2("fmark", "📎"));
-    const nm = el2("fname", f.name + (f.size ? "（" + fmtSize(f.size) + "）" : ""));
+    const nm = el2("fname", f.name + (f.size ? `（${fmtSize(f.size)}）` : ""));
     row.appendChild(nm);
     const a = document.createElement("a");
     a.className = "tbtn";
-    a.href = "/files/" + encodeURIComponent(f.name);
+    a.href = `/files/${encodeURIComponent(f.name)}`;
     a.setAttribute("download", f.name);
     a.textContent = "下载";
     row.appendChild(a);
@@ -480,7 +487,7 @@ function pomoFmt(sec) {
   sec = Math.max(0, Math.ceil(sec));
   const m = Math.floor(sec / 60),
     s = sec % 60;
-  return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+  return `${(m < 10 ? "0" : "") + m}:${s < 10 ? "0" : ""}${s}`;
 }
 /* 到点三声提示音：WebAudio 现场合成，不依赖任何音频文件 */
 function pomoBeep() {
@@ -506,7 +513,7 @@ function pomoBeep() {
   }
 }
 function pomoCard(tl, p) {
-  if (!p || !p.endsAt) return;
+  if (!p?.endsAt) return;
   const total =
     p.totalSec || Math.max(1, Math.round((p.endsAt - (p.startsAt || Date.now())) / 1000));
   const card = el("pomo");
@@ -517,12 +524,9 @@ function pomoCard(tl, p) {
   const row = el("prow");
   row.appendChild(el2("pmark", "🍅"));
   row.appendChild(
-    el2(
-      "plabel",
-      (p.label || "专注") + " · " + (p.focusMinutes || Math.round(total / 60)) + "分钟",
-    ),
+    el2("plabel", `${p.label || "专注"} · ${p.focusMinutes || Math.round(total / 60)}分钟`),
   );
-  row.appendChild(el2("pmeta", "至 " + clock(p.endsAt) + " 结束"));
+  row.appendChild(el2("pmeta", `至 ${clock(p.endsAt)} 结束`));
   card.appendChild(row);
   card.appendChild(el2("pclock", pomoFmt((p.endsAt - Date.now()) / 1000)));
   const bar = el("pbar");
@@ -608,10 +612,10 @@ function pptFreeInner(box, s) {
     /* 成品里 blank 页标题固定排在 0.55/0.4、宽 8.9、字号按长度 28/36 */
     const t = el("pt-el pt-text pt-title");
     t.textContent = s.title;
-    t.style.left = (0.55 / PPT_CANVAS_W) * 100 + "%";
-    t.style.top = (0.4 / PPT_CANVAS_H) * 100 + "%";
-    t.style.width = (8.9 / PPT_CANVAS_W) * 100 + "%";
-    t.style.height = (0.85 / PPT_CANVAS_H) * 100 + "%";
+    t.style.left = `${(0.55 / PPT_CANVAS_W) * 100}%`;
+    t.style.top = `${(0.4 / PPT_CANVAS_H) * 100}%`;
+    t.style.width = `${(8.9 / PPT_CANVAS_W) * 100}%`;
+    t.style.height = `${(0.85 / PPT_CANVAS_H) * 100}%`;
     t.dataset.ptsize = s.title.length > 16 ? "28" : "36";
     t.style.fontWeight = "700";
     t.style.justifyContent = "flex-end";
@@ -619,17 +623,17 @@ function pptFreeInner(box, s) {
   }
   (s.elements || []).forEach((e) => {
     const pct = {
-      left: (e.x / PPT_CANVAS_W) * 100 + "%",
-      top: (e.y / PPT_CANVAS_H) * 100 + "%",
-      width: (e.w / PPT_CANVAS_W) * 100 + "%",
-      height: (e.h / PPT_CANVAS_H) * 100 + "%",
+      left: `${(e.x / PPT_CANVAS_W) * 100}%`,
+      top: `${(e.y / PPT_CANVAS_H) * 100}%`,
+      width: `${(e.w / PPT_CANVAS_W) * 100}%`,
+      height: `${(e.h / PPT_CANVAS_H) * 100}%`,
     };
     if (e.kind === "text") {
       const d = el("pt-el pt-text");
       d.textContent = e.text;
       Object.assign(d.style, pct);
       d.dataset.ptsize = String(e.size || 14);
-      if (e.color) d.style.color = "#" + e.color;
+      if (e.color) d.style.color = `#${e.color}`;
       if (e.bold) d.style.fontWeight = "700";
       if (e.align) d.style.textAlign = e.align;
       if (e.valign)
@@ -652,35 +656,35 @@ function pptFreeInner(box, s) {
       d.style.left = pct.left;
       d.style.top = pct.top;
       d.style.width = pct.width;
-      d.style.background = "#" + (e.line || "E1DCCF");
+      d.style.background = `#${e.line || "E1DCCF"}`;
       /* 高度用 % 保持几何比例；线宽存磅值，布局后换算成 minHeight 兜住可见性 */
       d.style.height = pct.height;
       d.dataset.ptline = String(e.lineW || 1);
       d.dataset.ptlineMin = "1";
       box.appendChild(d);
     } else {
-      const d = el("pt-el pt-shape" + (e.kind === "ellipse" ? " round" : ""));
+      const d = el(`pt-el pt-shape${e.kind === "ellipse" ? " round" : ""}`);
       Object.assign(d.style, pct);
-      if (e.fill) d.style.background = "#" + e.fill;
+      if (e.fill) d.style.background = `#${e.fill}`;
       if (e.line) {
         d.style.borderStyle = "solid";
-        d.style.borderColor = "#" + e.line;
+        d.style.borderColor = `#${e.line}`;
         d.dataset.ptline = String(e.lineW || 1);
       }
-      if (e.rotate) d.style.rotate = e.rotate + "deg";
+      if (e.rotate) d.style.rotate = `${e.rotate}deg`;
       box.appendChild(d);
     }
   });
   if (s.elemCut) {
     const cut = el("pt-el pt-elemcut");
-    cut.textContent = "+ " + s.elemCut + " 元素";
+    cut.textContent = `+ ${s.elemCut} 元素`;
     cut.dataset.ptsize = "8";
     box.appendChild(cut);
   }
   /* free 页成品带内容页母版（页脚品牌字+页码+落款 logo），预览同步落款 */
   box.appendChild(pptLogo());
   /* 元素挂载后才有 clientWidth，布局完成后再统一换算字号/线宽 */
-  requestAnimationFrame(function () {
+  requestAnimationFrame(() => {
     pptFitFreePx(box);
   });
 }
@@ -690,20 +694,20 @@ function pptFreeInner(box, s) {
 function pptFitFreePx(box) {
   const w = box.clientWidth;
   if (!w) {
-    requestAnimationFrame(function () {
+    requestAnimationFrame(() => {
       pptFitFreePx(box);
     });
     return;
   }
   const pxPerPt = w / PPT_CANVAS_W / 72;
-  box.querySelectorAll("[data-ptsize]").forEach(function (d) {
+  box.querySelectorAll("[data-ptsize]").forEach((d) => {
     const v = +d.dataset.ptsize;
-    if (v) d.style.fontSize = Math.max(3, v * pxPerPt) + "px";
+    if (v) d.style.fontSize = `${Math.max(3, v * pxPerPt)}px`;
   });
-  box.querySelectorAll("[data-ptline]").forEach(function (d) {
+  box.querySelectorAll("[data-ptline]").forEach((d) => {
     const t = Math.max(0.75, (+d.dataset.ptline || 1) * pxPerPt);
-    if (d.dataset.ptlineMin) d.style.minHeight = t + "px";
-    else d.style.borderWidth = t + "px";
+    if (d.dataset.ptlineMin) d.style.minHeight = `${t}px`;
+    else d.style.borderWidth = `${t}px`;
   });
 }
 
@@ -725,7 +729,7 @@ function pptSlideInner(box, s, big) {
   }
   box.appendChild(el2("pt-title", s.title));
   if (s.subtitle) box.appendChild(el2("pt-sub", s.subtitle));
-  if (s.bullets && s.bullets.length) {
+  if (s.bullets?.length) {
     /* 与成品同一条规则：≤6 条且无表格 → 数字圆圈视觉行，否则紧凑列表 */
     if (!s.table && s.bullets.length <= 6) {
       const rows = el("pt-rows");
@@ -735,15 +739,17 @@ function pptSlideInner(box, s, big) {
         row.appendChild(el2("pt-li", b));
         rows.appendChild(row);
       });
-      if (s.bulletCut) rows.appendChild(el2("pt-li more", "+ " + s.bulletCut + " 条"));
+      if (s.bulletCut) rows.appendChild(el2("pt-li more", `+ ${s.bulletCut} 条`));
       box.appendChild(rows);
     } else {
       const ul = el("pt-list");
       const cap = big ? 12 : 5;
-      s.bullets.slice(0, cap).forEach((b) => ul.appendChild(el2("pt-li", b)));
+      s.bullets.slice(0, cap).forEach((b) => {
+        ul.appendChild(el2("pt-li", b));
+      });
       const more = (s.bulletCut || 0) + Math.max(0, s.bullets.length - cap);
       if (more > 0) {
-        const li = el2("pt-li", "+ " + more + " 条");
+        const li = el2("pt-li", `+ ${more} 条`);
         li.classList.add("more");
         ul.appendChild(li);
       }
@@ -752,10 +758,11 @@ function pptSlideInner(box, s, big) {
   } else if (s.table) {
     const tb = el("pt-table");
     const rows = [];
-    if (s.table.headers && s.table.headers.length)
-      rows.push({ cells: s.table.headers, head: true });
+    if (s.table.headers?.length) rows.push({ cells: s.table.headers, head: true });
     const cap = big ? 8 : 3;
-    s.table.rows.slice(0, cap).forEach((r) => rows.push({ cells: r, head: false }));
+    s.table.rows.slice(0, cap).forEach((r) => {
+      rows.push({ cells: r, head: false });
+    });
     const rc = (s.table.rowCut || 0) + Math.max(0, s.table.rows.length - cap);
     const cols = rows.length ? rows[0].cells.length : 1;
     rows.forEach((row) => {
@@ -773,7 +780,7 @@ function pptSlideInner(box, s, big) {
       const td = document.createElement("td");
       td.colSpan = cols;
       td.className = "pt-more";
-      td.textContent = "+ " + rc + " 行";
+      td.textContent = `+ ${rc} 行`;
       tr.appendChild(td);
       tb.appendChild(tr);
     }
@@ -783,25 +790,24 @@ function pptSlideInner(box, s, big) {
 }
 
 function pptCard(tl, ppt, files) {
-  if (!ppt || !ppt.slides || !ppt.slides.length) return;
+  if (!ppt?.slides?.length) return;
   const card = el("pptcard");
   const head = el("ppt-head");
   head.appendChild(el2("ppt-mark", "▦"));
   const cover = ppt.slides[0];
-  const dl = files && files[0];
-  const name =
-    (cover && cover.kind === "cover" && cover.title) || (dl && dl.name) || "PPT";
+  const dl = files?.[0];
+  const name = (cover && cover.kind === "cover" && cover.title) || dl?.name || "PPT";
   head.appendChild(el2("ppt-name", name));
   head.appendChild(
     el2(
       "ppt-meta",
-      ppt.count + " 页" + (ppt.slides.length < ppt.count ? " · 前 " + ppt.slides.length + " 页" : ""),
+      ppt.count + " 页" + (ppt.slides.length < ppt.count ? ` · 前 ${ppt.slides.length} 页` : ""),
     ),
   );
   if (dl) {
     const a = document.createElement("a");
     a.className = "tbtn";
-    a.href = "/files/" + encodeURIComponent(dl.name);
+    a.href = `/files/${encodeURIComponent(dl.name)}`;
     a.setAttribute("download", dl.name);
     a.textContent = "下载";
     head.appendChild(a);
@@ -809,7 +815,7 @@ function pptCard(tl, ppt, files) {
   card.appendChild(head);
   const strip = el("pptstrip");
   ppt.slides.forEach((s, i) => {
-    const sl = el("pptslide k-" + s.kind);
+    const sl = el(`pptslide k-${s.kind}`);
     pptSlideInner(sl, s, false);
     sl.addEventListener("click", () => pptView(ppt, i, files));
     strip.appendChild(sl);
@@ -825,7 +831,7 @@ function pptView(ppt, index, files) {
   if (old) old.remove();
   const total = ppt.slides.length;
   let i = Math.max(0, Math.min(index, total - 1));
-  const dl = files && files[0];
+  const dl = files?.[0];
 
   const ov = el("pptview");
   const stage = el("pptv-stage");
@@ -845,10 +851,10 @@ function pptView(ppt, index, files) {
   close.textContent = "✕";
 
   function render() {
-    stage.className = "pptv-stage k-" + ppt.slides[i].kind;
+    stage.className = `pptv-stage k-${ppt.slides[i].kind}`;
     while (stage.firstChild) stage.removeChild(stage.firstChild);
     pptSlideInner(stage, ppt.slides[i], true);
-    counter.textContent = i + 1 + " / " + (ppt.count || total);
+    counter.textContent = `${i + 1} / ${ppt.count || total}`;
     prev.disabled = i === 0;
     next.disabled = i === total - 1;
   }
@@ -874,7 +880,7 @@ function pptView(ppt, index, files) {
   if (dl) {
     const a = document.createElement("a");
     a.className = "tbtn";
-    a.href = "/files/" + encodeURIComponent(dl.name);
+    a.href = `/files/${encodeURIComponent(dl.name)}`;
     a.setAttribute("download", dl.name);
     a.textContent = "下载";
     bar.appendChild(a);
@@ -945,7 +951,7 @@ function pomoFinish(card) {
       });
       return b;
     };
-    foot.appendChild(followup("再来一个 " + mins + " 分钟番茄钟", "再来 " + mins + " 分钟"));
+    foot.appendChild(followup(`再来一个 ${mins} 分钟番茄钟`, `再来 ${mins} 分钟`));
     foot.appendChild(followup("来一个 5 分钟番茄钟，休息一下", "休息 5 分钟"));
   }
   pomoBeep();
@@ -953,7 +959,7 @@ function pomoFinish(card) {
   try {
     if (window.Notification && Notification.permission === "granted") {
       new Notification("⏰ 番茄钟时间到", {
-        body: (card.dataset.label || "专注") + "结束，休息一下吧",
+        body: `${card.dataset.label || "专注"}结束，休息一下吧`,
       });
     }
   } catch {
@@ -986,7 +992,7 @@ function pomoTick() {
       fill = card.querySelector(".pbar i");
     if (left > 0) {
       if (clockEl) clockEl.textContent = pomoFmt(left);
-      if (fill) fill.style.width = ((100 * (total - left)) / total).toFixed(1) + "%";
+      if (fill) fill.style.width = `${((100 * (total - left)) / total).toFixed(1)}%`;
       return;
     }
     if (clockEl) clockEl.textContent = "00:00";
@@ -1007,10 +1013,10 @@ function pomoSync() {
     .then((r) => r.json())
     .then((d) => {
       pomoSyncing = false;
-      const activeId = d.active && d.active.id ? String(d.active.id) : "";
+      const activeId = d.active?.id ? String(d.active.id) : "";
       const rec = {};
       (d.recent || []).forEach((p) => {
-        if (p && p.id) rec[String(p.id)] = p;
+        if (p?.id) rec[String(p.id)] = p;
       });
       document.querySelectorAll(".pomo").forEach((card) => {
         if (card.dataset.finished || card.classList.contains("cancelled")) return;
@@ -1024,7 +1030,7 @@ function pomoSync() {
           pomoCancelCard(card);
           return;
         }
-        if (card.dataset.confirming && (!remote || remote.status !== "running")) pomoFinish(card);
+        if (card.dataset.confirming && remote?.status !== "running") pomoFinish(card);
       });
     })
     .catch(() => {
@@ -1054,9 +1060,9 @@ function restorePomoCard() {
     .then((r) => r.json())
     .then((d) => {
       const p = d.active;
-      if (!p || p.status !== "running") return;
+      if (p?.status !== "running") return;
       const id = String(p.id || "");
-      if (id && inner.querySelector('.pomo[data-id="' + id + '"]')) return;
+      if (id && inner.querySelector(`.pomo[data-id="${id}"]`)) return;
       const wrap = el("pomo-restore");
       pomoCard(wrap, p);
       inner.prepend(wrap);
@@ -1091,11 +1097,11 @@ function renderSessList() {
   if (viewingArchived && !archivedCount) viewingArchived = false;
   const shownCount = viewingArchived ? archivedCount : lastSessions.length - archivedCount;
   document.getElementById("sessTitle").textContent = viewingArchived ? "已归档" : "历史记录";
-  document.getElementById("sessCount").textContent = shownCount ? shownCount + " 个" : "";
+  document.getElementById("sessCount").textContent = shownCount ? `${shownCount} 个` : "";
   /* 主列表里有归档过才给入口；进了归档视图常驻「返回」 */
   const toggle = document.getElementById("sessArchiveToggle");
   toggle.hidden = !viewingArchived && !archivedCount;
-  toggle.textContent = viewingArchived ? "返回" : "归档 " + archivedCount;
+  toggle.textContent = viewingArchived ? "返回" : `归档 ${archivedCount}`;
   const visible = lastSessions.filter((s) => !!s.archived === viewingArchived);
   if (!visible.length) {
     const li = document.createElement("li");
@@ -1108,7 +1114,7 @@ function renderSessList() {
       el2(
         "snone-hint",
         archivedCount
-          ? "会话都归档了，点右上「归档 " + archivedCount + "」可以找回。"
+          ? `会话都归档了，点右上「归档 ${archivedCount}」可以找回。`
           : "在下面问一句，这轮对话就会存进历史，重启也不丢。",
       ),
     );
@@ -1215,14 +1221,14 @@ function renderSessList() {
       let top = r.top;
       if (top + menu.offsetHeight > window.innerHeight - 8)
         top = Math.max(8, window.innerHeight - menu.offsetHeight - 8);
-      menu.style.left = left + "px";
-      menu.style.top = top + "px";
+      menu.style.left = `${left}px`;
+      menu.style.top = `${top}px`;
     }
   });
 }
 
 function patchSession(id, body) {
-  return fetch("/api/sessions/" + encodeURIComponent(id), {
+  return fetch(`/api/sessions/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -1253,10 +1259,10 @@ function refreshSessions() {
 function openSession(id) {
   activeId = id;
   lsSet(ACTIVE_KEY, id);
-  return fetch("/api/sessions/" + encodeURIComponent(id))
+  return fetch(`/api/sessions/${encodeURIComponent(id)}`)
     .then((r) => (r.ok ? r.json() : null))
     .then((d) => {
-      msgs = (d && d.messages) || [];
+      msgs = d?.messages || [];
       clearTurns();
       if (!msgs.length) {
         hero.style.display = "";
@@ -1280,7 +1286,7 @@ function openSession(id) {
 function delSession(id) {
   if (busy) return;
   /* 调用方已做两步确认（菜单 armed），这里不再弹 confirm */
-  fetch("/api/sessions/" + encodeURIComponent(id), { method: "DELETE" })
+  fetch(`/api/sessions/${encodeURIComponent(id)}`, { method: "DELETE" })
     .then(() => refreshSessions())
     .then(() => {
       if (id !== activeId) return;
@@ -1460,9 +1466,9 @@ const HALL_ICONS = {
   settings: GEAR,
   account:
     '<svg viewBox="0 0 24 24" aria-hidden="true">' +
-    '<circle cx="12" cy="8" r="4"/>'+
-    '<path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>'+
-    '</svg>',
+    '<circle cx="12" cy="8" r="4"/>' +
+    '<path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/>' +
+    "</svg>",
 };
 /* GitHub 描线标：与宫格图标同一族的 1.8px 描线（24 viewBox），主页页脚用 */
 const GH_MARK =
@@ -1493,7 +1499,13 @@ const HALL_CARDS = [
      全平台功能（本地版记自己的 Key 用量、托管版同记并上报网关），非托管专属 */
   { id: "usage", t: "用量统计", d: "每日 Token 消耗热力图与各模型用量", group: "系统" },
   /* 导入课表：不进宫格（入口在 设置 → 学校 与课表空态），深链 #hall=import 可达 */
-  { id: "import", t: "导入课表", d: "粘贴或上传课表，AI 解析后手动确认", group: "系统", hidden: true },
+  {
+    id: "import",
+    t: "导入课表",
+    d: "粘贴或上传课表，AI 解析后手动确认",
+    group: "系统",
+    hidden: true,
+  },
   /* 我的账号：托管版专有（改本站登录密码），quota 探测成功后现身 */
   { id: "account", t: "我的账号", d: "修改本站登录密码", group: "系统", hidden: true },
   { id: "settings", t: "设置", d: "学校与教务账号、AI 模型、QQ 与本地数据", group: "系统" },
@@ -1511,14 +1523,14 @@ let hallAutoMuted = false; // 本轮对话里用户手动关过抽屉：这轮�
    各面板与设置页据此区分「已适配学校 / 其他学校（手动课表）」 */
 let schoolState = null; // { current, manual, newsReady, scheduleCached, custom:{name,city}, options:[] }
 function schoolManual() {
-  return !!(schoolState && schoolState.manual);
+  return !!schoolState?.manual;
 }
 /* 教务通知卡的门槛（与设置页 newsReady 同口径）：本校接入教务通知且教务
    账号已保存才亮卡；没接入的学校宫格直接不出这张卡。
    演示页没有 /api/settings，保持展示（点开是演示空态） */
 function newsAvailable() {
   if (HALL_DEMO) return true;
-  return !!(schoolState && schoolState.newsReady);
+  return !!schoolState?.newsReady;
 }
 function applySchoolState(next) {
   if (!next || typeof next !== "object") return;
@@ -1538,7 +1550,7 @@ function briefOf() {
 }
 
 function hallItem(title, meta, hot) {
-  const item = el("hall-item" + (hot ? " hot" : ""));
+  const item = el(`hall-item${hot ? " hot" : ""}`);
   item.appendChild(el2("ht", title));
   if (meta) item.appendChild(el2("hm", meta));
   return item;
@@ -1585,7 +1597,7 @@ let hallKnowCat = "";
    被截断的摘要——末尾恰好顶到字符串结尾的 URL 大概率被拦腰切断，
    宁可不链（链了半截地址只会跳错），展开后自然恢复可点 */
 const KNOW_URL_RE =
-  /(https?:\/\/[A-Za-z0-9._~:\/?#\[\]@!$&'()*+,;=%-]+|www\.[A-Za-z0-9._~:\/?#\[\]@!$&'()*+,;=%-]+)/gi;
+  /(https?:\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+|www\.[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+)/gi;
 function linkifyInto(parent, text, cut) {
   let last = 0;
   for (const m of text.matchAll(KNOW_URL_RE)) {
@@ -1595,7 +1607,7 @@ function linkifyInto(parent, text, cut) {
     if (end <= at || (cut && end === text.length)) continue;
     if (at > last) parent.appendChild(document.createTextNode(text.slice(last, at)));
     const a = document.createElement("a");
-    a.href = /^www\./i.test(url) ? "https://" + url : url;
+    a.href = /^www\./i.test(url) ? `https://${url}` : url;
     a.textContent = url;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
@@ -1624,7 +1636,7 @@ function hallKnowledgeItem(k) {
     if (!open && truncated) text.appendChild(document.createTextNode("…"));
   };
   renderText(false);
-  if (k.source) text.title = "来源：" + k.source;
+  if (k.source) text.title = `来源：${k.source}`;
   main.appendChild(text);
   item.appendChild(main);
   if (!HALL_DEMO)
@@ -1632,7 +1644,7 @@ function hallKnowledgeItem(k) {
       hallDelBtn("删除", () => {
         item.remove();
         hallRecount("knowledge");
-        fetch("/api/knowledge/" + encodeURIComponent(k.id), { method: "DELETE" })
+        fetch(`/api/knowledge/${encodeURIComponent(k.id)}`, { method: "DELETE" })
           .then((r) => {
             if (!r.ok) throw new Error("delete failed");
           })
@@ -1725,7 +1737,7 @@ function hallMore(panel) {
   a.className = "hall-more";
   a.href = hallFullPage(panel);
   a.textContent = "完整页 →";
-  a.setAttribute("aria-label", "在完整页打开" + (HALL_TITLES[panel] || panel));
+  a.setAttribute("aria-label", `在完整页打开${HALL_TITLES[panel] || panel}`);
   return a;
 }
 /* 面板工具条：左侧条数，右侧刷新 + 完整页；刷新清掉 brief 缓存重取 */
@@ -1737,7 +1749,7 @@ function hallToolbar(panel, countText) {
   refresh.type = "button";
   refresh.className = "hall-refresh";
   refresh.textContent = "↻ 刷新";
-  refresh.setAttribute("aria-label", "刷新" + (HALL_TITLES[panel] || panel));
+  refresh.setAttribute("aria-label", `刷新${HALL_TITLES[panel] || panel}`);
   refresh.addEventListener("click", () => {
     /* 即时 disabled + 文案，避免重复点击；新工具条重建时自然恢复 */
     refresh.disabled = true;
@@ -1754,15 +1766,15 @@ function hallToolbar(panel, countText) {
    只返回列表内容；工具条（条数 + 刷新 + 完整页）由 renderHall 统一补。 */
 function buildToday(b) {
   const wrap = el("");
-  wrap.appendChild(hallItem(b.dateLabel + " · " + (b.term.weekLabel || "未在教学周"), "", true));
+  wrap.appendChild(hallItem(`${b.dateLabel} · ${b.term.weekLabel || "未在教学周"}`, "", true));
   /* 今日日程只看今天：brief.next 会向后看到最多 14 天，跨天的（明天及以后）不进这个面板 */
   const todayNext = b.next && b.next.dateLabel === "今天" ? b.next : null;
   if (todayNext) {
     wrap.appendChild(
       hallItem(
-        "下一节 · " + todayNext.course.title,
+        `下一节 · ${todayNext.course.title}`,
         (todayNext.course.time || todayNext.course.periods || "") +
-          (todayNext.course.location ? " @" + todayNext.course.location : ""),
+          (todayNext.course.location ? ` @${todayNext.course.location}` : ""),
         todayNext.startsInMin <= 60,
       ),
     );
@@ -1777,7 +1789,7 @@ function buildToday(b) {
         [
           c.periods,
           c.time,
-          c.location ? "@" + c.location : "",
+          c.location ? `@${c.location}` : "",
           c.status === "done" ? "已下课" : c.status === "current" ? "进行中" : "",
         ]
           .filter(Boolean)
@@ -1809,18 +1821,18 @@ function buildSchedule(b) {
     wrap.appendChild(hallEmpty("🗓️", "还没有课表", "在对话框里说「课表」，查询后这里就会显示。"));
     return wrap;
   }
-  ((b.week && b.week.days) || []).forEach((d) => {
+  (b.week?.days || []).forEach((d) => {
     if (d.holiday) {
       wrap.appendChild(
-        hallItem(d.label + " " + d.dateShort, d.holiday + (d.makeup ? " · 调休补课日" : "")),
+        hallItem(`${d.label} ${d.dateShort}`, d.holiday + (d.makeup ? " · 调休补课日" : "")),
       );
       return;
     }
     d.courses.forEach((c) => {
       wrap.appendChild(
         hallItem(
-          d.label + " " + c.title,
-          [c.time, c.location ? "@" + c.location : "", c.teacher].filter(Boolean).join(" · "),
+          `${d.label} ${c.title}`,
+          [c.time, c.location ? `@${c.location}` : "", c.teacher].filter(Boolean).join(" · "),
           d.isToday,
         ),
       );
@@ -1830,7 +1842,7 @@ function buildSchedule(b) {
 }
 function buildExams(b) {
   const wrap = el("");
-  const list = (b.exams && b.exams.upcoming) || [];
+  const list = b.exams?.upcoming || [];
   if (schoolManual() && !list.length) {
     wrap.appendChild(
       hallEmpty(
@@ -1853,7 +1865,7 @@ function buildExams(b) {
     wrap.appendChild(
       hallItem(
         x.subject,
-        [x.date, x.time, x.location, x.seatNumber ? "座位 " + x.seatNumber : ""]
+        [x.date, x.time, x.location, x.seatNumber ? `座位 ${x.seatNumber}` : ""]
           .filter(Boolean)
           .join(" · "),
         x.isToday || x.inDays <= 3,
@@ -1864,36 +1876,36 @@ function buildExams(b) {
 }
 /* 分组题注计数同步：条目被就地移除/恢复后改写「组名 · N」，组空时连同题注一起收掉 */
 function hallRetitleGroup(group) {
-  if (!group || !group.classList.contains("hall-todo-group")) return;
+  if (!group?.classList.contains("hall-todo-group")) return;
   const head = group.previousElementSibling;
   const kids = group.querySelectorAll(".hall-item").length;
   if (!kids) {
-    if (head && head.classList.contains("hall-group")) head.remove();
+    if (head?.classList.contains("hall-group")) head.remove();
     group.remove();
     return;
   }
-  if (head && head.classList.contains("hall-group")) {
+  if (head?.classList.contains("hall-group")) {
     const name = head.dataset.hallGroup || head.textContent.split(" ·")[0];
-    if (name) head.textContent = name + " · " + kids;
+    if (name) head.textContent = `${name} · ${kids}`;
   }
 }
 /* 待办条目行：勾选完成 + 删除都是乐观更新；逾期朱砂高亮，备注悬停可见，附 .ics 导出 */
 function todoHallItem(t) {
-  const item = el("hall-item has-act" + (t.overdue ? " hot" : ""));
+  const item = el(`hall-item has-act${t.overdue ? " hot" : ""}`);
   /* 勾选即完成：乐观更新——先变灰，落盘成功直接移除节点（未完成列表里自然消失），
      失败才回滚；整面板不重刷，焦点与滚动都不丢 */
   const pick = document.createElement("input");
   pick.type = "checkbox";
   pick.className = "hall-done";
   pick.title = "标记完成";
-  pick.setAttribute("aria-label", "标记完成：" + t.title);
+  pick.setAttribute("aria-label", `标记完成：${t.title}`);
   pick.disabled = HALL_DEMO;
   if (!HALL_DEMO)
     pick.addEventListener("change", () => {
       const done = pick.checked;
       item.classList.toggle("done", done);
       pick.disabled = true;
-      fetch("/api/reminders/" + encodeURIComponent(t.id), {
+      fetch(`/api/reminders/${encodeURIComponent(t.id)}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ done }),
@@ -1918,16 +1930,16 @@ function todoHallItem(t) {
   const metaText =
     t.dueLabel +
     (t.overdue ? " · 已逾期" : t.isToday ? " · 今天到期" : "") +
-    (t.source ? " · 来自" + t.source : "");
+    (t.source ? ` · 来自${t.source}` : "");
   const hm = el2("hm", metaText);
   if (t.overdue) {
     hm.innerHTML = "";
-    hm.appendChild(document.createTextNode(t.dueLabel + " · "));
+    hm.appendChild(document.createTextNode(`${t.dueLabel} · `));
     const tag = document.createElement("span");
     tag.className = "overdue-tag";
     tag.textContent = "⚠ 已逾期";
     hm.appendChild(tag);
-    if (t.source) hm.appendChild(document.createTextNode(" · 来自" + t.source));
+    if (t.source) hm.appendChild(document.createTextNode(` · 来自${t.source}`));
   }
   if (t.notes) hm.title = t.notes;
   main.appendChild(hm);
@@ -1935,10 +1947,10 @@ function todoHallItem(t) {
   if (!HALL_DEMO && t.id) {
     const ics = document.createElement("a");
     ics.className = "hall-ics";
-    ics.href = "/api/reminders/" + encodeURIComponent(t.id) + ".ics";
+    ics.href = `/api/reminders/${encodeURIComponent(t.id)}.ics`;
     ics.textContent = ".ics";
     ics.title = "导出到手机日历";
-    ics.setAttribute("aria-label", "导出待办到日历：" + t.title);
+    ics.setAttribute("aria-label", `导出待办到日历：${t.title}`);
     item.appendChild(ics);
   }
   if (!HALL_DEMO)
@@ -1949,7 +1961,7 @@ function todoHallItem(t) {
         item.remove();
         hallRetitleGroup(group);
         hallRecount("todos");
-        fetch("/api/reminders/" + encodeURIComponent(t.id), { method: "DELETE" })
+        fetch(`/api/reminders/${encodeURIComponent(t.id)}`, { method: "DELETE" })
           .then((r) => {
             if (!r.ok) throw new Error("delete failed");
           })
@@ -1966,7 +1978,7 @@ function todoDoneItem(t) {
   pick.className = "hall-done";
   pick.checked = true;
   pick.title = "取消勾选就恢复为未完成";
-  pick.setAttribute("aria-label", "恢复未完成：" + t.title);
+  pick.setAttribute("aria-label", `恢复未完成：${t.title}`);
   if (HALL_DEMO) {
     pick.disabled = true;
   } else {
@@ -1974,7 +1986,7 @@ function todoDoneItem(t) {
       pick.checked = true;
       /* 恢复要重新落进未完成分组，就地重排不如让数据说话；失败回滚无需处理（勾选态始终勾着） */
       pick.disabled = true;
-      fetch("/api/reminders/" + encodeURIComponent(t.id), {
+      fetch(`/api/reminders/${encodeURIComponent(t.id)}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ done: false }),
@@ -1992,7 +2004,7 @@ function todoDoneItem(t) {
   const main = el("hall-item-main");
   main.appendChild(el2("ht", t.title));
   main.appendChild(
-    el2("hm", (t.doneAt ? "完成于 " + fmtWhen(t.doneAt) + " · " : "") + "原截止 " + t.dueLabel),
+    el2("hm", `${t.doneAt ? `完成于 ${fmtWhen(t.doneAt)} · ` : ""}原截止 ${t.dueLabel}`),
   );
   item.appendChild(main);
   if (!HALL_DEMO)
@@ -2002,7 +2014,7 @@ function todoDoneItem(t) {
         item.remove();
         hallRetitleGroup(group);
         hallRecount("todos");
-        fetch("/api/reminders/" + encodeURIComponent(t.id), { method: "DELETE" })
+        fetch(`/api/reminders/${encodeURIComponent(t.id)}`, { method: "DELETE" })
           .then((r) => {
             if (!r.ok) throw new Error("delete failed");
           })
@@ -2044,8 +2056,8 @@ function buildTodoList(data) {
   });
   groups.forEach((g) => {
     if (!g.items.length) return;
-    const head = el("hall-group" + (g.overdue ? " overdue" : ""));
-    head.textContent = g.name + " · " + g.items.length;
+    const head = el(`hall-group${g.overdue ? " overdue" : ""}`);
+    head.textContent = `${g.name} · ${g.items.length}`;
     head.dataset.hallGroup = g.name;
     wrap.appendChild(head);
     const box = el("hall-todo-group");
@@ -2061,7 +2073,7 @@ function buildTodoList(data) {
     head.type = "button";
     head.className = "hall-group toggle";
     head.dataset.hallGroup = "已完成";
-    head.textContent = "已完成 · " + doneList.length + (todoDoneOpen ? " ▾" : " ▸");
+    head.textContent = `已完成 · ${doneList.length}${todoDoneOpen ? " ▾" : " ▸"}`;
     head.setAttribute("aria-expanded", todoDoneOpen ? "true" : "false");
     head.title = todoDoneOpen ? "收起已完成待办" : "展开已完成待办";
     const box = el("hall-todo-group");
@@ -2073,8 +2085,7 @@ function buildTodoList(data) {
     head.addEventListener("click", () => {
       todoDoneOpen = !todoDoneOpen;
       box.hidden = !todoDoneOpen;
-      head.textContent =
-        "已完成 · " + box.querySelectorAll(".hall-item").length + (todoDoneOpen ? " ▾" : " ▸");
+      head.textContent = `已完成 · ${box.querySelectorAll(".hall-item").length}${todoDoneOpen ? " ▾" : " ▸"}`;
       head.setAttribute("aria-expanded", todoDoneOpen ? "true" : "false");
       head.title = todoDoneOpen ? "收起已完成待办" : "展开已完成待办";
       if (todoDoneOpen) {
@@ -2108,8 +2119,8 @@ function hallKnowCats(entries) {
   bar.setAttribute("aria-label", "按分类筛选知识");
   const all = document.createElement("button");
   all.type = "button";
-  all.className = "hall-cat" + (!hallKnowCat ? " on" : "");
-  all.textContent = "全部 " + entries.length;
+  all.className = `hall-cat${!hallKnowCat ? " on" : ""}`;
+  all.textContent = `全部 ${entries.length}`;
   all.addEventListener("click", () => {
     hallKnowCat = "";
     renderHall(true);
@@ -2119,8 +2130,8 @@ function hallKnowCats(entries) {
     const n = entries.filter((k) => (k.category || "未分类") === c).length;
     const b = document.createElement("button");
     b.type = "button";
-    b.className = "hall-cat" + (hallKnowCat === c ? " on" : "");
-    b.textContent = c + " " + n;
+    b.className = `hall-cat${hallKnowCat === c ? " on" : ""}`;
+    b.textContent = `${c} ${n}`;
     b.setAttribute("aria-pressed", hallKnowCat === c ? "true" : "false");
     b.addEventListener("click", () => {
       hallKnowCat = hallKnowCat === c ? "" : c;
@@ -2143,14 +2154,16 @@ function buildKnowledge(b) {
   /* 演示环境没有 /api/knowledge 接口：保持 brief 速览（只读，带日期） */
   if (HALL_DEMO) {
     const wrap = el("");
-    const recent = (b.knowledge && b.knowledge.recent) || [];
+    const recent = b.knowledge?.recent || [];
     if (!recent.length) {
       wrap.appendChild(hallEmpty("📚", "知识库还是空的", "对话中沉淀的知识点会自动收录到这里。"));
       return wrap;
     }
-    wrap.dataset.total = String((b.knowledge && b.knowledge.total) || recent.length);
+    wrap.dataset.total = String(b.knowledge?.total || recent.length);
     /* 与正式环境同一张卡：标题 + 分类徽标/日期一行 + 摘要（演示无删除按钮） */
-    recent.forEach((k) => wrap.appendChild(hallKnowledgeItem(k)));
+    recent.forEach((k) => {
+      wrap.appendChild(hallKnowledgeItem(k));
+    });
     return wrap;
   }
   /* 正式环境：全量列表 + 分类筛 + 两步删除（与 /knowledge 页同一防误删口径）；
@@ -2181,9 +2194,7 @@ function buildKnowledge(b) {
       wrap.appendChild(box);
       if (entries.length > LIMIT) {
         wrap.appendChild(
-          hallNote(
-            "仅显示前 " + LIMIT + " 条，共 " + entries.length + " 条；完整检索去知识库完整页。",
-          ),
+          hallNote(`仅显示前 ${LIMIT} 条，共 ${entries.length} 条；完整检索去知识库完整页。`),
         );
       }
       return wrap;
@@ -2193,9 +2204,7 @@ function buildKnowledge(b) {
 function hallPomoDate(ts) {
   if (!ts) return "";
   const d = new Date(ts);
-  return (
-    d.getMonth() + 1 + "月" + d.getDate() + "日 " + pad(d.getHours()) + ":" + pad(d.getMinutes())
-  );
+  return `${d.getMonth() + 1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 function buildPomodoro() {
   const wrap = el("");
@@ -2218,7 +2227,7 @@ function buildPomodoro() {
         const p = d.active;
         const total = p.totalSec || Math.max(1, (p.focusMinutes || 25) * 60);
         const card = el("hall-item hot hall-pomo-active");
-        card.appendChild(el2("ht", (p.label || "专注") + " · 进行中"));
+        card.appendChild(el2("ht", `${p.label || "专注"} · 进行中`));
         const clk = el2(
           "hall-pomo-clock",
           pomoFmt(
@@ -2249,7 +2258,7 @@ function buildPomodoro() {
         cancel.type = "button";
         cancel.className = "hall-pomo-cancel";
         cancel.textContent = "取消";
-        cancel.setAttribute("aria-label", "取消番茄钟：" + (p.label || "专注"));
+        cancel.setAttribute("aria-label", `取消番茄钟：${p.label || "专注"}`);
         cancel.addEventListener("click", () => {
           cancel.disabled = true;
           cancel.textContent = "取消中…";
@@ -2283,7 +2292,7 @@ function buildPomodoro() {
       const recent = (d.recent || []).slice(0, 5);
       if (recent.length) {
         const head = el("hall-group");
-        head.textContent = "最近 · " + recent.length;
+        head.textContent = `最近 · ${recent.length}`;
         wrap.appendChild(head);
         recent.forEach((p) => {
           wrap.appendChild(
@@ -2293,7 +2302,7 @@ function buildPomodoro() {
                 " · " +
                 p.focusMinutes +
                 " 分钟" +
-                (p.startsAt ? " · " + hallPomoDate(p.startsAt) : ""),
+                (p.startsAt ? ` · ${hallPomoDate(p.startsAt)}` : ""),
               p.status === "running",
             ),
           );
@@ -2317,7 +2326,7 @@ function hallPomoTick() {
     const ends = Number(fill.dataset.ends),
       total = Number(fill.dataset.total) || 1;
     const left = Math.max(0, Math.ceil((ends - now) / 1000));
-    fill.style.width = ((100 * (total - left)) / total).toFixed(1) + "%";
+    fill.style.width = `${((100 * (total - left)) / total).toFixed(1)}%`;
   });
 }
 /* 成绩面板：纯缓存（get_grades 查通一次即落盘），零登录零模型 */
@@ -2343,19 +2352,16 @@ function gradesRender(g, wrap) {
   wrap.dataset.total = String(g.courseCount || 0);
   wrap.appendChild(
     hallItem(
-      "GPA " + g.gpa + (g.gpaBasis ? "（" + g.gpaBasis + "）" : ""),
-      "必修学分 " + g.requiredCredits + " · 共 " + g.courseCount + " 门课",
+      `GPA ${g.gpa}${g.gpaBasis ? `（${g.gpaBasis}）` : ""}`,
+      `必修学分 ${g.requiredCredits} · 共 ${g.courseCount} 门课`,
       true,
     ),
   );
   if (g.recentSemester) {
-    wrap.appendChild(hallNote("最近学期 " + g.recentSemester + "："));
+    wrap.appendChild(hallNote(`最近学期 ${g.recentSemester}：`));
     (g.recentCourses || []).slice(0, 8).forEach((c) => {
       wrap.appendChild(
-        hallItem(
-          c.course,
-          "成绩 " + c.score + " · " + c.credit + " 学分" + (c.type ? " · " + c.type : ""),
-        ),
+        hallItem(c.course, `成绩 ${c.score} · ${c.credit} 学分${c.type ? ` · ${c.type}` : ""}`),
       );
     });
   }
@@ -2426,7 +2432,7 @@ function buildNews() {
         );
         return wrap;
       }
-      if (d.error) wrap.appendChild(hallNote("抓取失败：" + d.error));
+      if (d.error) wrap.appendChild(hallNote(`抓取失败：${d.error}`));
       if (!items.length) {
         if (!d.error)
           wrap.appendChild(
@@ -2435,9 +2441,7 @@ function buildNews() {
         return wrap;
       }
       if (d.gradeBasis)
-        wrap.appendChild(
-          hallNote("已按你所在「" + d.gradeBasis + " 级」标记相关性，需行动的置顶。"),
-        );
+        wrap.appendChild(hallNote(`已按你所在「${d.gradeBasis} 级」标记相关性，需行动的置顶。`));
       /* 稳定排序把 high 挪到最前（组内保持日期新旧序），兑现提示里的「置顶」 */
       items
         .slice()
@@ -2475,14 +2479,14 @@ function buildNews() {
 /* token 数的中文缩写：1.23 亿 / 4.5 万 / 678 */
 function fmtTokens(n) {
   n = Number(n) || 0;
-  if (n >= 1e8) return (n / 1e8).toFixed(2).replace(/\.?0+$/, "") + " 亿";
-  if (n >= 1e4) return (n / 1e4).toFixed(1).replace(/\.0$/, "") + " 万";
+  if (n >= 1e8) return `${(n / 1e8).toFixed(2).replace(/\.?0+$/, "")} 亿`;
+  if (n >= 1e4) return `${(n / 1e4).toFixed(1).replace(/\.0$/, "")} 万`;
   return String(Math.round(n));
 }
 
 /* 本机时区的 YYYY-MM-DD（数据键是北京时间切日；用户本机即北京时间） */
 function usageDateKey(d) {
-  return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /* 热力图色阶：非零日按分位 25/50/75 升档（GitHub 同语义——非零即亮） */
@@ -2501,16 +2505,16 @@ function usageLevels(dayTotals) {
 /* 一格：日期 + 用量 + 原生 title 悬停说明（无障碍名字同步给 aria-label） */
 function usageCell(date, total, levelOf, future) {
   const cell = document.createElement("span");
-  cell.className = "uh-cell" + (future ? " future" : "");
+  cell.className = `uh-cell${future ? " future" : ""}`;
   if (future) {
     cell.setAttribute("aria-hidden", "true");
     return cell;
   }
   cell.dataset.l = String(levelOf(total));
   cell.dataset.d = date;
-  const label = total > 0 ? total.toLocaleString("zh-CN") + " tokens" : "无用量";
-  cell.title = date + " · " + label;
-  cell.setAttribute("aria-label", date + " " + label);
+  const label = total > 0 ? `${total.toLocaleString("zh-CN")} tokens` : "无用量";
+  cell.title = `${date} · ${label}`;
+  cell.setAttribute("aria-label", `${date} ${label}`);
   return cell;
 }
 
@@ -2546,7 +2550,7 @@ function usageHeatmap(dayTotals) {
     const m = monday.getMonth();
     const mLabel = document.createElement("span");
     if (m !== lastMonth) {
-      mLabel.textContent = m + 1 + "月";
+      mLabel.textContent = `${m + 1}月`;
       lastMonth = m;
     }
     months.appendChild(mLabel);
@@ -2590,14 +2594,17 @@ function usageModelList(models) {
     const name = document.createElement("b");
     name.textContent = m.model;
     head.appendChild(name);
-    const num = el2("um-num", fmtTokens(m.total) + (sum > 0 ? " · " + Math.round((m.total / sum) * 100) + "%" : ""));
+    const num = el2(
+      "um-num",
+      fmtTokens(m.total) + (sum > 0 ? ` · ${Math.round((m.total / sum) * 100)}%` : ""),
+    );
     head.appendChild(num);
     row.appendChild(head);
-    const meta = el2("um-meta", "输入 " + fmtTokens(m.in) + " · 输出 " + fmtTokens(m.out));
+    const meta = el2("um-meta", `输入 ${fmtTokens(m.in)} · 输出 ${fmtTokens(m.out)}`);
     row.appendChild(meta);
     const bar = el("um-bar");
     const fill = document.createElement("i");
-    fill.style.width = (sum > 0 ? Math.max(2, (m.total / sum) * 100) : 0) + "%";
+    fill.style.width = `${sum > 0 ? Math.max(2, (m.total / sum) * 100) : 0}%`;
     bar.appendChild(fill);
     row.appendChild(bar);
     box.appendChild(row);
@@ -2692,7 +2699,7 @@ function hallListTotal(node, panel) {
 function hallMountPanel(dyn, panel, node) {
   const total = hallListTotal(node, panel);
   dyn.innerHTML = "";
-  dyn.appendChild(hallToolbar(panel, total ? "共 " + total + " 条" : ""));
+  dyn.appendChild(hallToolbar(panel, total ? `共 ${total} 条` : ""));
   if (HALL_SEARCHABLE.includes(panel)) dyn.appendChild(hallSearchBox(panel));
   node.classList.add("hall-dyn-in");
   node.dataset.hallList = "1";
@@ -2706,8 +2713,8 @@ function hallSearchBox(panel) {
   input.type = "search";
   /* 手机软键盘回车键标成「搜索」，与行为一致（不动桌面） */
   input.setAttribute("enterkeyhint", "search");
-  input.placeholder = "搜索" + (HALL_TITLES[panel] || "本面板") + "…";
-  input.setAttribute("aria-label", "在" + (HALL_TITLES[panel] || "本面板") + "中搜索");
+  input.placeholder = `搜索${HALL_TITLES[panel] || "本面板"}…`;
+  input.setAttribute("aria-label", `在${HALL_TITLES[panel] || "本面板"}中搜索`);
   input.value = hallSearch.panel === panel ? hallSearch.q : "";
   input.addEventListener("input", () => {
     hallSearch = { panel, q: input.value };
@@ -2744,8 +2751,7 @@ function hallApplySearch(dyn, panel) {
     let box = null;
     if (key) {
       box =
-        node.querySelector('[data-hall-group="' + key + '"].hall-todo-group') ||
-        head.nextElementSibling;
+        node.querySelector(`[data-hall-group="${key}"].hall-todo-group`) || head.nextElementSibling;
     } else {
       box = head.nextElementSibling;
     }
@@ -2755,7 +2761,7 @@ function hallApplySearch(dyn, panel) {
        已完成区默认折叠：搜索命中它的条目时临时展开，无搜索词时回到折叠偏好 */
     const anyVisible = kids.some((k) => k.style.display !== "none");
     head.style.display = !q || anyVisible ? "" : "none";
-    if (box.classList && box.classList.contains("hall-todo-group")) {
+    if (box.classList?.contains("hall-todo-group")) {
       const doneFolded = box.dataset.hallGroup === "已完成" && !todoDoneOpen;
       box.style.display = doneFolded && !q ? "none" : !q || anyVisible ? "" : "none";
     }
@@ -2770,7 +2776,7 @@ function hallApplySearch(dyn, panel) {
   const count = dyn.querySelector(".hall-count");
   if (count) {
     const total = hallListTotal(node, panel);
-    count.textContent = q ? visible + " / " + total + " 条" : total ? "共 " + total + " 条" : "";
+    count.textContent = q ? `${visible} / ${total} 条` : total ? `共 ${total} 条` : "";
   }
 }
 /* 乐观更新后只重算计数（不整面板重刷，焦点与滚动都不丢） */
@@ -2801,13 +2807,13 @@ function hallBadges(dyn) {
       if (hallPanel !== "" || !document.body.classList.contains("hall-open")) return;
       const put = (id, text) => {
         if (!text) return;
-        const card = dyn.querySelector('[data-panel="' + id + '"]');
+        const card = dyn.querySelector(`[data-panel="${id}"]`);
         if (card && !card.querySelector(".hall-badge")) {
           const badge = el2("hall-badge", text);
           if (text.trim().startsWith("⚠")) badge.classList.add("warn");
           /* 放标题行右端、箭头左边：状态和入口同一行，扫一眼就知道哪个面板有事 */
           const go = card.querySelector(".hall-go");
-          if (go && go.parentNode) go.parentNode.insertBefore(badge, go);
+          if (go?.parentNode) go.parentNode.insertBefore(badge, go);
           else card.appendChild(badge);
         }
       };
@@ -2817,24 +2823,24 @@ function hallBadges(dyn) {
         put(
           "today",
           courses.length
-            ? "今日 " + courses.length + " 节"
+            ? `今日 ${courses.length} 节`
             : b.next
-              ? "下节" + b.next.dateLabel
+              ? `下节${b.next.dateLabel}`
               : "今日无课",
         );
       }
-      const days = (b.week && b.week.days) || [];
+      const days = b.week?.days || [];
       let weekN = 0;
       days.forEach((d) => {
-        weekN += ((d && d.courses) || []).length;
+        weekN += (d?.courses || []).length;
       });
-      put("schedule", weekN ? "本周 " + weekN + " 节" : "");
-      const ex = (b.exams && b.exams.upcoming) || [];
-      put("exams", ex.length ? ex.length + " 场临近" : "");
-      const td = (b.todos && b.todos.items) || [];
+      put("schedule", weekN ? `本周 ${weekN} 节` : "");
+      const ex = b.exams?.upcoming || [];
+      put("exams", ex.length ? `${ex.length} 场临近` : "");
+      const td = b.todos?.items || [];
       const overdueN = td.filter((t) => t.overdue).length;
-      put("todos", overdueN ? "⚠ " + overdueN + " 逾期" : td.length ? td.length + " 条待办" : "");
-      put("knowledge", b.knowledge && b.knowledge.total ? "共 " + b.knowledge.total + " 条" : "");
+      put("todos", overdueN ? `⚠ ${overdueN} 逾期` : td.length ? `${td.length} 条待办` : "");
+      put("knowledge", b.knowledge?.total ? `共 ${b.knowledge.total} 条` : "");
     })
     .catch(() => {});
   /* 设置卡徽标：缺关键凭证才亮（与自动推出设置的口径一致：教务 > 模型；QQ 选配不打扰）。
@@ -2846,21 +2852,20 @@ function hallBadges(dyn) {
       if (hallPanel !== "" || !document.body.classList.contains("hall-open")) return;
       const card = dyn.querySelector('[data-panel="settings"]');
       if (!card || card.querySelector(".hall-badge")) return;
-      const miss =
-        d.school && d.school.manual
-          ? d.school.scheduleCached
-            ? ""
-            : "未导课表"
-          : !d.jwgl || !d.jwgl.configured
-            ? "教务未配"
-            : !d.deepseek || !d.deepseek.configured
-              ? "模型未配"
-              : "";
+      const miss = d.school?.manual
+        ? d.school.scheduleCached
+          ? ""
+          : "未导课表"
+        : !d.jwgl?.configured
+          ? "教务未配"
+          : !d.deepseek?.configured
+            ? "模型未配"
+            : "";
       if (!miss) return;
       const badge = el2("hall-badge", miss);
       badge.classList.add("warn");
       const go = card.querySelector(".hall-go");
-      if (go && go.parentNode) go.parentNode.insertBefore(badge, go);
+      if (go?.parentNode) go.parentNode.insertBefore(badge, go);
       else card.appendChild(badge);
     })
     .catch(() => {});
@@ -2930,7 +2935,7 @@ function renderHall(force) {
         card.type = "button";
         card.className = "hall-card";
         card.dataset.panel = c.id;
-        card.setAttribute("aria-label", c.t + "：" + c.d);
+        card.setAttribute("aria-label", `${c.t}：${c.d}`);
         const top = el("hall-card-top");
         top.appendChild(iconSpan("hall-ico", HALL_ICONS[c.id] || GEAR));
         const t = document.createElement("b");
@@ -2959,7 +2964,7 @@ function renderHall(force) {
     gh.target = "_blank";
     gh.rel = "noopener noreferrer";
     gh.setAttribute("aria-label", "GitHub 仓库页面（新窗口打开）");
-    gh.innerHTML = GH_MARK + "<span>GitHub 仓库</span>";
+    gh.innerHTML = `${GH_MARK}<span>GitHub 仓库</span>`;
     dyn.appendChild(gh);
     /* 仓库链接下面再嗷一嗓子：迅猛龙拟声词求 Star，点进仓库页即可点亮 */
     const star = document.createElement("a");
@@ -2968,7 +2973,7 @@ function renderHall(force) {
     star.target = "_blank";
     star.rel = "noopener noreferrer";
     star.setAttribute("aria-label", "去 GitHub 点亮 Star（新窗口打开）");
-    star.innerHTML = "<span>嗷呜！顺手点个</span>" + STAR_MARK + "<span>Star 喂饱小恐龙</span>";
+    star.innerHTML = `<span>嗷呜！顺手点个</span>${STAR_MARK}<span>Star 喂饱小恐龙</span>`;
     dyn.appendChild(star);
     settle();
     hallBadges(dyn);
@@ -3030,7 +3035,7 @@ function openHall(panel, opts) {
   renderHall();
   syncHallHash();
   /* push 进来时不抢焦点：对话联动自动打开的场合，用户可能正在打字 */
-  if (!opts || opts.focus !== false) document.getElementById("closeHall").focus();
+  if (opts?.focus !== false) document.getElementById("closeHall").focus();
 }
 
 /* ── hash 深链：#hall=面板名。刷新还原、可收藏直达、浏览器后退关抽屉。
@@ -3038,7 +3043,7 @@ function openHall(panel, opts) {
 let hallHashSync = false;
 function hallPanelFromHash() {
   const m = /^#hall=([a-z]+)$/.exec(location.hash || "");
-  const id = m && m[1];
+  const id = m?.[1];
   if (!id || !(HALL_TITLES[id] || id === "settings")) return "";
   /* 教务通知门禁：状态未到位先放行（刷新直达收藏的深链），权限不足时
      由启动同步退回宫格 */
@@ -3050,7 +3055,7 @@ function syncHallHash() {
   hallHashSync = true;
   try {
     if (hallPanel) {
-      if (location.hash !== "#hall=" + hallPanel) location.hash = "hall=" + hallPanel;
+      if (location.hash !== `#hall=${hallPanel}`) location.hash = `hall=${hallPanel}`;
     } else if (location.hash) {
       history.replaceState(null, "", location.pathname + location.search);
     }
@@ -3083,7 +3088,7 @@ if (hallInitial) {
     try {
       openHall(hallInitial, { focus: false });
     } catch (e) {
-      window.__hallInitErr = String((e && e.stack) || e);
+      window.__hallInitErr = String(e?.stack || e);
     }
   }, 0);
 }
@@ -3132,7 +3137,7 @@ hallBack.addEventListener("click", () => {
   hallFromCard = "";
   renderHall();
   syncHallHash();
-  const card = from && hallBody.querySelector('[data-panel="' + from + '"]');
+  const card = from && hallBody.querySelector(`[data-panel="${from}"]`);
   (card || document.getElementById("closeHall")).focus();
 });
 hallBody.addEventListener("click", (e) => {
@@ -3167,14 +3172,12 @@ function refreshHallBadge() {
   fetch("/api/today")
     .then((r) => r.json())
     .then((b) => {
-      const urgent = ((b.todos && b.todos.items) || []).filter(
-        (t) => t.overdue || t.isToday,
-      ).length;
+      const urgent = (b.todos?.items || []).filter((t) => t.overdue || t.isToday).length;
       const soonClass = !!(b.next && b.next.dateLabel === "今天" && b.next.startsInMin <= 30);
       const show = urgent > 0 || soonClass;
       const why = [];
       if (soonClass) why.push("30 分钟内有课");
-      if (urgent) why.push(urgent + " 条待办今天到期");
+      if (urgent) why.push(`${urgent} 条待办今天到期`);
       for (const id of ["openHall", "openHallM"]) {
         const btn = document.getElementById(id);
         if (!btn) continue;
@@ -3186,7 +3189,7 @@ function refreshHallBadge() {
         }
         if (!show && dot) dot.remove();
         btn.title = show
-          ? "功能大厅（" + why.join("，") + "）"
+          ? `功能大厅（${why.join("，")}）`
           : "今日日程、课表、考试、待办、知识库、番茄钟";
       }
     })
@@ -3242,7 +3245,7 @@ var dsHosted = false;
    Key 形状提示；切换由 applyProviderUi 统一落 placeholder */
 let keyConfigured = false;
 function renderCurKey(d) {
-  keyConfigured = !!(d && d.deepseek && d.deepseek.configured);
+  keyConfigured = !!d?.deepseek?.configured;
   applyProviderUi();
 }
 function setDsMode(m) {
@@ -3257,7 +3260,7 @@ function setDsMode(m) {
 function dsSay(text, good) {
   var el = document.getElementById("setMsg");
   if (!el) return;
-  el.className = "setmsg" + (good ? " good" : "");
+  el.className = `setmsg${good ? " good" : ""}`;
   el.textContent = text;
 }
 function postDsMode(m) {
@@ -3266,10 +3269,8 @@ function postDsMode(m) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ mode: m }),
   })
-    .then(function (r) {
-      return r.ok;
-    })
-    .then(function (okFlag) {
+    .then((r) => r.ok)
+    .then((okFlag) => {
       if (!okFlag) {
         dsSay("切换失败，请稍后再试。");
         return;
@@ -3277,7 +3278,7 @@ function postDsMode(m) {
       dsUiMode = m;
       setDsMode(m);
       if (m === "own") {
-        var kk = document.getElementById("sKey");
+        const kk = document.getElementById("sKey");
         if (kk && !kk.value) {
           dsSay("在下方填入 API Key 并点「保存设置」，保存后即用自己的 Key。");
           kk.focus();
@@ -3287,11 +3288,11 @@ function postDsMode(m) {
       }
       refreshQuota();
     })
-    .catch(function () {
+    .catch(() => {
       dsSay("网络错误，切换失败。");
     });
 }
-document.addEventListener("click", function (e) {
+document.addEventListener("click", (e) => {
   var t = e.target.closest ? e.target.closest(".ds-opt") : null;
   if (!t) return;
   if (t.id === "dsSite") postDsMode("site");
@@ -3302,8 +3303,8 @@ document.addEventListener("click", function (e) {
    没有该接口，静默隐藏即可，不影响任何本地行为 */
 function refreshQuota() {
   fetch("/api/quota")
-    .then(function (r) { return r.ok ? r.json() : null; })
-    .then(function (q) {
+    .then((r) => (r.ok ? r.json() : null))
+    .then((q) => {
       var el = document.getElementById("curQuota");
       /* 形状守卫：非网关环境对 /api/quota 兜底出 200 页面/杂 JSON 时绝不能
          把站点卡片亮出来——本地版与演示页必须一行站点内容都不出现 */
@@ -3311,7 +3312,7 @@ function refreshQuota() {
       if (!dsHosted) {
         dsHosted = true;
         /* 简介换成托管语境：本地版说「保存在当前电脑」，托管版 Key 在服务器上 */
-        var intro = document.getElementById("dsIntro");
+        const intro = document.getElementById("dsIntro");
         if (intro) {
           intro.textContent =
             "模型服务支持多家供应商。下方选择 Key 来源：站点免费额度开箱即用；自己的 Key 由服务器加密保存，留空即保持不变。";
@@ -3327,17 +3328,16 @@ function refreshQuota() {
       /* 开关跟「同学的选择」走：本页点过的选择优先；没有点过时按服务端
          选择推导——钉在站点的显示站点，跟随模式且已存 Key 的显示自有，
          跟随但没存 Key 的（新同学默认态）显示站点 */
-      var ui =
-        dsUiMode || (q.dsMode === "site" ? "site" : q.hasOwnKey ? "own" : "site");
+      var ui = dsUiMode || (q.dsMode === "site" ? "site" : q.hasOwnKey ? "own" : "site");
       var mode = document.getElementById("dsMode");
       if (mode) {
         mode.hidden = false;
         setDsMode(ui);
       }
       var accEl = document.getElementById("curAccount");
-      if (accEl && q.username) accEl.textContent = "当前登录账号：" + q.username;
-      var cardDef = HALL_CARDS.find(function (c) { return c.id === "account"; });
-      if (cardDef && cardDef.hidden) {
+      if (accEl && q.username) accEl.textContent = `当前登录账号：${q.username}`;
+      var cardDef = HALL_CARDS.find((c) => c.id === "account");
+      if (cardDef?.hidden) {
         cardDef.hidden = false;
         if (!hallPanel) renderHall();
       }
@@ -3347,40 +3347,67 @@ function refreshQuota() {
           " Key（今日 " +
           (q.ownUsed || 0) +
           " 轮，不占站点额度）" +
-          (q.remaining !== undefined ? "；站点免费额度保留：剩余 " + q.remaining + " 次" : "")
+          (q.remaining !== undefined ? `；站点免费额度保留：剩余 ${q.remaining} 次` : "")
         : q.hasOwnKey
-          ? "站点免费对话：今日已用 " + q.used + "/" + q.limit + "，剩余 " + q.remaining + " 次（已保存自己的 Key，上方可随时切换）"
+          ? "站点免费对话：今日已用 " +
+            q.used +
+            "/" +
+            q.limit +
+            "，剩余 " +
+            q.remaining +
+            " 次（已保存自己的 Key，上方可随时切换）"
           : ui === "own"
             ? "已选择用自己的 Key：填入并保存后生效；保存前仍可用站点免费额度"
-            : "站点免费对话：今日已用 " + q.used + "/" + q.limit + "，剩余 " + q.remaining + " 次；填自己的 Key 后不占站点额度";
+            : "站点免费对话：今日已用 " +
+              q.used +
+              "/" +
+              q.limit +
+              "，剩余 " +
+              q.remaining +
+              " 次；填自己的 Key 后不占站点额度";
     })
-    .catch(function () {});
+    .catch(() => {});
 }
 
 /* 我的账号：托管版同学自助改本站登录密码（/api/password 由网关提供；
    本地版无此标签，整块不会出现） */
-document.getElementById("saveMyPass").addEventListener("click", function () {
+document.getElementById("saveMyPass").addEventListener("click", () => {
   var msg = document.getElementById("curPassMsg");
   var cur = document.getElementById("sPassCur").value;
   var nw = document.getElementById("sPassNew").value;
   var nw2 = document.getElementById("sPassNew2").value;
-  if (!cur || !nw) { msg.textContent = "请填写当前密码和新密码。"; return; }
-  if (nw !== nw2) { msg.textContent = "两次输入的新密码不一致。"; return; }
-  if (nw.length < 8) { msg.textContent = "新密码至少 8 位。"; return; }
+  if (!cur || !nw) {
+    msg.textContent = "请填写当前密码和新密码。";
+    return;
+  }
+  if (nw !== nw2) {
+    msg.textContent = "两次输入的新密码不一致。";
+    return;
+  }
+  if (nw.length < 8) {
+    msg.textContent = "新密码至少 8 位。";
+    return;
+  }
   msg.textContent = "正在修改…";
-  fetch("/api/password", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ current: cur, next: nw }) })
-    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-    .then(function (res) {
-      if (res.ok && res.d && res.d.ok) {
+  fetch("/api/password", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ current: cur, next: nw }),
+  })
+    .then((r) => r.json().then((d) => ({ ok: r.ok, d: d })))
+    .then((res) => {
+      if (res.ok && res.d?.ok) {
         msg.textContent = "✓ 已修改；下次登录请使用新密码。";
         document.getElementById("sPassCur").value = "";
         document.getElementById("sPassNew").value = "";
         document.getElementById("sPassNew2").value = "";
       } else {
-        msg.textContent = (res.d && res.d.error) || "修改失败，请稍后再试。";
+        msg.textContent = res.d?.error || "修改失败，请稍后再试。";
       }
     })
-    .catch(function () { msg.textContent = "网络错误，修改失败。"; });
+    .catch(() => {
+      msg.textContent = "网络错误，修改失败。";
+    });
 });
 
 refreshQuota();
@@ -3411,7 +3438,7 @@ let quickDraft = quickSaved.slice();
 let quickMsgTimer = 0;
 function quickCountText() {
   return quickDraft.length
-    ? "共 " + quickDraft.length + " 条 · 上限 12 条"
+    ? `共 ${quickDraft.length} 条 · 上限 12 条`
     : "清单为空 · 保存后恢复默认模板";
 }
 /* 状态小字：常态是条数，保存后闪一下「已保存」，出错换朱砂 */
@@ -3461,7 +3488,7 @@ function renderQuickList() {
         b.disabled = dir < 0 ? i === 0 : i === quickDraft.length - 1;
         const verb = dir < 0 ? "上移" : "下移";
         b.title = verb;
-        b.setAttribute("aria-label", verb + "：" + q);
+        b.setAttribute("aria-label", `${verb}：${q}`);
         b.addEventListener("click", () => moveQuick(i, dir));
         return b;
       };
@@ -3472,7 +3499,7 @@ function renderQuickList() {
     del.type = "button";
     del.textContent = "✕";
     del.title = "删除该模板";
-    del.setAttribute("aria-label", "删除：" + q);
+    del.setAttribute("aria-label", `删除：${q}`);
     del.addEventListener("click", () => {
       quickDraft = quickDraft.filter((x) => x !== q);
       renderQuickList();
@@ -3596,9 +3623,7 @@ function nearestDropTarget(container, dragEl, x, y) {
   });
   if (!best) return null;
   const r = best.getBoundingClientRect();
-  return x > r.left + r.width / 2 || y > r.top + r.height / 2
-    ? best.nextSibling
-    : best;
+  return x > r.left + r.width / 2 || y > r.top + r.height / 2 ? best.nextSibling : best;
 }
 if (document.body.dataset.demo !== "true") {
   enableDragSort(qchips, commitQuickOrder);
@@ -3663,11 +3688,14 @@ function settingsDirty() {
   if (document.body.dataset.demo === "true") return false;
   const customUrlEl = document.getElementById("customBaseUrl");
   const customModelEl = document.getElementById("customModelId");
-  const savedUrl = setStatus && setStatus.provider ? setStatus.provider.customBaseUrl || "" : "";
+  const savedUrl = setStatus?.provider ? setStatus.provider.customBaseUrl || "" : "";
   return !!(
     (schoolPicked && schoolState && schoolPicked !== schoolState.current) ||
     providerCurrent !== providerSaved ||
-    (providerCurrent === "custom" && customUrlEl && customUrlEl.value.trim() && customUrlEl.value.trim() !== savedUrl) ||
+    (providerCurrent === "custom" &&
+      customUrlEl &&
+      customUrlEl.value.trim() &&
+      customUrlEl.value.trim() !== savedUrl) ||
     (providerCurrent === "custom" && customModelEl && customModelEl.value.trim()) ||
     sUser.value.trim() ||
     sPass.value ||
@@ -3719,11 +3747,11 @@ function refreshData() {
     .then((r) => r.json())
     .then((d) => {
       const cells = [
-        ["会话", d.sessions.count + " 个 · " + d.sessions.messages + " 条"],
-        ["已读附件", d.attachments.count + " 个 · " + fmtSize(d.attachments.bytes)],
-        ["网页上传", d.uploads.count + " 个 · " + fmtSize(d.uploads.bytes)],
-        ["生成文件", d.generated.count + " 个 · " + fmtSize(d.generated.bytes)],
-        ["未完成待办", d.reminders.open + " 条"],
+        ["会话", `${d.sessions.count} 个 · ${d.sessions.messages} 条`],
+        ["已读附件", `${d.attachments.count} 个 · ${fmtSize(d.attachments.bytes)}`],
+        ["网页上传", `${d.uploads.count} 个 · ${fmtSize(d.uploads.bytes)}`],
+        ["生成文件", `${d.generated.count} 个 · ${fmtSize(d.generated.bytes)}`],
+        ["未完成待办", `${d.reminders.open} 条`],
       ];
       const host = document.getElementById("dataGrid");
       host.innerHTML = "";
@@ -3799,7 +3827,7 @@ function toggleDd(btn, items, onPick) {
   items.forEach((it) => {
     const row = document.createElement("button");
     row.type = "button";
-    row.className = "dd-item" + (it.on ? " on" : "");
+    row.className = `dd-item${it.on ? " on" : ""}`;
     row.setAttribute("role", "option");
     row.setAttribute("aria-selected", it.on ? "true" : "false");
     const main = document.createElement("span");
@@ -3820,14 +3848,14 @@ function toggleDd(btn, items, onPick) {
   });
   document.body.appendChild(pop);
   const r = btn.getBoundingClientRect();
-  pop.style.minWidth = r.width + "px";
-  pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - r.width - 8)) + "px";
+  pop.style.minWidth = `${r.width}px`;
+  pop.style.left = `${Math.max(8, Math.min(r.left, window.innerWidth - r.width - 8))}px`;
   /* 下方空间不够就翻到上方；两边都紧张时贴空间大的一侧 */
   const spaceBelow = window.innerHeight - r.bottom;
   if (spaceBelow < 160 && r.top > spaceBelow) {
-    pop.style.bottom = window.innerHeight - r.top + 4 + "px";
+    pop.style.bottom = `${window.innerHeight - r.top + 4}px`;
   } else {
-    pop.style.top = r.bottom + 4 + "px";
+    pop.style.top = `${r.bottom + 4}px`;
   }
   pop.addEventListener("keydown", (e) => {
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
@@ -3865,7 +3893,7 @@ document.addEventListener(
   (e) => {
     if (!ddOpenBtn) return;
     /* 浮层自己滚动（长清单）不收起 */
-    if (e.target && e.target.closest && e.target.closest("#ddPop")) return;
+    if (e.target?.closest?.("#ddPop")) return;
     closeDd();
   },
   true,
@@ -3894,11 +3922,11 @@ let siteProviders = ["deepseek"]; // quota 探测成功后更新；PR 过渡期�
 let quotaUiMode = ""; // quota 探测得到的 Key 来源选择（与 dsUiMode 同推导）
 function providerLabelOf(id) {
   const p = providerOptions.find((x) => x.id === id);
-  return p && p.label ? p.label : id;
+  return p?.label ? p.label : id;
 }
 function providerKeyHintOf(id) {
   const p = providerOptions.find((x) => x.id === id);
-  return p && p.keyHint ? p.keyHint : "API Key";
+  return p?.keyHint ? p.keyHint : "API Key";
 }
 function applyProviderUi() {
   const btn = document.getElementById("providerSelect");
@@ -3916,11 +3944,10 @@ function applyProviderUi() {
         : providerKeyHintOf(providerCurrent);
   const note = document.getElementById("dsOwnNote");
   if (note)
-    note.textContent =
-      "自己的 " + providerLabelOf(providerCurrent) + " Key，不占免费额度、不限轮数";
+    note.textContent = `自己的 ${providerLabelOf(providerCurrent)} Key，不占免费额度、不限轮数`;
 }
 function fillProviders(d) {
-  const p = d && d.provider;
+  const p = d?.provider;
   if (!p) return;
   providerOptions = Array.isArray(p.options)
     ? p.options.filter((x) => x && typeof x.id === "string")
@@ -3944,8 +3971,11 @@ function previewProviderModels(id) {
       return;
     }
   }
-  const cu = id === "custom" ? encodeURIComponent(document.getElementById("customBaseUrl").value.trim()) : "";
-  fetch("/api/models?provider=" + encodeURIComponent(id) + (cu ? "&custom=" + cu : "") + "&refresh=1")
+  const cu =
+    id === "custom"
+      ? encodeURIComponent(document.getElementById("customBaseUrl").value.trim())
+      : "";
+  fetch(`/api/models?provider=${encodeURIComponent(id)}${cu ? `&custom=${cu}` : ""}&refresh=1`)
     .then((r) => r.json())
     .then((m) => {
       if (!m) return;
@@ -4023,7 +4053,7 @@ function fillModels(options, current, message) {
   const list = Array.isArray(options) ? options : [];
   modelCurrent = current || "";
   modelOptions = list.filter((m) => m && typeof m.id === "string");
-  modelEmptyMsg = modelOptions.length ? "" : (message || "型号清单读取中…");
+  modelEmptyMsg = modelOptions.length ? "" : message || "型号清单读取中…";
   pickModel(sModel.value && modelOptions.some((m) => m.id === sModel.value) ? sModel.value : "");
   /* 当前型号由下拉按钮自身显示（按钮文案即在用型号），不常驻一行小字重复；
      这行只在服务端带话时出现：清单降级原因 / 自定义端点引导 */
@@ -4089,17 +4119,17 @@ document.getElementById("setTabs").addEventListener("keydown", (e) => {
 function renderSetDots(d) {
   if (!d) return;
   const mark = (pane, ok, optional) => {
-    const dot = document.querySelector('#setTabs .set-tab[data-pane="' + pane + '"] .sdot');
+    const dot = document.querySelector(`#setTabs .set-tab[data-pane="${pane}"] .sdot`);
     if (!dot) return;
-    dot.className = "sdot " + (ok ? "ok" : optional ? "" : "warn");
+    dot.className = `sdot ${ok ? "ok" : optional ? "" : "warn"}`;
     dot.title = ok ? "已配置" : optional ? "" : "未配置，需要填写";
   };
   /* 学校栏合并了教务账号：适配学校看教务账号是否已配，其他学校看
      是否已导入课表（默认南京工业大学，不存在「未选学校」态） */
   const sch = d.school || {};
-  mark("school", sch.manual ? !!sch.scheduleCached : !!(d.jwgl && d.jwgl.configured), false);
-  mark("model", !!(d.deepseek && d.deepseek.configured), false);
-  mark("qq", !!(d.qq && d.qq.configured), true);
+  mark("school", sch.manual ? !!sch.scheduleCached : !!d.jwgl?.configured, false);
+  mark("model", !!d.deepseek?.configured, false);
+  mark("qq", !!d.qq?.configured, true);
 }
 
 /* ── 学校栏目：下拉框选学校 + 随选择出现的教务账号 / 导入课表 ── */
@@ -4111,7 +4141,7 @@ function schoolOptionLabel(o) {
 function renderSchoolCards(d) {
   if (!schoolSelect) return;
   if (d) schoolData = d;
-  const school = (schoolData && schoolData.school) || {};
+  const school = schoolData?.school || {};
   const options = Array.isArray(school.options) ? school.options : [];
   const pickedId = schoolPicked || school.current;
   const picked = options.filter((o) => o.id === pickedId)[0];
@@ -4124,7 +4154,7 @@ function renderSchoolCards(d) {
 if (schoolSelect) {
   bindDdBtn(schoolSelect);
   schoolSelect.addEventListener("click", () => {
-    const school = (schoolData && schoolData.school) || {};
+    const school = schoolData?.school || {};
     const options = Array.isArray(school.options) ? school.options : [];
     if (!options.length) return;
     const active = schoolPicked || school.current;
@@ -4150,26 +4180,26 @@ if (schoolSelect) {
 /* 教务账号状态行：凭据不分学校，保存时的学校与当前学校不一致要明说，
    否则切校后旧学号对不上新校，看起来就像「还在登原来的学校」 */
 function jwglCurText(d) {
-  if (!d.jwgl || !d.jwgl.configured) return "尚未配置教务账号";
-  const base = "已保存：学号 " + d.jwgl.username + " · " + d.jwgl.sourceLabel;
-  const opts = (d.school && d.school.options) || [];
+  if (!d.jwgl?.configured) return "尚未配置教务账号";
+  const base = `已保存：学号 ${d.jwgl.username} · ${d.jwgl.sourceLabel}`;
+  const opts = d.school?.options || [];
   const saved = d.jwgl.savedSchoolId;
-  const cur = d.school && d.school.current;
+  const cur = d.school?.current;
   if (saved && cur && saved !== cur) {
     const name = (id) => {
       const o = opts.filter((x) => x.id === id)[0];
       return o ? (o.id === "custom" ? "其他学校" : o.name) : id;
     };
-    return base + "（⚠️ 此账号保存于" + name(saved) + "；当前学校是" + name(cur) + "，请更新教务账号）";
+    return `${base}（⚠️ 此账号保存于${name(saved)}；当前学校是${name(cur)}，请更新教务账号）`;
   }
   return base;
 }
 /* 学校相关 UI 的可见性/文案随「选中态」走：保存前预览，保存后即为现状 */
 function syncSchoolUi(preview) {
-  const picked = schoolPicked || (schoolState && schoolState.current) || "custom";
+  const picked = schoolPicked || schoolState?.current || "custom";
   const manual =
     preview && schoolPicked
-      ? !!((schoolState && schoolState.options) || []).find((o) => o.id === picked && o.manual)
+      ? !!(schoolState?.options || []).find((o) => o.id === picked && o.manual)
       : schoolManual();
   const jwglBox = document.getElementById("schoolJwglBox");
   const importBox = document.getElementById("schoolImportBox");
@@ -4177,7 +4207,7 @@ function syncSchoolUi(preview) {
   if (importBox) importBox.hidden = !manual;
   const cur = document.getElementById("curSchool");
   if (cur) {
-    const cached = schoolState && schoolState.scheduleCached;
+    const cached = schoolState?.scheduleCached;
     cur.textContent = cached
       ? "已有导入的课表；换学期或课表有变时重新导入即可"
       : "还没有导入课表：点下方按钮粘贴或上传，AI 解析后确认";
@@ -4185,7 +4215,7 @@ function syncSchoolUi(preview) {
 }
 
 function qqStatusText(q) {
-  return q && q.configured
+  return q?.configured
     ? "已配置：AppID " +
         (q.appIdMasked || "已保存") +
         " · " +
@@ -4195,8 +4225,8 @@ function qqStatusText(q) {
 }
 function qqApplyStatus(q) {
   document.getElementById("curQQ").textContent = qqStatusText(q);
-  sQQSecret.placeholder = q && q.configured ? "已保存；留空不修改" : "q.qq.com 机器人的 AppSecret";
-  sQQPass.placeholder = q && q.passcodeSet ? "已设暗号；留空不修改" : "首次激活用的暗号（自定）";
+  sQQSecret.placeholder = q?.configured ? "已保存；留空不修改" : "q.qq.com 机器人的 AppSecret";
+  sQQPass.placeholder = q?.passcodeSet ? "已设暗号；留空不修改" : "首次激活用的暗号（自定）";
 }
 
 function showSettings() {
@@ -4347,7 +4377,7 @@ document.getElementById("saveSettings").addEventListener("click", () => {
   if (pw) {
     /* 只改密码时自动带上现有学号，免得来回填 */
     body.jwglPassword = pw;
-    body.jwglUsername = u || (setStatus && setStatus.jwgl.username) || "";
+    body.jwglUsername = u || setStatus?.jwgl.username || "";
   } else if (u) {
     setMsg.className = "setmsg";
     setMsg.textContent = "修改学号时，请同时填写新的登录密码。";
@@ -4395,12 +4425,12 @@ document.getElementById("saveSettings").addEventListener("click", () => {
     .then(({ ok, d }) => {
       saveBtn.disabled = false;
       /* 保存结果逐条展示：失败行保持朱砂、成功行随 good 变墨色，混在一起也分得清 */
-      setMsg.className = "setmsg" + (ok ? " good" : "");
+      setMsg.className = `setmsg${ok ? " good" : ""}`;
       setMsg.textContent = "";
       const lines = d.results || [];
       for (const x of lines) {
         const line = document.createElement("div");
-        line.className = "setmsg-line" + (x.ok === false ? " bad" : "");
+        line.className = `setmsg-line${x.ok === false ? " bad" : ""}`;
         line.textContent = x.message;
         setMsg.appendChild(line);
       }
@@ -4476,7 +4506,11 @@ function impTermCandidates() {
   const now = new Date();
   const y = now.getFullYear();
   const m = now.getMonth() + 1;
-  if (m >= 9) return [{ year: y, semester: 3 }, { year: y - 1, semester: 12 }];
+  if (m >= 9)
+    return [
+      { year: y, semester: 3 },
+      { year: y - 1, semester: 12 },
+    ];
   if (m >= 7)
     return [
       { year: y, semester: 3 },
@@ -4489,7 +4523,7 @@ function impTermCandidates() {
   ];
 }
 function impTermLabel(t) {
-  return t.year + "-" + (t.year + 1) + "学年第" + (t.semester === 3 ? "一" : "二") + "学期";
+  return `${t.year}-${t.year + 1}学年第${t.semester === 3 ? "一" : "二"}学期`;
 }
 /* 节次文本 → 数组："3-4" / "3,4" / "3 4" 都认；编辑框里随手改 */
 function impParsePeriods(s) {
@@ -4510,10 +4544,10 @@ function impParsePeriods(s) {
 }
 function impCourseMeta(c) {
   return [
-    IMP_WEEKDAYS[c.weekday] || "周" + c.weekday,
-    (c.periods || []).join(",") + "节",
-    c.weeks ? c.weeks + "周" : "",
-    c.location ? "@" + c.location : "",
+    IMP_WEEKDAYS[c.weekday] || `周${c.weekday}`,
+    `${(c.periods || []).join(",")}节`,
+    c.weeks ? `${c.weeks}周` : "",
+    c.location ? `@${c.location}` : "",
     c.teacher,
   ]
     .filter(Boolean)
@@ -4535,7 +4569,7 @@ function impRender() {
   tBox.innerHTML = "";
   if (imp.done) {
     const done = el("imp-done");
-    done.appendChild(el2("id-t", "✓ " + imp.done));
+    done.appendChild(el2("id-t", `✓ ${imp.done}`));
     done.appendChild(
       el2(
         "id-s",
@@ -4560,8 +4594,8 @@ function impRender() {
   imp.questions.forEach((q) => {
     const card = el("imp-q");
     card.dataset.question = q.question;
-    card.appendChild(el2("iq-t", "AI 想确认：" + q.question));
-    if (q.options) card.appendChild(el2("iq-o", "可选：" + q.options));
+    card.appendChild(el2("iq-t", `AI 想确认：${q.question}`));
+    if (q.options) card.appendChild(el2("iq-o", `可选：${q.options}`));
     const input = document.createElement("input");
     input.type = "text";
     input.placeholder = "写下你的回答，然后点「解析课表」带上答案重新解析";
@@ -4575,10 +4609,16 @@ function impRender() {
   }
   /* 解析质量问题如实亮出来：被拒行 + 时间冲突 */
   const warns = [];
-  imp.rejected.forEach((r) => warns.push("第 " + r.row + " 行未解析：" + r.reason));
-  imp.conflicts.forEach((c) => warns.push("⚠ " + c));
+  imp.rejected.forEach((r) => {
+    warns.push(`第 ${r.row} 行未解析：${r.reason}`);
+  });
+  imp.conflicts.forEach((c) => {
+    warns.push(`⚠ ${c}`);
+  });
   if (warns.length) pBox.appendChild(el2("imp-warn", warns.join("\n")));
-  imp.courses.forEach((c, i) => pBox.appendChild(impRowNode(c, i)));
+  imp.courses.forEach((c, i) => {
+    pBox.appendChild(impRowNode(c, i));
+  });
   if (!imp.courses.length && !warns.length)
     pBox.appendChild(el2("imp-warn", "没有解析出任何课程：换一段更完整的文字再试。"));
   /* 学期与开学日期：模型从内容里看出的线索做预选，最终以这里的选择为准 */
@@ -4593,14 +4633,14 @@ function impRender() {
   const candidates = impTermCandidates();
   candidates.forEach((t) => {
     const o = document.createElement("option");
-    o.value = t.year + ":" + t.semester;
+    o.value = `${t.year}:${t.semester}`;
     o.textContent = impTermLabel(t);
     sel.appendChild(o);
   });
   if (imp.termHint) {
     const o = document.createElement("option");
     o.value = "";
-    o.textContent = "内容提到：" + imp.termHint;
+    o.textContent = `内容提到：${imp.termHint}`;
     o.disabled = true;
     sel.insertBefore(o, sel.children[1] ?? null);
   }
@@ -4654,7 +4694,12 @@ function impRowNode(c, i) {
       options: IMP_WEEKDAYS.slice(1).map((n, k) => [String(k + 1), n]),
       value: () => String(c.weekday || 1),
     },
-    { key: "periods", label: "节次（如 3-4）", type: "text", value: () => (c.periods || []).join(",") },
+    {
+      key: "periods",
+      label: "节次（如 3-4）",
+      type: "text",
+      value: () => (c.periods || []).join(","),
+    },
     { key: "weeks", label: "周次（如 1-16）", type: "text", value: () => c.weeks || "" },
     { key: "location", label: "地点", type: "text", value: () => c.location || "" },
     { key: "teacher", label: "教师", type: "text", value: () => c.teacher || "" },
@@ -4721,7 +4766,7 @@ impParseBtn.addEventListener("click", () => {
   const answers = [];
   document.querySelectorAll("#impQuestions .imp-q").forEach((card) => {
     const q = card.dataset.question || "";
-    const a = (card.querySelector("input") || {}).value || "";
+    const a = card.querySelector("input")?.value || "";
     if (q && a.trim()) answers.push({ question: q, answer: a.trim() });
   });
   imp.busy = true;
@@ -4758,11 +4803,11 @@ impParseBtn.addEventListener("click", () => {
       impSay(
         imp.questions.length
           ? "解析出 " +
-            imp.courses.length +
-            " 条课程；AI 还有 " +
-            imp.questions.length +
-            " 个问题要确认（见下方）"
-          : "解析出 " + imp.courses.length + " 条课程；核对预览后点「确认导入」",
+              imp.courses.length +
+              " 条课程；AI 还有 " +
+              imp.questions.length +
+              " 个问题要确认（见下方）"
+          : `解析出 ${imp.courses.length} 条课程；核对预览后点「确认导入」`,
       );
       impRender();
     })
@@ -4778,10 +4823,10 @@ document.getElementById("impFileBtn").addEventListener("click", () => {
   document.getElementById("impFile").click();
 });
 document.getElementById("impFile").addEventListener("change", (e) => {
-  const file = e.target.files && e.target.files[0];
+  const file = e.target.files?.[0];
   e.target.value = "";
   if (!file) return;
-  impSay("正在上传 " + file.name + "…");
+  impSay(`正在上传 ${file.name}…`);
   const reader = new FileReader();
   reader.onerror = () => impSay("读取文件失败");
   reader.onload = () => {
@@ -4800,7 +4845,7 @@ document.getElementById("impFile").addEventListener("change", (e) => {
         imp.uploadId = d.upload.id;
         imp.fileName = file.name;
         document.getElementById("impFileName").textContent =
-          file.name + "（" + Math.max(1, Math.round(file.size / 1024)) + " KB，已上传）";
+          `${file.name}（${Math.max(1, Math.round(file.size / 1024))} KB，已上传）`;
         impSay("文件已就绪，点「解析课表」让 AI 读取");
       })
       .catch(() => impSay("网络错误，上传失败"));
@@ -4839,12 +4884,12 @@ impCommitBtn.addEventListener("click", () => {
     teacher: c.teacher || "",
   }));
   const body = { courses };
-  if (termSel && termSel.value) {
+  if (termSel?.value) {
     const [y, s] = termSel.value.split(":");
     body.year = Number(y);
     body.semester = Number(s);
   }
-  if (dateInput && dateInput.value) body.termStart = dateInput.value;
+  if (dateInput?.value) body.termStart = dateInput.value;
   imp.busy = true;
   impCommitBtn.disabled = true;
   impCommitBtn.textContent = "导入中…";
@@ -4861,7 +4906,7 @@ impCommitBtn.addEventListener("click", () => {
         impCommitBtn.textContent = impCommitBtn.dataset.label || "确认导入";
         return;
       }
-      imp.done = "已导入 " + d.count + " 门课（" + d.term + "）";
+      imp.done = `已导入 ${d.count} 门课（${d.term}）`;
       hallBrief = null;
       if (schoolState) {
         schoolState.scheduleCached = true;
@@ -4938,10 +4983,10 @@ const cwrap = document.querySelector(".cwrap");
 function renderUploads() {
   uploadTray.innerHTML = "";
   pendingUploads.forEach((upload) => {
-    const chip = el("upchip" + (upload.status === "uploading" ? " loading" : ""));
+    const chip = el(`upchip${upload.status === "uploading" ? " loading" : ""}`);
     if (upload.status === "error") {
       /* 失败 chip 可点击重试：原名保留，错误原因收进 title */
-      chip.appendChild(el2("", "失败，点击重试 · " + upload.name));
+      chip.appendChild(el2("", `失败，点击重试 · ${upload.name}`));
       chip.title = upload.error || "上传失败";
       chip.tabIndex = 0;
       chip.setAttribute("role", "button");
@@ -4970,7 +5015,7 @@ function renderUploads() {
     remove.title = "移除附件";
     remove.addEventListener("click", () => {
       pendingUploads = pendingUploads.filter((x) => x.localId !== upload.localId);
-      if (upload.id) fetch("/api/uploads/" + upload.id, { method: "DELETE" }).catch(() => {});
+      if (upload.id) fetch(`/api/uploads/${upload.id}`, { method: "DELETE" }).catch(() => {});
       renderUploads();
       syncBtn();
     });
@@ -5028,25 +5073,25 @@ fileInput.addEventListener("change", () => {
    走同一套上传队列；纯文本粘贴保持原生行为不受影响 */
 input.addEventListener("paste", (e) => {
   if (document.body.dataset.demo === "true") return;
-  const files = [...((e.clipboardData && e.clipboardData.files) || [])];
+  const files = [...(e.clipboardData?.files || [])];
   if (files.length) {
     e.preventDefault();
     handleFiles(files);
   }
 });
-["dragenter", "dragover"].forEach((name) =>
+["dragenter", "dragover"].forEach((name) => {
   cwrap.addEventListener(name, (e) => {
     e.preventDefault();
     if (!document.body.dataset.demo.includes("true")) cwrap.classList.add("drag");
-  }),
-);
-["dragleave", "drop"].forEach((name) =>
+  });
+});
+["dragleave", "drop"].forEach((name) => {
   cwrap.addEventListener(name, (e) => {
     e.preventDefault();
     cwrap.classList.remove("drag");
     if (name === "drop" && e.dataTransfer) handleFiles(e.dataTransfer.files || []);
-  }),
-);
+  });
+});
 
 async function send(text) {
   if (!text || busy) return;
@@ -5082,7 +5127,7 @@ async function send(text) {
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || "HTTP " + res.status);
+      throw new Error(body.error || `HTTP ${res.status}`);
     }
     pendingUploads = pendingUploads.filter((x) => !sendingUploads.includes(x));
     renderUploads();
@@ -5121,7 +5166,7 @@ async function send(text) {
             if (panel === "settings" && !hallAutoMuted) openHall(panel, { focus: false });
           } else {
             toolDone(shell, ev, ev.phase === "end");
-            if (ev.files && ev.files.length) fileRows(shell.tl, ev.files);
+            if (ev.files?.length) fileRows(shell.tl, ev.files);
             if (ev.pomodoro) pomoCard(shell.tl, ev.pomodoro);
             /* pptx 成品：下载行之外再出一张可翻页的幻灯片预览卡 */
             if (ev.ppt) pptCard(shell.tl, ev.ppt, ev.files);
@@ -5148,7 +5193,7 @@ async function send(text) {
           lineBad(shell.tl, ev.v);
         } else if (ev.t === "end") {
           thinkClose(shell);
-          if (ev.dur != null) shell.dur.textContent = "· " + (ev.dur / 1000).toFixed(1) + "s";
+          if (ev.dur != null) shell.dur.textContent = `· ${(ev.dur / 1000).toFixed(1)}s`;
           /* 服务端可能把无名新会话建档成 default 档：认领回来的 id */
           if (ev.sid) {
             activeId = String(ev.sid);
@@ -5218,7 +5263,7 @@ async function send(text) {
 const form = document.getElementById("f");
 function fit() {
   input.style.height = "auto";
-  input.style.height = Math.min(input.scrollHeight, 180) + "px";
+  input.style.height = `${Math.min(input.scrollHeight, 180)}px`;
 }
 /* 空内容时发送键禁用；流式进行中永远可点（此时它是「停止」） */
 function syncBtn() {
@@ -5269,10 +5314,8 @@ const vv = window.visualViewport;
 if (vv) {
   const syncKb = () => {
     const kb =
-      Math.abs(vv.scale - 1) > 0.01
-        ? 0
-        : Math.max(0, Math.round(window.innerHeight - vv.height));
-    document.documentElement.style.setProperty("--vkb", kb + "px");
+      Math.abs(vv.scale - 1) > 0.01 ? 0 : Math.max(0, Math.round(window.innerHeight - vv.height));
+    document.documentElement.style.setProperty("--vkb", `${kb}px`);
     /* iOS 会顺势把页面往上顶；锁高布局里那只是一段空白，拉回顶部 */
     if (kb > 0 && window.scrollY !== 0) window.scrollTo(0, 0);
     /* 高度变化后按需贴底：正在看最新消息时不让键盘把消息顶出视野 */

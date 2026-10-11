@@ -1,27 +1,8 @@
 /** 网页视图：正式服务与离线演示共用，不依赖账号、模型或会话存储。
  *
  * 前端应用代码在 assets/chat-app.js（独立 JS 资产：编辑器与工具可直接解析，
- * 语法自检也有测试兜底），此处读入后内联进页面——保持单文件交付，浏览器
- * 不多发一个请求。演示模式由 body[data-demo] 传给前端，代码本体不分叉。 */
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const APP_JS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "assets", "chat-app.js");
-let appJsCache: string | null = null;
-
-function appJs(): string {
-  if (appJsCache === null) {
-    try {
-      appJsCache = fs.readFileSync(APP_JS, "utf8");
-    } catch {
-      // 资产读不到时页面仍可打开，但在控制台明确报因，不渲染一个死页面
-      appJsCache = 'console.error("前端脚本缺失：src/channels/web/assets/chat-app.js 不可读");';
-    }
-  }
-  return appJsCache;
-}
-
+ * 语法自检也有测试兜底），经 /app.js 端点伺服（app-asset.ts）。演示模式由
+ * body[data-demo] 传给前端，代码本体不分叉。 */
 export function chatPage(options: { demo?: boolean } = {}): string {
   const demo = options.demo === true;
   return `<!doctype html>
@@ -1637,9 +1618,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   </div>
 </aside>
 <div class="drawer-backdrop" id="drawerBackdrop"></div>
-<script>
-${appJs()}
-</script>
+<script src="/app.js"></script>
 </body>
 </html>`;
 }
