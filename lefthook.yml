@@ -1,0 +1,13 @@
+# pre-commit 保持快：只对暂存文件跑 Biome（check + fix，修完自动回写暂存区）。
+# 完整门禁（typecheck / 全量 lint / 测试 / audit）交给 CI，本地不重复背全套。
+pre-commit:
+  commands:
+    biome:
+      glob: "*.{js,jsx,ts,tsx,mjs,cjs,json,jsonc}"
+      run: npx biome check --write --no-errors-on-unmatched {staged_files}
+      stage_fixed: true
+
+pre-push:
+  commands:
+    typecheck:
+      run: npm run typecheck

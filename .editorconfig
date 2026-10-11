@@ -1,0 +1,16 @@
+# 与 .gitattributes 分工：git 管检出换行，editorconfig 管编辑器落盘。
+# 数值与 biome.json 对齐：2 空格缩进、LF、文件末尾保留换行。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+# 与 .gitattributes 的 *.bat 例外一致：批处理必须 CRLF
+# （原因见 .gitattributes 内注释：cmd.exe 按字节偏移回扫，裸 LF 会截断中文行）
+[*.{bat,cmd}]
+end_of_line = crlf
