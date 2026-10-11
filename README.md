@@ -4,38 +4,124 @@
 
 # 🦖 CourseRaptor
 
-**大学教务对话式 Agent 框架** —— 课表 · 成绩 · 考试 · 教务通知 · 待办 · 知识库 · 记忆，一句话搞定。<br>
-学校无关的本地优先内核（Vercel AI SDK v7 · 端口-适配器 · 三端入口）：开箱即「手动课表」模式、任何学校都能用；要在线直查教务，为自己的学校写一个适配器插件即可，内核零改动。
+**散落在教务系统各处的信息，收进一句对话。**<br>
+学校无关、本地优先的教务 Agent 框架（Vercel AI SDK v7 · 端口-适配器 · 三端入口）：开箱即「手动课表」模式，任何学校都能用；要在线直查教务，为自己的学校写一个适配器插件即可，内核零改动。
 
 [![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
 [![下载最新版](https://img.shields.io/github/v/release/Health-525/courseraptor?label=%E4%B8%8B%E8%BD%BD%E6%9C%80%E6%96%B0%E7%89%88&color=orange)](https://github.com/Health-525/courseraptor/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social)](https://github.com/Health-525/courseraptor)
+[![Node 24+](https://img.shields.io/badge/Node.js-24%2B-8f2b21?logo=nodedotjs&logoColor=white)](https://nodejs.org/en/download)
+[![GitHubDaily](https://img.shields.io/badge/GitHubDaily-Featured-1DA1F2?logo=x&logoColor=white)](https://x.com/github_daily/status/2105560876132757969)
+[![Indie Dev List](https://img.shields.io/badge/China_Indie_Dev_List-Featured-9B59B6)](https://github.com/1c7/chinese-independent-developer/blob/master/.github/pages/README-Programmer-Edition.md)
 
 [简体中文](README.md) · [English](README.en.md)
 
-[核心特性](#核心特性) · [界面预览](#界面预览) · [工程样例](#给开发者一套可整体搬走的本地-agent-工程) · [快速开始](#快速开始) · [隐私与安全](#隐私与安全) · [项目架构](#项目架构) · [文档](#文档) · [常见问题](#常见问题)
+[快速开始](#快速开始) · [离线演示](#先零门槛体验可选) · [核心特性](#核心特性) · [界面预览](#界面预览) · [给开发者](#给开发者一套可整体搬走的本地-agent-工程) · [常见问题](#常见问题) · [Discussions](https://github.com/Health-525/courseraptor/discussions)
 
 </div>
 
 ---
 
-散落在教务系统各处的信息，收进一句对话。
+<p align="center">
+  <img src="docs/screenshots/gui-demo.gif" width="800" alt="网页端动态演示：快捷提问与一句话查询全流程（虚构示例数据）">
+</p>
 
-问「这周课表」「我的 GPA」「最近的考试」「通识学分还缺哪几类」——为自己的学校写好适配器后，agent 自动登录教务、抓取、结构化后回答；还没写适配器也能用「手动课表」模式管课表、待办与学习。
+> 演示与截图均为虚构示例数据（演示模式），不代表真实教务信息。
+
+问「这周课表」「我的 GPA」「最近的考试」「通识学分还缺哪几类」——agent 一句话作答：写好适配器的学校自动登录教务、抓取、结构化后回答；还没写适配器也不影响起步，「手动课表」导入后今日页、待办与学习教练照常运转。
 
 - **三端一个内核** —— 终端敲 `raptor`、浏览器开 `localhost:3210`、QQ 里 @机器人，共用同一份记忆
 - **一切都在本机** —— 凭证 AES-256-GCM 加密落盘，教务数据不经第三方，不上报遥测（历史装机统计服务已下线；旧包可设 `RAPTOR_NO_TELEMETRY=1` 关闭上报尝试）
-- **模型接你自己的 Key** —— 默认 DeepSeek，另有 11 家国内厂商可选（通义千问 / 智谱 GLM / Kimi / 豆包 / 混元 / MiniMax / 阶跃 / 文心 / 讯飞 / 硅基流动 / 移动云，共 12 家），或填自定义 OpenAI 兼容端点，按量计费、用量透明
-- **任何学校开箱即用** —— 默认「手动课表」模式（导入课表、零教务联网）；要在线直查教务，为你学校写一个适配器插件即可，框架已备好 `SchoolAdapter` 端口与自动发现加载器（[`src/adapters/`](src/adapters/)）
+- **模型接你自己的 Key** —— 默认 DeepSeek，共 12 家国内厂商可选，或填自定义 OpenAI 兼容端点，按量计费、用量透明
+- **开箱即用，接教务只差一个插件** —— 开箱「手动课表」模式零教务联网；要在线直查，往 [`src/adapters/`](src/adapters/) 丢一个自包含插件目录，启动时自动发现、内核零改动（[学校适配器指南](src/adapters/README.md)）
 
 正在写 Agent 的朋友可以直接把它当参考实现读：`ToolLoopAgent` 多轮工具循环怎么组织几十个工具、外部系统怎么用端口-适配器隔离（新增一所学校 = 往 `src/adapters/` 丢一个自包含插件目录，自动被发现、内核零改动）、多厂商模型层怎么用纯数据注册表装配——见下方 [工程样例](#给开发者一套可整体搬走的本地-agent-工程)。
 
 ---
 
+## 界面预览
+
+> 截图均为虚构示例数据（演示模式），不代表真实教务信息；动态演示见顶部。
+
+**终端卡片 TUI** —— 敲 `raptor` 直接开聊，启动首屏即见今日课表、一周待办、临近考试与最新通知：
+
+<p align="center"><img src="docs/screenshots/tui.png" width="800" alt="终端 TUI 首屏：今日课表、待办、考试与通知速览（虚构示例数据）"></p>
+
+**网页对话** —— 浏览器打开 `http://localhost:3210` 即聊，思考过程与工具调用全程可见：
+
+<p align="center"><img src="docs/screenshots/gui.png" width="800" alt="网页对话：思考卡片、工具调用与课表回复（虚构示例数据）"></p>
+
+---
+
+## 快速开始
+
+三种用法按需选：**安装包**（推荐给同学，零开发环境）、**源码运行**（开发者）、**无头命令行**（自动化与二次封装）。无论哪种，思考过程、工具调用与每轮问答都会归档进会话历史。
+
+### 先零门槛体验（可选）
+
+还没配教务账号和 API Key？按下方方式二完成 `git clone` 与 `npm install` 后，一行命令进入离线演示：
+
+```bash
+npm run demo
+```
+
+- **虚构示例数据 + 剧本式回答**：不读本机凭证、不连教务、不调模型、对话不落盘
+- 打开终端打印的地址（通常 `http://127.0.0.1:3211`），体验与正式版一致的界面和交互
+- 想看真实 AI 对同样的虚构数据做分析：`.env` 配好 `DEEPSEEK_API_KEY` 后改跑 `npm run demo:live`（回复来自真实模型、工具仍返回虚构数据，API 用量可能产生费用；没配 Key 自动退回离线剧本）
+
+### 方式一：下载安装包（推荐给同学，无需任何开发环境）
+
+到 [Releases](https://github.com/Health-525/courseraptor/releases/latest) 下载任一安装包（约 100 MB，已内置 Node 运行时，不用装 Node.js、也不用联网装依赖）。别下页面最底部 GitHub 自动生成的 Source code 包。
+
+- **`portable-win-x64.exe`（最省事，推荐）**：双击即用。exe 放哪、程序就装到哪——首次双击在旁边释放 `CourseRaptor` 文件夹（解压后约 290 MB，含内置 Node 运行时与依赖）后直接进入对话；之后秒开，删文件夹即卸载。升级 = 新版 exe 放进原文件夹再双击，账号、记忆、数据全部保留
+- **`portable-win-x64.zip`（绿色版）**：解压后双击文件夹里的 `start.bat`，适合 U 盘携带或机房电脑
+
+启动不在终端提问，直接进入界面；教务账号和模型 API Key（默认 DeepSeek，其他厂商在网页「设置 → AI 模型」里切换）都在网页「功能大厅 → 设置」里填写，加密存本机、之后免填。
+
+> 双击没反应或被拦截：安装包未做代码签名（exe 是自释放启动器、zip 里的 `runtime\node.exe` 是 Node 官方运行时），SmartScreen 弹窗选「更多信息 → 仍要运行」，或把安装/解压目录加入杀软信任区。
+
+### 方式二：git 克隆（开发者）
+
+```bash
+git clone https://github.com/Health-525/courseraptor.git
+cd courseraptor
+npm install        # 需 Node.js ≥ 24
+
+# 模型 Key（默认 DeepSeek）：cp .env.example .env 后编辑填入；其余 11 家厂商与自定义端点可在网页设置里配
+# 教务账号：留空即可，启动后在网页「设置 → 教务账号」里填写并加密保存本机
+
+npm link           # 注册全局命令（一次即可，任意目录可用）
+raptor             # 启动；项目内也可 npm run dev
+```
+
+常用脚本：`npm run doctor`（环境自检）· `npm test`（node:test）· `npm run test:coverage`（同测试，带覆盖率门槛）· `npm run typecheck && npm run lint`（类型 + Biome 检查）。
+
+### 方式三：无头命令行（自动化 / 二次封装，不消耗 token）
+
+把教务查询（课表 / 成绩 / 考试 / 通知 / 选课）封装成无头 CLI——**不经过 LLM 对话、不消耗任何模型 token**，输出结构化 JSON，适合脚本化调用与二次封装。这类查询技能随学校适配器一并提供（[学校适配器指南](src/adapters/README.md)），仓库不含任何真实学校的教务协议。
+
+下面两个独立技能包与学校无关、仓库已内置，可整份拷到 `~/.claude/skills/`、`~/.zcode/skills/` 等目录给别的 agent 用，或从 [Releases](https://github.com/Health-525/courseraptor/releases) 下载 zip：
+
+- [`skills/export-schedule/`](skills/export-schedule/) —— 把课表缓存渲染成图片供下载，适配各平台聊天里直接发图看课表的场景（`npm run package:skill -- export-schedule` 构建）
+- [`skills/meta-learning/`](skills/meta-learning/) —— 学习教练：认知科学驱动的元学习引擎（深度教学 / 知识结构诊断 / 考试型刻意练习编排），辅助期末备考，原作者 [changer-changer](https://github.com/changer-changer)（MIT-0）。raptor agent 已内置触发：说「帮我复习高数」「讲解一下傅里叶变换」自动进入学习教练模式，方法论经 `read_learning_reference` 按需加载（详见 [能力文档](docs/capabilities.md)）
+
+<details>
+<summary><b>系统要求</b>（点开查看）</summary>
+
+- **操作系统** —— Windows 10/11、macOS 12+、Linux (glibc 2.28+)
+- **Node.js** —— ≥ 24（安装包已内置 Node 运行时，无需预装）
+- **内存** —— ≥ 512 MB 可用（运行时约 150-300 MB）
+- **磁盘** —— ≥ 300 MB（含运行时、依赖、本地数据）
+- **网络** —— 首次配置需联网拉取模型 API（默认 DeepSeek，可换厂商）、教务系统；之后可离线使用已缓存数据
+
+</details>
+
+---
+
 ## 核心特性
 
-内核自带 17 个学校无关工具（文件表格、文档生成、沙箱计算、记忆、知识库、待办、学习教练、番茄钟、天气等），加内置「手动课表」适配器的课表与放假调休 2 个工具，开箱即 19 个工具、零教务联网。在线教务直查（课表 / 成绩 / 考试 / 通知 / 选课）由「学校适配器」提供：框架只给 `SchoolAdapter` 端口与自动发现加载器，某所学校的教务协议要你自己写一个适配器插件，按实现的能力再挂载相应教务工具（参考实现合计 31 个工具），写好后在浏览器「设置 → 学校」里选用。完整参数、耗时、环境变量与工具清单见 [能力文档](docs/capabilities.md)。
+开箱 19 个学校无关工具（内核 17 个 + 内置「手动课表」适配器的课表与放假调休 2 个），零教务联网；在线教务直查（课表 / 成绩 / 考试 / 通知 / 选课）由学校适配器按能力挂载（参考实现合计 31 个工具），写好后在浏览器「设置 → 学校」里选用。完整参数、耗时、环境变量与工具清单见 [能力文档](docs/capabilities.md)。
 
 **开箱即用（任何学校，无需适配器）**
 
@@ -62,24 +148,6 @@
 
 ---
 
-## 界面预览
-
-> 截图均为虚构示例数据（演示模式），不代表真实教务信息。
-
-**终端卡片 TUI** —— 敲 `raptor` 直接开聊，启动首屏即见今日课表、一周待办、临近考试与最新通知：
-
-<p align="center"><img src="docs/screenshots/tui.png" width="800" alt="终端 TUI 首屏：今日课表、待办、考试与通知速览（虚构示例数据）"></p>
-
-**网页对话** —— 浏览器打开 `http://localhost:3210` 即聊，思考过程与工具调用全程可见：
-
-<p align="center"><img src="docs/screenshots/gui.png" width="800" alt="网页对话：思考卡片、工具调用与课表回复（虚构示例数据）"></p>
-
-**动态演示** —— 从欢迎页、快捷提问到一句话发起查询的完整流程（虚构示例数据）：
-
-<p align="center"><img src="docs/screenshots/gui-demo.gif" width="800" alt="网页端动态演示：快捷提问与一句话查询全流程（虚构示例数据）"></p>
-
----
-
 ## 给开发者：一套可整体搬走的本地 Agent 工程
 
 > 在找「Vercel AI SDK 的生产级完整例子」，或者「Agent 怎么接一堆外部系统而不失控」？这个仓库是一份答案：三端入口跑在真实用户的日常使用里，每个设计都有源码可查、有测试兜底，以 MIT 许可证开源，欢迎拆走复用（详见 [LICENSE](LICENSE)）。
@@ -92,84 +160,6 @@
 - **多入口单内核** —— 终端 TUI / 本地网页 / QQ 机器人共享同一内核与记忆；另有独立技能包（课表图导出 / 元学习）可整份拷给别的 agent 用（[`src/channels/`](src/channels/) · [`local/`](local/) · [`skills/`](skills/)）
 - **本地优先安全** —— 凭证 AES-256-GCM 绑定本机指纹；Web 仅回环监听 + Host/Origin/CSRF 校验；沙箱 JS 无网络无磁盘（[`src/core/credentials.ts`](src/core/credentials.ts) · [`src/core/sandbox-js.ts`](src/core/sandbox-js.ts)）
 - **工程化底盘** —— TypeScript `strict` + node:test（覆盖率门槛只升不降）+ Biome + 双 OS 矩阵 CI（[`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml)）
-
----
-
-## 快速开始
-
-三种用法按需选：**安装包**（推荐给同学，零开发环境）、**源码运行**（开发者）、**无头命令行**（自动化与二次封装）。无论哪种，思考过程、工具调用与每轮问答都会归档进会话历史。
-
-### 先零门槛体验（可选）
-
-还没配教务账号和 API Key？按下方方式二完成 `git clone` 与 `npm install` 后，一行命令进入离线演示：
-
-```bash
-npm run demo
-```
-
-- **虚构示例数据 + 剧本式回答**：不读本机凭证、不连教务、不调模型、对话不落盘
-- 打开终端打印的地址（通常 `http://127.0.0.1:3211`），体验与正式版一致的界面和交互
-- 想看真实 AI 对同样的虚构数据做分析：`.env` 配好 `DEEPSEEK_API_KEY` 后改跑 `npm run demo:live`（回复来自真实模型、工具仍返回虚构数据，API 用量可能产生费用；没配 Key 自动退回离线剧本）
-
-### 方式一：下载安装包（推荐给同学，无需任何开发环境）
-
-到 [Releases](https://github.com/Health-525/courseraptor/releases/latest) 下载任一安装包（约 116 MB，已内置 Node 运行时，不用装 Node.js、也不用联网装依赖）。别下页面最底部 GitHub 自动生成的 Source code 包。
-
-- **`portable-win-x64.exe`（最省事，推荐）**：双击即用。exe 放哪、程序就装到哪——首次双击在旁边释放 `CourseRaptor` 文件夹（约 116 MB）后直接进入对话；之后秒开，删文件夹即卸载。升级 = 新版 exe 放进原文件夹再双击，账号、记忆、数据全部保留
-- **`portable-win-x64.zip`（绿色版）**：解压后双击文件夹里的 `start.bat`，适合 U 盘携带或机房电脑
-
-启动不在终端提问，直接进入界面；教务账号和模型 API Key（默认 DeepSeek，其他厂商在网页「设置 → AI 模型」里切换）都在网页「功能大厅 → 设置」里填写，加密存本机、之后免填。
-
-> 双击没反应或被拦截：安装包未做代码签名（exe 是自释放启动器、zip 里的 `runtime\node.exe` 是 Node 官方运行时），SmartScreen 弹窗选「更多信息 → 仍要运行」，或把安装/解压目录加入杀软信任区。
-
-### 方式二：git 克隆（开发者）
-
-```bash
-git clone https://github.com/Health-525/courseraptor.git
-cd courseraptor
-npm install        # 需 Node.js ≥ 24
-
-# 模型 Key（默认 DeepSeek）：cp .env.example .env 后编辑填入；其余 11 家厂商与自定义端点可在网页设置里配
-# 教务账号：留空即可，启动后在网页「设置 → 教务账号」里填写并加密保存本机
-
-npm link           # 注册全局命令（一次即可，任意目录可用）
-raptor             # 启动；项目内也可 npm run dev
-```
-
-常用脚本：`npm run doctor`（环境自检）· `npm test`（node:test）· `npm run test:coverage`（同测试，带覆盖率门槛）· `npm run typecheck && npm run lint`（类型 + Biome 检查）。
-
-### 方式三：无头命令行（自动化 / 二次封装，不消耗 token）
-
-把教务查询（课表 / 成绩 / 考试 / 通知 / 选课）封装成无头 CLI——**不经过 LLM 对话、不消耗任何模型 token**，输出结构化 JSON，适合脚本化调用与二次封装。这类无头查询技能**随学校适配器一起提供**：框架本身不含任何真实学校的教务协议，需先为本校写好适配器（见 [学校适配器指南](src/adapters/README.md)），再把它的查询封成 CLI 本地分发。
-
-下面两个独立技能包与学校无关、仓库已内置，可整份拷到 `~/.claude/skills/`、`~/.zcode/skills/` 等目录给别的 agent 用，或从 [Releases](https://github.com/Health-525/courseraptor/releases) 下载 zip：
-
-- [`skills/export-schedule/`](skills/export-schedule/) —— 把课表缓存渲染成图片供下载，适配各平台聊天里直接发图看课表的场景（`npm run package:skill -- export-schedule` 构建）
-- [`skills/meta-learning/`](skills/meta-learning/) —— 学习教练：认知科学驱动的元学习引擎（深度教学 / 知识结构诊断 / 考试型刻意练习编排），辅助期末备考，原作者 [changer-changer](https://github.com/changer-changer)（MIT-0）。raptor agent 已内置触发：说「帮我复习高数」「讲解一下傅里叶变换」自动进入学习教练模式，方法论经 `read_learning_reference` 按需加载（详见 [能力文档](docs/capabilities.md)）
-
-<details>
-<summary><b>系统要求</b>（点开查看）</summary>
-
-- **操作系统** —— Windows 10/11、macOS 12+、Linux (glibc 2.28+)
-- **Node.js** —— ≥ 24（安装包已内置 Node 运行时，无需预装）
-- **内存** —— ≥ 512 MB 可用（运行时约 150-300 MB）
-- **磁盘** —— ≥ 300 MB（含运行时、依赖、本地数据）
-- **网络** —— 首次配置需联网拉取模型 API（默认 DeepSeek，可换厂商）、教务系统；之后可离线使用已缓存数据
-
-</details>
-
----
-
-## 隐私与安全
-
-- **数据不出设备** —— 教务查询、文件解析、文档生成、记忆与知识库存储均在本机完成
-- **凭证加密存储** —— 教务密码、API Key、QQ 机器人密钥均经 AES-256-GCM 加密写入 `credentials.enc`，密钥绑定本机指纹，拷走的文件在别的电脑解不开
-- **无遥测上报** —— 匿名装机统计服务已下线、不再收集任何数据；历史安装包每 24h 一次的上报尝试（随机设备号 + 版本 + 平台，`src/core/usage-ping.ts`）无人接收、静默丢弃，`RAPTOR_NO_TELEMETRY=1` 可关闭；源码运行从不上报
-- **可审计** —— 完全开源，`src/` 下所有网络请求、文件读写、加密逻辑均可直接阅读
-- **网页服务仅监听 `127.0.0.1`** —— Host / Origin 校验、写请求须携带 CSRF token、仅认 `application/json`
-- **沙箱 JS 无网络无磁盘、超时截断** —— 教务工具全为只读查询，不含任何提交类操作
-- **敏感文件已被 `.gitignore` 排除** —— `.env`、`session.json`、`memory.json`、`data/chat-sessions.json` 等含个人数据，切勿提交或分享
-- **「本地运行」不等于完全离线** —— 提示词与相关查询结果会发给你配置的模型服务商；附件云解析仅用于公开网站，教务数据一律本地直连、不经第三方
 
 ---
 
@@ -204,6 +194,19 @@ raptor             # 启动；项目内也可 npm run dev
 
 ---
 
+## 隐私与安全
+
+- **数据不出设备** —— 教务查询、文件解析、文档生成、记忆与知识库存储均在本机完成
+- **凭证加密存储** —— 教务密码、API Key、QQ 机器人密钥均经 AES-256-GCM 加密写入 `credentials.enc`，密钥绑定本机指纹，拷走的文件在别的电脑解不开
+- **无遥测上报** —— 匿名装机统计服务已下线、不再收集任何数据；历史安装包每 24h 一次的上报尝试（随机设备号 + 版本 + 平台，`src/core/usage-ping.ts`）无人接收、静默丢弃，`RAPTOR_NO_TELEMETRY=1` 可关闭；源码运行从不上报
+- **可审计** —— 完全开源，`src/` 下所有网络请求、文件读写、加密逻辑均可直接阅读
+- **网页服务仅监听 `127.0.0.1`** —— Host / Origin 校验、写请求须携带 CSRF token、仅认 `application/json`
+- **沙箱 JS 无网络无磁盘、超时截断** —— 教务工具全为只读查询，不含任何提交类操作
+- **敏感文件已被 `.gitignore` 排除** —— `.env`、`session.json`、`memory.json`、`data/chat-sessions.json` 等含个人数据，切勿提交或分享
+- **「本地运行」不等于完全离线** —— 提示词与相关查询结果会发给你配置的模型服务商；附件云解析仅用于公开网站，教务数据一律本地直连、不经第三方
+
+---
+
 ## 文档
 
 - [能力文档](docs/capabilities.md) —— 查工具参数、耗时、环境变量、教务模块覆盖
@@ -212,17 +215,6 @@ raptor             # 启动；项目内也可 npm run dev
 - [路线图](docs/roadmap.md) —— 看做了什么、接下来做什么
 - [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md) · [行为准则](CODE_OF_CONDUCT.md) —— 参与贡献 / 报安全问题 / 行为准则
 - [GitHub Discussions](https://github.com/Health-525/courseraptor/discussions) —— 提问、交流、反馈
-
----
-
-## 免责声明与使用建议
-
-- 本项目基于 [MIT 许可证](LICENSE) 开源：可自由使用、复制、修改和分发。本项目为非官方的独立开源项目，与任何学校及其教务系统官方无关，未获其授权或认可。
-- 本项目按「现状」（AS IS）提供，**不作任何明示或默示的担保**（包括但不限于适销性、特定用途适用性、结果准确性）；使用者需**自行承担全部风险**，请遵守学校相关规定及教务系统使用条款，因使用本工具产生的任何后果（包括但不限于账号受限、成绩处理）由使用者本人负责。
-- 本项目仅供个人学习、研究与技术交流使用，请勿用于任何商业用途或牟利场景。
-- 教务数据以学校官方系统为准：查询结果可能因缓存、学期切换或数据更新而存在偏差，涉及选课、考试安排、毕业审核等重要决策时，请务必以教务系统官方页面为准。
-- 请避免大规模或高频请求，尊重教务系统的承载能力（传输层内置全局限速令牌桶，`RAPTOR_MAX_RPS` 只允许下调、请勿调高）。
-- **不做验证码识别**：本项目不识别、不绕过任何图形验证码。通知附件若受验证码保护，会明确失败并提示你在浏览器里手动下载——不做「绕过网站反自动化措施」这类事，也就没有相应风险。
 
 ---
 
@@ -250,6 +242,26 @@ raptor             # 启动；项目内也可 npm run dev
 走腾讯官方机器人路线（零封号）：网页「功能大厅 → 设置」填 AppID / AppSecret / 激活暗号即可上线，QQ 里发暗号完成授权；细节见[能力文档](docs/capabilities.md)「QQ 接入」一节。
 
 更多问题欢迎到 [GitHub Discussions](https://github.com/Health-525/courseraptor/discussions) 提问。
+
+---
+
+<details>
+<summary><b>免责声明与使用建议</b>（点开查看）</summary>
+
+- 本项目基于 [MIT 许可证](LICENSE) 开源：可自由使用、复制、修改和分发。本项目为非官方的独立开源项目，与任何学校及其教务系统官方无关，未获其授权或认可。
+- 本项目按「现状」（AS IS）提供，**不作任何明示或默示的担保**（包括但不限于适销性、特定用途适用性、结果准确性）；使用者需**自行承担全部风险**，请遵守学校相关规定及教务系统使用条款，因使用本工具产生的任何后果（包括但不限于账号受限、成绩处理）由使用者本人负责。
+- 本项目仅供个人学习、研究与技术交流使用，请勿用于任何商业用途或牟利场景。
+- 教务数据以学校官方系统为准：查询结果可能因缓存、学期切换或数据更新而存在偏差，涉及选课、考试安排、毕业审核等重要决策时，请务必以教务系统官方页面为准。
+- 请避免大规模或高频请求，尊重教务系统的承载能力（传输层内置全局限速令牌桶，`RAPTOR_MAX_RPS` 只允许下调、请勿调高）。
+- **不做验证码识别**：本项目不识别、不绕过任何图形验证码。通知附件若受验证码保护，会明确失败并提示你在浏览器里手动下载——不做「绕过网站反自动化措施」这类事，也就没有相应风险。
+
+</details>
+
+---
+
+## 许可证
+
+[MIT](LICENSE) —— 可自由使用、复制、修改和分发。
 
 ---
 

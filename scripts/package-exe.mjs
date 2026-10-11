@@ -157,7 +157,7 @@ execSync(
 if (selftest) {
   const home = path.join(work, "selftest-home");
   const env = { ...process.env, RAPTOR_PORTABLE_HOME: home };
-  console.log("\n自测 1/2：首次释放 + doctor 自检（会解 110MB，稍等）...");
+  console.log("\n自测 1/2：首次释放 + doctor 自检（会解 290MB，稍等）...");
   execSync(`"${exeOut}" --raptor-selftest`, { stdio: "inherit", env });
   console.log("自测 2/2：二次启动（应跳过释放直接 doctor）...");
   execSync(`"${exeOut}" --raptor-selftest`, { stdio: "inherit", env });
