@@ -18,15 +18,28 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { HAS_NJTECH } from "./_util/njtech-probe";
 
 // 必须在导入被测模块之前指向临时数据目录，避免读写真实 data/
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-time-"));
-// 本文件钉的是南工大校历/教学周语义：默认学校已改为 custom（不接入任何学校），显式选校
-process.env.RAPTOR_SCHOOL = "njtech";
+// 本文件钉的是南工大校历/教学周语义：默认学校已改为 custom（不接入任何学校），显式选校。
+// njtech 是本地可选插件、不进公开仓库；缺失时退回默认 custom 让装配点通过，
+// 全部教学周用例由 testNjtech=test.skip 跳过（本文件断言的都是 njtech 校历口径）。
+if (HAS_NJTECH) {
+  process.env.RAPTOR_SCHOOL = "njtech";
+} else {
+  delete process.env.RAPTOR_SCHOOL;
+}
 
 await import("../src/adapters");
 const { getTimeReport, schoolTimezone } = await import("../src/core/time");
 const SCHOOL_TIMEZONE = schoolTimezone();
+
+/**
+ * njtech 插件缺失（公开仓库 / CI）时整文件跳过。别名不叫 t：下面用例体内
+ * 有 `const t = mustOk(...)` 局部变量，避免遮蔽。
+ */
+const testNjtech = HAS_NJTECH ? test : test.skip;
 
 type Ok = Extract<ReturnType<typeof getTimeReport>, { ok: true }>["data"];
 
@@ -35,7 +48,7 @@ function mustOk(r: ReturnType<typeof getTimeReport>): Ok {
   return (r as { data: Ok }).data;
 }
 
-test("默认北京时间：字段齐全且互相一致（2026-09-05 周六 14:30:45）", () => {
+testNjtech("默认北京时间：字段齐全且互相一致（2026-09-05 周六 14:30:45）", () => {
   const t = mustOk(getTimeReport(undefined, new Date("2026-09-05T06:30:45Z")));
   assert.equal(t.timezone, SCHOOL_TIMEZONE);
   assert.equal(t.date, "2026-09-05");
@@ -48,7 +61,7 @@ test("默认北京时间：字段齐全且互相一致（2026-09-05 周六 14:30
   assert.equal(t.beijingNow, t.datetime);
 });
 
-test("时区换算：同一时刻纽约是凌晨，教学周仍按北京口径", () => {
+testNjtech("时区换算：同一时刻纽约是凌晨，教学周仍按北京口径", () => {
   const t = mustOk(getTimeReport("America/New_York", new Date("2026-09-05T06:30:45Z")));
   assert.equal(t.timezone, "America/New_York");
   assert.equal(t.date, "2026-09-05");
@@ -58,7 +71,7 @@ test("时区换算：同一时刻纽约是凌晨，教学周仍按北京口径",
   assert.equal(t.term.week, 1);
 });
 
-test("跨日边界：北京已过午夜是周日，纽约还在周六", () => {
+testNjtech("跨日边界：北京已过午夜是周日，纽约还在周六", () => {
   const instant = new Date("2026-09-05T16:30:00Z");
   const ny = mustOk(getTimeReport("America/New_York", instant));
   assert.equal(ny.date, "2026-09-05");
@@ -71,7 +84,7 @@ test("跨日边界：北京已过午夜是周日，纽约还在周六", () => {
   assert.equal(bj.weekday, "周日");
 });
 
-test("教学周：开学第 1 周，周次真值来自种子（week1Monday=2026-08-31）", () => {
+testNjtech("教学周：开学第 1 周，周次真值来自种子（week1Monday=2026-08-31）", () => {
   const t = mustOk(getTimeReport(undefined, new Date("2026-09-05T06:30:45Z")));
   assert.equal(t.term.label, "2026-2027学年第一学期");
   assert.equal(t.term.week, 1);
@@ -80,14 +93,14 @@ test("教学周：开学第 1 周，周次真值来自种子（week1Monday=2026-
   assert.ok(t.term.source === "known" || t.term.source === "recorded");
 });
 
-test("教学周：第 2 周周一，weekRange 对齐到本周一~周日", () => {
+testNjtech("教学周：第 2 周周一，weekRange 对齐到本周一~周日", () => {
   const t = mustOk(getTimeReport(undefined, new Date("2026-09-07T02:00:00Z"))); // 北京 9-07 10:00
   assert.equal(t.term.week, 2);
   assert.equal(t.term.weekRange, "2026-09-07 ~ 2026-09-13");
   assert.equal(t.weekday, "周一");
 });
 
-test("非法时区返回失败，不静默降级成默认时区", () => {
+testNjtech("非法时区返回失败，不静默降级成默认时区", () => {
   const r = getTimeReport("Mars/Olympus");
   assert.equal(r.ok, false);
   assert.match((r as { error: string }).error, /无法识别的时区/);

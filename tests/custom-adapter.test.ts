@@ -7,6 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { HAS_NJTECH } from "./_util/njtech-probe";
 
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-custom-"));
 process.env.RAPTOR_CREDENTIALS_FILE = path.join(process.env.RAPTOR_DATA_DIR, "credentials.enc");
@@ -17,13 +18,17 @@ const { school, selectSchool } = await import("../src/core/school");
 const { loadScheduleCache, saveScheduleCache } = await import("../src/core/schedule-cache");
 const { recordManualTermStart, manualTermStarts } = await import("../src/core/manual-terms");
 
+/** 跨校（custom ↔ njtech）隔离用例专用：njtech 插件缺失（公开仓库 / CI）时跳过 */
+const testNjtech = HAS_NJTECH ? test : test.skip;
+
 /** 切到自定义学校再执行，结束后切回（不影响同进程后续断言） */
 async function withCustom<T>(fn: () => Promise<T> | T): Promise<T> {
   assert.ok(selectSchool("custom"));
   try {
     return await fn();
   } finally {
-    selectSchool("njtech");
+    // 装了 njtech 就切回它当基线；没装（CI）则停在 custom，后续用例各自再选 custom
+    if (HAS_NJTECH) selectSchool("njtech");
   }
 }
 
@@ -128,7 +133,7 @@ test("能力边界：无教务登录、无通知面；fetchSmart 即读缓存", 
   });
 });
 
-test("课表缓存分校：custom 的缓存在 njtech 下不可见，反之亦然", () => {
+testNjtech("课表缓存分校：custom 的缓存在 njtech 下不可见，反之亦然", () => {
   selectSchool("custom");
   saveScheduleCache({
     year: 2026,

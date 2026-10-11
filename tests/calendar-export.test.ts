@@ -15,15 +15,25 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { HAS_NJTECH } from "./_util/njtech-probe";
 
 // 必须在导入被测模块之前指向临时数据目录（term-holidays 真值源落在这里）
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-ics-"));
-// 本文件钉的是南工大校历/教学周语义：默认学校已改为 custom（不接入任何学校），显式选校
-process.env.RAPTOR_SCHOOL = "njtech";
+// 本文件钉的是南工大校历/教学周语义：默认学校已改为 custom（不接入任何学校），显式选校。
+// njtech 是本地可选插件、不进公开仓库；缺失时不能设 njtech（否则装配点抛错整文件崩），
+// 改用默认 custom 让装配通过，下面所有 test 由 t=test.skip 统一跳过。
+if (HAS_NJTECH) {
+  process.env.RAPTOR_SCHOOL = "njtech";
+} else {
+  delete process.env.RAPTOR_SCHOOL;
+}
 
 await import("../src/adapters");
 const { buildTermICS } = await import("../src/core/calendar/export");
 const { recordSpecialDays } = await import("../src/core/calendar/holidays");
+
+/** njtech 插件缺失（公开仓库 / CI）时整文件跳过，本地装了 njtech 才真正跑 */
+const t = HAS_NJTECH ? test : test.skip;
 
 const NOW = new Date("2026-09-01T00:00:00Z");
 
@@ -72,7 +82,7 @@ function fixture() {
 }
 
 /** 第 1 周周三=09-02（放假日）、周六=09-05（调休补课）；第 2 周周三=09-09 正常 */
-test("假期吞课、全天事件补齐、调休按被换周几补课", () => {
+t("假期吞课、全天事件补齐、调休按被换周几补课", () => {
   recordSpecialDays([
     { date: "2026-09-02", type: "holiday", name: "测试节" },
     { date: "2026-09-04", type: "holiday", name: "没课日的中秋" }, // 当天无课，靠全量补齐
@@ -102,7 +112,7 @@ test("假期吞课、全天事件补齐、调休按被换周几补课", () => {
   assert.ok(!r.ics.includes("20260905T1020"));
 });
 
-test("考试事件带时刻、考场座位与提前 30 分钟提醒", () => {
+t("考试事件带时刻、考场座位与提前 30 分钟提醒", () => {
   const r = buildTermICS(fixture());
   assert.ok(r.ics.includes("DTSTART;TZID=Asia/Shanghai:20260910T140000"));
   assert.ok(r.ics.includes("DTEND;TZID=Asia/Shanghai:20260910T160000"));
@@ -112,7 +122,7 @@ test("考试事件带时刻、考场座位与提前 30 分钟提醒", () => {
   assert.equal(r.examEvents, 1);
 });
 
-test("无时刻的考试是全天事件：不挂 30 分钟提醒（否则前一夜 23:30 响铃）", () => {
+t("无时刻的考试是全天事件：不挂 30 分钟提醒（否则前一夜 23:30 响铃）", () => {
   const fx = fixture();
   fx.exams = [
     { date: "2026-12-28", subject: "思想政治理论", time: "", location: "", seatNumber: "" },
@@ -122,7 +132,7 @@ test("无时刻的考试是全天事件：不挂 30 分钟提醒（否则前一�
   assert.ok(!r.ics.includes("TRIGGER"), "全天考试事件不得携带提醒");
 });
 
-test("RFC 5545 基本面：CRLF、转义、日历名、UID 稳定", () => {
+t("RFC 5545 基本面：CRLF、转义、日历名、UID 稳定", () => {
   const a = buildTermICS(fixture());
   const b = buildTermICS(fixture());
   assert.equal(a.ics, b.ics, "同输入同 now 必须逐字节一致（UID/DTSTAMP 稳定）");
@@ -144,7 +154,7 @@ test("RFC 5545 基本面：CRLF、转义、日历名、UID 稳定", () => {
   }
 });
 
-test("长中文标题正确折叠后仍能还原完整 SUMMARY", () => {
+t("长中文标题正确折叠后仍能还原完整 SUMMARY", () => {
   const fx = fixture();
   const longTitle = "习近平新时代中国特色社会主义思想概论（含形势与政策实践环节）";
   fx.courses = [

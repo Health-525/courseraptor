@@ -34,3 +34,22 @@ hall-main.png
 .qmuse/
 # 本地语义评审临时产物，不入库
 semantic-review/
+
+# ── 学校插件（真实学校适配器，本地私有，不进公开仓库）──────────────
+# 装配点 src/adapters/index.ts 启动时扫描 src/adapters/ 自动发现并登记插件；
+# 缺插件时只登记内置 custom，编译与测试照常通过。约定详见 src/adapters/README.md。
+/src/adapters/njtech/
+# 配套的无头教务查询技能包（直接 import src/adapters/njtech，随插件一并本地化）
+/skills/njtech-jwgl/
+# 随 njtech 插件本地化的专属单测（直接 import src/adapters/njtech 模块，
+# 缺源码会令 tsc typecheck 失败，故不入库；本地存在 njtech 时照常运行）
+/tests/academic-summary.test.ts
+/tests/jwgl-crypto.test.ts
+/tests/jwgl-news.test.ts
+/tests/njtech-session-recovery.test.ts
+/tests/term-dates.test.ts
+/tests/term-holidays.test.ts
+/tests/today-brief.test.ts
+/tests/tools-cache-first.test.ts
+/tests/xk-parse.test.ts
+/tests/xk.test.ts
