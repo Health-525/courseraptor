@@ -62,3 +62,6 @@ semantic-review/
 /tests/tools-cache-first.test.ts
 /tests/xk-parse.test.ts
 /tests/xk.test.ts
+
+# jscpd 复制粘贴检测的本地报告
+.jscpd-report/

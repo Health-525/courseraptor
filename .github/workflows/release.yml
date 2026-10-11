@@ -1,0 +1,66 @@
+# 发布流水线：release.mjs 推送 v* tag 后自动触发——
+# 打便携 zip（内置 doctor 冒烟）→ 打单文件 exe（--selftest 跑两遍释放自检）→
+# 建 GitHub Release 并上传双产物。此前这两步全靠本地手工跑脚本再 gh release upload。
+#
+# tag 必须与 package.json 版本一致（release.mjs 保证；手工误打 tag 会在此拦下）。
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      RAPTOR_NO_UPDATE_CHECK: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+
+      # 打包脚本按 package.json 版本命名产物；tag 与版本不一致说明手工 tag 错位
+      - name: 校验 tag 与 package.json 版本一致
+        run: node -e "const v=require('./package.json').version; if (process.env.GITHUB_REF_NAME !== 'v'+v) { console.error('tag '+process.env.GITHUB_REF_NAME+' != v'+v); process.exit(1); }"
+        env:
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+
+      - run: npm ci
+
+      # 便携 zip：内部含 runtime\node.exe 运行 doctor 的冒烟测试，全过才产出
+      - run: node scripts/package-portable.mjs
+
+      # 单文件 exe：--selftest 验证「首次释放」与「秒开」两条启动路径
+      - run: node scripts/package-exe.mjs --selftest
+
+      # 两个打包脚本都把产物落在 os.tmpdir()（≠ RUNNER_TEMP），这里取真实路径
+      - name: 记录产物路径
+        shell: bash
+        run: echo "TMP_DIR=$(node -p 'os.tmpdir()')" >> "$GITHUB_ENV"
+
+      - name: 创建 Release 并上传产物
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          ZIP="$TMP_DIR/courseraptor-${TAG}-portable-win-x64.zip"
+          EXE="$TMP_DIR/courseraptor-${TAG}-portable-win-x64.exe"
+          ls -l "$ZIP" "$EXE"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+                 --title "$TAG" --generate-notes
+          gh release upload "$TAG" "$ZIP" "$EXE" --clobber --repo "$GITHUB_REPOSITORY"
+          echo "✅ $TAG 双产物已发布"

@@ -16,7 +16,8 @@
     "lint:fix": "biome check --write",
     "format": "biome format --write",
     "format:check": "biome format",
-    "postinstall": "node scripts/patch-tui.mjs",
+    "postinstall": "node scripts/patch-tui.mjs && lefthook install",
+    "duplication": "jscpd",
     "release": "node scripts/release.mjs",
     "package:skill": "node scripts/package-skill.mjs",
     "obsidian:build": "npm --prefix obsidian run build",
@@ -72,6 +73,8 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
     "@types/node": "^26.6.4",
+    "jscpd": "^5.4.1",
+    "lefthook": "^2.2.1",
     "typescript": "^7.0.2"
   }
 }

@@ -1,0 +1,9 @@
+{
+  "minTokens": 60,
+  "mode": "mild",
+  "reporters": ["console"],
+  "threshold": 1,
+  "formats": ["typescript", "tsx"],
+  "ignore": ["**/*.test.ts", "**/assets/**"],
+  "absolute": false
+}
