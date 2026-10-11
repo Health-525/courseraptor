@@ -16,6 +16,8 @@ delete process.env.RAPTOR_SCHOOL;
 await import("../src/adapters");
 const { school, selectSchool } = await import("../src/core/school");
 const { loadScheduleCache, saveScheduleCache } = await import("../src/core/schedule-cache");
+const { loadExamCache } = await import("../src/core/exam-cache");
+const { loadGradesCache } = await import("../src/core/grades-cache");
 const { recordManualTermStart, manualTermStarts } = await import("../src/core/manual-terms");
 
 /** 跨校（custom ↔ njtech）隔离用例专用：njtech 插件缺失（公开仓库 / CI）时跳过 */
@@ -194,4 +196,42 @@ test("无适配（custom）放行别校标记的缓存：手动课表只认数�
   const loaded = loadScheduleCache();
   assert.ok(loaded, "切到手动课表后，已有的课表缓存必须仍然可见");
   assert.equal(loaded.schedule.courses[0].title, "高等数学");
+});
+
+test("无适配（custom）放行别校标记的成绩/考试缓存：面板与今日页同口径", () => {
+  // 成绩缓存：此前在真实学校（如 njtech）下落盘，切到 custom 后成绩面板必须仍读得到
+  fs.writeFileSync(
+    path.join(process.env.RAPTOR_DATA_DIR!, "grades-cache.json"),
+    JSON.stringify({
+      savedAt: Date.now(),
+      schoolId: "njtech",
+      gpa: "3.52",
+      requiredCredits: 8,
+      courseCount: 2,
+      recentSemester: "2026-2027-1",
+      recentCourses: [
+        { course: "高等数学", score: 95, credit: "5", semester: "2026-2027-1" },
+        { course: "大学英语", score: 88, credit: "3", semester: "2026-2027-1" },
+      ],
+    }),
+    "utf8",
+  );
+  assert.ok(selectSchool("custom"));
+  const grades = loadGradesCache();
+  assert.ok(grades, "切到手动课表后，成绩缓存必须仍然可见");
+  assert.equal(grades.courseCount, 2);
+
+  // 考试缓存：今日页「临近考试」在 custom 下同样只认缓存
+  fs.writeFileSync(
+    path.join(process.env.RAPTOR_DATA_DIR!, "exam-cache.json"),
+    JSON.stringify({
+      savedAt: Date.now(),
+      schoolId: "njtech",
+      exams: { year: 2026, semester: 3, exams: [] },
+    }),
+    "utf8",
+  );
+  const exams = loadExamCache();
+  assert.ok(exams, "切到手动课表后，考试缓存必须仍然可见");
+  assert.equal(exams.exams.year, 2026);
 });
