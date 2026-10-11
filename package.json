@@ -1,7 +1,7 @@
 {
   "name": "courseraptor",
   "version": "0.6.0",
-  "description": "学校无关的本地优先教务 Agent 框架：开箱即用手动课表，写一个适配器插件即可在线直查教务",
+  "description": "🦖 教务信息，一句话问清楚。本地运行，数据不出电脑。",
   "scripts": {
     "dev": "tsx local/cli/index.ts",
     "start": "tsx local/cli/index.ts",
