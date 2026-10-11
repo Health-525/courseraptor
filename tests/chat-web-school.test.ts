@@ -10,6 +10,7 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { HAS_NJTECH } from "./_util/njtech-probe";
 
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-import-"));
 process.env.RAPTOR_CREDENTIALS_FILE = path.join(process.env.RAPTOR_DATA_DIR, "credentials.enc");
@@ -21,6 +22,9 @@ const { setScheduleParser } = await import("../src/core/schedule-import");
 const { loadScheduleCache } = await import("../src/core/schedule-cache");
 const { loadCredentialsStore } = await import("../src/core/credentials");
 const { manualTermStarts } = await import("../src/core/manual-terms");
+
+/** 依赖 njtech（真实学校账号切换）的用例：插件缺失（公开仓库 / CI）时跳过 */
+const testNjtech = HAS_NJTECH ? test : test.skip;
 
 /** 页面签发的 CSRF token（写请求必须带） */
 let pageToken: string | null = null;
@@ -63,16 +67,16 @@ test("GET /api/settings：school 块带清单与手动课表标记，默认 cust
   const r = await (await fetch(`${await base()}/api/settings`)).json();
   assert.equal(r.school.current, "custom");
   assert.equal(r.school.manual, true);
-  assert.deepEqual(
-    r.school.options.map((o: { id: string }) => o.id),
-    ["njtech", "custom"],
-  );
-  assert.equal(r.school.options[1].manual, true);
+  const optIds = r.school.options.map((o: { id: string }) => o.id);
+  // njtech 是本地可选插件、不进公开仓库：装了才在 custom 之前多一项真实学校
+  assert.deepEqual(optIds, HAS_NJTECH ? ["njtech", "custom"] : ["custom"]);
+  // custom（手动课表）恒为清单末位
+  assert.equal(r.school.options[r.school.options.length - 1].manual, true);
   // 默认 custom 没接教务通知：通知卡不亮（与本机 .env 是否带账号无关）
   assert.equal(r.school.newsReady, false);
 });
 
-test("切学校教务账号跟着切：旧校存回名下、新校空则清空待填、切回自动恢复", async () => {
+testNjtech("切学校教务账号跟着切：旧校存回名下、新校空则清空待填、切回自动恢复", async () => {
   // ⓪ 默认 custom 起步：先显式切到 njtech 才有教务账号可言。
   //     本机 .env 可能带账号，切校结果文案两种都合法，只钉「已切换」
   const toNjtech = await wfetch(`${await base()}/api/settings`, {
@@ -132,7 +136,7 @@ test("切学校教务账号跟着切：旧校存回名下、新校空则清空�
   assert.equal(opts.find((o) => o.id === "custom")?.note, undefined);
 });
 
-test("POST /api/settings 切换学校：运行期生效并落凭证", async () => {
+testNjtech("POST /api/settings 切换学校：运行期生效并落凭证", async () => {
   const r = await wfetch(`${await base()}/api/settings`, {
     method: "POST",
     body: JSON.stringify({ schoolId: "custom", customSchoolName: "某某大学", customCity: "杭州" }),
@@ -143,6 +147,8 @@ test("POST /api/settings 切换学校：运行期生效并落凭证", async () =
   assert.equal(d.status.school.manual, true);
   // 自定义学校没有教务处官网可抓：通知卡同样不亮
   assert.equal(d.status.school.newsReady, false);
+  // 本用例由 testNjtech 守卫：仅在装了 njtech 时运行，此时上一用例把当前学校
+  // 留在 njtech，切 custom 是真实切换 → 「已切换」。
   assert.match(d.results.find((x: { field: string }) => x.field === "school").message, /已切换/);
   const creds = loadCredentialsStore();
   assert.equal(creds?.schoolId, "custom");

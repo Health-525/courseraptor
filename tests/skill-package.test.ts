@@ -4,8 +4,16 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { HAS_NJTECH } from "./_util/njtech-probe";
 
 const { buildSkillPackage } = await import("../scripts/package-skill.mjs");
+
+/**
+ * njtech-jwgl 技能包直接 import src/adapters/njtech 源码；njtech 是本地可选
+ * 插件、不进公开仓库，缺失时该打包用例跳过（export-schedule / meta-learning
+ * 两个不依赖 njtech 的用例照常跑）。
+ */
+const testNjtech = HAS_NJTECH ? test : test.skip;
 
 /**
  * njtech-jwgl 独立技能包（npm run package:skill）的产物契约：
@@ -28,7 +36,7 @@ function childEnv() {
   return env;
 }
 
-test("技能打包：独立目录 + 单文件 bundle + zip，自包含可运行", async (t) => {
+testNjtech("技能打包：独立目录 + 单文件 bundle + zip，自包含可运行", async (t) => {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-skill-pkg-"));
   t.after(() => fs.rmSync(outDir, { recursive: true, force: true }));
 
@@ -138,7 +146,10 @@ test("技能打包：export-schedule 独立包结构 + 自包含可运行", asyn
   assert.match(noCache.stderr, /--cache/);
 
   // --cache 指向缓存 → 导出成功。本包不带 resvg 二进制（includeBinaries:false），
-  // PNG 应自动降级为 SVG 而不是崩溃——断言放行两种后缀，钉住「不崩」契约
+  // PNG 应自动降级为 SVG 而不是崩溃——断言放行两种后缀，钉住「不崩」契约。
+  // 缓存 schoolId 用 custom（内置、永远登记）：export-schedule 是自包含独立包，
+  // 计算式动态 import 的本地学校插件（njtech）无法被 esbuild 打进单文件 bundle，
+  // 故这里不依赖任何私有插件，仍覆盖「按缓存 schoolId 自动选校」代码路径。
   const cacheFile = path.join(outDir, "schedule-cache.json");
   fs.writeFileSync(
     cacheFile,
@@ -159,7 +170,7 @@ test("技能打包：export-schedule 独立包结构 + 自包含可运行", asyn
           },
         ],
       },
-      schoolId: "njtech",
+      schoolId: "custom",
     }),
   );
   // 默认不弹浏览器（对话内嵌交付），跑测试不会在宿主机开窗口

@@ -7,6 +7,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { HAS_NJTECH } from "./_util/njtech-probe";
 
 // 隔离：凭证与数据都指到临时目录，绝不碰真机 credentials.enc / data/
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-school-"));
@@ -21,11 +22,15 @@ test("未存过 schoolId 时默认 custom（不接入任何学校）；登记序
   await import("../src/adapters");
   assert.equal(school().info.id, "custom");
   assert.equal(school().info.manual, true);
-  const ids = listSchoolOptions().map((a) => a.info.id);
-  assert.deepEqual(ids, ["njtech", "custom"]);
-  // 手动课表标记：custom 有、真实学校没有
-  assert.equal(listSchoolOptions()[1].info.manual, true);
-  assert.notEqual(listSchoolOptions()[0].info.manual, true);
+  const opts = listSchoolOptions();
+  const ids = opts.map((a) => a.info.id);
+  // njtech 是本地可选插件、不进公开仓库：装了才有真实学校垫在 custom 之前
+  assert.deepEqual(ids, HAS_NJTECH ? ["njtech", "custom"] : ["custom"]);
+  // 手动课表标记：custom 有、真实学校没有；custom 恒为清单末位
+  assert.equal(opts[opts.length - 1].info.manual, true);
+  if (HAS_NJTECH) {
+    assert.notEqual(opts[0].info.manual, true);
+  }
 });
 
 test("凭证里保存 schoolId=custom：新进程默认落在自定义学校", async () => {
@@ -60,9 +65,16 @@ test("selectSchool 运行期切换与未知 id 拒绝", async () => {
   assert.equal(selectSchool("custom"), true);
   assert.equal(school().info.id, "custom");
   assert.equal(school().info.manual, true);
-  assert.equal(selectSchool("njtech"), true);
-  assert.equal(school().info.id, "njtech");
   assert.equal(selectSchool(" nonexistent "), false);
-  // 未知 id 不改变当前学校
-  assert.equal(school().info.id, "njtech");
+  if (HAS_NJTECH) {
+    // 未知 id 不改变当前学校
+    assert.equal(school().info.id, "custom");
+    assert.equal(selectSchool("njtech"), true);
+    assert.equal(school().info.id, "njtech");
+    assert.equal(selectSchool(" nonexistent "), false);
+    assert.equal(school().info.id, "njtech");
+  } else {
+    // 无 njtech 插件：未知 id 拒绝后仍停在 custom
+    assert.equal(school().info.id, "custom");
+  }
 });
