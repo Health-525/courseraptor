@@ -1,0 +1,9 @@
+{
+  "id": "courseraptor",
+  "name": "CourseRaptor",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "CourseRaptor 本地教务 Agent 的 Obsidian 入口：侧栏一句话查课表、成绩、考试，今日日程与待办一键插入笔记。需本机运行 CourseRaptor。",
+  "author": "jiangshu",
+  "isDesktopOnly": true
+}

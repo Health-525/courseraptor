@@ -6,7 +6,7 @@
 
 ### Less time navigating academic portals. More time for student life.
 
-**An open-source conversational academic-agent framework** — a school-agnostic, local-first kernel (Vercel AI SDK v7 · ports-and-adapters `SchoolAdapter` · three entrances, one kernel) that works at any school out of the box in manual timetable mode; write a self-contained adapter plugin for your own school to unlock online academic-system queries, with zero kernel changes.
+**An open-source conversational academic-agent framework** — a school-agnostic, local-first kernel (Vercel AI SDK v7 · ports-and-adapters `SchoolAdapter` · four entrances, one kernel) that works at any school out of the box in manual timetable mode; write a self-contained adapter plugin for your own school to unlock online academic-system queries, with zero kernel changes.
 
 [简体中文](README.md) · **English**
 
@@ -20,7 +20,7 @@
 
 </div>
 
-CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Ask in the terminal, the browser, or QQ — three entrances sharing one agent kernel and one memory store. Everything runs on your own machine: credentials are AES-256-GCM encrypted on disk, and it talks to your own model API key — DeepSeek by default, with 11 more built-in Chinese providers (Qwen, Zhipu GLM, Kimi, Doubao, Hunyuan, MiniMax, Step, ERNIE, Spark, SiliconFlow, China Mobile Cloud) plus custom OpenAI-compatible endpoints. Nothing is reported: the anonymous install-statistics server has been retired (legacy installers' once-every-24h pings go nowhere and are silently dropped; `RAPTOR_NO_TELEMETRY=1` disables them; running from source never reports).
+CourseRaptor brings timetables, grades, exams, academic announcements, and calendar exports into one conversational interface. Ask in the terminal, the browser, QQ, or an Obsidian sidebar — four entrances sharing one agent kernel and one memory store. Everything runs on your own machine: credentials are AES-256-GCM encrypted on disk, and it talks to your own model API key — DeepSeek by default, with 11 more built-in Chinese providers (Qwen, Zhipu GLM, Kimi, Doubao, Hunyuan, MiniMax, Step, ERNIE, Spark, SiliconFlow, China Mobile Cloud) plus custom OpenAI-compatible endpoints. Nothing is reported: the anonymous install-statistics server has been retired (legacy installers' once-every-24h pings go nowhere and are silently dropped; `RAPTOR_NO_TELEMETRY=1` disables them; running from source never reports).
 
 If you are building agents yourself, the repo doubles as a reference implementation: how a `ToolLoopAgent` loop organizes dozens of tools, how external systems sit behind a ports-and-adapters boundary (a new school is one self-contained directory dropped into `src/adapters/`, auto-discovered at startup, zero kernel changes), and how a multi-provider model layer is assembled from a plain-data registry. See [Build with us](#build-with-us) below.
 
@@ -101,6 +101,8 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 ├── skills/               # Bundled skill packages: timetable image export,
 │                         # meta-learning (headless academic queries ship
 │                         # with school adapters, not the framework)
+├── obsidian/             # Obsidian plugin (fourth entrance: sidebar chat +
+│                         # today-schedule/todo insertion; own npm project)
 ├── src/
 │   ├── core/             # School-agnostic kernel: agent, memory, calendar,
 │   │                     # documents, attachments, knowledge + generic tools

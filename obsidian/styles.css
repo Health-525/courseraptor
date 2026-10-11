@@ -1,0 +1,211 @@
+/* CourseRaptor Obsidian 插件：对话侧栏与状态栏样式
+   全部走 Obsidian 主题变量，深浅色主题自动适配 */
+
+/* ── 状态栏 ── */
+.cr-status {
+  cursor: pointer;
+}
+
+/* ── 布局 ── */
+.cr-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 8px;
+}
+
+.cr-head {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.cr-sessions {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-ui-smaller);
+}
+
+.cr-newchat {
+  flex-shrink: 0;
+}
+
+/* ── 消息区 ── */
+.cr-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cr-msg-user {
+  align-self: flex-end;
+  max-width: 92%;
+  background: var(--background-modifier-active);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px 10px 2px 10px;
+  padding: 7px 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: var(--font-ui-small);
+}
+
+.cr-msg-assistant {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--font-ui-small);
+}
+
+.cr-stream {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.55;
+}
+
+.cr-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 1em;
+  vertical-align: text-bottom;
+  background: var(--interactive-accent);
+  animation: cr-blink 1s step-start infinite;
+  border-radius: 1px;
+}
+
+@keyframes cr-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* Markdown 正文（回合结束后渲染） */
+.cr-md > :first-child {
+  margin-top: 0;
+}
+
+.cr-md > :last-child {
+  margin-bottom: 0;
+}
+
+/* ── 思考过程折叠卡 ── */
+.cr-think {
+  border: 1px dashed var(--background-modifier-border);
+  border-radius: 8px;
+  background: var(--background-secondary);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.cr-think > summary {
+  cursor: pointer;
+  padding: 5px 10px;
+  user-select: none;
+}
+
+.cr-think-body {
+  padding: 0 10px 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+/* ── 工具调用 chip ── */
+.cr-tool {
+  align-self: flex-start;
+  max-width: 100%;
+  font-size: var(--font-ui-smaller);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  color: var(--text-muted);
+  background: var(--background-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cr-tool-running {
+  color: var(--text-faint);
+  border-style: dashed;
+}
+
+.cr-tool-error {
+  color: var(--text-error);
+  border-color: var(--text-error);
+}
+
+/* ── 错误与耗时 ── */
+.cr-errorevent {
+  border-left: 3px solid var(--text-error);
+  background: var(--background-modifier-error);
+  padding: 6px 10px;
+  border-radius: 0 8px 8px 0;
+  font-size: var(--font-ui-small);
+  color: var(--text-error);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cr-errhint {
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  margin-top: 4px;
+}
+
+.cr-dur {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+}
+
+/* ── 快捷提问 ── */
+.cr-quickrow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.cr-quick {
+  font-size: var(--font-ui-smaller);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.cr-quick:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+
+/* ── 输入区 ── */
+.cr-input {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.cr-inputbox {
+  flex: 1;
+  resize: none;
+  min-height: 44px;
+  font-size: var(--font-ui-small);
+}
+
+.cr-send {
+  flex-shrink: 0;
+}
+
+.cr-send.cr-stopping {
+  background: var(--background-modifier-error);
+  color: var(--text-on-accent);
+}

@@ -55,6 +55,7 @@ import {
   listKnowledge,
   updateKnowledge,
 } from "../../core/knowledge";
+import { localApiToken, OBSIDIAN_ORIGIN } from "../../core/local-api";
 import { recordManualTermStart } from "../../core/manual-terms";
 import { loadUserGrade } from "../../core/memory/longterm";
 import {
@@ -428,6 +429,9 @@ function previewJson(v: unknown, max = 1200): string {
 function listen(port: number): Promise<string> {
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
+      // Obsidian 插件的 CORS 与预检最先处理：预检不该被三道门里的任何
+      // 一道拦下（预检不带令牌），真实请求过这道后照常走三道门
+      if (applyObsidianCors(req, res)) return;
       if (requestForbidden(req, res)) return;
       // 处理器的意外异常在这里兜底回 500：放任成未处理 rejection 会把
       // 整个进程带崩（Node 24 默认 unhandledRejection = 退出），
@@ -474,9 +478,14 @@ let listenPort = 0;
 /**
  * 恶意网页借浏览器发请求的几条路逐一堵死：
  * 1) Host 不是本机地址 → 403（DNS rebinding：外站域名解析到 127.0.0.1 冒充同源）；
- * 2) 带 Origin 且不是本服务 → 403（跨站 fetch：text/plain 免预检直达，浏览器只拦读不拦发）；
- * 3) 写请求（POST/PATCH/PUT/DELETE）必须携带本服务页面签发的 CSRF token → 403。
+ * 2) 带 Origin 且不是本服务/Obsidian → 403（跨站 fetch：text/plain 免预检直达，
+ *    浏览器只拦读不拦发）；
+ * 3) 写请求必须携带本服务页面签发的 CSRF token 或本地 API 令牌 → 403。
  * 返回 true 表示已写完拒绝响应，调用方直接 return。
+ *
+ * app://obsidian.md 是 Obsidian 渲染进程的私有 origin，浏览器里的网页发不出
+ * 这个值，放进白名单不会给恶意网页开门；它携带的写请求仍须过第 3 道门
+ * （插件持本地 API 令牌）。
  */
 function requestForbidden(req: http.IncomingMessage, res: http.ServerResponse): boolean {
   const method = (req.method ?? "GET").toUpperCase();
@@ -491,6 +500,7 @@ function requestForbidden(req: http.IncomingMessage, res: http.ServerResponse): 
     const localOrigins = new Set([
       `http://127.0.0.1:${listenPort}`,
       `http://localhost:${listenPort}`,
+      OBSIDIAN_ORIGIN,
     ]);
     if (!localOrigins.has(origin)) {
       json(res, { error: "拒绝访问：请求不是来自本服务页面" }, 403);
@@ -498,10 +508,34 @@ function requestForbidden(req: http.IncomingMessage, res: http.ServerResponse): 
     }
   }
   if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
-    if (req.headers["x-csrf-token"] !== CSRF_TOKEN) {
+    const apiToken = req.headers["x-raptor-token"];
+    const hasApiToken = typeof apiToken === "string" && apiToken === localApiToken();
+    if (req.headers["x-csrf-token"] !== CSRF_TOKEN && !hasApiToken) {
       json(res, { error: "拒绝访问：缺少有效令牌，请从本服务页面操作" }, 403);
       return true;
     }
+  }
+  return false;
+}
+
+/**
+ * Obsidian 插件在渲染进程里走浏览器 fetch（Obsidian 的 requestUrl 不支持
+ * 流式读响应，聊天 SSE 用不了），跨源请求要 CORS 头才读得到响应。这里只对
+ * app://obsidian.md 开：恶意网页的 Origin 不同，依然读不到任何响应（发得
+ * 出、读不进，与现状一致）。返回 true 表示这是预检请求、已代答 204。
+ */
+function applyObsidianCors(req: http.IncomingMessage, res: http.ServerResponse): boolean {
+  if (req.headers.origin !== OBSIDIAN_ORIGIN) return false;
+  res.setHeader("Access-Control-Allow-Origin", OBSIDIAN_ORIGIN);
+  res.setHeader("Vary", "Origin");
+  if ((req.method ?? "").toUpperCase() === "OPTIONS") {
+    res.writeHead(204, {
+      "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
+      "access-control-allow-headers": "content-type, x-csrf-token, x-raptor-token",
+      "access-control-max-age": "600",
+    });
+    res.end();
+    return true;
   }
   return false;
 }
@@ -1335,6 +1369,12 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     }
     if (url === "/api/sessions") {
       json(res, { sessions: listSessions() });
+      return;
+    }
+    if (url === "/api/localapi") {
+      // 本地 API 令牌 + 实际端口：设置页「Obsidian 插件」栏目与插件连接
+      // 检测用。本机限定 + 浏览器同源策略挡外站读响应，与本机其他数据一致
+      json(res, { token: localApiToken(), port: listenPort });
       return;
     }
     if (url === "/api/settings") {
