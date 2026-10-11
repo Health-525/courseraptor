@@ -114,7 +114,7 @@ export class RaptorClient {
     if (configured && configured !== info.token) {
       return {
         ok: false,
-        message: "令牌不匹配：清空设置里的令牌即可自动获取，或到 CourseRaptor 网页「设置 → Obsidian 插件」重新复制",
+        message: "令牌不匹配：清空插件设置里的令牌即可恢复自动获取",
       };
     }
     this.autoToken = info.token;
