@@ -10,15 +10,12 @@ import { getUploads, type WebUpload } from "../../core/workspace-data";
 import { agentProvider, type ChatStreamableAgent } from "./web-agent-gate";
 import { json } from "./web-http";
 import { pptPreviewOfToolOutput } from "./web-ppt-preview";
+import { translateStream } from "./web-stream-translate";
 import {
-  deltaOf,
   filesOfToolOutput,
   NEED_SETUP_RE,
   openPanelIdOf,
   pomodoroOfToolOutput,
-  previewJson,
-  type StreamEvent,
-  summarizeResult,
 } from "./web-tool-events";
 
 // ── 轮次串行化 ──────────────────────────────────────────────
@@ -200,106 +197,34 @@ async function runTurn(
     { role: "user", content: message + attachmentContext },
   ];
   const startedAt = Date.now();
-  const toolStart = new Map<string, { name: string; at: number; input?: unknown }>();
-  let text = "";
-  let think = "";
-  let failure: string | null = null;
 
-  try {
-    const stream = await agent.stream({ messages, abortSignal: signal });
-    for await (const p of stream.fullStream as AsyncIterable<StreamEvent>) {
-      switch (p.type) {
-        case "text-delta": {
-          const t = deltaOf(p);
-          if (t) {
-            text += t;
-            send({ t: "text", v: t });
-          }
-          break;
-        }
-        // 思考过程走独立的 think 通道，前端渲染成草稿卡片：和正文分开累积，
-        // 绝不混进 text（混进去会既当正文渲染、又被当成回答写回下一轮上下文）
-        case "reasoning-delta": {
-          const t = deltaOf(p);
-          if (t) {
-            think += t;
-            send({ t: "think", v: t });
-          }
-          break;
-        }
-        case "reasoning-end": {
-          // 只发段末标记（全文已经逐字发过）：前端据此把这一段定格折叠
-          send({ t: "think", phase: "end" });
-          break;
-        }
-        case "tool-call": {
-          if (p.toolCallId)
-            toolStart.set(p.toolCallId, {
-              name: p.toolName ?? "tool",
-              at: Date.now(),
-              input: p.input,
-            });
-          send({
-            t: "tool",
-            phase: "start",
-            id: p.toolCallId ?? "",
-            name: p.toolName ?? "tool",
-            args: previewJson(p.input),
-          });
-          break;
-        }
-        case "tool-result": {
-          const t0 = p.toolCallId ? toolStart.get(p.toolCallId) : undefined;
-          const files = filesOfToolOutput(p.output);
-          const pomodoro = pomodoroOfToolOutput(p.output);
-          const ppt = pptPreviewOfToolOutput(p.output);
-          // open_panel：模型点名的面板随事件带给前端自动推出（同 NEED_SETUP 的 panel 通道）
-          const openPanel = openPanelIdOf(p.toolName, t0?.input);
-          send({
-            t: "tool",
-            phase: "end",
-            id: p.toolCallId ?? "",
-            name: p.toolName ?? "tool",
-            dur: t0 ? Date.now() - t0.at : undefined,
-            brief: summarizeResult(p.output),
-            out: previewJson(p.output),
-            // 有成品文件时前端在工具卡下方渲染下载行
-            ...(files.length ? { files } : {}),
-            // 新建番茄钟时前端在工具卡下方渲染实时倒计时卡片
-            ...(pomodoro ? { pomodoro } : {}),
-            // pptx 成品带预览载荷：前端渲染可翻页的幻灯片预览卡
-            ...(ppt ? { ppt } : {}),
-            // manage_pomodoro 的取消/查询也可能改了状态：让页面把
-            // 顶部恢复卡等处的倒计时卡对表收掉（10 秒轮询的即时版）
-            ...(p.toolName === "manage_pomodoro" ? { pomoSync: true } : {}),
-            ...(openPanel ? { panel: openPanel } : {}),
-          });
-          break;
-        }
-        case "tool-error": {
-          const msg = p.error instanceof Error ? p.error.message : String(p.error ?? "");
-          send({
-            t: "tool",
-            phase: "error",
-            id: p.toolCallId ?? "",
-            name: p.toolName ?? "tool",
-            brief: msg,
-            // 教务凭证等未配置导致的失败：网页端自动推出设置面板，用户补填后重试
-            ...(NEED_SETUP_RE.test(msg) ? { panel: "settings" } : {}),
-          });
-          break;
-        }
-        case "error": {
-          failure = p.error instanceof Error ? p.error.message : String(p.error ?? "");
-          break;
-        }
-        default:
-          break;
-      }
-    }
-  } catch (e) {
-    if (!signal.aborted) failure = e instanceof Error ? e.message : String(e);
-  }
+  const { text, think, failure } = await translateStream(agent, {
+    messages,
+    signal,
+    send,
+    extraForToolResult: (output, toolName, toolCallId, clock) => {
+      const files = filesOfToolOutput(output);
+      const pomodoro = pomodoroOfToolOutput(output);
+      const ppt = pptPreviewOfToolOutput(output);
+      // open_panel：模型点名的面板随事件带给前端自动推出（同 NEED_SETUP 的 panel 通道）
+      const openPanel = openPanelIdOf(toolName, clock.inputOf(toolCallId));
+      return {
+        // 有成品文件时前端在工具卡下方渲染下载行
+        ...(files.length ? { files } : {}),
+        // 新建番茄钟时前端在工具卡下方渲染实时倒计时卡片
+        ...(pomodoro ? { pomodoro } : {}),
+        // pptx 成品带预览载荷：前端渲染可翻页的幻灯片预览卡
+        ...(ppt ? { ppt } : {}),
+        // manage_pomodoro 的取消/查询也可能改了状态：让页面把
+        // 顶部恢复卡等处的倒计时卡对表收掉（10 秒轮询的即时版）
+        ...(toolName === "manage_pomodoro" ? { pomoSync: true } : {}),
+        ...(openPanel ? { panel: openPanel } : {}),
+      };
+    },
+    extraForToolError: (msg) =>
+      // 教务凭证等未配置导致的失败：网页端自动推出设置面板，用户补填后重试
+      NEED_SETUP_RE.test(msg) ? { panel: "settings" } : {},
+  });
 
   if (failure) send({ t: "err", v: failure });
   send({ t: "end", dur: Date.now() - startedAt, sid: sessionId });

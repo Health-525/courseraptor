@@ -3,16 +3,15 @@
  * 虚构数据统一来自 ./data；传入 liveAgent（entry --live 时构建的真实模型
  * agent）后 /api/chat 走真实模型分析，否则维持离线固定剧本。
  */
-import { readFileSync } from "node:fs";
 import http from "node:http";
 import type { ModelMessage } from "ai";
-import { appJsAsset } from "../../src/channels/web/app-asset";
 import { chatPage } from "../../src/channels/web/chat-page";
 import { knowledgePage } from "../../src/channels/web/knowledge-page";
 import { DEFAULT_QUESTIONS } from "../../src/channels/web/quick-questions";
 import { schedulePage } from "../../src/channels/web/schedule-page";
 import { todayPage } from "../../src/channels/web/today-page";
 import { todosPage } from "../../src/channels/web/todos-page";
+import { serveStaticAsset } from "../../src/channels/web/web-static";
 import { FALLBACK_MODEL_ID, FALLBACK_MODELS, fallbackModelsFor } from "../../src/core/models";
 import { getProviderDef, providerOptionList, resolveProviderId } from "../../src/core/providers";
 import { type DemoStreamAgent, runDemoLiveTurn } from "./agent";
@@ -280,19 +279,8 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
       if (req.method === "GET" && url === "/") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(chatPage({ demo: true }));
-      } else if (req.method === "GET" && url === "/app.js") {
-        // 前端应用脚本：与正式服务同一份资产（chat-page 引用 /app.js）
-        const buf = appJsAsset();
-        if (buf) {
-          res.writeHead(200, {
-            "content-type": "text/javascript; charset=utf-8",
-            "cache-control": "no-cache",
-          });
-          res.end(buf);
-        } else {
-          res.writeHead(404);
-          res.end('console.error("前端脚本缺失：src/channels/web/assets/chat-app.js 不可读");');
-        }
+      } else if (req.method === "GET" && serveStaticAsset(url, res)) {
+        // /app.js、marked、logo、PWA 清单与正式服务同一份资产与响应头
       } else if (req.method === "GET" && (url === "/today" || url === "/today/")) {
         // 独立日程页的演示版：数据内嵌虚构课表，不发任何请求
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
@@ -309,42 +297,6 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
         // 独立知识库页的演示版：数据内嵌虚构知识，不发任何请求
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(knowledgePage({ demo: true, demoData: demoKnowledge(new Date()) }));
-      } else if (
-        req.method === "GET" &&
-        ["/logo.png", "/favicon.ico", "/vendor/marked.min.js"].includes(url)
-      ) {
-        const script = url.endsWith(".js");
-        const asset = new URL(
-          script
-            ? "../../node_modules/marked/lib/marked.umd.js"
-            : "../../docs/courseraptor-logo.png",
-          import.meta.url,
-        );
-        const bytes = readFileSync(asset);
-        res.writeHead(200, {
-          "content-type": script ? "text/javascript; charset=utf-8" : "image/png",
-        });
-        res.end(bytes);
-      } else if (req.method === "GET" && url === "/manifest.webmanifest") {
-        // 与正式版 chat-web 同源的 PWA 清单（图标复用 logo）
-        res.writeHead(200, {
-          "content-type": "application/manifest+json; charset=utf-8",
-        });
-        res.end(
-          JSON.stringify({
-            name: "CourseRaptor",
-            short_name: "CourseRaptor",
-            description: "课表、成绩、考试、通知，一句话查询",
-            start_url: "/",
-            display: "standalone",
-            background_color: "#F6F4ED",
-            theme_color: "#F0EDE4",
-            icons: [
-              { src: "/logo.png", sizes: "192x192", type: "image/png" },
-              { src: "/logo.png", sizes: "512x512", type: "image/png" },
-            ],
-          }),
-        );
       } else if (req.method === "GET" && url === "/api/settings") {
         json(res, {
           jwgl: { configured: false, username: "", sourceLabel: "演示模式" },
