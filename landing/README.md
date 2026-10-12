@@ -1,6 +1,6 @@
 # courseraptor-web
 
-CourseRaptor 的官网落地页（React + Vite，纯静态、虚构示例数据，不连接教务系统或模型服务，不含任何密钥），同时作为导入 [QMuse](https://docs.qmuse.cn/docs/qmuse-cli) 平台的前端载体（QMuse CLI 仅支持 React 项目）。
+CourseRaptor 的官网落地页（React + Vite，纯静态、虚构示例数据，不连接模型服务或任何外部系统，不含任何密钥），同时作为导入 [QMuse](https://docs.qmuse.cn/docs/qmuse-cli) 平台的前端载体（QMuse CLI 仅支持 React 项目）。
 
 官网由 `.github/workflows/landing-pages.yml` 自动构建并发布到 GitHub Pages（子路径 `/courseraptor/`，构建时注入 `PAGES_BASE`）；根路径构建（如 qmuse 导入）无需设置该变量。
 
