@@ -1,6 +1,6 @@
 {
   "name": "courseraptor",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "大学生的本地教务 Agent：课表成绩一句话问清楚；也是一套可整体搬走的本地 Agent 工程样例",
   "scripts": {
     "dev": "tsx local/cli/index.ts",
