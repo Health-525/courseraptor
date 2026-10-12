@@ -16,7 +16,7 @@ process.env.RAPTOR_DATA_DIR = tmpData;
 
 const { dueWithinWindow, runReminderCheck } = await import("../src/core/todo-reminders");
 const { addReminder, updateReminder } = await import("../src/core/workspace-data");
-const { pushQQText, registerQQPush } = await import("../local/qq/push");
+const { sendQQPush, registerQQPushSender } = await import("../src/core/notify");
 
 /** 注入的通知出口：只记录提醒到的标题 */
 function recorder() {
@@ -124,11 +124,11 @@ test("单轮最多提醒 5 条，剩余的下一轮再补", () => {
 });
 
 test("QQ 推送通道：桥未注册返回 false，注册后送达", async () => {
-  assert.equal(await pushQQText("桥不在时只能静默降级"), false);
+  assert.equal(await sendQQPush("桥不在时只能静默降级"), false);
   const pushed: string[] = [];
-  registerQQPush(async (text) => {
+  registerQQPushSender(async (text) => {
     pushed.push(text);
   });
-  assert.equal(await pushQQText("待办提醒测试"), true);
+  assert.equal(await sendQQPush("待办提醒测试"), true);
   assert.deepEqual(pushed, ["待办提醒测试"]);
 });

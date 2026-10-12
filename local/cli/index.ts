@@ -88,7 +88,7 @@ if (config.qqBotAppId && config.qqBotAppSecret) {
 const agent = await createRaptorAgent();
 
 // 网页对话窗口：浏览器打开即聊（地址显示在欢迎卡片下方），起不来不影响终端
-const { setChatAgent, setChatAgentRefresher, startChatWeb } = await import(
+const { setChatAgent, setChatAgentRefresher, setQQBridgeLauncher, startChatWeb } = await import(
   "../../src/channels/web/chat-web"
 );
 setChatAgent(agent);
@@ -96,6 +96,10 @@ setChatAgent(agent);
 setChatAgentRefresher(async () => {
   setChatAgent(await createRaptorAgent());
 });
+// 桥热启动是宿主职责（web 不 import local/）：设置页存 QQ 凭证后懒加载拉起
+setQQBridgeLauncher(() =>
+  import("../qq/bridge").then(({ ensureQQBridgeOnline }) => ensureQQBridgeOnline()),
+);
 startChatWeb()
   .then((url) => {
     // 未选学校时不再有终端引导与提示信息，只报网页地址；

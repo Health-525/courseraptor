@@ -43,6 +43,8 @@ jobs:
       - run: npm run duplication
       # .env.example 文档与 src/core/config.ts 实现的一致性门禁
       - run: node scripts/verify-env-example.mjs
+      # 分层边界门禁：core 不碰 channels/local、channels 不碰 local、adapters 只依赖 core
+      - run: node scripts/verify-imports.mjs
       # 覆盖率棘轮基线（2026-09 实测 lines 84.5 / branches 82.0 / functions 80.1）：
       # 阈值写进 npm run test:coverage，只升不降；下调前先补测试再改阈值
       # （test:coverage 本身就会执行全量测试，不再单独跑一遍 npm test）

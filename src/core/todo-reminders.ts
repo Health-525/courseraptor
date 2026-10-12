@@ -10,10 +10,10 @@
 import { execFile } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-// 桌面提醒与 QQ 推送只随本地版（local/qq）分发；托管实例不启用提醒
-import { pushQQText } from "../../local/qq/push";
 import { writeFileAtomicSync } from "./atomic-write";
 import { PROJECT_ROOT } from "./config";
+// QQ 推送走 core 内的渠道端口（实现由宿主注册），core 不 import local/
+import { sendQQPush } from "./notify";
 import { listReminders, type Reminder } from "./workspace-data";
 
 const DAY_MS = 86_400_000;
@@ -112,7 +112,7 @@ async function defaultNotify(items: Reminder[], now: Date): Promise<void> {
     windowsToast("CourseRaptor 待办提醒", `「${r.title}」${dueText(r, now)}`);
   }
   const lines = items.map((r) => `• ${r.title} — ${dueText(r, now)}`).join("\n");
-  await pushQQText(`⏰ 待办提醒（未来 7 天内到期）\n${lines}`).catch(() => {});
+  await sendQQPush(`⏰ 待办提醒（未来 7 天内到期）\n${lines}`).catch(() => {});
 }
 
 export interface ReminderCheckDeps {
