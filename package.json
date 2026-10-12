@@ -1,7 +1,7 @@
 {
   "name": "courseraptor",
   "version": "0.6.1",
-  "description": "大学生的本地教务 Agent：课表成绩一句话问清楚；也是一套可整体搬走的本地 Agent 工程样例",
+  "description": "大学校园对话式 Agent：导入课表即可开聊——课表 · 待办 · 知识库 · 记忆一句话问清，数据全留在本机",
   "scripts": {
     "dev": "tsx local/cli/index.ts",
     "start": "tsx local/cli/index.ts",
@@ -19,6 +19,9 @@
     "postinstall": "node scripts/patch-tui.mjs && node scripts/install-hooks.mjs",
     "duplication": "jscpd",
     "verify:imports": "node scripts/verify-imports.mjs",
+    "sync:library": "python3 scripts/sync-library.py",
+    "sync:library:dry": "python3 scripts/sync-library.py --dry-run",
+    "page:today": "node --import tsx scripts/build-today-page.mts",
     "release": "node scripts/release.mjs",
     "package:skill": "node scripts/package-skill.mjs",
     "obsidian:build": "npm --prefix obsidian run build",
