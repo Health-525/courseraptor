@@ -24,7 +24,7 @@ import "../../../src/adapters"; // 学校适配器装配（school() / terms 周�
 import { loadScheduleCache } from "../../../src/core/schedule-cache";
 import { readJsonCache } from "../../../src/core/json-cache";
 import { registeredSchool, school, selectSchool } from "../../../src/core/school";
-import { renderTermScheduleSVG, renderWeekScheduleSVG } from "../../../src/core/schedule-svg";
+import { renderScheduleImage } from "../../../src/core/schedule-svg";
 import { scheduleSvgToPng } from "../../../src/core/schedule-png";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -326,48 +326,45 @@ let filename: string;
 let describe: string;
 
 if (args.mode === "week") {
-  const terms = school().terms;
-  const current = terms.weekOf(schedule.year, schedule.semester);
-  const maxWeek = Math.max(
-    1,
-    ...schedule.courses.flatMap((course) => terms.expandWeeks(course.weeks)),
-  );
-  let week: number;
-  if (args.week !== null) {
-    if (args.week > maxWeek) {
-      process.stderr.write(`周次越界：${args.week}（有效范围 1-${maxWeek}）\n`);
-      process.exit(1);
-    }
-    week = args.week;
-  } else {
-    if (current?.week == null) {
-      process.stderr.write(`当前不在教学周内，请用 --week 指定周次（1-${maxWeek}）\n`);
-      process.exit(1);
-    }
-    week = current.week;
+  const out = renderScheduleImage({
+    courses: schedule.courses,
+    termLabel: schedule.label,
+    year: schedule.year,
+    semester: schedule.semester,
+    mode: "week",
+    week: args.week,
+    style: args.style,
+    ...(logo ? { logoDataUri: logo } : {}),
+  });
+  if (!out.ok) {
+    const why =
+      out.reason === "out-of-term"
+        ? "当前不在教学周内，请用 --week 指定周次"
+        : "周次越界";
+    process.stderr.write(`${why}（有效范围 1-${out.maxWeek}）\n`);
+    process.exit(1);
   }
-  const week1Monday = terms.week1MondayOf(schedule.year, schedule.semester).week1Monday;
-  const r = renderWeekScheduleSVG({
-    courses: schedule.courses,
-    week,
-    week1Monday,
-    termLabel: schedule.label,
-    style: args.style,
-    ...(logo ? { logoDataUri: logo } : {}),
-  });
-  svg = r.svg;
-  svgWidth = r.width;
-  filename = `schedule-week${week}-${semPart}${styleSuffix}`;
-  describe = `第 ${week} 周`;
+  svg = out.result.svg;
+  svgWidth = out.result.width;
+  filename = `schedule-week${out.week}-${semPart}${styleSuffix}`;
+  describe = `第 ${out.week} 周`;
 } else {
-  const r = renderTermScheduleSVG({
+  const out = renderScheduleImage({
     courses: schedule.courses,
     termLabel: schedule.label,
+    year: schedule.year,
+    semester: schedule.semester,
+    mode: "term",
     style: args.style,
     ...(logo ? { logoDataUri: logo } : {}),
   });
-  svg = r.svg;
-  svgWidth = r.width;
+  // term 形态不会失败（无 week 解析），防御性分支避免伪造 result
+  if (!out.ok) {
+    process.stderr.write("课表渲染失败\n");
+    process.exit(1);
+  }
+  svg = out.result.svg;
+  svgWidth = out.result.width;
   filename = `schedule-term-${semPart}${styleSuffix}`;
   describe = "整学期汇总";
 }

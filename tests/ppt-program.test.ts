@@ -22,11 +22,11 @@ process.env.RAPTOR_DATA_DIR = tmpData;
 
 const require = createRequire(import.meta.url);
 
+import { pptPreviewOfToolOutput } from "../src/channels/web/web-ppt-preview";
 import { PPT_LIMITS, runPptCode, validateProgram } from "../src/core/document/ppt-program";
 import {
   buildProgramPreview,
   PREVIEW_ELEM_CAP,
-  pptPreviewOfToolOutput,
   renderPptxProgram,
 } from "../src/core/document/pptx-theme";
 

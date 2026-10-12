@@ -62,7 +62,7 @@ import {
   sanitizeCourses,
 } from "../../core/schedule-import";
 import { scheduleSvgToPng } from "../../core/schedule-png";
-import { renderTermScheduleSVG, renderWeekScheduleSVG } from "../../core/schedule-svg";
+import { renderScheduleImage } from "../../core/schedule-svg";
 import { school } from "../../core/school";
 import { tokenUsageSnapshot } from "../../core/token-usage";
 import {
@@ -381,47 +381,31 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       const schedule = cached.schedule;
       const semPart = `${schedule.year}-${schedule.semester === 3 ? 1 : 2}`;
       const logo = loadLogoDataUri() ?? undefined;
-      let svg: string;
-      let svgWidth: number;
-      let filename: string;
-      if (mode === "week") {
-        const terms = school().terms;
-        const current = terms.weekOf(schedule.year, schedule.semester);
-        const maxWeek = Math.max(
-          1,
-          ...schedule.courses.flatMap((course) => terms.expandWeeks(course.weeks)),
-        );
-        const week =
-          Number.isInteger(weekParam) && weekParam >= 1 && weekParam <= maxWeek
-            ? weekParam
-            : current?.week;
-        if (week == null) {
-          json(res, { error: `当前不在教学周内，请指定周次（week=1-${maxWeek}）` });
-          return;
-        }
-        const week1Monday = terms.week1MondayOf(schedule.year, schedule.semester).week1Monday;
-        const r = renderWeekScheduleSVG({
-          courses: schedule.courses,
-          week,
-          week1Monday,
-          termLabel: schedule.label,
-          style,
-          ...(logo ? { logoDataUri: logo } : {}),
+      // 越界 week 传 null：静默回落到当前教学周（网页直链的既有语义，
+      // 不因参数写错就报错——错参数不该让人白等一个错误页）
+      const out = renderScheduleImage({
+        courses: schedule.courses,
+        termLabel: schedule.label,
+        year: schedule.year,
+        semester: schedule.semester,
+        mode,
+        week: mode === "week" && Number.isInteger(weekParam) && weekParam >= 1 ? weekParam : null,
+        style,
+        ...(logo ? { logoDataUri: logo } : {}),
+      });
+      if (!out.ok) {
+        json(res, {
+          error:
+            out.reason === "out-of-term"
+              ? `当前不在教学周内，请指定周次（week=1-${out.maxWeek}）`
+              : `周次越界：1-${out.maxWeek}`,
         });
-        svg = r.svg;
-        svgWidth = r.width;
-        filename = `schedule-week${week}-${semPart}`;
-      } else {
-        const r = renderTermScheduleSVG({
-          courses: schedule.courses,
-          termLabel: schedule.label,
-          style,
-          ...(logo ? { logoDataUri: logo } : {}),
-        });
-        svg = r.svg;
-        svgWidth = r.width;
-        filename = `schedule-term-${semPart}`;
+        return;
       }
+      const svg = out.result.svg;
+      const svgWidth = out.result.width;
+      const filename =
+        out.week != null ? `schedule-week${out.week}-${semPart}` : `schedule-term-${semPart}`;
       if (format === "png") {
         // 2 倍宽出图：手机放大看笔画不发虚
         const png = scheduleSvgToPng(svg, svgWidth * 2);
