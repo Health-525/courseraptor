@@ -5,11 +5,11 @@ import type http from "node:http";
 import type { ModelMessage } from "ai";
 import { type AttachmentResult, openLocalFile } from "../../core/attachments";
 import { appendRound, contextMessages, DEFAULT_ID } from "../../core/chat-sessions";
-import { pptPreviewOfToolOutput } from "../../core/document/pptx-theme";
 import { maybeAutoTitle } from "../../core/session-titles";
 import { getUploads, type WebUpload } from "../../core/workspace-data";
 import { agentProvider, type ChatStreamableAgent } from "./web-agent-gate";
 import { json } from "./web-http";
+import { pptPreviewOfToolOutput } from "./web-ppt-preview";
 import {
   deltaOf,
   filesOfToolOutput,

@@ -789,3 +789,78 @@ export function renderWeekScheduleSVG(opts: {
     ...(opts.logoDataUri ? { logoDataUri: opts.logoDataUri } : {}),
   });
 }
+
+// ── 两形态的统一入口（三处消费端共用）─────────────────────────────
+
+export type ScheduleImageMode = "week" | "term";
+
+export interface ScheduleImageRequest {
+  courses: CourseData[];
+  /** 学期标签（页脚/副标题用） */
+  termLabel: string;
+  /** 学年与学期号：决定「当前第几周」的查表键 */
+  year: number;
+  semester: number;
+  mode: ScheduleImageMode;
+  /** mode=week 时的期望周次；越界或缺省时回落到当前教学周 */
+  week?: number | null;
+  style?: ScheduleStyle;
+  logoDataUri?: string;
+}
+
+export type ScheduleImageOutcome =
+  | { ok: true; result: ScheduleSvgResult; week?: number }
+  | { ok: false; reason: "out-of-term" | "week-out-of-range"; maxWeek: number };
+
+/**
+ * 按形态渲染课表图，把「当前教学周 / 最大周次 / week1Monday」的解析
+ * 收在一处。网页直链、适配器工具、技能包 CLI 三条消费链此前各自抄了
+ * 一份这段解析（jscpd 只认出其中 7 行，其余因阈值滤过）。
+ *
+ * 错误一律用结构化 reason 返回，由调用方决定文案与退出方式——同一段逻辑
+ * 在网页是 JSON error、在工具是返回文案、在 CLI 是 stderr + exit(1)。
+ */
+export function renderScheduleImage(req: ScheduleImageRequest): ScheduleImageOutcome {
+  const { courses, mode } = req;
+  const style = req.style ?? "classic";
+  const terms = school().terms;
+  const current = terms.weekOf(req.year, req.semester);
+  const maxWeek = Math.max(1, ...courses.flatMap((course) => terms.expandWeeks(course.weeks)));
+
+  if (mode === "term") {
+    return {
+      ok: true,
+      result: renderTermScheduleSVG({
+        courses,
+        termLabel: req.termLabel,
+        style,
+        ...(req.logoDataUri ? { logoDataUri: req.logoDataUri } : {}),
+      }),
+    };
+  }
+
+  // mode=week：显式周次优先，越界即报错（不回落到当前周，避免静默出错误图）
+  let week: number;
+  if (req.week != null) {
+    if (req.week < 1 || req.week > maxWeek)
+      return { ok: false, reason: "week-out-of-range", maxWeek };
+    week = req.week;
+  } else {
+    if (current?.week == null) return { ok: false, reason: "out-of-term", maxWeek };
+    week = current.week;
+  }
+
+  const week1Monday = terms.week1MondayOf(req.year, req.semester).week1Monday;
+  return {
+    ok: true,
+    week,
+    result: renderWeekScheduleSVG({
+      courses,
+      week,
+      week1Monday,
+      termLabel: req.termLabel,
+      style,
+      ...(req.logoDataUri ? { logoDataUri: req.logoDataUri } : {}),
+    }),
+  };
+}
