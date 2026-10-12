@@ -21,10 +21,10 @@ const distPath = fileURLToPath(pathToFileURL(require.resolve("@ai-sdk/tui")));
 
 const dim = (s) => `\x1b[2m${s}\x1b[0m`;
 const fallbackLines = [
-  dim("欢迎使用 CourseRaptor 🦖 — NJTECH 教务 Agent"),
+  dim("欢迎使用 CourseRaptor 🦖 — 校园学习助手"),
   "",
   dim("可以直接问："),
-  dim("  这周课表 · 最近通知 · 我的成绩 · 通识还差哪几类"),
+  dim("  这周课表 · 最近通知 · 我的成绩 · 我的待办"),
   "",
   dim("快捷键：滚轮/↑↓ 滚动 · ESC 打断回复 · Ctrl+C 退出 · 输入 / 唤出命令菜单"),
 ];
@@ -61,22 +61,48 @@ if (!source.includes("globalThis.__raptorWelcome")) {
 
 // ── 补丁 2：斜杠命令菜单 ─────────────────────────────────────
 if (!source.includes("globalThis.__raptorSlashMenu")) {
-  // 正文高度让位给菜单，总行数保持 = height
-  const heightAnchor = "const bodyHeight = height - inputHeight;";
-  const heightPatch =
-    "const bodyHeight = height - inputHeight - " +
-    "(globalThis.__raptorSlashMenu ? globalThis.__raptorSlashMenu.length : 0);";
-  // 菜单行插在正文框底边与输入框顶边之间
-  const linesAnchor =
-    'bottomBorder(width),\n    topBorder(width, state.inputActive ? "Input" : "Status"),';
-  const linesPatch =
-    "bottomBorder(width),\n" +
-    "    ...(globalThis.__raptorSlashMenu != null ? globalThis.__raptorSlashMenu : []),\n" +
-    '    topBorder(width, state.inputActive ? "Input" : "Status"),';
-  if (patched.includes(heightAnchor) && patched.includes(linesAnchor)) {
-    patched = patched.replace(heightAnchor, heightPatch).replace(linesAnchor, linesPatch);
-    applied.push("斜杠命令菜单");
-  } else {
+  // 正文高度让位给菜单，总行数保持 = height。
+  // 布局代码在 1.0.128 重写过一轮（变量名与缩进都变了：bodyHeight/inputHeight
+  // 空格缩进 → bodyContentHeight 单行公式 tab 缩进），两套锚点各自完整匹配，
+  // 匹配哪套用哪套；两套都不中再报"可能已升级"。
+  const variants = [
+    {
+      // ≤1.0.12x 旧布局（空格缩进）
+      heightAnchor: "const bodyHeight = height - inputHeight;",
+      heightPatch:
+        "const bodyHeight = height - inputHeight - " +
+        "(globalThis.__raptorSlashMenu ? globalThis.__raptorSlashMenu.length : 0);",
+      linesAnchor:
+        'bottomBorder(width),\n    topBorder(width, state.inputActive ? "Input" : "Status"),',
+      linesPatch:
+        "bottomBorder(width),\n" +
+        "    ...(globalThis.__raptorSlashMenu != null ? globalThis.__raptorSlashMenu : []),\n" +
+        '    topBorder(width, state.inputActive ? "Input" : "Status"),',
+    },
+    {
+      // 1.0.128+ 新布局（tab 缩进，bodyContentHeight 单行公式）
+      heightAnchor: "const bodyContentHeight = Math.max(8, state.height) - 3 - 2;",
+      heightPatch:
+        "const bodyContentHeight = Math.max(8, state.height) - 3 - 2 - " +
+        "(globalThis.__raptorSlashMenu ? globalThis.__raptorSlashMenu.length : 0);",
+      linesAnchor:
+        'bottomBorder(width),\n\t\ttopBorder(width, state.inputActive ? "Input" : "Status"),',
+      linesPatch:
+        "bottomBorder(width),\n" +
+        "\t\t...(globalThis.__raptorSlashMenu != null ? globalThis.__raptorSlashMenu : []),\n" +
+        '\t\ttopBorder(width, state.inputActive ? "Input" : "Status"),',
+    },
+  ];
+  let menuApplied = false;
+  for (const v of variants) {
+    if (patched.includes(v.heightAnchor) && patched.includes(v.linesAnchor)) {
+      patched = patched.replace(v.heightAnchor, v.heightPatch).replace(v.linesAnchor, v.linesPatch);
+      applied.push("斜杠命令菜单");
+      menuApplied = true;
+      break;
+    }
+  }
+  if (!menuApplied) {
     console.error("[patch-tui] 菜单锚点未匹配，@ai-sdk/tui 可能已升级，跳过该项");
   }
 }
