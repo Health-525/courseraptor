@@ -1508,7 +1508,7 @@ const HALL_CARDS = [
   },
   /* 我的账号：托管版专有（改本站登录密码），quota 探测成功后现身 */
   { id: "account", t: "我的账号", d: "修改本站登录密码", group: "系统", hidden: true },
-  { id: "settings", t: "设置", d: "学校与教务账号、AI 模型、QQ 与本地数据", group: "系统" },
+  { id: "settings", t: "设置", d: "AI 模型、QQ 与本地数据", group: "系统" },
 ];
 const HALL_GROUPS = ["学习安排", "效率工具", "系统"];
 const HALL_TITLES = Object.fromEntries(HALL_CARDS.map((c) => [c.id, c.t]));
@@ -1847,10 +1847,8 @@ function buildExams(b) {
     wrap.appendChild(
       hallEmpty(
         "📝",
-        "考试安排需要学校适配",
-        "当前是手动课表模式：考试安排要从教务系统抓取，暂不支持。",
-        "去设置学校",
-        () => openHall("settings"),
+        "近 14 天没有考试",
+        "当前是手动课表模式：考试安排要接入教务系统才支持，直接问我也一样。",
       ),
     );
     return wrap;
@@ -2336,10 +2334,8 @@ function gradesRender(g, wrap) {
       wrap.appendChild(
         hallEmpty(
           "📊",
-          "成绩查询需要学校适配",
-          "当前是手动课表模式：成绩要从教务系统抓取，暂不支持。",
-          "去设置学校",
-          () => openHall("settings"),
+          "还没有成绩",
+          "当前是手动课表模式：成绩要接入教务系统才支持，在对话框里说「我的成绩」试试。",
         ),
       );
       return wrap;
@@ -2424,10 +2420,8 @@ function buildNews() {
         wrap.appendChild(
           hallEmpty(
             "📣",
-            "教务通知需要学校适配",
-            "当前是手动课表模式：通知要从你所在学校的教务处官网抓取，暂不支持。",
-            "去设置学校",
-            () => openHall("settings"),
+            "教务通知暂不可用",
+            "当前是手动课表模式：通知要从教务处官网抓取，暂不支持。",
           ),
         );
         return wrap;
@@ -2843,9 +2837,8 @@ function hallBadges(dyn) {
       put("knowledge", b.knowledge?.total ? `共 ${b.knowledge.total} 条` : "");
     })
     .catch(() => {});
-  /* 设置卡徽标：缺关键凭证才亮（与自动推出设置的口径一致：教务 > 模型；QQ 选配不打扰）。
-     缺配置是要行动的事，与逾期同档用朱砂实底跳出。手动课表模式的「要行动」
-     换成未导课表（教务账号在那边不适用） */
+  /* 设置卡徽标：缺关键凭证才亮（模型未配或手动课表模式未导课表；QQ 选配不打扰）。
+     缺配置是要行动的事，与逾期同档用朱砂实底跳出 */
   fetch("/api/settings")
     .then((r) => r.json())
     .then((d) => {
@@ -2856,11 +2849,9 @@ function hallBadges(dyn) {
         ? d.school.scheduleCached
           ? ""
           : "未导课表"
-        : !d.jwgl?.configured
-          ? "教务未配"
-          : !d.deepseek?.configured
-            ? "模型未配"
-            : "";
+        : !d.deepseek?.configured
+          ? "模型未配"
+          : "";
       if (!miss) return;
       const badge = el2("hall-badge", miss);
       badge.classList.add("warn");
@@ -3241,7 +3232,7 @@ let dsUiMode = "";
 var dsHosted = false;
 /* Key 状态不再常驻一行小字（供应商、型号下拉各自可见，掩码 Key + 来源 +
    供应商 + 型号的拼接行是纯重复）：已配置改由输入框 placeholder 表达
-   「已保存；留空不修改」（与教务密码同一语言），未配置显示该供应商的
+   「已保存；留空不修改」，未配置显示该供应商的
    Key 形状提示；切换由 applyProviderUi 统一落 placeholder */
 let keyConfigured = false;
 function renderCurKey(d) {
@@ -3412,10 +3403,8 @@ document.getElementById("saveMyPass").addEventListener("click", () => {
 
 refreshQuota();
 
-/* ── 设置：常驻在功能大厅抽屉里（见 #hallSettings），教务账号 / DeepSeek API Key
+/* ── 设置：常驻在功能大厅抽屉里（见 #hallSettings），DeepSeek API Key
    等凭证仍走后端 /api/settings 同一套加密热生效 ── */
-const sUser = document.getElementById("sUser");
-const sPass = document.getElementById("sPass");
 const sKey = document.getElementById("sKey");
 const sModel = document.getElementById("sModel");
 const sQQAppId = document.getElementById("sQQAppId");
@@ -3690,15 +3679,12 @@ function settingsDirty() {
   const customModelEl = document.getElementById("customModelId");
   const savedUrl = setStatus?.provider ? setStatus.provider.customBaseUrl || "" : "";
   return !!(
-    (schoolPicked && schoolState && schoolPicked !== schoolState.current) ||
     providerCurrent !== providerSaved ||
     (providerCurrent === "custom" &&
       customUrlEl &&
       customUrlEl.value.trim() &&
       customUrlEl.value.trim() !== savedUrl) ||
     (providerCurrent === "custom" && customModelEl && customModelEl.value.trim()) ||
-    sUser.value.trim() ||
-    sPass.value ||
     sKey.value.trim() ||
     sModel.value ||
     sQQAppId.value.trim() ||
@@ -3726,7 +3712,7 @@ function disarmSettingsClose() {
   }
 }
 
-/* ── 密码可见性：教务密码 / API Key / AppSecret 右侧「显示/隐藏」。
+/* ── 密码可见性：API Key / AppSecret / 网站密码右侧「显示/隐藏」。
     只切 input.type，值不额外落任何地方；点按钮时拦下 label 的默认聚焦转发 ── */
 for (const eye of document.querySelectorAll(".fld-eye")) {
   const input = eye.parentElement ? eye.parentElement.querySelector("input") : null;
@@ -3794,9 +3780,6 @@ function runDiagnostic(target, buttonId, stateId) {
       state.textContent = "检测失败，请确认本地服务正在运行。";
     });
 }
-document
-  .getElementById("testJwgl")
-  .addEventListener("click", () => runDiagnostic("jwgl", "testJwgl", "diagJwgl"));
 document
   .getElementById("testDeepseek")
   .addEventListener("click", () => runDiagnostic("deepseek", "testDeepseek", "diagDeepseek"));
@@ -4086,12 +4069,11 @@ if (modelSelectBtn) {
 }
 
 /* ── 设置栏目切换：点左列目录，右列换内容。「保存设置」只属于
-   凭证类栏目（学校 / 教务 / 模型 / QQ）；本地数据即改即存，不亮保存 ── */
+   凭证类栏目（模型 / QQ）；本地数据即改即存，不亮保存 ── */
 const setTabs = [...document.querySelectorAll(".set-tab")];
-let setLastTab = "school"; // 记住上次停留的栏目，进设置直达上次位置
-let schoolPicked = ""; // 学校卡片本次选中的 id（保存时提交；空 = 未动）
+let setLastTab = "model"; // 记住上次停留的栏目，进设置直达上次位置
 function setTab(name) {
-  if (!setTabs.some((t) => t.dataset.pane === name && !t.hidden)) name = "school";
+  if (!setTabs.some((t) => t.dataset.pane === name && !t.hidden)) name = "model";
   setLastTab = name;
   for (const tab of setTabs) {
     const on = tab.dataset.pane === name;
@@ -4102,7 +4084,7 @@ function setTab(name) {
   for (const pane of document.querySelectorAll(".set-pane")) {
     pane.classList.toggle("on", pane.dataset.pane === name);
   }
-  document.getElementById("saveSettings").hidden = !["school", "model", "qq"].includes(name);
+  document.getElementById("saveSettings").hidden = !["model", "qq"].includes(name);
 }
 for (const tab of setTabs) tab.addEventListener("click", () => setTab(tab.dataset.pane));
 /* 方向键在栏目间移动焦点：大厅里目录是横排（左右）+ 窄屏也是横排，竖排同样支持上下 */
@@ -4124,94 +4106,18 @@ function renderSetDots(d) {
     dot.className = `sdot ${ok ? "ok" : optional ? "" : "warn"}`;
     dot.title = ok ? "已配置" : optional ? "" : "未配置，需要填写";
   };
-  /* 学校栏合并了教务账号：适配学校看教务账号是否已配，其他学校看
-     是否已导入课表（默认南京工业大学，不存在「未选学校」态） */
-  const sch = d.school || {};
-  mark("school", sch.manual ? !!sch.scheduleCached : !!d.jwgl?.configured, false);
   mark("model", !!d.deepseek?.configured, false);
   mark("qq", !!d.qq?.configured, true);
 }
 
-/* ── 学校栏目：下拉框选学校 + 随选择出现的教务账号 / 导入课表 ── */
-const schoolSelect = document.getElementById("schoolSelect");
-let schoolData = null; /* renderSchoolCards 最近一次的数据，选中后重绘按钮文案用 */
-function schoolOptionLabel(o) {
-  return o.id === "custom" ? "其他学校（手动导入课表）" : o.name;
-}
-function renderSchoolCards(d) {
-  if (!schoolSelect) return;
-  if (d) schoolData = d;
-  const school = schoolData?.school || {};
-  const options = Array.isArray(school.options) ? school.options : [];
-  const pickedId = schoolPicked || school.current;
-  const picked = options.filter((o) => o.id === pickedId)[0];
-  schoolSelect.textContent = picked
-    ? schoolOptionLabel(picked)
-    : options.length
-      ? "请选择学校"
-      : "读取中…";
-}
-if (schoolSelect) {
-  bindDdBtn(schoolSelect);
-  schoolSelect.addEventListener("click", () => {
-    const school = schoolData?.school || {};
-    const options = Array.isArray(school.options) ? school.options : [];
-    if (!options.length) return;
-    const active = schoolPicked || school.current;
-    toggleDd(
-      schoolSelect,
-      options.map((o) => ({
-        id: o.id,
-        label: schoolOptionLabel(o),
-        /* 能力说明由后端按本校 capabilities 生成（接了什么说什么），前端不再写死 */
-        note: o.manual ? "粘贴 / 上传课表，AI 解析后保存" : o.note || "教务系统已适配",
-        on: o.id === active,
-      })),
-      (id) => {
-        /* 演示页同样放行：纯客户端预览，「保存设置」在演示里本就禁用，不落数据 */
-        schoolPicked = id;
-        renderSchoolCards();
-        /* 选适配学校 → 下方出教务账号表单；选「其他学校」→ 只出导入课表入口 */
-        syncSchoolUi(true);
-      },
-    );
-  });
-}
-/* 教务账号状态行：凭据不分学校，保存时的学校与当前学校不一致要明说，
-   否则切校后旧学号对不上新校，看起来就像「还在登原来的学校」 */
-function jwglCurText(d) {
-  if (!d.jwgl?.configured) return "尚未配置教务账号";
-  const base = `已保存：学号 ${d.jwgl.username} · ${d.jwgl.sourceLabel}`;
-  const opts = d.school?.options || [];
-  const saved = d.jwgl.savedSchoolId;
-  const cur = d.school?.current;
-  if (saved && cur && saved !== cur) {
-    const name = (id) => {
-      const o = opts.filter((x) => x.id === id)[0];
-      return o ? (o.id === "custom" ? "其他学校" : o.name) : id;
-    };
-    return `${base}（⚠️ 此账号保存于${name(saved)}；当前学校是${name(cur)}，请更新教务账号）`;
-  }
-  return base;
-}
-/* 学校相关 UI 的可见性/文案随「选中态」走：保存前预览，保存后即为现状 */
-function syncSchoolUi(preview) {
-  const picked = schoolPicked || schoolState?.current || "custom";
-  const manual =
-    preview && schoolPicked
-      ? !!(schoolState?.options || []).find((o) => o.id === picked && o.manual)
-      : schoolManual();
-  const jwglBox = document.getElementById("schoolJwglBox");
-  const importBox = document.getElementById("schoolImportBox");
-  if (jwglBox) jwglBox.hidden = manual;
-  if (importBox) importBox.hidden = !manual;
+/* 课表导入状态行（设置 → 本地数据）：有缓存提示可重导，没缓存引导导入 */
+function syncSchoolUi() {
   const cur = document.getElementById("curSchool");
-  if (cur) {
-    const cached = schoolState?.scheduleCached;
-    cur.textContent = cached
-      ? "已有导入的课表；换学期或课表有变时重新导入即可"
-      : "还没有导入课表：点下方按钮粘贴或上传，AI 解析后确认";
-  }
+  if (!cur) return;
+  const cached = schoolState?.scheduleCached;
+  cur.textContent = cached
+    ? "已有导入的课表；换学期或课表有变时重新导入即可"
+    : "还没有导入课表：点下方按钮粘贴或上传，AI 解析后确认";
 }
 
 function qqStatusText(q) {
@@ -4246,7 +4152,6 @@ function showSettings() {
   setTab(setLastTab);
   setMsg.className = "setmsg";
   setMsg.textContent = "";
-  sPass.value = "";
   sKey.value = "";
   pickModel("");
   const customModelEl = document.getElementById("customModelId");
@@ -4254,8 +4159,6 @@ function showSettings() {
   sQQAppId.value = "";
   sQQSecret.value = "";
   sQQPass.value = "";
-  schoolPicked = "";
-  document.getElementById("diagJwgl").textContent = "";
   document.getElementById("diagDeepseek").textContent = "";
   document.getElementById("diagSchool").textContent = "";
   refreshData();
@@ -4265,11 +4168,6 @@ function showSettings() {
       setStatus = d;
       renderSetDots(d);
       applySchoolState(d.school);
-      renderSchoolCards(d);
-      sUser.value = "";
-      sUser.placeholder = d.jwgl.username || "请输入教务系统学号";
-      sPass.placeholder = d.jwgl.configured ? "已保存；留空不修改" : "请输入教务系统密码";
-      document.getElementById("curJwgl").textContent = jwglCurText(d);
       fillProviders(d);
       renderCurKey(d);
       refreshQuota();
@@ -4367,22 +4265,7 @@ document.getElementById("clearFiles").title =
 document.getElementById("clearAllData").title = "清空全部本地会话、附件、生成文件和待办；不可恢复";
 document.getElementById("saveSettings").addEventListener("click", () => {
   const body = {};
-  const u = sUser.value.trim(),
-    pw = sPass.value,
-    k = sKey.value.trim();
-  /* 学校切换：只在下拉框选了别的学校时提交（选回当前学校不算修改） */
-  if (schoolPicked && schoolState && schoolPicked !== schoolState.current) {
-    body.schoolId = schoolPicked;
-  }
-  if (pw) {
-    /* 只改密码时自动带上现有学号，免得来回填 */
-    body.jwglPassword = pw;
-    body.jwglUsername = u || setStatus?.jwgl.username || "";
-  } else if (u) {
-    setMsg.className = "setmsg";
-    setMsg.textContent = "修改学号时，请同时填写新的登录密码。";
-    return;
-  }
+  const k = sKey.value.trim();
   if (k) body.apiKey = k;
   /* 供应商与自定义端点：本地版随保存提交（托管版走 /api/provider，不进这里） */
   if (!dsHosted && providerCurrent !== providerSaved) body.providerId = providerCurrent;
@@ -4437,19 +4320,12 @@ document.getElementById("saveSettings").addEventListener("click", () => {
       if (!lines.length) setMsg.textContent = ok ? "设置已保存。" : d.error || "保存失败，请重试。";
       if (ok && d.status) {
         setStatus = d.status;
-        sUser.value = "";
-        sPass.value = "";
         sKey.value = "";
         renderSetDots(d.status);
-        /* 学校切换落库后：同步模式标记并重绘下拉框（含下方表单显隐） */
+        /* 学校切换落库后：同步模式标记（各面板门禁用） */
         if (d.status.school) {
           applySchoolState(d.status.school);
-          renderSchoolCards(d.status);
         }
-        schoolPicked = "";
-        sUser.placeholder = d.status.jwgl.username || "请输入教务系统学号";
-        sPass.placeholder = d.status.jwgl.configured ? "已保存；留空不修改" : "请输入教务系统密码";
-        document.getElementById("curJwgl").textContent = jwglCurText(d.status);
         fillProviders(d.status);
         renderCurKey(d.status);
         refreshQuota();
@@ -4925,12 +4801,12 @@ impCommitBtn.addEventListener("click", () => {
       imp.busy = false;
     });
 });
-/* 返回：回设置的学校栏（入口在那儿）；直接深链进来的关掉抽屉也一样能走 */
+/* 返回：回设置的本地数据栏（导入课表入口在那儿）；直接深链进来的关掉抽屉也一样能走 */
 document.getElementById("impBack").addEventListener("click", () => {
   openHall("settings");
-  setTab("school");
+  setTab("data");
 });
-/* 设置 → 学校 → 导入 / 重新导入课表 */
+/* 设置 → 本地数据 → 导入 / 重新导入课表 */
 const openImportBtn = document.getElementById("openImport");
 if (openImportBtn)
   openImportBtn.addEventListener("click", () => {
