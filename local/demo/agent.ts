@@ -9,6 +9,9 @@ import { createDeepSeek } from "@ai-sdk/deepseek";
 import type { ModelMessage } from "ai";
 import { ToolLoopAgent, tool } from "ai";
 import { z } from "zod";
+// 流事件翻译骨架与正式版共用（此前逐字抄了一份 30 行克隆）：只做「事件类型 →
+// SSE 载荷」的公共部分，不碰凭证、会话落盘与用户数据，不违反本模块的隔离约束。
+import { translateStream } from "../../src/channels/web/web-stream-translate";
 import { type DemoCard, demoCardFromTool } from "./cards";
 import {
   DEMO_PERIOD_TIMES,
@@ -404,51 +407,6 @@ export interface DemoStreamAgent {
   }): PromiseLike<{ fullStream: AsyncIterable<unknown> }>;
 }
 
-/** fullStream 事件的宽松视图（同 chat-web.ts 的 StreamEvent，字段按需取用） */
-interface StreamEvent {
-  type: string;
-  text?: string;
-  delta?: string;
-  toolName?: string;
-  toolCallId?: string;
-  input?: unknown;
-  output?: unknown;
-  error?: unknown;
-}
-
-const deltaOf = (p: StreamEvent): string => p.text ?? p.delta ?? "";
-
-function oneLine(s: string, max: number): string {
-  const flat = s.replace(/\s+/g, " ").trim();
-  return flat.length > max ? `${flat.slice(0, max)}…` : flat;
-}
-
-/** 工具结果的一行摘要（同 chat-web.ts 的简化版） */
-function summarizeResult(output: unknown): string {
-  if (output == null) return "";
-  if (typeof output === "string") return oneLine(output, 100);
-  if (Array.isArray(output)) return `${output.length} 项`;
-  if (typeof output !== "object") return oneLine(String(output), 60);
-  const o = output as Record<string, unknown>;
-  if (typeof o.error === "string") return `错误：${oneLine(o.error, 80)}`;
-  const bits: string[] = [];
-  for (const k of ["summary", "term", "gpa", "total"])
-    if (o[k] !== undefined && o[k] !== null) bits.push(oneLine(String(o[k]), 48));
-  return bits.join(" · ");
-}
-
-/** 工具参数/结果的展开态预览：给工具卡 <pre> 用，封顶防刷屏 */
-function previewJson(v: unknown, max = 1200): string {
-  if (v == null) return "";
-  let s: string;
-  try {
-    s = typeof v === "string" ? v : (JSON.stringify(v, null, 1) ?? String(v));
-  } catch {
-    s = String(v);
-  }
-  return s.length > max ? `${s.slice(0, max)}\n…（已截断）` : s;
-}
-
 /** 跑一轮 live 对话：把 agent 事件流翻译成 SSE 事件发给 send，返回累积正文与失败信息 */
 export async function runDemoLiveTurn(options: {
   agent: DemoStreamAgent;
@@ -459,89 +417,23 @@ export async function runDemoLiveTurn(options: {
 }): Promise<{ text: string; think: string; failure: string | null; cards: DemoCard[] }> {
   const { agent, history, message, send, signal } = options;
   const messages: ModelMessage[] = [...history, { role: "user", content: message }];
-  const toolStart = new Map<string, { name: string; at: number }>();
-  let text = "";
-  let think = "";
-  let failure: string | null = null;
   const cards: DemoCard[] = [];
 
-  try {
-    const stream = await agent.stream({ messages, abortSignal: signal });
-    for await (const p of stream.fullStream as AsyncIterable<StreamEvent>) {
-      switch (p.type) {
-        case "text-delta": {
-          const t = deltaOf(p);
-          if (t) {
-            text += t;
-            send({ t: "text", v: t });
-          }
-          break;
-        }
-        // 思考过程走独立 think 通道（前端渲染成草稿卡），绝不混进 text
-        case "reasoning-delta": {
-          const t = deltaOf(p);
-          if (t) {
-            think += t;
-            send({ t: "think", v: t });
-          }
-          break;
-        }
-        case "reasoning-end": {
-          send({ t: "think", phase: "end" });
-          break;
-        }
-        case "tool-call": {
-          if (p.toolCallId)
-            toolStart.set(p.toolCallId, { name: p.toolName ?? "tool", at: Date.now() });
-          send({
-            t: "tool",
-            phase: "start",
-            id: p.toolCallId ?? "",
-            name: p.toolName ?? "tool",
-            args: previewJson(p.input),
-          });
-          break;
-        }
-        case "tool-result": {
-          const t0 = p.toolCallId ? toolStart.get(p.toolCallId) : undefined;
-          send({
-            t: "tool",
-            phase: "end",
-            id: p.toolCallId ?? "",
-            name: p.toolName ?? "tool",
-            dur: t0 ? Date.now() - t0.at : undefined,
-            brief: summarizeResult(p.output),
-            out: previewJson(p.output),
-          });
-          // 读态查询的结果同时以结构化卡片呈现（同 kind 去重，一轮至多一张）
-          const card = demoCardFromTool(p.toolName, p.output);
-          if (card && !cards.some((c) => c.kind === card.kind)) {
-            cards.push(card);
-            send({ t: "card", card });
-          }
-          break;
-        }
-        case "tool-error": {
-          send({
-            t: "tool",
-            phase: "error",
-            id: p.toolCallId ?? "",
-            name: p.toolName ?? "tool",
-            brief: p.error instanceof Error ? p.error.message : String(p.error ?? ""),
-          });
-          break;
-        }
-        case "error": {
-          failure = p.error instanceof Error ? p.error.message : String(p.error ?? "");
-          break;
-        }
-        default:
-          break;
+  // 事件翻译骨架与正式版共用（此前逐字抄了一份）；演示差异只有「工具结果
+  // 之后再发一张结构化结果卡」，通过 afterToolResult 钩子挂上
+  const { text, think, failure } = await translateStream(agent, {
+    messages,
+    signal,
+    send,
+    afterToolResult: (output, toolName) => {
+      // 读态查询的结果同时以结构化卡片呈现（同 kind 去重，一轮至多一张）
+      const card = demoCardFromTool(toolName, output);
+      if (card && !cards.some((c) => c.kind === card.kind)) {
+        cards.push(card);
+        send({ t: "card", card });
       }
-    }
-  } catch (e) {
-    if (!signal.aborted) failure = e instanceof Error ? e.message : String(e);
-  }
+    },
+  });
 
   return { text, think, failure, cards };
 }

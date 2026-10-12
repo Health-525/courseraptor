@@ -78,7 +78,6 @@ import {
   saveUpload,
   updateReminder,
 } from "../../core/workspace-data";
-import { appJsAsset } from "./app-asset";
 import { chatPage } from "./chat-page";
 import {
   decodeSessionSegment,
@@ -112,7 +111,7 @@ import {
   runDiagnostic,
   settingsPayload,
 } from "./web-settings";
-import { LOGO_PNG, loadStaticOnce, MARKED_UMD, WEB_MANIFEST } from "./web-static";
+import { serveStaticAsset } from "./web-static";
 
 // ── 会话自动命名：协调器在 src/session-titles.ts（QQ 桥也走同一套）。
 // setTitleMaker 原地转出口：index.ts 与测试的旧装配入口不变。
@@ -229,60 +228,8 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       await serveGeneratedFile(url.slice("/files/".length), res);
       return;
     }
-    // 前端应用脚本：assets/chat-app.js 独立伺服（不再内联进页面模板）。
-    // no-cache 而非长缓存：开发期改前端必须立刻生效，localhost 全量拉取无感
-    if (url === "/app.js") {
-      const buf = appJsAsset();
-      if (buf) {
-        res.writeHead(200, {
-          "content-type": "text/javascript; charset=utf-8",
-          "cache-control": "no-cache",
-        });
-        res.end(buf);
-      } else {
-        res.writeHead(404);
-        res.end('console.error("前端脚本缺失：src/channels/web/assets/chat-app.js 不可读");');
-      }
-      return;
-    }
-    if (url === "/vendor/marked.min.js") {
-      const buf = loadStaticOnce(MARKED_UMD);
-      if (buf) {
-        res.writeHead(200, {
-          "content-type": "text/javascript; charset=utf-8",
-          "cache-control": "public, max-age=86400",
-        });
-        res.end(buf);
-      } else {
-        res.writeHead(404);
-        res.end("// marked 不可用，页面会退回纯文本渲染");
-      }
-      return;
-    }
-    if (url === "/logo.png" || url === "/favicon.ico") {
-      const buf = loadStaticOnce(LOGO_PNG);
-      if (buf) {
-        res.writeHead(200, {
-          "content-type": "image/png",
-          "cache-control": "public, max-age=86400",
-        });
-        res.end(buf);
-      } else {
-        // 图没了也只是没图标，不能连累页面
-        res.writeHead(404);
-        res.end();
-      }
-      return;
-    }
-    // PWA 清单（iOS 添加到主屏幕 / Android 安装到桌面）；图标复用 logo
-    if (url === "/manifest.webmanifest") {
-      res.writeHead(200, {
-        "content-type": "application/manifest+json; charset=utf-8",
-        "cache-control": "public, max-age=86400",
-      });
-      res.end(WEB_MANIFEST);
-      return;
-    }
+    // 静态端点（/app.js、marked、logo、PWA 清单）统一伺服，演示页共用
+    if (serveStaticAsset(url, res)) return;
     if (url === "/today" || url === "/today/") {
       // 独立日程页：今日头条/今日速览/临近考试，纯本地缓存渲染
       todayPageHtml ??= todayPage();

@@ -1,8 +1,10 @@
 /** 网页静态资产：marked UMD、logo、PWA 清单与进程级「读一次常驻内存」缓存。 */
 
 import fs from "node:fs";
+import type { ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { appJsAsset } from "./app-asset";
 
 /** 前端 Markdown 渲染器（marked 的 UMD 构建，静态吐给浏览器） */
 export const MARKED_UMD = path.resolve(
@@ -57,4 +59,62 @@ export function loadStaticOnce(absolutePath: string): Buffer | null {
     }
   }
   return staticCache.get(absolutePath) ?? null;
+}
+
+/** 四个静态端点（前端脚本 / marked / logo / PWA 清单）的统一伺服。
+ * 正式对话与演示页共用同一份资产与响应头，此前各写了一遍。 */
+export function serveStaticAsset(url: string, res: ServerResponse): boolean {
+  if (url === "/app.js") {
+    const buf = appJsAsset();
+    if (buf) {
+      res.writeHead(200, {
+        "content-type": "text/javascript; charset=utf-8",
+        // no-cache 而非长缓存：开发期改前端必须立刻生效，localhost 全量拉取无感
+        "cache-control": "no-cache",
+      });
+      res.end(buf);
+    } else {
+      res.writeHead(404);
+      res.end('console.error("前端脚本缺失：src/channels/web/assets/chat-app.js 不可读");');
+    }
+    return true;
+  }
+  if (url === "/vendor/marked.min.js") {
+    const buf = loadStaticOnce(MARKED_UMD);
+    if (buf) {
+      res.writeHead(200, {
+        "content-type": "text/javascript; charset=utf-8",
+        "cache-control": "public, max-age=86400",
+      });
+      res.end(buf);
+    } else {
+      res.writeHead(404);
+      res.end("// marked 不可用，页面会退回纯文本渲染");
+    }
+    return true;
+  }
+  if (url === "/logo.png" || url === "/favicon.ico") {
+    const buf = loadStaticOnce(LOGO_PNG);
+    if (buf) {
+      res.writeHead(200, {
+        "content-type": "image/png",
+        "cache-control": "public, max-age=86400",
+      });
+      res.end(buf);
+    } else {
+      // 图没了也只是没图标，不能连累页面
+      res.writeHead(404);
+      res.end();
+    }
+    return true;
+  }
+  if (url === "/manifest.webmanifest") {
+    res.writeHead(200, {
+      "content-type": "application/manifest+json; charset=utf-8",
+      "cache-control": "public, max-age=86400",
+    });
+    res.end(WEB_MANIFEST);
+    return true;
+  }
+  return false;
 }
