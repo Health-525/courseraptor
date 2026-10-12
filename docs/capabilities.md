@@ -194,7 +194,7 @@ npm run qq
 ## 🧰 开箱工具分层（共 19 个）
 
 - **内核 17 个**（`src/core/tools/`，与学校无关）：文件与数据四件套（`read_local_file` / `query_table` / `run_js` / `manage_attachments`）、文档写作与转换（`generate_document` / `convert_document`）、PPT 课件两件套（`ppt_preview` / `ppt_save`）、`save_memory`、`manage_todos`、`manage_knowledge`、`manage_pomodoro`、`read_learning_reference`、`open_settings`、`open_panel`、`get_weather`、`get_time`
-- **课表与校历 2 个**（`src/adapters/custom/tools/schedule.ts`）：`get_schedule`（只读本地导入的课表缓存）、`set_holidays`（放假 / 调休落盘）
+- **课表与校历 2 个**：`get_schedule`（只读本地导入的课表缓存）、`set_holidays`（放假 / 调休落盘）
 
 全部 19 个都只读写本地数据：课表来自你在网页端导入的缓存，其余能力走本机文件、沙箱计算与本地 JSON。
 
@@ -232,9 +232,6 @@ npm run qq
 │   │   ├── document/        # 文档生成（Word/Excel/PPT/PDF 渲染 + 跨格式转换）
 │   │   ├── memory/          # 两层记忆（长期事实条目 + 短期会话捕获恢复）
 │   │   └── tools/           # 内核 agent 工具（文档/文件/知识库/记忆/待办提醒/番茄钟/设置/时间/天气）
-│   ├── adapters/            # 校内数据接入层（学期规则 + 课表数据来源）
-│   │   ├── README.md        # 本目录说明
-│   │   └── custom/          # 内置手动课表实现（导入缓存 → 结构化课表）
 │   └── channels/
 │       └── web/             # 网页版：聊天页 + 功能大厅 + /today 日程页 + /knowledge 知识库页 + 今日简报
 └── local/                   # 本地版入口
