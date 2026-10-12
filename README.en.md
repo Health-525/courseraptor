@@ -26,7 +26,7 @@ If you are building agents yourself, the repo doubles as a reference implementat
 > ⚠️ **This is an independent, unofficial project.** The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project. The [Chinese README](README.md) is the authoritative, fully detailed version.
 
 <p align="center">
-  <img src="docs/screenshots/gui-demo.gif" width="800" alt="Web UI demo: quick prompts and one-line queries (fictional demo data)">
+  <img src="docs/screenshots/gui.png" width="800" alt="Web chat: reasoning card, tool calls and timetable reply (fictional demo data)">
 </p>
 
 > Demo and screenshots use fictional sample data (demo mode), never real academic records.
@@ -46,16 +46,6 @@ If you are building agents yourself, the repo doubles as a reference implementat
 | Can it help me study? | Study-coach mode with methods loaded on demand, so they never occupy the standing context |
 
 The kernel ships **19 tools out of the box**, covering timetables, files and tables, document generation, sandboxed computation, memory, the knowledge base, todos, the study coach, and settings. See [capabilities](docs/capabilities.md) for the full table.
-
-Both screenshots below use fictional demo data.
-
-**Terminal TUI** — type `raptor` to chat; the first screen shows today's classes and this week's todos at a glance:
-
-<p align="center"><img src="docs/screenshots/tui.png" width="800" alt="Terminal TUI welcome panel: today's classes and this week's todos (fictional demo data)"></p>
-
-**Web chat** — open `http://localhost:3210` in a browser; reasoning and tool calls are visible in the conversation:
-
-<p align="center"><img src="docs/screenshots/gui.png" width="800" alt="Web chat: reasoning card, tool calls and timetable reply (fictional demo data)"></p>
 
 ## Try it without credentials
 
