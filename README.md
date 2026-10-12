@@ -175,12 +175,11 @@ raptor             # 启动；项目内也可 npm run dev
 ├── obsidian/           # Obsidian 插件（第四端入口：侧栏对话 + 日程/待办插入笔记，独立 npm 工程）
 ├── src/                # 公用核心（与运行形态无关）
 │   ├── core/           # 内核：agent/记忆/日历/文档/附件/知识库等 + 通用工具
-│   ├── adapters/       # 课表等校内数据的接入层（内置手动课表导入）
 │   └── channels/       # 输出渠道：web（网页版）
 └── local/              # 本地版入口：cli（终端 TUI）、qq（机器人）、demo（离线演示）
 ```
 
-分层依赖单向向内：`local → channels/adapters → core`。`src/core/` 不 import 任何具体实现，跨层需求一律走端口注入，由 `npm run verify:imports` 在 CI 里钉死。
+分层依赖单向向内：`local → channels → core`。`src/core/` 不 import 任何具体实现，跨层需求一律走端口注入，由 `npm run verify:imports` 在 CI 里钉死。
 
 ---
 

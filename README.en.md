@@ -76,7 +76,7 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 - **Agent runtime**: Vercel AI SDK v7 (`ToolLoopAgent` + `runAgentTUI` for terminal)
 - **LLM**: DeepSeek by default (`deepseek-flash` / V4.1-Flash), switchable to 11 more Chinese providers or a custom OpenAI-compatible endpoint — each provider's key stored and hot-swapped independently
 - **Web UI**: Single-page Node server (`src/channels/web/`) with push-panel layout, session history, and real-time tool result sync
-- **Layering**: dependencies point inward only (`local → channels/adapters → core`); the kernel never imports a concrete implementation, and cross-layer needs go through port injection — enforced by `npm run verify:imports` in CI
+- **Layering**: dependencies point inward only (`local → channels → core`); the kernel never imports a concrete implementation, and cross-layer needs go through port injection — enforced by `npm run verify:imports` in CI
 - **Data storage**: Local JSON files only (`data/`, `session.json`, `memory.json`, `credentials.enc`); no database, no cloud sync
 
 ## Project structure (key directories)
@@ -91,8 +91,6 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 ├── src/
 │   ├── core/             # Kernel: agent, memory, calendar, documents,
 │   │                     # attachments, knowledge + generic tools
-│   ├── adapters/         # Campus-data integration layer (built-in manual
-│   │                     # timetable import)
 │   └── channels/web/     # Web UI: chat, hall, /today, /todos, /knowledge
 └── local/                # Entrypoints: cli (TUI), qq (bot bridge), demo
 ```
