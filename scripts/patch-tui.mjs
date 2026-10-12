@@ -3,7 +3,7 @@
  *
  * 1. 启动欢迎页：库的空状态只有一行 "Waiting for input..."，改成读
  *    globalThis.__raptorWelcome（string[]，应用侧随时更新、每次重绘重读）。
- *    应用侧见 local/cli/tui/welcome.ts：启动后后台拉今日课表/最新通知逐段刷新。
+ *    应用侧见 local/cli/tui/welcome.ts：启动后后台拉今日课表/待办逐段刷新。
  *
  * 2. 斜杠命令菜单：帧渲染读 globalThis.__raptorSlashMenu（string[]，应用侧
  *    local/cli/tui/slash-menu.ts），非空时插到正文框与输入框之间，同时把正文高度

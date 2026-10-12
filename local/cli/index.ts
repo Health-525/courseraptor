@@ -163,7 +163,7 @@ while (running) {
         "/exit": { desc: SLASH_COMMANDS["/exit"].desc, switchTo: "exit" },
       },
     });
-    // 空屏欢迎面板：后台拉今日课表/最新通知/GPA，逐段填进 TUI 空状态
+    // 空屏欢迎面板：后台拉今日课表/一周内待办，逐段填进 TUI 空状态
     startWelcomeBootstrap();
     try {
       await runAgentTUI({
