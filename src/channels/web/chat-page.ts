@@ -741,8 +741,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .dclose:hover { color: var(--accent); }
   .dlg-intro { margin: 0 0 16px; color: var(--ink-2); font-size: 14px;
                line-height: 1.75; }
-  /* 学校栏里的分区小标题（教务账号 / 其他学校）：细线隔开学校卡片与
-     跟随选择出现的表单块，选了什么下面就是什么，不再分栏跳转 */
+  /* 栏目内分区小标题（如本地数据栏的「导入课表」）：细线隔开功能块 */
   .pane-sub { margin: 4px 0 10px; padding-top: 12px; border-top: 1px solid var(--rule-2);
               font-family: var(--mono); font-size: 11.5px; letter-spacing: .1em;
               color: var(--ink-3); }
@@ -1509,29 +1508,12 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     <div id="hallSettings" hidden>
       <div class="set-frame">
         <nav class="set-tabs" id="setTabs" role="tablist" aria-label="设置栏目">
-          <button class="set-tab on" type="button" role="tab" id="setTabSchool" aria-controls="setPaneSchool" aria-selected="true" data-pane="school"><i class="sdot" aria-hidden="true"></i>学校</button>
-          <button class="set-tab" type="button" role="tab" id="setTabModel" aria-controls="setPaneModel" aria-selected="false" data-pane="model"><i class="sdot" aria-hidden="true"></i>AI 模型</button>
+          <button class="set-tab on" type="button" role="tab" id="setTabModel" aria-controls="setPaneModel" aria-selected="true" data-pane="model"><i class="sdot" aria-hidden="true"></i>AI 模型</button>
           <button class="set-tab" type="button" role="tab" id="setTabQQ" aria-controls="setPaneQQ" aria-selected="false" data-pane="qq"><i class="sdot" aria-hidden="true"></i>QQ 机器人</button>
           <button class="set-tab" type="button" role="tab" id="setTabData" aria-selected="false" data-pane="data">本地数据</button>
         </nav>
         <div class="set-main">
-          <section class="set-pane on" id="setPaneSchool" role="tabpanel" aria-labelledby="setTabSchool" data-pane="school">
-            <p class="dlg-intro">先选学校：适配学校填教务账号自动查询；其他学校导入课表即可。</p>
-            <label class="fld"><span>学校</span><button type="button" class="dd-btn" id="schoolSelect" aria-haspopup="listbox" aria-expanded="false"></button></label>
-            <div id="schoolJwglBox" hidden>
-              <div class="pane-sub">教务账号</div>
-              <label class="fld"><span>学号</span><input id="sUser" type="text" autocomplete="off" ${demo ? "disabled" : ""}></label>
-              <label class="fld"><span>登录密码</span><span class="fld-row"><input id="sPass" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyePass" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
-              <div class="cur" id="curJwgl"></div>
-              <div class="diagrow"><button class="tbtn" id="testJwgl" type="button" ${demo ? "disabled" : ""}>检测教务连接</button><span class="diagstate" id="diagJwgl"></span></div>
-            </div>
-            <div id="schoolImportBox" hidden>
-              <div class="pane-sub">导入课表</div>
-              <div class="cur" id="curSchool"></div>
-              <div class="diagrow"><button class="tbtn" id="openImport" type="button" ${demo ? "disabled" : ""}>导入 / 重新导入课表</button><span class="diagstate" id="diagSchool"></span></div>
-            </div>
-          </section>
-          <section class="set-pane" id="setPaneModel" role="tabpanel" aria-labelledby="setTabModel" data-pane="model">
+          <section class="set-pane on" id="setPaneModel" role="tabpanel" aria-labelledby="setTabModel" data-pane="model">
             <p class="dlg-intro" id="dsIntro">模型服务支持多家供应商（DeepSeek、通义千问、智谱 GLM、Kimi 等），也可填自定义 OpenAI 兼容端点。API Key 与所选型号仅加密保存在当前电脑，留空即保持不变。</p>
             <label class="fld"><span>供应商</span><button type="button" class="dd-btn" id="providerSelect" aria-haspopup="listbox" aria-expanded="false"></button></label>
             <label class="fld" id="customBaseUrlRow" hidden><span>服务地址</span><input id="customBaseUrl" type="url" autocomplete="off" spellcheck="false" placeholder="https://…（OpenAI 兼容端点，到 /v1 这一级）" ${demo ? "disabled" : ""}></label>
@@ -1561,7 +1543,10 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             <div class="cur" id="curQQ">未配置；到 q.qq.com 创建机器人后填入，保存后即可在 QQ 里使用</div>
           </section>
           <section class="set-pane" id="setPaneData" role="tabpanel" aria-labelledby="setTabData" data-pane="data">
-            <p class="dlg-intro">会话、附件、生成文件与待办都保存在本机，可导出或按需清理。此栏目的操作即时生效，无需点「保存设置」。</p>
+            <p class="dlg-intro">会话、附件、生成文件、待办与课表都保存在本机，可导入、导出或按需清理。此栏目的操作即时生效，无需点「保存设置」。</p>
+            <div class="pane-sub">导入课表</div>
+            <div class="cur" id="curSchool"></div>
+            <div class="diagrow"><button class="tbtn" id="openImport" type="button" ${demo ? "disabled" : ""}>导入 / 重新导入课表</button><span class="diagstate" id="diagSchool"></span></div>
             <div class="data-grid" id="dataGrid"></div>
             <div class="data-actions">
               ${demo ? '<span class="tbtn" aria-disabled="true">导出本人数据</span>' : '<a class="tbtn" href="/api/data/export" download>导出本人数据</a>'}

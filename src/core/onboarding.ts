@@ -54,11 +54,11 @@ export async function ensureCredentials(
   const terminal = io ?? createTerminalCredentialIO();
   try {
     // 默认不接入任何学校（手动课表模式）：没有教务账号可配，直接放行。
-    // 想接入教务的同学先在网页「设置 → 学校」里选校，选完这里自然不再命中。
+    // 课表在网页「设置 → 本地数据」里导入；接入教务属内部机制，不在 UI 引导。
     // 未装配适配器（纯单测环境）时无从判断，按老流程走
     if (registeredSchool()?.info.manual) {
-      terminal.write("🦖 当前未接入任何学校（手动课表模式），无需教务账号。");
-      terminal.write("   要接入教务系统：在网页「设置 → 学校」里选择你的学校并填写账号即可。\n");
+      terminal.write("🦖 当前是手动课表模式，无需教务账号。");
+      terminal.write("   导入课表：打开网页对话，在「设置 → 本地数据」里粘贴或上传课表即可。\n");
       return "skipped";
     }
 

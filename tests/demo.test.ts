@@ -14,7 +14,9 @@ test("免账号演示：共用网页、内存会话、拒绝凭证设置与任�
     assert.match(html, /虚构示例，会话仅保留在内存/);
     assert.doesNotMatch(html, /demo-banner/);
     assert.match(html, /id="hallSettings"/, "设置面板常驻在功能大厅抽屉里");
-    assert.match(html, /id="sUser"[^>]+disabled/);
+    // 设置页已无学校/教务账号栏（2026-10-12 收敛为普通校园 agent 口径），
+    // 演示拒绝凭证设置的断言改挂 API Key 输入框
+    assert.match(html, /id="sKey"[^>]+disabled/);
     // 型号改用卡片单选：hidden input 载值，无 disabled 属性可挂，演示拦截由脚本守卫实现
     assert.match(html, /id="sModel"/);
     // 脚本守卫在外置的 chat-app.js 资产里（经 /app.js 伺服）

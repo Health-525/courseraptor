@@ -1,6 +1,6 @@
 /**
  * 默认不接入任何学校（custom 手动课表模式）时，QQ 入口的教务凭证引导
- * 直接放行：不问学号密码，指引去网页「设置 → 学校」里选校。
+ * 直接放行：不问学号密码，指引去网页「设置 → 本地数据」导入课表。
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -35,6 +35,6 @@ test("默认 custom：ensureCredentials 不引导填教务账号，直接 skippe
   );
   assert.equal(outcome, "skipped");
   assert.equal(asked.length, 0, "手动课表模式下不应发起任何终端提问");
-  assert.ok(output.some((m) => m.includes("未接入任何学校")));
-  assert.ok(output.some((m) => m.includes("设置 → 学校")));
+  assert.ok(output.some((m) => m.includes("手动课表模式")));
+  assert.ok(output.some((m) => m.includes("设置 → 本地数据")));
 });
