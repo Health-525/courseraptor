@@ -27,10 +27,8 @@ src/adapters/
 插件**，通过 `.gitignore` 排除、不进公开仓库：
 
 - 公开仓库 / CI 上没有真实学校代码时，装配点只登记内置 `custom`，编译与测试照常通过；
-- 依赖真实学校的测试用 `tests/_util/njtech-probe.ts` 的 `HAS_NJTECH` 降级为跳过；
+- 依赖真实学校的测试用 `tests/_util/njtech-probe.ts` 的 `HAS_NJTECH` 探针降级为跳过；
 - 本地把插件目录放回 `src/adapters/<学校>/` 即被自动加载，无需任何注册代码改动。
-
-配套的无头查询技能包 `skills/njtech-jwgl/` 同样属于该插件、一并不入库。
 
 ## 写一个新实现
 

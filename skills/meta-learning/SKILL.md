@@ -161,7 +161,7 @@ license: MIT-0
 
 ## 与本仓库其他技能协同（CourseRaptor）
 
-- 同学所用工具里若装有课表查询、闪卡或出题类技能（如 `njtech-jwgl`、`flashcard-studio` / `anki-card-maker` / `bloom-quiz-maker`），可按需调用：查课表对齐进度、用历史成绩定位薄弱科目、用闪卡生成间隔重复材料
+- 同学所用工具里若装有课表查询、闪卡或出题类技能（如 CourseRaptor 内置的课表与学习教练工具、`flashcard-studio` / `anki-card-maker` / `bloom-quiz-maker`），可按需调用：查课表对齐进度、结合练习记录定位薄弱科目、用闪卡生成间隔重复材料
 
 ---
 

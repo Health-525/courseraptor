@@ -3,11 +3,17 @@
 ## README 横幅
 
 - 文件：`hero-banner.png`
-- 方式：内置 imagegen，使用现有 `courseraptor-logo.png` 作为品牌参考。
+- 方式：SVG 手绘编辑排版（米纸底 + 朱砂双线框）→ `@resvg/resvg-js` 渲染 PNG。生成脚本 `outputs/gen-hero-banner.mjs` 本地留档（不入库），logo 以 data URI 内嵌进 SVG 圆章。
 - 定位：宣传插画，不是产品截图，不包含用户数据。
-- `social-preview.jpg`：将同一张横幅在本地品牌预览页按 1280×640 渲染导出；约 70 KB，满足 GitHub 社交预览大小要求。
-- 提示词：
+- 文案口径（与 README 主口径一致，不含任何学校名称与教务字样）：
+  - 顶部小字：开源校园 Agent
+  - 副标语：校园日常，一句话。
+  - 能力清单：课表 · 待办 · 知识库 · 文档 · 记忆
+  - 底部：本地优先 · 数据不出电脑 ｜ Web · TUI · QQ · Obsidian
+- `social-preview.jpg`：同一横幅的原字节另存为 `.jpg`（内容为 PNG，GitHub 社交预览按内容识别显示），1280×640，满足 GitHub 社交预览大小要求。
 
-```text
-Use case: ads-marketing. Create a polished GitHub repository hero banner for CourseRaptor, an open-source academic assistant for students of Nanjing Tech University. Reference image is a brand reference, not a photo to replicate: preserve the recognizable cute mint-green dinosaur with round dark navy glasses, cream belly, friendly smile. Format wide 2:1, target 1280 x 640 pixels. Premium playful developer-tool aesthetic: deep midnight navy background, restrained mint and pale lime highlights, subtle blueprint grid and a few elegant orbital lines. On the right, a sculptural soft 3D mascot inspired by the supplied logo, holding a small glowing timetable card, looking left towards title, cropped tastefully at waist. On the left, extremely legible large clean sans-serif title exactly "CourseRaptor". Under title place the Chinese tagline exactly "教务琐事，一句话。" in crisp high-quality typography. Small line below exactly "课表 · 成绩 · 考试 · 通知 · 日历". Bottom-left small typography exactly "OPEN SOURCE / BUILT FOR NJTECH". Keep all text within safe 70px margins, title visually dominant. Balanced minimal editorial tech design, professional yet youthful. No fake stats, no stars counts, no university seal, no official endorsement, no watermarks, no clutter. This is a promotional illustration, not a UI screenshot. Output one standalone finished banner.
-```
+## README 架构图
+
+- 文件：`courseraptor-architecture.png`（深色）/ `courseraptor-architecture-white.png`（浅色），SVG 源同目录同名 `.svg`。
+- 方式：SVG 手绘排版 → `@resvg/resvg-js` 渲染，脚本 `outputs/gen-architecture.mjs` 本地留档。
+- 口径：本地 Agent 内核 + 通用工具（17 个）+ 课表/校历工具（2 个）；外部服务仅腾讯 QQ、模型 API、天气。
