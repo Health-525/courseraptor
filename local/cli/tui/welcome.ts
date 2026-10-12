@@ -1,7 +1,7 @@
 /**
  * 启动欢迎面板：往 @ai-sdk/tui 的空状态（scripts/patch-tui.mjs 打的补丁）
  * 注入实时教务数据。补丁每次重绘都读 globalThis.__raptorWelcome，所以这里
- * 分阶段拉、逐段刷新：最新通知（无需登录）→ 今日课表（登录）。
+ * 后台拉取、逐段刷新：一周内待办（本地）→ 今日课表（登录）。
  * 任何一段失败只降级那一段的文案，不影响其他段和正常对话。
  * 未选学校（教务账号与导入课表都没有）时只留栏目题头与网页地址，
  * 不显示、也不拉取任何教务信息（用户 2026-10-04 指示）。
@@ -9,7 +9,6 @@
 
 import { startChatWeb } from "../../../src/channels/web/chat-web";
 import { config } from "../../../src/core/config";
-import { loadExamCache } from "../../../src/core/exam-cache";
 import type { ScheduleResult } from "../../../src/core/model";
 import { loadScheduleCache, saveScheduleCache } from "../../../src/core/schedule-cache";
 import { school } from "../../../src/core/school";
@@ -36,8 +35,6 @@ const panel = {
   blank: false,
   scheduleLines: [dim("  正在登录教务系统…")],
   todoLines: [dim("  正在获取…")],
-  examLines: [dim("  正在获取…")],
-  newsLines: [dim("  正在获取…")],
 };
 
 /** 「已选学校」= 配了教务账号，或自定义学校已导入课表；两者都没有时不拉任何教务信息 */
@@ -51,7 +48,7 @@ function render() {
   const date = `${now.getMonth() + 1}月${now.getDate()}日 ${school().terms.weekdayName(todayWeekday())}`;
   lines.push(`欢迎使用 CourseRaptor 🦖 · ${date}${panel.week ? ` · 第${panel.week}周` : ""}`, "");
   if (panel.blank) {
-    for (const t of ["今日课表", "一周内待办", "临近考试", "最新通知"]) lines.push(header(t), "");
+    for (const t of ["今日课表", "一周内待办"]) lines.push(header(t), "");
   } else {
     lines.push(
       header("今日课表"),
@@ -59,16 +56,10 @@ function render() {
       "",
       header("一周内待办"),
       ...panel.todoLines,
-      "",
-      header("临近考试"),
-      ...panel.examLines,
-      "",
-      header("最新通知"),
-      ...panel.newsLines,
     );
   }
   if (panel.webUrl) {
-    // 非空面板的新闻段后没有收尾空行，这里补上；空面板各段自带尾空行
+    // 非空面板最后一段（待办）后没有收尾空行，这里补上；空面板各段自带尾空行
     if (!panel.blank) lines.push("");
     lines.push(`💬 网页对话：${panel.webUrl} ${dim("（浏览器打开即聊）")}`);
   }
@@ -88,14 +79,12 @@ export function startWelcomeBootstrap(): void {
 
 async function bootstrap() {
   // 未选学校（教务账号与导入课表都没有）：栏目题头保留、里面不显示任何信息，
-  // 也不再发起教务/通知请求——只把网页地址补进面板，配置都在网页「设置」里做
+  // 也不再发起教务请求——只把网页地址补进面板，配置都在网页「设置」里做
   panel.blank = !schoolConfigured();
   render();
   void refreshWebUrl(); // 网页版地址随本地服务起好后补进面板
   if (panel.blank) return;
-  void refreshNews(); // 通知不依赖教务登录，并行先刷
   refreshTodos(); // 待办是本地数据，同步读
-  refreshExams(); // 考试是本地缓存，同步读
   await refreshSchedule();
 }
 
@@ -131,74 +120,9 @@ function refreshTodos() {
   render();
 }
 
-/** 临近考试：只读本地考试缓存（14 天窗口），学期对不上时如实说明不硬讲 */
-function refreshExams() {
-  try {
-    const cached = loadExamCache();
-    if (!cached) {
-      panel.examLines = [dim("  暂无考试数据，问一次考试安排即缓存")];
-      render();
-      return;
-    }
-    const term = loadScheduleCache()?.schedule;
-    if (term && (cached.exams.year !== term.year || cached.exams.semester !== term.semester)) {
-      panel.examLines = [dim("  考试缓存是旧学期的，问一次即刷新")];
-      render();
-      return;
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const upcoming = cached.exams.exams.flatMap((e) => {
-      const m = String(e.date).match(/(20\d{2})-(\d{1,2})-(\d{1,2})/);
-      if (!m) return [];
-      const inDays = Math.round(
-        (new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() - today.getTime()) /
-          DAY_MS,
-      );
-      return inDays < 0 || inDays > 14 ? [] : [{ ...e, inDays }];
-    });
-    upcoming.sort((a, b) => a.inDays - b.inDays || a.subject.localeCompare(b.subject, "zh"));
-    if (!upcoming.length) {
-      panel.examLines = [dim("  14 天内没有考试安排")];
-      render();
-      return;
-    }
-    panel.examLines = upcoming.slice(0, 3).map((e) => {
-      const when = e.inDays === 0 ? "今天" : e.inDays === 1 ? "明天" : `还有 ${e.inDays} 天`;
-      return `• ${e.subject} ${dim(`· ${when}${e.location ? ` · ${e.location}` : ""}`)}`;
-    });
-  } catch {
-    panel.examLines = [dim("  考试读取失败（不影响使用）")];
-  }
-  render();
-}
-
 /** 网页服务在 index.ts 已并行启动，这里只等它的地址；起不来就不显示这一行 */
 async function refreshWebUrl() {
   panel.webUrl = await startChatWeb();
-  render();
-}
-
-async function refreshNews() {
-  try {
-    // 截图/演示开关：RAPTOR_DEMO_NEWS=1 时用虚构通知，不请求教务处网站
-    if (process.env.RAPTOR_DEMO_NEWS === "1") {
-      const demoNews = [
-        { title: "关于 2026-2027-1 学期期中教学检查安排的通知（示例）", date: "2026-09-22" },
-        { title: "关于国庆节放假及调休调课的通知（示例）", date: "2026-09-19" },
-        { title: "关于开展本科生学业预警与帮扶工作的通知（示例）", date: "2026-09-18" },
-      ];
-      panel.newsLines = demoNews.map((n) => `• ${n.title} ${dim(n.date.slice(5))}`);
-      render();
-      return;
-    }
-    const news = (await school().notices?.fetchNews([], 3)) ?? [];
-    panel.newsLines = news.length
-      ? news.map((n) => `• ${n.title} ${dim(String(n.date).slice(5))}`)
-      : [dim("  暂无通知")];
-  } catch {
-    panel.newsLines = [dim("  通知获取失败（不影响使用）")];
-  }
   render();
 }
 
