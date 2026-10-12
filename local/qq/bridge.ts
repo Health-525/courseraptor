@@ -32,12 +32,12 @@ import { appendRound } from "../../src/core/chat-sessions";
 import { config } from "../../src/core/config";
 import { drainGeneratedRound, runInDocumentRound } from "../../src/core/document/save";
 import { isRaptorError, isSessionExpiredError } from "../../src/core/errors";
+import { registerQQPushSender } from "../../src/core/notify";
 import { ensureCredentials } from "../../src/core/onboarding";
 import { migratedDataPath } from "../../src/core/paths";
 import { maybeAutoTitle } from "../../src/core/session-titles";
 import { localOnlyCommandMessage } from "../cli/tui/slash-menu";
 import { mdToPlain, splitMessage } from "./format";
-import { registerQQPush } from "./push";
 import { type QqArchiveInput, qqArchiveSlot } from "./session-archive";
 
 type BridgeLogger = Pick<Console, "log" | "info" | "warn" | "error" | "debug">;
@@ -215,6 +215,33 @@ export function startQQBridge(opts: { logger?: BridgeLogger } = {}): Promise<voi
   return bridgeStarting;
 }
 
+/**
+ * 桥热启动（供网页设置保存 QQ 凭证后即时拉起，宿主经 setQQBridgeLauncher 注入）。
+ * 未在跑则拉起；已在跑则沿用启动时的凭证（重启后切换），失败如实说明。
+ * 返回追加到保存结果里的用户文案。
+ */
+export async function ensureQQBridgeOnline(): Promise<string> {
+  if (isQQBridgeOnline()) {
+    return "；QQ 桥已在线（沿用启动时的凭证），重启 raptor 后切换为新凭证";
+  }
+  try {
+    const { createQQFileLogger } = await import("./logger");
+    // 20 秒没连上就先回话：桥后台继续尝试，凭证已加密保存
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("连接超时（20 秒）")), 20_000);
+    });
+    await Promise.race([startQQBridge({ logger: createQQFileLogger() }), timeout]);
+    return "；QQ 桥已拉起，到 QQ 里给机器人发激活暗号即可开始使用";
+  } catch (error) {
+    // 与 web 侧 oneLine 同口径：压平空白、超长截断加省略号
+    const flat = (error instanceof Error ? error.message : String(error))
+      .replace(/\s+/g, " ")
+      .trim();
+    const detail = flat.length > 120 ? `${flat.slice(0, 120)}…` : flat;
+    return `；QQ 桥拉起失败：${detail}。凭证已保存，可稍后重启 raptor 重试`;
+  }
+}
+
 async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
   const log = opts.logger ?? console;
 
@@ -372,7 +399,7 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
     }
     log.log(`主动推送目标：${pushTargets.length} 个 openid`);
   }
-  registerQQPush(async (text) => {
+  registerQQPushSender(async (text) => {
     for (const openid of pushTargets) {
       await bot.sendText({ scope: "c2c", targetId: openid }, text).catch((e) => {
         log.warn(`[qq] 主动推送失败（openid=${openid}）：${(e as Error)?.message ?? e}`);

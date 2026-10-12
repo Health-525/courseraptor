@@ -18,6 +18,7 @@
     "format:check": "biome format",
     "postinstall": "node scripts/patch-tui.mjs && lefthook install",
     "duplication": "jscpd",
+    "verify:imports": "node scripts/verify-imports.mjs",
     "release": "node scripts/release.mjs",
     "package:skill": "node scripts/package-skill.mjs",
     "obsidian:build": "npm --prefix obsidian run build",

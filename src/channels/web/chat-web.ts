@@ -113,7 +113,6 @@ import {
   settingsPayload,
 } from "./web-settings";
 import { LOGO_PNG, loadStaticOnce, MARKED_UMD, WEB_MANIFEST } from "./web-static";
-import { oneLine } from "./web-tool-events";
 
 // ── 会话自动命名：协调器在 src/session-titles.ts（QQ 桥也走同一套）。
 // setTitleMaker 原地转出口：index.ts 与测试的旧装配入口不变。
@@ -164,31 +163,10 @@ export function setQQBridgeLauncher(fn: QQBridgeLauncher | null): void {
   qqBridgeLauncher = fn;
 }
 
-/** 未在跑则拉起；已在跑则沿用启动时的凭证（重启后切换），失败如实说明 */
-async function defaultQQBridgeLauncher(): Promise<string> {
-  const {
-    isQQBridgeOnline,
-    startQQBridge,
-  } = // QQ 桥只随本地版（local/qq）分发；托管实例不会走到这个懒加载
-    await import("../../../local/qq/bridge");
-  if (isQQBridgeOnline()) {
-    return "；QQ 桥已在线（沿用启动时的凭证），重启 raptor 后切换为新凭证";
-  }
-  try {
-    const { createQQFileLogger } = await import("../../../local/qq/logger");
-    // 20 秒没连上就先回话：桥后台继续尝试，凭证已加密保存
-    const timeout = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error("连接超时（20 秒）")), 20_000);
-    });
-    await Promise.race([startQQBridge({ logger: createQQFileLogger() }), timeout]);
-    return "；QQ 桥已拉起，到 QQ 里给机器人发激活暗号即可开始使用";
-  } catch (error) {
-    return `；QQ 桥拉起失败：${oneLine(error instanceof Error ? error.message : String(error), 120)}。凭证已保存，可稍后重启 raptor 重试`;
-  }
-}
-
+/** 桥的启动实现是宿主（local/cli）的职责——web 不 import local/（分层红线）。
+ * 宿主未注入（测试/裸起 web）时如实返回空串，保存结果里不追加桥文案 */
 async function maybeStartQQBridge(): Promise<string> {
-  return (qqBridgeLauncher ?? defaultQQBridgeLauncher)();
+  return qqBridgeLauncher ? qqBridgeLauncher() : "";
 }
 
 function listen(port: number): Promise<string> {
