@@ -21,10 +21,10 @@ const { LEARNING_REFERENCES, learningReferenceMenu } = await import("../src/core
 const { coreTools } = await import("../src/core/tools");
 const { basePrompt } = await import("../src/core/prompt");
 
-test("参考库：六篇文档 id 唯一、标题/场景/内容齐全", () => {
-  assert.equal(LEARNING_REFERENCES.length, 6, "应为六篇方法论文档");
+test("参考库：七篇文档 id 唯一、标题/场景/内容齐全", () => {
+  assert.equal(LEARNING_REFERENCES.length, 7, "应为七篇方法论文档");
   const ids = LEARNING_REFERENCES.map((r) => r.id);
-  assert.equal(new Set(ids).size, 6, "id 不得重复");
+  assert.equal(new Set(ids).size, 7, "id 不得重复");
   for (const r of LEARNING_REFERENCES) {
     assert.ok(r.id && r.title && r.when, `${r.id} 元信息应齐全`);
     assert.ok(r.content.length > 300, `${r.id} 内容不应为空壳`);
@@ -61,6 +61,16 @@ test("工具接线：read_learning_reference 注册且按 id 返回文档", asyn
     content?: string;
   };
   assert.match(structure.content ?? "", /五维诊断/, "结构诊断篇应含五维诊断");
+
+  const drill = (await read.execute({ doc: "diagnostic-drill" })) as {
+    title?: string;
+    content?: string;
+    error?: string;
+  };
+  assert.equal(drill.title, "习题课：诊断与补差");
+  assert.match(drill.content ?? "", /独立诊断/, "习题课篇应含独立诊断步");
+  assert.match(drill.content ?? "", /新鲜独立复检/, "复检必须换表面特征不同的题");
+  assert.match(drill.content ?? "", /诊断题与复检题必须不同/);
 
   const miss = (await read.execute({ doc: "no-such-doc" })) as { error?: string };
   assert.match(miss.error ?? "", /没有这篇参考/, "未知 id 应明确报错并列出可用项");

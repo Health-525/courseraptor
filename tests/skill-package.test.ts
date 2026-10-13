@@ -186,6 +186,7 @@ test("技能打包：meta-learning 纯提示词技能（无 bundle，整拷即�
     "SKILL.md",
     "README.md",
     "references/deep-understanding.md",
+    "references/diagnostic-drill.md",
     "references/exam-strategies.md",
     "references/knowledge-structure-assessment.md",
     "references/learning-frameworks.md",
@@ -200,7 +201,7 @@ test("技能打包：meta-learning 纯提示词技能（无 bundle，整拷即�
 
   assert.match(fs.readFileSync(path.join(built.skillDir, "SKILL.md"), "utf8"), /学习/);
 
-  // zip：本地头签名 + 条目前缀 + 条目数恰为 8（SKILL/README + 六篇 references）
+  // zip：本地头签名 + 条目前缀 + 条目数恰为 9（SKILL/README + 七篇 references）
   const zip = fs.readFileSync(built.zipPath);
   assert.equal(zip.subarray(0, 4).toString("latin1"), "PK\u0003\u0004");
   const asLatin1 = zip.toString("latin1");
@@ -209,5 +210,5 @@ test("技能打包：meta-learning 纯提示词技能（无 bundle，整拷即�
     asLatin1.includes("meta-learning/references/exam-strategies.md"),
     "zip 应含 references",
   );
-  assert.equal(built.files.length, 8, "zip 条目数应为 8（无多余文件混入）");
+  assert.equal(built.files.length, 9, "zip 条目数应为 9（无多余文件混入）");
 });

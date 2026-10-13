@@ -156,6 +156,7 @@ license: MIT-0
 - **了解记忆机制/专注方法/学习科学** → `references/learning-frameworks.md`
 - **了解最优知识结构/专家组织方式/检验方法** → `references/knowledge-structure-assessment.md`
 - **编排实践训练/项目设计/刻意练习** → `references/practice-design.md`
+- **讲习题/诊断薄弱点/补差/哪里没学会** → `references/diagnostic-drill.md`
 
 ---
 

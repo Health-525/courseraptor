@@ -293,3 +293,20 @@ test("工具接线：ppt_preview 干跑不落盘、ppt_save 落盘带 ppt 载荷
   assert.match(gb.error!, /title 不能为空/);
   assert.match(gb.note!, /半成品/);
 });
+
+test("工具描述：ppt_preview / ppt_save 都带排版法则（字号阶梯、对比度成对、切词先于缩字号）", async () => {
+  const { pptTools } = await import("../src/core/tools/ppt");
+  for (const name of ["ppt_preview", "ppt_save"] as const) {
+    const desc = String((pptTools[name] as { description?: string }).description ?? "");
+    assert.match(desc, /## 排版法则/, `${name} 应带排版法则段`);
+    assert.match(desc, /10 × 5\.625 英寸/, "法则按本项目画布尺寸写，不留上游像素体系");
+    assert.match(desc, /四周留 ≥0\.4 英寸/, "要有留白硬规则");
+    assert.match(desc, /页标题 28-32/, "要有字号阶梯");
+    assert.match(desc, /删词，不要继续缩字号/, "切词优先于缩字号");
+    assert.match(desc, /对比度是一对/, "颜色必须成对改");
+    assert.match(desc, /间距用完全相同的数值/, "并排元素共享精确数值");
+    assert.match(desc, /口播台词不上页面/, "讲课内容进 notes 不进页面");
+    assert.match(desc, /中心点偏差 ≤0\.02 英寸/, "文字在形状里要居中");
+    assert.doesNotMatch(desc, /562\.5px|1000 × 562/, "不得残留上游 slide DSL 的像素体系");
+  }
+});
