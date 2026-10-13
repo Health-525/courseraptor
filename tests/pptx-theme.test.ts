@@ -295,9 +295,18 @@ test("前端接线：chat-app.js 定义并调用 pptCard，chat-page.ts 带查�
     path.resolve(import.meta.dirname, "../src/channels/web/chat-page.ts"),
     "utf8",
   );
-  for (const sel of [".pptcard", ".pptstrip", ".pptslide", ".pptv-stage", ".pptview"]) {
+  for (const sel of [".pptcard", ".pptstrip", ".pptslide", ".pptv-stage", ".pptv"]) {
     assert.ok(css.includes(sel), `chat-page.ts 应含 ${sel} 样式`);
   }
+  // 全屏查看器是 flex column：舞台宽由量出来的可用高度反算，不再写死
+  // calc((100dvh - 118px) * 16 / 9) 那种「猜底栏多高」的魔法数
+  assert.ok(
+    !/width:\s*min\(94vw,\s*calc\(\(100dvh - 118px\)/.test(css),
+    "舞台尺寸不该再写死减 118px",
+  );
+  assert.ok(css.includes("--pptv-w"), "舞台宽应走 --pptv-w 变量");
+  // 打开时锁死背后滚动：fixed 遮罩挡不住滚轮滚 #log
+  assert.ok(css.includes("body.ppt-open #log"), "全屏打开要锁住 #log 滚动");
 });
 
 test("媒体去重：重复 logo 合并为一份，且 rels 不悬空（PowerPoint 破损图回放）", async () => {

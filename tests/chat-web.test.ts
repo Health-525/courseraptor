@@ -102,6 +102,31 @@ test("GET 四张独立页同样禁缓存（都内嵌 CSRF token）", async () =>
   }
 });
 
+test("页面路由按 pathname 匹配：带查询串的深链不再 404", async () => {
+  const url = (await startChatWeb())!;
+  // 图谱卡「打开画板」带 ?bookId= 跳过来；以前五个页面路由都拿含查询串的
+  // req.url 做 === 精确匹配，这些深链一律落到 404 not found
+  const graph = await fetch(`${url}/graph?bookId=book-123`);
+  assert.equal(graph.status, 200, "/graph?bookId= 应返回页面本体");
+  assert.match(graph.headers.get("content-type") ?? "", /html/);
+  assert.equal(graph.headers.get("cache-control"), "no-store");
+  // 其余四页同一个病：查询串是页面自己解析的参数，不该被路由层吃掉
+  for (const p of ["/today?x=1", "/schedule?week=3", "/todos?a=b", "/knowledge?q=test"]) {
+    const res = await fetch(`${url}${p}`);
+    assert.equal(res.status, 200, p);
+    assert.equal(res.headers.get("cache-control"), "no-store", p);
+  }
+  // 尾斜杠 + 查询串也要认
+  assert.equal((await fetch(`${url}/graph/?bookId=book-123`)).status, 200);
+  // 前缀相近的路径不能被误当成 /graph：未知 GET 本来就走 SPA 兜底回对话页，
+  // 这里要的是「兜底页不是图谱页」——谁把路由放宽成 startsWith 就会现形
+  const near = await fetch(`${url}/graphx?bookId=1`);
+  assert.equal(near.status, 200);
+  const nearHtml = await near.text();
+  assert.ok(!nearHtml.includes("人物图谱 · CourseRaptor"), "/graphx 不能被当成图谱页");
+  assert.ok(nearHtml.includes("marked.min.js"), "兜底应回到对话页");
+});
+
 test("GET /vendor/marked.min.js 返回 marked 脚本本体", async () => {
   const url = (await startChatWeb())!;
   const res = await fetch(`${url}/vendor/marked.min.js`);

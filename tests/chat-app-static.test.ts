@@ -209,6 +209,74 @@ test("提示词模板换序钩子齐全：面板与输入框上方 chips 都可�
   assert.match(fn[0], /saveQuick\(\)/);
 });
 
+test("PPT 全屏查看器：深链路由、锁滚、焦点与 a11y 四件套齐全", () => {
+  const src = fs.readFileSync(APP_JS, "utf8");
+  // 路由：打开态走 ?ppt=&p= 查询串，pushState 压栈让后退键变成「关全屏」
+  assert.match(src, /function pptUrlId\(\)/);
+  assert.match(src, /function pptUrlPage\(\)/);
+  assert.match(src, /function pptCardById\(/);
+  assert.match(src, /history\.pushState\(null, "", pptUrlFor\(deckId, i \+ 1\)\)/);
+  // 翻页只 replaceState：不把历史栈撑成一页一格
+  assert.match(src, /history\.replaceState\(null, "", pptUrlFor\(deckId, i \+ 1\)\)/);
+  // popstate 是唯一的关闭/翻页入口：后退到没有 ppt= 的地址就关
+  assert.match(src, /window\.addEventListener\("popstate", \(\) => \{/);
+  assert.match(src, /if \(live\) pptClose\(live, false\);/);
+  // 主动关才 back()：由后退触发的关闭不能再弹一次历史
+  assert.match(src, /if \(pop && pptPushed\) \{/);
+
+  // 锁滚：fixed 遮罩挡不住滚轮滚 #log
+  assert.match(src, /document\.body\.classList\.add\("ppt-open"\)/);
+  assert.match(src, /document\.body\.classList\.remove\("ppt-open"\)/);
+
+  // keydown 监听必须摘：挂在 document 上，不摘会越开越多、关了还在翻页
+  assert.match(src, /document\.removeEventListener\("keydown", live\.onKey\)/);
+  assert.match(src, /document\.addEventListener\("keydown", onKey\)/);
+
+  // 键盘守卫：焦点在输入类控件里时方向键归控件自己
+  assert.match(src, /function pptEditable\(t\)/);
+  assert.match(src, /if \(pptEditable\(e\.target\)\)/);
+
+  // a11y：模态语义 + 焦点陷阱 + 打开即聚焦 + 关闭归还来源缩略图
+  assert.match(src, /ov\.setAttribute\("role", "dialog"\)/);
+  assert.match(src, /ov\.setAttribute\("aria-modal", "true"\)/);
+  assert.match(src, /function trapFocus\(e\)/);
+  assert.match(src, /close\.setAttribute\("aria-label", "关闭全屏预览"\)/);
+  assert.match(src, /returnFocus: opts\?\.returnFocus \?\? null/);
+
+  // 画册 id 用成品文件名：同一份课件刷新前后不变，深链才站得住
+  assert.match(src, /const named = files\?\.\[0\]\?\.name;/);
+  assert.match(src, /card\.dataset\.pptId = deckId;/);
+  assert.match(src, /pptView\(ppt, i, files, deckId, \{ returnFocus: sl \}\)/);
+  // 对话卡缩略图必须可聚焦：CSS 的 :focus-visible 高亮一直在，但缺 tabindex
+  // 的话键盘用户进不到预览入口，全屏关闭也没处还焦点
+  assert.match(src, /sl\.tabIndex = 0;/);
+  assert.match(src, /sl\.setAttribute\("role", "button"\)/);
+
+  // 预览截断要说清：count 是总页数、slides 最多前 N 页，计数器不许拿
+  // 总页数冒充可翻范围（那是「翻到 30 页却显示 /60」的老 bug）
+  assert.match(src, /const truncated = ppt\.count > total;/);
+  assert.match(src, /预览前 \$\{total\} 页 · 全 \$\{ppt\.count\} 页/);
+  assert.match(src, /counter\.textContent = `\$\{i \+ 1\} \/ \$\{total\}`;/);
+
+  // 缩略图条：长课件能直接跳页，当前页有标记
+  assert.match(src, /const rail = el\("pptv-rail"\);/);
+  assert.match(src, /thumbs\[k\]\.classList\.toggle\("on", k === i\)/);
+});
+
+test("图谱卡与图谱面板都带 bookId 跳 /graph：多本书不开错书", () => {
+  const src = fs.readFileSync(APP_JS, "utf8");
+  // 对话区迷你卡：不带 bookId 时 /graph 只会开默认书
+  assert.match(
+    src,
+    /more\.href = graph\.bookId \? `\/graph\?bookId=\$\{encodeURIComponent\(graph\.bookId\)\}` : "\/graph";/,
+  );
+  // 功能大厅里的图谱面板：同一口径
+  assert.match(
+    src,
+    /go\.href = d\.bookId \? `\/graph\?bookId=\$\{encodeURIComponent\(d\.bookId\)\}` : "\/graph";/,
+  );
+});
+
 test("教务通知卡按学校显隐：newsReady 门禁接线齐全，没接入的学校不出卡", () => {
   const src = fs.readFileSync(APP_JS, "utf8");
   // 门槛函数：以服务端算好的 school.newsReady 为准，演示页放行

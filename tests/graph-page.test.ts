@@ -45,6 +45,32 @@ test("画板页包含全部交互控件（缩放/查找/布局/导出）", () =>
   assert.ok(html.includes("raptor-graph-pos-v1:"), "缺少位置持久化键名");
 });
 
+test("画板页支持 ?bookId= 深链：URL 与当前书双向同步", () => {
+  const html = graphPage();
+  // 启动时读 URL 指定哪本书：从对话的图谱卡带 id 跳进来，画板才开对书
+  assert.ok(
+    html.includes("/(?:\\?|&)bookId=([^&]+)/.exec(location.search"),
+    "启动时要解析 ?bookId=",
+  );
+  assert.ok(html.includes('var urlBook = "";'), "缺少 urlBook 变量");
+  // 深链优先于默认书：URL 里指定的书存在就开它，不在书单里才回落
+  assert.ok(
+    html.includes("if (urlBook && state.books.some(function (b) { return b.id === urlBook; }))"),
+    "深链书要优先于默认书",
+  );
+  // 切书/换书都回写 URL：复制链接发给别人打开还是同一本书
+  assert.ok(html.includes("function syncUrlBook()"), "缺少 syncUrlBook");
+  assert.ok(
+    html.includes(
+      'history.replaceState(null, "", location.pathname + "?bookId=" + encodeURIComponent(state.bookId))',
+    ),
+    "切书要回写 URL",
+  );
+  // replaceState 而非 hash：查询串不进历史栈，后退不会在书与书之间弹来弹去
+  assert.ok(!html.includes('location.hash = "?bookId='), "切书不许动 hash，会污染 #hall= 通道");
+  assert.ok(!html.includes("location.hash = `?bookId="), "切书不许动 hash，会污染 #hall= 通道");
+});
+
 test("内联脚本自洽：不再开 script 标签、CSRF 读取点在位", () => {
   const html = graphPage();
   const start = html.indexOf("<script>");
