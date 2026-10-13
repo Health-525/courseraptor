@@ -86,11 +86,24 @@ export function raptorModelMiddleware(): LanguageModelMiddleware {
     },
   };
 }
-/** 组装 agent：注入长期记忆与上次会话记录；channel 指定输出渠道风格 */
-export async function createRaptorAgent(channel?: "qq") {
+/**
+ * 组装 agent：注入长期记忆与上次会话记录；channel 指定输出渠道风格
+ *
+ * `carryOver` 管的是**短期记忆的跨会话延续**（data/session.json 的尾部
+ * 转写）。默认 true，因为 TUI 与 QQ 都是单线对话：TUI 重启后靠它接上，
+ * QQ 每条消息新建 agent、靠它保持上下文连续。
+ *
+ * 网页端必须传 false：它每轮都带该会话自己的完整历史
+ * （chat-stream 用 contextMessages(sessionId)），连续性已经够了；而
+ * session.json 是**全局单文件**（模型中间件每轮覆写），把它注入网页
+ * 提示词等于让 A 会话的尾巴出现在 B 会话里——多会话/多标签下还会互相
+ * 覆盖。新会话要延续上文，切回历史会话即可，不必靠提示词注入。
+ */
+export async function createRaptorAgent(channel?: "qq", options?: { carryOver?: boolean }) {
+  const carryOver = options?.carryOver ?? true;
   const [memorySection, lastSession] = await Promise.all([
     formatMemoryForPrompt(),
-    loadLastSessionTranscript(),
+    carryOver ? loadLastSessionTranscript() : Promise.resolve(""),
   ]);
   const instructions = [
     basePrompt(),
