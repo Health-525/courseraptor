@@ -12,6 +12,8 @@
  * 的优雅退出路径。
  */
 
+import type { LoopTimeoutConfig } from "../../../src/core/loop-timeout";
+
 type SoftInterruptHandler = () => void;
 
 const handlers = new Set<SoftInterruptHandler>();
@@ -32,6 +34,8 @@ export function emitSoftInterrupt(): void {
 interface TUIStreamArgs {
   prompt: string;
   abortSignal?: AbortSignal;
+  /** 流式看门狗配置（core/loop-timeout）：透传给底层 agent.stream */
+  timeout?: LoopTimeoutConfig;
 }
 
 /**

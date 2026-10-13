@@ -28,6 +28,8 @@
 
 import readline from "node:readline";
 import { PassThrough } from "node:stream";
+import type { LoopTimeoutConfig } from "../../../src/core/loop-timeout";
+import { abortFailure, streamTimeoutConfig } from "../../../src/core/loop-timeout";
 import { CYAN, DIM, GREEN, RED, RESET, YELLOW } from "./color";
 import {
   coalesceText,
@@ -66,6 +68,8 @@ export interface TUIStreamableAgent {
   stream(options: {
     prompt: string;
     abortSignal?: AbortSignal;
+    /** 流式看门狗配置（core/loop-timeout） */
+    timeout?: LoopTimeoutConfig;
   }): PromiseLike<{ fullStream: AsyncIterable<unknown> }>;
 }
 
@@ -463,8 +467,13 @@ export async function runInlineTUI(options: {
     rl.pause();
     try {
       // 行内渲染只需要 fullStream 的这些事件；ai 包的完整类型比这宽得多，
-      // 在边界上收窄一次，循环内部按上面的 StreamEvent 处理
-      const stream = await agent.stream({ prompt, abortSignal: abort.signal });
+      // 在边界上收窄一次，循环内部按上面的 StreamEvent 处理。
+      // timeout 带上流式看门狗（首 chunk / chunk 间隔），治模型侧「转圈圈」
+      const stream = await agent.stream({
+        prompt,
+        abortSignal: abort.signal,
+        timeout: streamTimeoutConfig(),
+      });
       const events = stream.fullStream as AsyncIterable<StreamEvent>;
 
       for await (const p of events) {
@@ -514,6 +523,15 @@ export async function runInlineTUI(options: {
             failure = oneLine(msg, 200);
             break;
           }
+          case "abort": {
+            // 看门狗（首 chunk / chunk 间隔）到点：SDK 发 abort part 后让流
+            // 正常结束，不接住就是「无声结束」。软打断的 abort 由
+            // abort.signal.aborted 分流，不算失败
+            if (!abort.signal.aborted) {
+              failure = oneLine(abortFailure((p as { reason?: unknown }).reason), 200);
+            }
+            break;
+          }
           case "finish": {
             if (p.totalUsage) usage = p.totalUsage;
             break;
@@ -524,7 +542,12 @@ export async function runInlineTUI(options: {
       }
     } catch (e) {
       if (!abort.signal.aborted) {
-        failure = e instanceof Error ? e.message : String(e);
+        // 看门狗若以抛错形态出来（SDK 版本差异），同样翻成中文说明
+        const err = e instanceof Error ? e : null;
+        failure =
+          err && (err.name === "TimeoutError" || err.name === "AbortError")
+            ? oneLine(abortFailure(err), 200)
+            : (err?.message ?? String(e));
       }
     } finally {
       if (wroteText) write("\n");
