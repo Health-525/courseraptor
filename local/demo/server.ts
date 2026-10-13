@@ -6,6 +6,7 @@
 import http from "node:http";
 import type { ModelMessage } from "ai";
 import { chatPage } from "../../src/channels/web/chat-page";
+import { graphPage } from "../../src/channels/web/graph-page";
 import { knowledgePage } from "../../src/channels/web/knowledge-page";
 import { DEFAULT_QUESTIONS } from "../../src/channels/web/quick-questions";
 import { schedulePage } from "../../src/channels/web/schedule-page";
@@ -16,7 +17,7 @@ import { FALLBACK_MODEL_ID, FALLBACK_MODELS, fallbackModelsFor } from "../../src
 import { getProviderDef, providerOptionList, resolveProviderId } from "../../src/core/providers";
 import { type DemoStreamAgent, runDemoLiveTurn } from "./agent";
 import { type DemoCard, demoCardsForMessage } from "./cards";
-import { demoKnowledge, demoTodayBrief } from "./data";
+import { demoGraph, demoGraphBook, demoKnowledge, demoTodayBrief } from "./data";
 
 interface DemoMessage {
   role: "user" | "assistant";
@@ -297,6 +298,22 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
         // 独立知识库页的演示版：数据内嵌虚构知识，不发任何请求
         res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
         res.end(knowledgePage({ demo: true, demoData: demoKnowledge(new Date()) }));
+      } else if (req.method === "GET" && (url === "/graph" || url === "/graph/")) {
+        // 独立人物图谱页的演示版：内嵌一本虚构《红楼梦》快照，
+        // 画板、查找、缩放、类别开关全部可用；增删走 403（演示只读）
+        res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+        res.end(graphPage({ demo: true, demoData: demoGraph() }));
+      } else if (req.method === "GET" && url === "/api/graph/books") {
+        // 图谱页左栏书目（演示只有一本书）
+        json(res, [demoGraphBook()]);
+      } else if (req.method === "GET" && (url === "/api/graph" || url.startsWith("/api/graph?"))) {
+        // 画板数据：与正式版同形 { bookId, book, snapshot }；
+        // 功能大厅的图谱缩略面板也吃这份（demo 不再显示「没有数据」空态）
+        json(res, {
+          bookId: demoGraphBook().id,
+          book: demoGraphBook(),
+          snapshot: demoGraph(),
+        });
       } else if (req.method === "GET" && url === "/api/settings") {
         json(res, {
           jwgl: { configured: false, username: "", sourceLabel: "演示模式" },

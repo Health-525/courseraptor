@@ -4,12 +4,14 @@
  * 形态照 flomo（浮墨笔记）做减法：左侧栏（搜索 + 标签列表）+ 主列
  * （卷首概览 + 发布框 + 按日分组的卡片川流）。无导图/日历/时间线等多视图，
  * 无排序切换——只有一条按更新时间倒序的川流。
- * 视觉为红头档案：页头与 /today 同源三件套（印章+楷体 h1+mono 戳记，
- * sticky 毛玻璃）；主列开卷是一条「卷首」横带——衬线大数字（条数/标签/
- * 连续记录）配近 16 周的朱砂热力带（列=周、行=星期，只亮有记录的日子），
- * 是全页的视觉锚点；知识卡作档案卡：衬线标题独立成行、右上 mono 档号
- * （№ 按创建顺序）、左缘朱砂签条 hover 点亮、标签成药丸 chip；发布框是
- * 带朱砂竖签的白纸便签。首屏一次轻浮入动画，reduced-motion 关闭。
+ * 视觉为红头档案，与 /today /schedule /todos 同一套骨架：实色纸底页头
+ * （印章 + 楷体 h1 + mono 戳记）、限宽居中、左栏 sticky 不铺白、4px 圆角。
+ * 主列开卷是一张「卷首」档案卡（朱砂顶边）——衬线大数字台账（条数/标签/
+ * 连续记录）；活跃天数足够（≥8 天）时才在卡右绘出近 16 周朱砂热力带
+ * （列=周、行=星期），记录稀时只留数字，不画像坏块的散点。知识卡同作
+ * 档案卡：衬线标题独立成行、右上 mono 档号（№ 按创建顺序）、左缘朱砂
+ * 签条 hover 点亮、标签成药丸 chip；发布框是带朱砂竖签的白纸便签。
+ * 首屏一次轻浮入动画，reduced-motion 关闭。
  *
  * 发布框（flomo 核心交互）：首行=标题、其余=正文，分类可留空自动归
  * 课表课程，Ctrl+Enter 记下；POST /api/knowledge。编辑：卡片原地变
@@ -27,6 +29,8 @@ const CLAMP_LEN = 160;
 const BATCH = 50;
 /** 卷首热力带的周数（列数，每列 7 天） */
 const HEAT_WEEKS = 16;
+/** 热力带最少需要的活跃天数：不足时只展示台账数字，不画稀疏散点 */
+const HEAT_MIN_DAYS = 8;
 
 export function knowledgePage(
   options: { demo?: boolean; demoData?: KnowledgeEntry[] } = {},
@@ -71,7 +75,6 @@ export function knowledgePage(
     --kai: "KaiTi", "STKaiti", "Kaiti SC", var(--serif);
     --sans: system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     --mono: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
-    --head-h: 64px;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--paper); color: var(--ink);
@@ -87,12 +90,10 @@ export function knowledgePage(
   .tbtn:hover { border-color: var(--accent); color: var(--accent); background: var(--card); }
   .tbtn:active { transform: translateY(1px); }
 
-  /* ── 页头：与 /today /todos 同源的红头档案三件套（印章+楷体 h1+mono 戳记），
-     sticky 半透明纸底 + 柔和模糊，滚动时内容从页头下穿过去 ── */
-  .pagehead { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px;
-              padding: 10px 28px; height: var(--head-h); border-bottom: 1px solid var(--rule);
-              background: rgba(246, 244, 237, 0.92);
-              -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  /* ── 页头：与 /today /schedule /todos 同源——实色纸底 + 朱砂印章 + 楷体 h1 ── */
+  .pagehead { display: flex; align-items: center; gap: 16px;
+              padding: 18px 28px; border-bottom: 1px solid var(--rule);
+              background: var(--paper-deep); }
   .pagehead .seal { flex: none; position: relative; width: 44px; height: 44px;
                     transform: rotate(-7deg); }
   .pagehead .seal::before { content: ""; position: absolute; inset: 0;
@@ -106,35 +107,29 @@ export function knowledgePage(
                         letter-spacing: .1em; white-space: nowrap; }
   .ph-right { display: flex; align-items: center; gap: 10px; }
 
-  /* ── 布局：侧栏（搜索 + 标签，meta 沉底）+ 主列川流 ──
-     侧栏 288px 白底通高（flex 列，meta 贴底，不再留半截空白），
-     主区底压深一档（paper-deep），白卡在浅底上「浮」出来 */
-  main { display: grid; grid-template-columns: 288px minmax(0, 1fr); align-items: stretch;
-         min-height: calc(100vh - var(--head-h)); background: var(--paper-deep); }
+  /* ── 布局：侧栏（搜索 + 标签）+ 主列川流，与 /today 同源（限宽居中、
+     纸底、左栏 sticky 不铺白）── */
+  main { max-width: 1240px; margin: 0 auto; padding: 30px 22px 64px;
+         display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 24px;
+         align-items: start; }
 
-  .kn-rail { background: var(--card); border-right: 1px solid var(--rule);
-             padding: 20px 18px 20px; position: sticky; top: var(--head-h); align-self: start;
-             /* 白底至少铺满一屏：内容再长，左栏也不会在半截处断成纸底 */
-             min-height: calc(100vh - var(--head-h));
-             max-height: calc(100vh - var(--head-h)); overflow-y: auto;
-             display: flex; flex-direction: column; }
-  .kw-box { width: 100%; min-height: 42px; padding: 8px 14px; border: 1px solid transparent;
-            border-radius: 10px; background: var(--shade); color: var(--ink); font-size: 14px;
-            font-family: inherit; transition: background .15s ease, border-color .15s ease,
-            box-shadow .15s ease; }
-  .kw-box:focus { outline: none; background: var(--card); border-color: var(--accent);
+  .kn-rail { padding: 8px 4px; position: sticky; top: 22px; min-width: 0; }
+  .kw-box { width: 100%; min-height: 40px; padding: 8px 12px; border: 1px solid var(--rule-2);
+            border-radius: 4px; background: var(--card); color: var(--ink); font-size: 14px;
+            font-family: inherit; transition: border-color .15s ease, box-shadow .15s ease; }
+  .kw-box:focus { outline: none; border-color: var(--accent);
                   box-shadow: 0 0 0 3px var(--accent-soft); }
-  .kw-hint { margin: 6px 2px 0; font-size: 11px; color: var(--ink-3); }
-  .rail-sec { margin: 18px 0 4px; font-size: 12px; color: var(--ink-2); font-weight: 500;
-              letter-spacing: .12em; display: flex; align-items: center; gap: 10px; }
-  .rail-sec::after { content: ""; flex: 1; border-bottom: 1px solid var(--rule); }
+  .kw-hint { margin: 6px 2px 0; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  /* 栏目标题：mono 小字 kicker（朱砂深色 + 宽字距），与 /today 左栏同款 */
+  .rail-sec { margin: 18px 0 4px; font-family: var(--mono); font-size: 11px; color: var(--accent-deep);
+              font-weight: 400; letter-spacing: .18em; }
   .cat-nav { display: flex; flex-direction: column; gap: 1px; margin: 6px 0 14px; }
   .cat-btn { display: flex; align-items: baseline; gap: 7px;
-             background: none; border: none; padding: 6px 10px; border-radius: 8px;
+             background: none; border: none; padding: 6px 10px; border-radius: 4px;
              color: var(--ink-2); font-size: 14px; cursor: pointer; font-family: inherit;
              text-align: left; width: 100%; position: relative;
              transition: background .12s ease, color .12s ease; }
-  .cat-btn:hover { background: var(--shade); color: var(--ink); }
+  .cat-btn:hover { background: var(--paper-deep); color: var(--ink); }
   .cat-btn.active { background: var(--accent-soft); color: var(--accent-deep); font-weight: 600; }
   .cat-btn.active::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px;
                             width: 2.5px; border-radius: 2px; background: var(--accent); }
@@ -142,23 +137,24 @@ export function knowledgePage(
   .cat-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .cat-count { font-size: 12px; color: var(--ink-3); flex: none;
                font-variant-numeric: tabular-nums; font-family: var(--mono); }
-  /* meta 沉到侧栏底：标签少时也不留半截空白 */
-  .rail-meta { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--rule);
+  /* meta 沉在侧栏底部：与 /today 左栏同一语言（mono 小字 + 顶细线） */
+  .rail-meta { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--rule-2);
                font-size: 12px; line-height: 1.7; color: var(--ink-3); font-family: var(--mono); }
   .rail-meta .tbtn { margin-top: 12px; min-height: 30px; padding: 3px 12px; font-size: 12px; }
 
   /* ── 主列 ── */
-  .kn-main { width: 100%; max-width: 900px; margin: 0 auto; padding: 22px 24px 64px; }
+  .kn-main { min-width: 0; }
 
-  /* 卷首横带：全页视觉锚点——衬线大数字台账 + 朱砂热力带 */
+  /* 卷首横带：一张档案卡（朱砂顶边 + 细边 + 纸面投影），衬线大数字台账 */
   .kn-hero { display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
-             background: var(--card); border: 1px solid var(--rule); border-radius: 14px;
-             box-shadow: var(--shadow-sm); padding: 16px 22px; margin-bottom: 16px; }
+             background: var(--card); border: 1px solid var(--rule-2); border-top: 2px solid var(--accent);
+             border-radius: 4px;
+             box-shadow: var(--shadow-sm); padding: 16px 22px; margin-bottom: 20px; }
   .hero-stats { display: flex; align-items: baseline; flex: none; }
   .hs-cell { display: flex; align-items: baseline; gap: 8px; padding: 0 22px;
              border-left: 1px solid var(--rule); }
   .hs-cell:first-child { border-left: none; padding-left: 0; }
-  .hs-cell .n { font-family: var(--serif); font-size: 34px; font-weight: 600; line-height: 1.05;
+  .hs-cell .n { font-family: var(--serif); font-size: 30px; font-weight: 600; line-height: 1.05;
                 color: var(--ink); font-variant-numeric: tabular-nums; }
   .hs-cell.hot .n { color: var(--accent); }
   .hs-cell .l { font-size: 12px; color: var(--ink-3); }
@@ -168,16 +164,16 @@ export function knowledgePage(
      旧版按行铺 16 列会把同一周折行、看起来像坏掉的灰块 */
   .heat-grid { display: grid; grid-template-rows: repeat(7, var(--heat-s));
                grid-auto-flow: column; grid-auto-columns: var(--heat-s); gap: 3px; }
-  .heat-cell { border-radius: 3px; background: var(--heat-0); transition: transform .1s ease; }
+  .heat-cell { border-radius: 2px; background: var(--heat-0); transition: transform .1s ease; }
   .heat-cell:hover { transform: scale(1.25); }
   .heat-cell.h1 { background: var(--heat-1); }
   .heat-cell.h2 { background: var(--heat-2); }
   .heat-cell.h3 { background: var(--heat-3); }
   .heat-cell.blank { background: transparent; }
-  .heat-note { margin: 0; font-size: 11.5px; color: var(--ink-3); }
+  .heat-note { margin: 0; font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); }
 
   /* 发布框：带朱砂竖签的白纸便签，聚焦时阴影浮起 */
-  .composer { position: relative; border: 1px solid var(--rule); border-radius: 14px;
+  .composer { position: relative; border: 1px solid var(--rule); border-radius: 4px;
               background: var(--card); padding: 6px 16px 12px 20px; margin-bottom: 20px;
               box-shadow: var(--shadow-sm);
               transition: border-color .18s ease, box-shadow .18s ease; }
@@ -189,13 +185,13 @@ export function knowledgePage(
              font-family: inherit; padding: 10px 0 6px; }
   .cp-text::placeholder { color: var(--ink-3); }
   .cp-row { display: flex; align-items: center; gap: 8px; }
-  .cp-subject { flex: 1; min-width: 0; border: 1px solid transparent; border-radius: 8px;
-                background: var(--shade); color: var(--ink); font-size: 13px;
+  .cp-subject { flex: 1; min-width: 0; border: 1px solid var(--rule-2); border-radius: 4px;
+                background: var(--card); color: var(--ink); font-size: 13px;
                 padding: 6px 12px; font-family: inherit;
-                transition: background .15s ease, box-shadow .15s ease; }
-  .cp-subject:focus { outline: none; background: var(--card);
-                      box-shadow: 0 0 0 1.5px var(--accent); }
-  .cp-send { flex: none; border: none; border-radius: 8px; background: var(--accent);
+                transition: border-color .15s ease, box-shadow .15s ease; }
+  .cp-subject:focus { outline: none; border-color: var(--accent);
+                      box-shadow: 0 0 0 3px var(--accent-soft); }
+  .cp-send { flex: none; border: none; border-radius: 4px; background: var(--accent);
              color: #FCFBF7; font-size: 14px; font-weight: 500; padding: 7px 20px;
              cursor: pointer; font-family: inherit;
              transition: background .15s ease, box-shadow .15s ease; }
@@ -208,7 +204,7 @@ export function knowledgePage(
 
   .skel { color: var(--ink-3); font-size: 15px; padding: 8px 2px; }
   .empty { margin: 0; padding: 32px 20px; border: 1.5px dashed var(--rule-2); text-align: center;
-           border-radius: 12px; background: var(--card); color: var(--ink-3); font-size: 14px;
+           border-radius: 4px; background: var(--card); color: var(--ink-3); font-size: 14px;
            line-height: 1.8; }
 
   /* 按日分组头：朱砂菱标 + 衬线日期 + mono 计数 + 引导细线 */
@@ -226,7 +222,7 @@ export function knowledgePage(
   /* 档案卡：左缘签条（hover 点亮朱砂）、衬线标题独立成行、右上 mono 档号 */
   .k-entry { padding: 14px 18px 12px 20px; border: 1px solid var(--rule);
              border-left: 3px solid var(--rule-2); background: var(--card);
-             border-radius: 12px; margin-bottom: 12px; box-shadow: var(--shadow-sm);
+             border-radius: 4px; margin-bottom: 12px; box-shadow: var(--shadow-sm);
              transition: border-color .15s ease, box-shadow .18s ease, transform .18s ease; }
   .k-entry:hover { border-color: var(--rule-2); border-left-color: var(--accent);
                    box-shadow: var(--shadow-md); transform: translateY(-1px); }
@@ -272,20 +268,20 @@ export function knowledgePage(
 
   /* ── 条目编辑态：卡片原地变表单 ── */
   .k-edit { display: grid; gap: 8px; }
-  .k-edit input, .k-edit textarea { border: 1px solid transparent; border-radius: 8px;
-                                    background: var(--shade); color: var(--ink); font-size: 14px;
+  .k-edit input, .k-edit textarea { border: 1px solid var(--rule-2); border-radius: 4px;
+                                    background: var(--card); color: var(--ink); font-size: 14px;
                                     padding: 7px 12px; font-family: inherit; width: 100%; }
-  .k-edit input:focus, .k-edit textarea:focus { outline: none; background: var(--card);
-                                                box-shadow: 0 0 0 1.5px var(--accent); }
+  .k-edit input:focus, .k-edit textarea:focus { outline: none; border-color: var(--accent);
+                                                box-shadow: 0 0 0 3px var(--accent-soft); }
   .k-edit-title { font-weight: 600; }
   .k-edit-content { min-height: 96px; resize: vertical; line-height: 1.65; }
   .k-edit-row { display: flex; align-items: center; gap: 8px; }
   .k-edit-subject { flex: 1; }
-  .k-save { border: none; border-radius: 8px; background: var(--accent); color: #FCFBF7;
+  .k-save { border: none; border-radius: 4px; background: var(--accent); color: #FCFBF7;
             font-size: 13px; font-weight: 500; padding: 7px 18px; cursor: pointer;
             font-family: inherit; }
   .k-save:hover { background: var(--accent-deep); }
-  .k-cancel { background: none; border: 1px solid var(--rule-2); border-radius: 8px;
+  .k-cancel { background: none; border: 1px solid var(--rule-2); border-radius: 4px;
               color: var(--ink-2); font-size: 13px; padding: 6px 14px; cursor: pointer;
               font-family: inherit; }
   .k-cancel:hover { border-color: var(--ink-3); color: var(--ink); }
@@ -298,28 +294,25 @@ export function knowledgePage(
 
   @media (max-width: 720px) {
     :root { --heat-s: 10px; }
-    .pagehead { flex-wrap: wrap; height: auto; padding: 12px 16px; gap: 10px 12px;
-                background: rgba(246, 244, 237, 0.96); }
+    .pagehead { flex-wrap: wrap; padding: 14px 16px; gap: 10px 12px; }
     .pagehead .seal { width: 38px; height: 38px; }
     .pagehead .seal img { top: 4px; left: 4px; width: 30px; height: 30px; }
     .ph-title h1 { font-size: 20px; }
     .ph-title .ph-stamp { display: none; }
     .ph-right { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
     .ph-right .tbtn { flex: none; white-space: nowrap; }
-    main { display: block; min-height: 0; }
-    .kn-rail { position: static; min-height: 0; max-height: none; overflow: visible;
-               border-right: none; border-bottom: 1px solid var(--rule); padding: 14px 16px 16px; }
+    main { display: block; padding: 22px 14px 56px; }
+    .kn-rail { position: static; border-bottom: 1px solid var(--rule); padding: 0 0 16px; }
     .cat-nav { flex-direction: row; flex-wrap: wrap; gap: 4px; margin: 6px 0 4px; }
     .cat-btn { border: 1px solid var(--rule-2); background: var(--paper); padding: 4px 10px;
                width: auto; }
     .cat-btn.active::before { display: none; }
     .cat-label { max-width: 9em; }
     .rail-meta { margin-top: 10px; padding-top: 10px; }
-    .kn-main { padding: 16px 14px 56px; }
     .kn-hero { flex-direction: column; align-items: stretch; gap: 14px; padding: 14px 16px; }
     .hero-stats { flex-wrap: wrap; gap: 8px 0; }
     .hs-cell { padding: 0 16px; }
-    .hs-cell .n { font-size: 28px; }
+    .hs-cell .n { font-size: 26px; }
     .hero-heat { min-width: 0; align-items: flex-start; }
   }
   /* 触屏：搜索框提到 16px 防 iOS 聚焦缩放；小字按钮放大到能点的尺寸；
@@ -394,6 +387,7 @@ ${
 const CLAMP_LEN = ${CLAMP_LEN};
 const BATCH = ${BATCH};
 const HEAT_WEEKS = ${HEAT_WEEKS};
+const HEAT_MIN_DAYS = ${HEAT_MIN_DAYS};
 ${demo && demoData ? `const DEMO_DATA = ${JSON.stringify(demoData)};` : "const DEMO_DATA = null;"}
 const $ = (id) => document.getElementById(id);
 let entries = [];
@@ -566,7 +560,9 @@ function renderHeroStats() {
   host.appendChild(cell(streak, "天连续记录", streak > 0));
 }
 
-/* 卷首热力带：近 N 周每日条目数，列=周行=星期，朱砂四档 */
+/* 卷首热力带：近 N 周每日条目数，列=周行=星期，朱砂四档。
+   记录天数太少时整块不画——稀疏散点在 16 周格子里像坏了的灰块，
+   不如只留台账数字；攒够 HEAT_MIN_DAYS 天自然出现。 */
 function renderHeroHeat() {
   const host = $("heroHeat");
   host.textContent = "";
@@ -578,6 +574,16 @@ function renderHeroHeat() {
   const today = new Date();
   const dow = (today.getDay() + 6) % 7; // 周一=0，对齐周列
   const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dow);
+  if (counts.size < HEAT_MIN_DAYS) {
+    host.appendChild(
+      el(
+        "p",
+        "heat-note",
+        "近 " + HEAT_WEEKS + " 周共 " + counts.size + " 天有记录，攒够 " + HEAT_MIN_DAYS + " 天再绘热力图",
+      ),
+    );
+    return;
+  }
   const grid = el("div", "heat-grid");
   grid.setAttribute("role", "img");
   grid.setAttribute("aria-label", "近 " + HEAT_WEEKS + "周的知识热力图");

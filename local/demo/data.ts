@@ -4,6 +4,7 @@
  */
 
 import type { BriefCourse, BriefDay, TodayBrief } from "../../src/channels/web/today-brief";
+import type { GraphPerson, GraphSnapshot } from "../../src/core/graph-store";
 import type { KnowledgeEntry } from "../../src/core/knowledge";
 
 export const DEMO_PERIOD_TIMES: Record<string, string> = {
@@ -28,61 +29,157 @@ export const DEMO_CLASS_TIMES: Record<string, string> = {
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-/** 演示知识库：覆盖「归入课程 / 自定义分类 / 未分类」三种形态，条目全为虚构 */
+/** 演示知识库：覆盖「归入课程 / 自定义分类 / 未分类」三种形态，条目全为虚构。
+ *  跨度约两个月、16 个活跃日——知识页卷首热力带（≥8 天才绘制）在演示里
+ *  就能看到真实形态，川流也不是只有首屏几条。 */
 export function demoKnowledge(now: Date): KnowledgeEntry[] {
   const at = (daysAgo: number) =>
     new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysAgo, 20, 30).getTime();
+  const kn = (
+    id: string,
+    title: string,
+    content: string,
+    category: string | null,
+    createdAgo: number,
+    updatedAgo: number,
+  ): KnowledgeEntry => ({
+    id,
+    title,
+    content,
+    category,
+    source: "对话",
+    createdAt: at(createdAgo),
+    updatedAt: at(updatedAgo),
+  });
   return [
-    {
-      id: "demo-kn-1",
-      title: "洛必达法则",
-      content:
-        "求 0/0 或 ∞/∞ 型未定式极限时，若分子分母均可导，可分别求导后再取极限：lim f(x)/g(x) = lim f'(x)/g'(x)。条件不满足（如导数比值的极限不存在）时不能用它。（虚构示例）",
-      category: "示例高等数学",
-      source: "对话",
-      createdAt: at(6),
-      updatedAt: at(2),
-    },
-    {
-      id: "demo-kn-2",
-      title: "现在完成时",
-      content:
-        "have/has + 过去分词：表示过去发生的动作对现在的影响，或从过去持续到现在的状态。常见信号词：already、yet、just、since、for。（虚构示例）",
-      category: "示例大学英语",
-      source: "对话",
-      createdAt: at(5),
-      updatedAt: at(5),
-    },
-    {
-      id: "demo-kn-3",
-      title: "二分查找",
-      content:
-        "有序数组中查找目标：每次与中点比较，排除一半区间，时间复杂度 O(log n)。注意边界：左闭右开区间用 left < right 循环。（虚构示例）",
-      category: "示例程序设计",
-      source: "对话",
-      createdAt: at(4),
-      updatedAt: at(4),
-    },
-    {
-      id: "demo-kn-4",
-      title: "番茄工作法",
-      content:
-        "25 分钟专注 + 5 分钟休息为一个番茄钟，每 4 个番茄钟多休一会儿；期间被打断就重新计。（虚构示例）",
-      category: null,
-      source: "对话",
-      createdAt: at(1),
-      updatedAt: at(1),
-    },
-    {
-      id: "demo-kn-5",
-      title: "TypeScript 类型收窄",
-      content:
-        "typeof / instanceof / in 判断后变量类型自动收窄；只需约束取值时，字面量联合（'ok' | 'error'）比 enum 更轻量。（虚构示例）",
-      category: "编程技术",
-      source: "对话",
-      createdAt: at(3),
-      updatedAt: at(3),
-    },
+    kn(
+      "demo-kn-1",
+      "洛必达法则",
+      "求 0/0 或 ∞/∞ 型未定式极限时，若分子分母均可导，可分别求导后再取极限：lim f(x)/g(x) = lim f'(x)/g'(x)。条件不满足（如导数比值的极限不存在）时不能用它。（虚构示例）",
+      "示例高等数学",
+      6,
+      2,
+    ),
+    kn(
+      "demo-kn-2",
+      "现在完成时",
+      "have/has + 过去分词：表示过去发生的动作对现在的影响，或从过去持续到现在的状态。常见信号词：already、yet、just、since、for。（虚构示例）",
+      "示例大学英语",
+      5,
+      5,
+    ),
+    kn(
+      "demo-kn-3",
+      "二分查找",
+      "有序数组中查找目标：每次与中点比较，排除一半区间，时间复杂度 O(log n)。注意边界：左闭右开区间用 left < right 循环。（虚构示例）",
+      "示例程序设计",
+      4,
+      4,
+    ),
+    kn(
+      "demo-kn-4",
+      "番茄工作法",
+      "25 分钟专注 + 5 分钟休息为一个番茄钟，每 4 个番茄钟多休一会儿；期间被打断就重新计。（虚构示例）",
+      null,
+      1,
+      1,
+    ),
+    kn(
+      "demo-kn-5",
+      "TypeScript 类型收窄",
+      "typeof / instanceof / in 判断后变量类型自动收窄；只需约束取值时，字面量联合（'ok' | 'error'）比 enum 更轻量。（虚构示例）",
+      "编程技术",
+      3,
+      3,
+    ),
+    kn(
+      "demo-kn-6",
+      "拉格朗日中值定理",
+      "若函数在闭区间连续、开区间可导，则区间内至少一点使切线斜率等于弦斜率：f'(ξ) = (f(b)-f(a))/(b-a)。常用来证明不等式。（虚构示例）",
+      "示例高等数学",
+      9,
+      9,
+    ),
+    kn(
+      "demo-kn-7",
+      "虚拟语气",
+      "与现在事实相反用过去式（be 统一用 were）；与过去事实相反用 had done；与将来相反用 should/were to do。（虚构示例）",
+      "示例大学英语",
+      12,
+      12,
+    ),
+    kn(
+      "demo-kn-8",
+      "快慢指针",
+      "链表找环：慢指针每次一步、快指针每次两步，相遇即有环；找入环点再把一个指针挪回头部同步前进。（虚构示例）",
+      "示例程序设计",
+      14,
+      14,
+    ),
+    kn(
+      "demo-kn-9",
+      "指针与引用",
+      "指针存地址、可为空可重定向；引用是别名、必须初始化且不能改绑。传参想改原值用指针或引用，避免大对象拷贝用 const 引用。（虚构示例）",
+      "示例程序设计",
+      20,
+      20,
+    ),
+    kn(
+      "demo-kn-10",
+      "第三单元单词",
+      "abandon / accumulate / deliberate / explicit / fragile / genuine / inevitable / notorious / persistent / trivial（虚构示例）",
+      "示例大学英语",
+      23,
+      23,
+    ),
+    kn(
+      "demo-kn-11",
+      "泰勒展开",
+      "f(x) 在 x0 附近用各阶导数构造多项式逼近：e^x、sin x、cos x、ln(1+x) 的展开式要背熟，估算时按阶数截断。（虚构示例）",
+      "示例高等数学",
+      30,
+      30,
+    ),
+    kn(
+      "demo-kn-12",
+      "常见等价无穷小",
+      "x→0 时：sin x ~ x，tan x ~ x，e^x-1 ~ x，ln(1+x) ~ x，1-cos x ~ x²/2。乘除可随便换，加减慎用。（虚构示例）",
+      "示例高等数学",
+      31,
+      30,
+    ),
+    kn(
+      "demo-kn-13",
+      "一阶线性微分方程",
+      "y' + p(x)y = q(x)：先解齐次得通解，再用常数变易法找特解；可分离变量与齐次方程都要先化标准形。（虚构示例）",
+      "示例高等数学",
+      38,
+      38,
+    ),
+    kn(
+      "demo-kn-14",
+      "倒排索引",
+      "搜索引擎核心结构：词项 → 文档列表。查询时取各词项文档求交/并，用跳表压 posting 体积。（虚构示例）",
+      "编程技术",
+      45,
+      45,
+    ),
+    kn(
+      "demo-kn-15",
+      "B+ 树",
+      "数据库索引默认结构：数据只在叶子、叶子间链表相连，非叶子只存键做路由；层高矮所以磁盘 IO 少。（虚构示例）",
+      "编程技术",
+      52,
+      52,
+    ),
+    kn(
+      "demo-kn-16",
+      "遗忘曲线",
+      "艾宾浩斯：记忆留存随时间指数衰减，20 分钟后只剩约 58%。按 1 天 / 2 天 / 4 天 / 7 天 / 15 天间隔复习效果最好。（虚构示例）",
+      null,
+      60,
+      60,
+    ),
   ].sort((a, b) => b.updatedAt - a.updatedAt); // 与真实 listKnowledge 一致：最近更新在前
 }
 
@@ -342,6 +439,98 @@ export function demoExams(now: Date) {
       isToday: false,
     },
   ];
+}
+
+/** 演示图谱：一本《红楼梦》虚构快照，覆盖六类关系与有向/无向两种边。
+ *  与真实 store 输出同形（relations 带 sourceName/targetName），演示服务
+ *  同时喂给 /graph 页内嵌数据与 /api/graph（大厅缩略画板）。 */
+const DEMO_GRAPH_BOOK_ID = "demo-book-honglou";
+
+export function demoGraph(): GraphSnapshot {
+  const t0 = Date.UTC(2026, 9, 1, 12, 0, 0);
+  const person = (
+    id: string,
+    name: string,
+    aliases: string[],
+    note: string,
+    importance: number,
+  ): GraphPerson => ({
+    id,
+    bookId: DEMO_GRAPH_BOOK_ID,
+    name,
+    aliases,
+    note,
+    importance,
+    createdAt: t0,
+  });
+  const persons: GraphPerson[] = [
+    person("demo-p-1", "贾母", ["史太君"], "荣国府老祖宗", 3),
+    person("demo-p-2", "贾宝玉", ["宝二爷", "怡红公子"], "荣国府二少爷", 3),
+    person("demo-p-3", "林黛玉", ["颦儿"], "寄居荣国府的表小姐", 3),
+    person("demo-p-4", "薛宝钗", ["宝姐姐"], "薛家小姐", 2),
+    person("demo-p-5", "王夫人", [], "贾宝玉之母", 2),
+    person("demo-p-6", "贾政", [], "贾宝玉之父", 2),
+    person("demo-p-7", "王熙凤", ["凤姐儿"], "荣国府管家奶奶", 2),
+    person("demo-p-8", "史湘云", ["云姑娘"], "贾母侄孙女", 1),
+    person("demo-p-9", "晴雯", [], "贾宝玉的丫鬟", 1),
+    person("demo-p-10", "紫鹃", [], "林黛玉的丫鬟", 1),
+    person("demo-p-11", "贾环", [], "贾政庶子", 1),
+  ];
+  const rel = (
+    id: string,
+    sourceId: string,
+    targetId: string,
+    category: GraphSnapshot["relations"][number]["category"],
+    label: string,
+    directed: boolean,
+    evidence: string,
+  ) => ({
+    id,
+    bookId: DEMO_GRAPH_BOOK_ID,
+    sourceId,
+    targetId,
+    category,
+    label,
+    directed,
+    evidence,
+    chapter: "",
+    createdAt: t0,
+    sourceName: persons.find((p) => p.id === sourceId)?.name ?? "",
+    targetName: persons.find((p) => p.id === targetId)?.name ?? "",
+  });
+  return {
+    bookId: DEMO_GRAPH_BOOK_ID,
+    version: 1,
+    persons,
+    relations: [
+      rel("demo-r-1", "demo-p-1", "demo-p-2", "family", "祖孙", false, "宝玉是贾母的孙子"),
+      rel("demo-r-2", "demo-p-1", "demo-p-3", "family", "外祖母", true, "黛玉是贾母的外孙女"),
+      rel("demo-r-3", "demo-p-1", "demo-p-8", "family", "侄孙女", true, "湘云是贾母的侄孙女"),
+      rel("demo-r-4", "demo-p-5", "demo-p-2", "family", "母子", true, "王夫人是宝玉的母亲"),
+      rel("demo-r-5", "demo-p-6", "demo-p-2", "family", "父子", true, "贾政是宝玉的父亲"),
+      rel("demo-r-6", "demo-p-5", "demo-p-6", "romance", "夫妻", true, "贾政与王夫人是夫妻"),
+      rel("demo-r-7", "demo-p-3", "demo-p-2", "romance", "恋人", true, "黛玉与宝玉青梅竹马"),
+      rel("demo-r-8", "demo-p-4", "demo-p-2", "romance", "未婚妻", true, "宝钗是宝玉的未婚妻"),
+      rel("demo-r-9", "demo-p-3", "demo-p-4", "friendship", "知交", false, "黛玉与宝钗义结金兰"),
+      rel("demo-r-10", "demo-p-3", "demo-p-8", "friendship", "诗友", false, "黛玉与湘云联诗"),
+      rel("demo-r-11", "demo-p-2", "demo-p-7", "family", "堂嫂", true, "凤姐是宝玉的堂嫂"),
+      rel("demo-r-12", "demo-p-2", "demo-p-9", "hierarchy", "主仆", true, "晴雯是宝玉的丫鬟"),
+      rel("demo-r-13", "demo-p-3", "demo-p-10", "hierarchy", "主仆", true, "紫鹃是黛玉的丫鬟"),
+      rel("demo-r-14", "demo-p-6", "demo-p-11", "family", "父子", true, "贾环是贾政的庶子"),
+      rel("demo-r-15", "demo-p-11", "demo-p-2", "conflict", "兄弟不合", false, "贾环与宝玉不和"),
+    ],
+  };
+}
+
+/** 演示图谱的书目行（/api/graph/books 用，与真实 store 同形） */
+export function demoGraphBook() {
+  return {
+    id: DEMO_GRAPH_BOOK_ID,
+    title: "红楼梦",
+    createdAt: Date.UTC(2026, 9, 1, 12, 0, 0),
+    personCount: 11,
+    relationCount: 15,
+  };
 }
 
 /** 演示通知：3 条虚构条目，不含任何真实链接 */
