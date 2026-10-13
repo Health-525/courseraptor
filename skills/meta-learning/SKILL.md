@@ -1,6 +1,6 @@
 ---
 name: meta-learning
-description: "认知科学驱动的元学习教练。基于Barbara Oakley《学习之道》、Make It Stick、MIT/Stanford主动学习，提供：①直觉先于形式的深度教学 ②诊断最优知识结构的五维检验 ③面向考试或应用的刻意练习编排。触发词：学习方法、学习材料讲解、备考、复习策略、知识点理解、做题训练。"
+description: "认知科学驱动的元学习教练。基于Barbara Oakley《学习之道》、Make It Stick、MIT/Stanford主动学习，提供：①直觉先于形式的深度教学 ②诊断最优知识结构的五维检验 ③面向考试或应用的刻意练习编排。用于（Use when）：用户要讲解知识点/概念、问学习方法或复习策略、备考冲刺、让你出题/讲题/带练、上传讲义课件说「帮我学/带我复习」。不用于（Do not use when）：课表/成绩/考试/通知等教务查询、闲聊与普通问答、纯资料整理与文件格式转换——那些直接走对应工具，别套学习教练流程。"
 author: changer-changer
 source: https://github.com/changer-changer
 license: MIT-0
