@@ -233,3 +233,21 @@ test("坏文件隔离：损坏的 knowledge.json 先留档再当空，不被空�
   const quarantined = fs.readdirSync(tmpData).some((f) => f.startsWith("knowledge.json.corrupt-"));
   assert.ok(quarantined, "坏文件应被隔离留档而非直接覆盖");
 });
+
+test("入库纪律：content 要求附来源行，无法确定时写「来源：待核实」", async () => {
+  const { knowledgeTools } = await import("../src/core/tools/knowledge");
+  const desc = String(
+    (knowledgeTools.manage_knowledge as { description?: string }).description ?? "",
+  );
+  assert.match(desc, /末尾必须附一行「来源：/, "知识入库要带来源行");
+  assert.match(desc, /来源：待核实/, "依据不明时如实标待核实");
+  type ContentField = { meta?: () => { description?: string } };
+  type ItemsField = { element: { shape: { content: ContentField } } };
+  const schema = knowledgeTools.manage_knowledge.inputSchema as unknown as {
+    shape: { items: ItemsField & { unwrap?: () => ItemsField } };
+  };
+  const items = schema.shape.items;
+  const arr = items.unwrap?.() ?? items;
+  const contentDesc = arr.element.shape.content.meta?.()?.description ?? "";
+  assert.match(contentDesc, /末尾附一行「来源：/, "content 字段说明里也要给出来源行示例");
+});
