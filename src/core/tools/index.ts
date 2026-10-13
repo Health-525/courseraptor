@@ -3,13 +3,14 @@
  *
  * 与教务相关的工具（课表/成绩/学籍/选课/通知/日历）由学校适配器贡献
  * （src/adapters/njtech/tools），agent.ts 在装配时把两边合并。
- * 这里只聚合 12 个通用模块：
+ * 这里只聚合 13 个通用模块：
  * - files.ts      本地文件 / 表格查询 / 沙箱 JS / 附件管理（4）
  * - document.ts   文档生成 / 格式转换（2，Word/Excel/PDF；PPT 见 ppt.ts）
  * - ppt.ts        PPT 课件代码工具：干跑自检 / 落盘（2）
  * - memory.ts     长期记忆（1）
  * - reminders.ts  待办（1）
  * - knowledge.ts  知识库（1）
+ * - graph.ts      读书人物关系图谱（1）
  * - pomodoro.ts   番茄钟（1）
  * - learning.ts   学习教练方法论参考（1，源自 skills/meta-learning）
  * - settings.ts   设置（1）
@@ -20,6 +21,7 @@
 
 import { documentTools } from "./document";
 import { filesTools } from "./files";
+import { graphTools } from "./graph";
 import { knowledgeTools } from "./knowledge";
 import { learningTools } from "./learning";
 import { memoryTools } from "./memory";
@@ -38,6 +40,7 @@ export const coreTools = {
   ...memoryTools,
   ...reminderTools,
   ...knowledgeTools,
+  ...graphTools,
   ...pomodoroTools,
   ...learningTools,
   ...settingsTools,

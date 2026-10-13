@@ -59,6 +59,7 @@ test("面板白名单：覆盖功能大厅各面板，隐藏卡 import/account �
   assert.deepEqual([...PANEL_IDS].sort(), [
     "exams",
     "grades",
+    "graph",
     "knowledge",
     "news",
     "pomodoro",

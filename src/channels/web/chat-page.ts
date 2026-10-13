@@ -396,6 +396,22 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .pptstrip { display: flex; gap: 10px; padding: 12px 14px; overflow-x: auto;
               scroll-snap-type: x proximity; }
 
+  /* ── 人物图谱迷你卡：与 pptcard 同款档案卡壳，主体是可横滑的 SVG 画板。
+     节点保持原尺寸不缩放——缩了就看不清人名了，横滑比缩小有用 ── */
+  .graphcard { margin: 4px 0 9px; border: 1px solid var(--rule-2);
+               border-top: 2px solid var(--accent); background: var(--card);
+               box-shadow: var(--shadow-sm); }
+  .graph-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+                border-bottom: 1px dashed var(--rule); }
+  .graph-mark { flex: none; color: var(--accent); font-size: 14px; }
+  .graph-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+                white-space: nowrap; font-family: var(--kai); font-size: 15px;
+                letter-spacing: .04em; }
+  .graph-meta { flex: none; font-family: var(--mono); font-size: 12px;
+                color: var(--ink-3); }
+  .graph-scroll { padding: 12px 14px; overflow-x: auto; background: var(--shade); }
+  .graph-scroll svg { display: block; }
+
   /* ── 朱砂印章：圆形裁切 logo + 描边圈、整章旋转 -7°（课表导出同款，签名 motif） ── */
   .pt-seal { position: absolute; display: flex; align-items: center; justify-content: center;
              border: 2px solid var(--accent); border-radius: 50%; background: var(--card); }
@@ -1252,6 +1268,18 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-empty .he-s { margin-top: 4px; font-family: var(--mono); font-size: 12px;
                       color: var(--ink-3); line-height: 1.7; }
   .hall-empty .tbtn { margin-top: 10px; min-height: 32px; padding: 4px 14px; font-size: 12px; }
+  /* 人物图谱面板：缩略画板铺满抽屉宽（宽高比由 SVG 自身决定），
+     下面跟类别图例与跳转按钮 */
+  .hall-graph { border: 1px solid var(--rule-2); border-radius: 4px;
+                background: var(--shade); padding: 10px; overflow-x: auto; }
+  .hall-graph svg { display: block; }
+  .hall-graph-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 10px;
+                       font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+  .hall-graph-cat { display: flex; align-items: center; gap: 5px; }
+  .hall-graph-sw { width: 9px; height: 9px; border-radius: 2px; }
+  .hall-graph-foot { margin-top: 12px; }
+  .hall-graph-foot .tbtn { min-height: 32px; padding: 4px 14px; font-size: 12px;
+                           text-decoration: none; }
   /* 大厅里的设置：抽屉不宽，栏目目录改横排（沿用窄屏设置的形态），
      字段与检测行等内部样式原样复用 */
   .hall .set-frame { flex-direction: column; gap: 0; }
