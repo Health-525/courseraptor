@@ -1251,6 +1251,8 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                  letter-spacing: .12em; color: var(--ink-3); }
    .hall-group:first-of-type { margin-top: 2px; }
    .hall-group.overdue { color: var(--accent-deep); font-weight: 600; }
+   /* 今天的天头（课表按天分组 / 今日日程题注）：与逾期同档的朱砂点亮 */
+   .hall-group.today { color: var(--accent-deep); font-weight: 600; }
    /* 已完成折叠开关：题注变身按钮，保持等宽小字外观 */
    .hall-group.toggle { border: 0; background: none; padding: 0; cursor: pointer;
                         text-align: left; font: inherit; font-family: var(--mono);

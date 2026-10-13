@@ -54,11 +54,11 @@ export function graphPage(
     --accent: #AD392C;
     --accent-deep: #852B22;
     --accent-soft: #F3E3DE;
+    --shadow-sm: 0 8px 24px rgba(50, 42, 31, 0.055);
     --serif: Georgia, "Times New Roman", "Songti SC", SimSun, serif;
     --kai: "KaiTi", "STKaiti", "Kaiti SC", var(--serif);
     --sans: system-ui, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     --mono: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
-    --head-h: 64px;
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--paper); color: var(--ink);
@@ -67,16 +67,16 @@ export function graphPage(
   ::selection { background: var(--accent-soft); }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .tbtn { background: none; border: 1px solid var(--rule-2); color: var(--ink-2);
-          min-height: 36px; font-size: 14px; padding: 6px 14px; border-radius: 8px;
+          min-height: 38px; font-size: 14px; padding: 7px 14px; border-radius: 4px;
           cursor: pointer; font-family: inherit; display: inline-flex; align-items: center;
           transition: border-color .15s ease, color .15s ease, background .15s ease; }
   .tbtn:hover { border-color: var(--accent); color: var(--accent); background: var(--card); }
   .tbtn:active { transform: translateY(1px); }
 
-  .pagehead { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 16px;
-              padding: 10px 28px; height: var(--head-h); border-bottom: 1px solid var(--rule);
-              background: rgba(246, 244, 237, 0.92);
-              -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+  /* ── 页头：与 /today /schedule /todos 同源——实色纸底 + 朱砂印章 + 楷体 h1 ── */
+  .pagehead { display: flex; align-items: center; gap: 16px;
+              padding: 18px 28px; border-bottom: 1px solid var(--rule);
+              background: var(--paper-deep); }
   .pagehead .seal { flex: none; position: relative; width: 44px; height: 44px; transform: rotate(-7deg); }
   .pagehead .seal::before { content: ""; position: absolute; inset: 0;
                             border: 2px solid var(--accent); border-radius: 50%; opacity: .9; }
@@ -87,35 +87,41 @@ export function graphPage(
   .ph-title .ph-stamp { font-family: var(--mono); font-size: 12px; color: var(--ink-3); letter-spacing: .1em; }
   .ph-right { display: flex; align-items: center; gap: 10px; }
 
-  main { display: grid; grid-template-columns: 272px minmax(0, 1fr); align-items: stretch;
-         min-height: calc(100vh - var(--head-h)); background: var(--paper-deep); }
+  /* ── 布局：左栏书目统计 + 右栏画板，与 /today 同源（限宽居中、纸底、
+     左栏 sticky 不铺白）；stretch + 视口余高让画板撑满一屏 ── */
+  main { max-width: 1240px; margin: 0 auto; padding: 30px 22px 64px;
+         display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 24px;
+         align-items: stretch; min-height: calc(100vh - 80px); }
 
-  .gn-rail { background: var(--card); border-right: 1px solid var(--rule);
-             padding: 20px 18px; position: sticky; top: var(--head-h); align-self: start;
-             min-height: calc(100vh - var(--head-h)); max-height: calc(100vh - var(--head-h));
-             overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+  .gn-rail { padding: 8px 4px; position: sticky; top: 22px;
+             display: flex; flex-direction: column; gap: 22px; min-width: 0; }
 
-  .gn-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .gn-stat { background: var(--paper); border-radius: 10px; padding: 12px; text-align: center; }
-  .gn-stat b { display: block; font-size: 26px; font-weight: 500; line-height: 1.2; }
-  .gn-stat span { font-size: 12px; color: var(--ink-3); }
+  /* 概览台账：衬线大数字 + mono 标签，中间细分隔线（与 /today 左栏同语言） */
+  .gn-stats { display: flex; align-items: baseline; gap: 18px; margin-top: 10px; }
+  .gn-stat { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+  .gn-stat + .gn-stat { border-left: 1px solid var(--rule); padding-left: 18px; }
+  .gn-stat b { font-family: var(--serif); font-size: 30px; font-weight: 600; line-height: 1.1;
+               color: var(--ink); font-variant-numeric: tabular-nums; }
+  .gn-stat span { font-family: var(--mono); font-size: 12px; color: var(--ink-3);
+                  letter-spacing: .1em; }
 
-  .gn-h { font-size: 12px; color: var(--ink-3); letter-spacing: .14em; margin: 0 0 8px;
-          font-family: var(--mono); text-transform: uppercase; }
+  /* 栏目标题：mono 小字 kicker（朱砂深色 + 宽字距），与 /today 左栏同款 */
+  .gn-h { font-size: 11px; color: var(--accent-deep); letter-spacing: .18em; margin: 0 0 8px;
+          font-family: var(--mono); }
 
-  .gn-books { display: flex; flex-direction: column; gap: 6px; }
-  .gn-book { display: flex; align-items: center; gap: 2px; border-radius: 8px;
+  .gn-books { display: flex; flex-direction: column; gap: 4px; }
+  .gn-book { display: flex; align-items: center; gap: 2px; border-radius: 4px;
              border: 1px solid transparent;
              transition: background .15s ease, border-color .15s ease; }
-  .gn-book:hover { background: var(--paper); }
+  .gn-book:hover { background: var(--paper-deep); }
   .gn-book[aria-current="true"] { background: var(--accent-soft); border-color: var(--accent); }
   .gn-book[aria-current="true"] .gn-book-main { color: var(--accent-deep); }
   .gn-book-main { flex: 1; min-width: 0; display: flex; justify-content: space-between; align-items: baseline;
-                  gap: 8px; padding: 9px 4px 9px 12px; border: none; background: none; cursor: pointer;
+                  gap: 8px; padding: 8px 4px 8px 12px; border: none; background: none; cursor: pointer;
                   font-family: inherit; font-size: 14px; color: var(--ink-2); text-align: left; }
   .gn-book-main i { font-style: normal; font-family: var(--mono); font-size: 11px; color: var(--ink-3); flex: none; }
   .gn-book-main i.empty-tag { font-family: var(--sans); }
-  .gn-book-del { flex: none; width: 26px; height: 26px; margin-right: 6px; border: none; border-radius: 6px;
+  .gn-book-del { flex: none; width: 26px; height: 26px; margin-right: 6px; border: none; border-radius: 4px;
                  background: none; color: var(--ink-3); font-size: 15px; line-height: 1; cursor: pointer;
                  opacity: 0; transition: opacity .15s ease, color .15s ease, background .15s ease; }
   .gn-book:hover .gn-book-del { opacity: 1; }
@@ -125,21 +131,24 @@ export function graphPage(
   @media (hover: none) { .gn-book-del { opacity: .6; } }
 
   .gn-cats { display: flex; flex-direction: column; gap: 2px; }
-  .gn-cat { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 8px;
+  .gn-cat { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 4px;
             cursor: pointer; border: none; background: none; font-family: inherit; font-size: 13px;
             color: var(--ink-2); text-align: left; width: 100%;
             transition: background .15s ease, opacity .15s ease; }
-  .gn-cat:hover { background: var(--paper); }
+  .gn-cat:hover { background: var(--paper-deep); }
   .gn-cat[aria-pressed="false"] { opacity: .42; }
   .gn-cat .sw { width: 11px; height: 11px; border-radius: 3px; flex: none; }
   .gn-cat .cnt { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
 
-  .gn-meta { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--rule);
+  .gn-meta { padding-top: 14px; border-top: 1px solid var(--rule-2);
              font-family: var(--mono); font-size: 11px; color: var(--ink-3); line-height: 1.9; }
   .gn-meta a { color: var(--ink-2); }
 
-  /* ── 画板 ── */
-  .board { position: relative; display: flex; flex-direction: column; min-width: 0; }
+  /* ── 画板：作一张档案卡（朱砂顶边 + 细边 + 纸面投影），与 /schedule
+     的周课表卡同语言；画布区沉一档纸灰，节点卡浮起来 ── */
+  .board { position: relative; display: flex; flex-direction: column; min-width: 0;
+           border: 1px solid var(--rule-2); border-top: 2px solid var(--accent);
+           background: var(--paper); box-shadow: var(--shadow-sm); }
   .board-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
                padding: 12px 20px; border-bottom: 1px solid var(--rule); background: var(--paper); }
   .board-bar .bb-title { font-family: var(--kai); font-size: 17px; letter-spacing: 1px; }
@@ -149,7 +158,7 @@ export function graphPage(
                 margin: 0; line-height: 1.6; }
 
   .bb-search { display: inline-flex; align-items: center; gap: 6px; background: var(--card);
-               border: 1px solid var(--rule-2); border-radius: 8px; padding: 1px 8px; }
+               border: 1px solid var(--rule-2); border-radius: 4px; padding: 1px 8px; }
   .bb-search:focus-within { border-color: var(--accent); }
   .bb-search input { border: none; outline: none; background: none; font-family: inherit;
                      font-size: 13px; width: 108px; color: var(--ink); padding: 5px 0; }
@@ -172,7 +181,7 @@ export function graphPage(
                    pointer-events: none; }
 
   .node { cursor: move; }
-  .node-box { fill: var(--card); stroke: var(--rule-2); stroke-width: 1; rx: 9; }
+  .node-box { fill: var(--card); stroke: var(--rule-2); stroke-width: 1; rx: 4; }
   .node.sel .node-box { stroke: var(--accent); stroke-width: 2; }
   .node-name { font-family: var(--kai); font-size: 14px; fill: var(--ink); text-anchor: middle; pointer-events: none; }
   .node-alias { font-family: var(--mono); font-size: 9px; fill: var(--ink-3); text-anchor: middle; pointer-events: none; }
@@ -216,9 +225,9 @@ export function graphPage(
   .toast.on { opacity: .94; }
 
   @media (max-width: 860px) {
-    main { grid-template-columns: 1fr; }
-    .gn-rail { position: static; max-height: none; min-height: 0; border-right: none;
-               border-bottom: 1px solid var(--rule); }
+    main { grid-template-columns: 1fr; min-height: 0; }
+    .gn-rail { position: static; border-bottom: 1px solid var(--rule);
+               padding-bottom: 18px; }
     /* 画板在窄屏是独立一行，不给下限高度 flex:1 会塌成 0，SVG 直接消失 */
     .board { min-height: 72vh; }
     .board-bar { padding: 10px 14px; gap: 8px; }
@@ -235,7 +244,7 @@ export function graphPage(
   <div class="seal"><img src="/logo.png" alt=""></div>
   <div class="ph-title">
     <h1>人物图谱</h1>
-    <span class="ph-stamp">CHARACTER ATLAS</span>
+    <span class="ph-stamp">COURSERAPTOR · GRAPH</span>
   </div>
   <div class="ph-right">
     <button class="tbtn" id="btn-export" type="button">导出 JSON</button>
@@ -350,7 +359,20 @@ export function graphPage(
   }
 
   function loadBooks() {
-    if (DEMO) return Promise.resolve(DEMO_DATA ? [DEMO_DATA.book] : []);
+    // 演示快照是 GraphSnapshot（无 book 字段），书目行照 fetchBook 的口径从快照推
+    if (DEMO)
+      return Promise.resolve(
+        DEMO_DATA
+          ? [
+              {
+                id: DEMO_DATA.bookId,
+                title: "红楼梦",
+                personCount: DEMO_DATA.persons.length,
+                relationCount: DEMO_DATA.relations.length,
+              },
+            ]
+          : [],
+      );
     return api("/api/graph/books");
   }
 

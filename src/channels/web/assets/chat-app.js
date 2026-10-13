@@ -2216,10 +2216,12 @@ function hallSkel() {
 }
 function hallFullPage(panel) {
   /* 课表/待办/知识各有独立完整页；今日日程/考试合用 /today；
-     番茄钟/成绩/通知没有独立完整页：工具条不挂「完整页」链接 */
+     图谱是画板独立页 /graph；番茄钟/成绩/通知没有独立完整页：
+     工具条不挂「完整页」链接 */
   if (panel === "schedule") return "/schedule";
   if (panel === "todos") return "/todos";
   if (panel === "knowledge") return "/knowledge";
+  if (panel === "graph") return "/graph";
   if (panel === "pomodoro" || panel === "grades" || panel === "news" || panel === "usage")
     return "";
   return "/today";
@@ -2258,16 +2260,31 @@ function hallToolbar(panel, countText) {
    只返回列表内容；工具条（条数 + 刷新 + 完整页）由 renderHall 统一补。 */
 function buildToday(b) {
   const wrap = el("");
-  wrap.appendChild(hallItem(`${b.dateLabel} · ${b.term.weekLabel || "未在教学周"}`, "", true));
+  /* 日期题注与课表面板的天头同一语言：等宽小字 + 朱砂点亮 */
+  const head = el("hall-group today");
+  head.textContent = `${b.dateLabel} · ${b.term.weekLabel || "未在教学周"}`;
+  wrap.appendChild(head);
   /* 今日日程只看今天：brief.next 会向后看到最多 14 天，跨天的（明天及以后）不进这个面板 */
   const todayNext = b.next && b.next.dateLabel === "今天" ? b.next : null;
   if (todayNext) {
+    const mins = todayNext.startsInMin;
+    const when =
+      mins <= 0
+        ? "即将开始"
+        : mins < 60
+          ? `还有 ${mins} 分钟`
+          : `还有 ${Math.floor(mins / 60)} 小时${mins % 60 ? ` ${mins % 60} 分` : ""}`;
     wrap.appendChild(
       hallItem(
         `下一节 · ${todayNext.course.title}`,
-        (todayNext.course.time || todayNext.course.periods || "") +
-          (todayNext.course.location ? ` @${todayNext.course.location}` : ""),
-        todayNext.startsInMin <= 60,
+        [
+          todayNext.course.time || todayNext.course.periods || "",
+          todayNext.course.location ? `@${todayNext.course.location}` : "",
+          when,
+        ]
+          .filter(Boolean)
+          .join(" · "),
+        mins <= 60,
       ),
     );
   }
@@ -2314,23 +2331,48 @@ function buildSchedule(b) {
     return wrap;
   }
   (b.week?.days || []).forEach((d) => {
-    if (d.holiday) {
-      wrap.appendChild(
-        hallItem(`${d.label} ${d.dateShort}`, d.holiday + (d.makeup ? " · 调休补课日" : "")),
-      );
-      return;
-    }
-    d.courses.forEach((c) => {
-      wrap.appendChild(
+    const courses = d.courses || [];
+    const name = `${d.label} ${d.dateShort}`;
+    /* 既没课也没放假/调休说明的日子连天头一起收，不占视线；
+       有说明的天头把说明并进去（「周六 10/17 · 国庆节 · 调休补课日」） */
+    if (!courses.length && !d.holiday && !d.isToday) return;
+    const head = el(`hall-group${d.isToday ? " today" : ""}`);
+    head.dataset.hallGroup = name;
+    head.textContent =
+      name +
+      (d.holiday
+        ? ` · ${d.holiday}${d.makeup ? " · 调休补课日" : ""}`
+        : courses.length
+          ? ""
+          : " · 无课");
+    /* 每天一个分组盒：搜索过滤按组收起天头（与待办分组同一套结构） */
+    const box = el("hall-todo-group");
+    box.dataset.hallGroup = name;
+    courses.forEach((c) => {
+      box.appendChild(
         hallItem(
-          `${d.label} ${c.title}`,
+          c.title,
           [c.time, c.location ? `@${c.location}` : "", c.teacher].filter(Boolean).join(" · "),
-          d.isToday,
+          d.isToday && courseHappeningNow(c),
         ),
       );
     });
+    wrap.appendChild(head);
+    wrap.appendChild(box);
   });
   return wrap;
+}
+/* 周课表条目没有 status 字段（只有今日课程有）：按 time 区间现场判断是否正在上 */
+function courseHappeningNow(c) {
+  if (!c.time) return false;
+  const [a, z] = c.time.split("-");
+  const hm = (s) => {
+    const [h, m] = s.split(":").map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+  const now = new Date();
+  const min = now.getHours() * 60 + now.getMinutes();
+  return hm(a) <= min && min <= hm(z);
 }
 function buildExams(b) {
   const wrap = el("");
@@ -2642,19 +2684,11 @@ function hallKnowEmpty() {
 }
 /* 人物图谱面板（功能大厅抽屉）：只做「快速看一眼 + 跳完整画板」。
    完整版在 /graph 独立页——那里能拖节点、切类别、逐条删除，抽屉里
-   塞不下这些交互，硬塞只会让两个地方都难用。 */
+   塞不下这些交互，硬塞只会让两个地方都难用。
+   演示模式也走同一路径：演示服务内置 /api/graph（一本虚构红楼梦），
+   抽屉里照样能预览缩略画板，不再是「演示环境没有数据」的干空态。 */
 function buildGraphHall() {
   const wrap = el("");
-  if (HALL_DEMO) {
-    wrap.appendChild(
-      hallEmpty(
-        "⌗",
-        "演示环境没有图谱数据",
-        "人物图谱在正式环境的对话里口述生成，比如「宝玉是贾母的孙子」。",
-      ),
-    );
-    return wrap;
-  }
   return fetch("/api/graph")
     .then((r) => r.json())
     .then((d) => {
