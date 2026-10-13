@@ -9,6 +9,8 @@
  * 骨架只负责「事件类型 → SSE 载荷」的公共部分与工具耗时配对，不碰
  * 会话落盘、附件预解析等各自的收尾逻辑。
  */
+import type { LoopTimeoutConfig } from "../../core/loop-timeout";
+import { abortFailure, streamTimeoutConfig } from "../../core/loop-timeout";
 import {
   deltaOf,
   oneLine,
@@ -18,9 +20,15 @@ import {
 } from "./web-tool-events";
 
 /** 能拿到 stream.fullStream 的最小形态（正式 agent 与 demo agent 都满足）。
- *  M 就是该 agent 的消息类型——翻译器只透传它、不解读，故用泛型挂住而不约束。 */
+ *  M 就是该 agent 的消息类型——翻译器只透传它、不解读，故用泛型挂住而不约束。
+ *  timeout 可选：正式 agent（ToolLoopAgent）与 demo agent 都吃得下，
+ *  窄签名 agent（测试桩）不传也不影响——翻译器每次都带上看门狗配置。 */
 export interface StreamableLike<M> {
-  stream(options: { messages: M[]; abortSignal?: AbortSignal }): PromiseLike<{
+  stream(options: {
+    messages: M[];
+    abortSignal?: AbortSignal;
+    timeout?: LoopTimeoutConfig;
+  }): PromiseLike<{
     fullStream: unknown;
   }>;
 }
@@ -90,7 +98,13 @@ export async function translateStream<M>(
   let failure: string | null = null;
 
   try {
-    const stream = await agent.stream({ messages: opts.messages, abortSignal: signal });
+    // 流式看门狗随每次 stream 调用带上：首 chunk / chunk 间隔超时会把
+    // 「转圈圈」的轮次当场中止成 failure，而不是无限挂在 SSE 上
+    const stream = await agent.stream({
+      messages: opts.messages,
+      abortSignal: signal,
+      timeout: streamTimeoutConfig(),
+    });
     for await (const p of stream.fullStream as AsyncIterable<StreamEvent>) {
       switch (p.type) {
         case "text-delta": {
@@ -159,12 +173,28 @@ export async function translateStream<M>(
           failure = p.error instanceof Error ? p.error.message : String(p.error ?? "");
           break;
         }
+        // 看门狗（firstChunkMs/chunkMs/totalMs）到点：SDK 不抛错，而是发一个
+        // abort part 后让流正常结束。此前它落进 default 被丢掉——用户侧表现
+        // 为「闪一下什么也没发生」。软打断（用户主动中止）不归我们报失败，
+        // 由调用方的 signal.aborted 分流。
+        case "abort": {
+          if (!signal.aborted) failure = abortFailure((p as { reason?: unknown }).reason);
+          break;
+        }
         default:
           break;
       }
     }
   } catch (e) {
-    if (!signal.aborted) failure = e instanceof Error ? e.message : String(e);
+    // 用户主动关页面/ESC 的中断不报失败；看门狗到点若以抛错形态出来
+    // （SDK 版本差异），同样翻成可读的中文超时说明
+    if (!signal.aborted) {
+      const err = e instanceof Error ? e : null;
+      failure =
+        err && (err.name === "TimeoutError" || err.name === "AbortError")
+          ? abortFailure(err)
+          : (err?.message ?? String(e));
+    }
   }
 
   return { text, think, failure };

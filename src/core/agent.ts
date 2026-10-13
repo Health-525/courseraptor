@@ -10,6 +10,7 @@ import { type LanguageModelMiddleware, ToolLoopAgent, wrapLanguageModel } from "
 
 import { config } from "./config";
 import { buildLanguageModel } from "./llm";
+import { toolTimeoutConfig } from "./loop-timeout";
 import { formatMemoryForPrompt } from "./memory/longterm";
 import { captureSessionPrompt, loadLastSessionTranscript } from "./memory/shortterm";
 import { basePrompt, QQ_CHANNEL_PROMPT } from "./prompt";
@@ -117,6 +118,12 @@ export async function createRaptorAgent(channel?: "qq", options?: { carryOver?: 
   return new ToolLoopAgent({
     model: buildWrappedModel(),
     instructions,
+    // 循环看门狗：单次工具执行硬预算（含文档三件套的更长覆盖）。
+    // 经 AbortSignal 下发——信号感知的工具超时抛错，SDK 转成错误
+    // tool-result 喂回模型，轮次不死；详见 loop-timeout.ts 的背景注释。
+    // 流式看门狗（首 chunk / chunk 间隔）在 stream 调用点另配，
+    // 因为 generateText 不支持那两个字段。
+    timeout: toolTimeoutConfig(),
     // 通用工具（core/tools）+ 当前学校适配器贡献的教务工具（含能力门禁：
     // 学校没实现的模块，对应工具根本不会出现）
     tools: { ...coreTools, ...school().tools },

@@ -3,13 +3,17 @@
 
 import type { ModelMessage } from "ai";
 
+import type { LoopTimeoutConfig } from "../../core/loop-timeout";
+
 /** 与 agent.ts 的 ToolLoopAgent 对齐的最小接口：网页端每轮都带全量历史，
  * 所以只声明 messages 分支（ToolLoopAgent.stream 的 prompt/messages 是
- * 二选一的判别联合，两边都可选反而匹配不上） */
+ * 二选一的判别联合，两边都可选反而匹配不上）。timeout 由翻译层每次调用
+ * 时带上（流式看门狗），这里声明上保持类型诚实。 */
 export interface ChatStreamableAgent {
   stream(options: {
     messages: ModelMessage[];
     abortSignal?: AbortSignal;
+    timeout?: LoopTimeoutConfig;
   }): PromiseLike<{ fullStream: AsyncIterable<unknown> }>;
 }
 
