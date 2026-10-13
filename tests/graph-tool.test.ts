@@ -395,3 +395,68 @@ test("证据留空时不编造：用户没给原句就真的空着", async () =>
   const relation = store.getGraph(book.id).relations[0];
   assert.equal(relation?.evidence, "", "没给原句就不该凭空生成证据");
 });
+
+test("delete_book：删整本书连书档带内容，回带删除摘要", async () => {
+  const target = store.createBook("整本删掉");
+  store.upsertPerson(target.id, "甲", [], "");
+  store.addRelation(target.id, "甲", "乙", "family", "父亲", { evidence: "原文" });
+
+  const out = await call({ action: "delete_book", book: "整本删掉" });
+  assert.equal(out.ok, true);
+  assert.match(String(out.summary), /已删除整本书：《整本删掉》/);
+  assert.match(String(out.summary), /不可恢复/);
+  assert.deepEqual(out.deletedBooks, ["整本删掉"]);
+  assert.equal(out.graphDirty, true);
+
+  // 书档与内容一起消失
+  assert.equal(store.getBook(target.id), null);
+  assert.equal(
+    store.listBooks().some((b) => b.id === target.id),
+    false,
+  );
+  assert.equal(store.getGraph(target.id).persons.length, 0);
+});
+
+test("delete_book：删不存在的书只报错，绝不把默认占位书改名删掉", async () => {
+  // resolveBookId 遇到「书名不存在 + 目录里有空占位书」会把占位书改名成它
+  // 再返回——delete_book 的分支必须赶在这之前，否则用户默认书凭空蒸发
+  const placeholder = store.createBook("占位未命名");
+
+  const out = await call({ action: "delete_book", book: "绝对不存在的书名" });
+  assert.ok(out.error, "查不到书必须报错");
+  assert.match(String(out.error), /没有找到《绝对不存在的书名》/);
+
+  // 占位书标题没被篡改、书档还在，一点副作用都不许有
+  assert.ok(store.getBook(placeholder.id), "占位书不允许被顺手删掉");
+  assert.equal(store.getBook(placeholder.id)?.title, "占位未命名", "占位书标题不允许被改名");
+});
+
+test("delete_book：同名多本时只删空书档，有内容的绝不误删", async () => {
+  const withData = store.createBook("重名书");
+  store.upsertPerson(withData.id, "甲", [], "");
+  const empty = store.createBook("重名书");
+
+  const out = await call({ action: "delete_book", book: "重名书" });
+  assert.equal(out.ok, true);
+  assert.deepEqual(out.deletedBooks, ["重名书"]);
+
+  assert.equal(store.getBook(empty.id), null, "空书档该被删掉");
+  assert.ok(store.getBook(withData.id), "有内容的那本必须保住");
+  assert.equal(store.getGraph(withData.id).persons.length, 1, "有内容书的数据必须完好");
+});
+
+test("delete_book：不指名时多本必须报错，只剩一本才动手", async () => {
+  // 此刻共享库里铁定不止一本书（前面用例建了一摞）
+  const many = await call({ action: "delete_book" });
+  assert.ok(many.error, "多本书时不指名删除必须报错");
+  assert.match(String(many.error), /必须用 book 指明/);
+
+  // 清空到只剩一本，才允许不指名删除（首访问自动建的占位书就是这样清掉的）
+  for (const b of store.listBooks()) store.deleteBook(b.id);
+  const only = store.createBook("唯一一本");
+  const out = await call({ action: "delete_book" });
+  assert.equal(out.ok, true);
+  assert.match(String(out.summary), /唯一一本/);
+  assert.equal(store.getBook(only.id), null);
+  assert.equal(store.listBooks().length, 0, "删完就该一本不剩");
+});

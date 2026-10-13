@@ -42,6 +42,7 @@ import {
 import { config } from "../../core/config";
 import { loadGradesCache } from "../../core/grades-cache";
 import {
+  deleteBook,
   deletePerson,
   deleteRelation,
   exportGraph,
@@ -805,6 +806,26 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
           return;
         }
         json(res, { ok: true, deleted });
+      } catch (error) {
+        json(res, { error: error instanceof Error ? error.message : "删除失败" }, 400);
+      }
+      return;
+    }
+    if (url === "/api/graph/book/delete") {
+      // 画板左栏删整本书：书档连同其人物/关系/记忆一起删，不可恢复
+      // （页面删除栏两步确认后才发请求；工具侧走 manage_graph delete_book）
+      try {
+        const body = (await jsonBody(req, 8_192)) as { bookId?: unknown };
+        if (typeof body.bookId !== "string" || !body.bookId) {
+          json(res, { error: "缺少书 id" }, 400);
+          return;
+        }
+        const removed = deleteBook(body.bookId);
+        if (!removed) {
+          json(res, { error: "这本书已不存在" }, 404);
+          return;
+        }
+        json(res, { ok: true, deleted: removed });
       } catch (error) {
         json(res, { error: error instanceof Error ? error.message : "删除失败" }, 400);
       }

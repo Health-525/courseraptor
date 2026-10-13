@@ -326,3 +326,68 @@ test("graphSummary：空图谱给明确提示，有数据时带书名", () => {
   assert.match(text, /《有内容》共 2 个人物、1 条关系/);
   assert.match(text, /甲 --\[父亲\]--> 乙/);
 });
+
+test("deleteBook：书档连同人物/关系/记忆一起删，别的书无损", () => {
+  const target = store.createBook("要删的书");
+  store.upsertPerson(target.id, "甲", ["小甲"], "主角");
+  store.upsertPerson(target.id, "乙", [], "");
+  store.addRelation(target.id, "甲", "乙", "family", "父亲", { evidence: "原文" });
+  store.addMemory(target.id, "这本书的阅读记忆");
+
+  const keep = store.createBook("要留的书");
+  store.upsertPerson(keep.id, "丙", [], "");
+  store.addRelation(keep.id, "丙", "丁", "friendship", "朋友", { evidence: "原文" });
+  store.addMemory(keep.id, "另一本书的记忆");
+
+  const removed = store.deleteBook(target.id);
+  assert.ok(removed, "命中必须返回摘要");
+  assert.equal(removed.title, "要删的书");
+  assert.equal(removed.persons, 2);
+  assert.equal(removed.relations, 1);
+
+  // 书档没了：listBooks 与 getBook 都查不到
+  assert.equal(
+    store.listBooks().some((b) => b.id === target.id),
+    false,
+    "书档必须消失",
+  );
+  assert.equal(store.getBook(target.id), null, "getBook 也查不到");
+  // 内容没了：快照空了，记忆也跟着清（否则删了书还留一摞陈旧记忆）
+  assert.equal(store.getGraph(target.id).persons.length, 0);
+  assert.equal(store.getGraph(target.id).relations.length, 0);
+  assert.equal(store.listMemories(target.id).length, 0, "书删了记忆必须跟着清");
+
+  // 另一本书一根汗毛都没少（丙 + addRelation 自动补的丁 = 2 人物、1 关系）
+  assert.ok(store.getBook(keep.id));
+  const kept = store.getGraph(keep.id);
+  assert.equal(kept.persons.length, 2);
+  assert.equal(kept.relations.length, 1);
+  assert.equal(store.listMemories(keep.id).length, 1);
+});
+
+test("deleteBook：不存在的书返回 null，不写盘不误伤", () => {
+  const before = store.listBooks();
+  assert.equal(
+    store.deleteBook("不存在的书 id"),
+    null,
+    "未命中必须返回 null 而非 undefined 或抛错",
+  );
+  assert.deepEqual(
+    store.listBooks().map((b) => b.id),
+    before.map((b) => b.id),
+    "没删任何东西时书目不该变",
+  );
+});
+
+test("deleteBook 与 clearGraph 分工：clear 留书档，delete 连书档一起删", () => {
+  const a = store.createBook("清空那本");
+  store.upsertPerson(a.id, "甲", [], "");
+  const cleared = store.clearGraph(a.id);
+  assert.equal(cleared.persons, 1);
+  assert.ok(store.getBook(a.id), "clearGraph 只清内容，书档要留着");
+  assert.equal(store.getGraph(a.id).persons.length, 0);
+
+  const removed = store.deleteBook(a.id);
+  assert.equal(removed?.persons, 0, "已清空的书再删就是 0 条");
+  assert.equal(store.getBook(a.id), null, "deleteBook 连书档一起删");
+});

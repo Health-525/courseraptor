@@ -60,6 +60,26 @@ test("类别闭集嵌入页面（图例与连线配色同源）", () => {
   assert.ok(html.includes(GRAPH_CATEGORIES.family.color), "类别展示色未嵌入");
 });
 
+test("删整本书入口在页：左栏 × 按钮、删除栏两步确认、删书接口", () => {
+  const html = graphPage();
+  // 左栏书名行的删除按钮（悬停显现、触屏常驻的规则在 CSS 里）
+  assert.ok(html.includes("gn-book-del"), "左栏缺少删书 × 按钮");
+  assert.ok(html.includes("armBookDelete"), "删书缺少悬停触发函数");
+  // 删除栏对 book 选择的文案：不可恢复要写明
+  assert.ok(html.includes("删后不可恢复"), "删书删除栏必须提示不可恢复");
+  assert.ok(html.includes("整本书："), "删书删除栏必须标明删的是整本书");
+  // 两步确认与删书请求目标
+  assert.ok(html.includes("/api/graph/book/delete"), "页面缺少删书接口");
+  assert.ok(html.includes("确认删除"), "删除必须是两步确认");
+  // 删的是当前书时要让 refresh 重新择书，否则画板还挂在已删书上
+  assert.ok(
+    html.includes("if (state.bookId === sel.id) state.bookId = null;"),
+    "删当前书后要交还择书",
+  );
+  // 位置缓存要按被删书的 id 清，不能只清当前书
+  assert.ok(html.includes("clearPos(sel.id)"), "删书要清掉那本书的位置缓存");
+});
+
 test("演示模式：嵌数据、禁写请求、无持久化副作用", () => {
   const demoData = {
     bookId: "b-demo",
