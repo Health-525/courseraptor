@@ -20,6 +20,7 @@ import {
   addRelation,
   clearGraph,
   createBook,
+  deleteBook,
   deletePerson,
   deleteRelation,
   findRelation,
@@ -48,7 +49,7 @@ export const graphTools = {
   /** 读书人物关系图谱维护 */
   manage_graph: tool({
     description:
-      "读书人物关系图谱（本地持久，/graph 页有画板可以直接看）。用户口述书中人物与关系时调用。三条铁律：一、只抽取不生成——只记用户明确说过的，绝不用你对该书的既有知识补充人物或关系（那是剧透，也是污染），用户没说的就等于不存在；二、evidence 只填用户输入里的原句，没有就留空，禁止编造；三、category 只能取血缘亲属/婚姻爱情/友情同盟/敌对冲突/尊卑从属/其他这 6 类之一（血缘亲属=父母子女兄妹祖孙叔侄表亲，婚姻爱情=夫妻恋人暗恋，友情同盟=朋友挚友同窗结拜盟友，敌对冲突=仇人对手情敌背叛，尊卑从属=师徒上下级主仆君臣雇佣，其他=邻居同事室友），label 则填具体关系词（如「父亲」「暗恋」「师徒」）。用法：用户说「张三是李四的父亲」用 action=add_relation；说「宝玉又叫宝二爷」用 action=merge_person；说「把张三改叫张小明」用 action=update_person；说「我记错了删掉张三」用 action=delete_person（连带删除其全部关系）；说「删掉张三和李四的仇人关系」用 action=delete_relation；说「清空图谱重来」用 action=clear_graph（危险，必须先口头跟用户确认）；用户问「贾宝玉和林黛玉什么关系」先用 action=query_person 查图再答，图里没有就直说不知道，绝不靠记忆编；action=list 看全图。闲聊提问、非小说场景不要往图谱里塞东西；拿不准人物关系时先问用户一句。",
+      "读书人物关系图谱（本地持久，/graph 页有画板可以直接看）。用户口述书中人物与关系时调用。三条铁律：一、只抽取不生成——只记用户明确说过的，绝不用你对该书的既有知识补充人物或关系（那是剧透，也是污染），用户没说的就等于不存在；二、evidence 只填用户输入里的原句，没有就留空，禁止编造；三、category 只能取血缘亲属/婚姻爱情/友情同盟/敌对冲突/尊卑从属/其他这 6 类之一（血缘亲属=父母子女兄妹祖孙叔侄表亲，婚姻爱情=夫妻恋人暗恋，友情同盟=朋友挚友同窗结拜盟友，敌对冲突=仇人对手情敌背叛，尊卑从属=师徒上下级主仆君臣雇佣，其他=邻居同事室友），label 则填具体关系词（如「父亲」「暗恋」「师徒」）。用法：用户说「张三是李四的父亲」用 action=add_relation；说「宝玉又叫宝二爷」用 action=merge_person；说「把张三改叫张小明」用 action=update_person；说「我记错了删掉张三」用 action=delete_person（连带删除其全部关系）；说「删掉张三和李四的仇人关系」用 action=delete_relation；说「清空图谱重来」用 action=clear_graph（只清内容、书档保留，危险，必须先口头跟用户确认）；说「删掉整本书」用 action=delete_book（书档连同内容一起删，危险，必须先口头跟用户确认，还必须说清是哪本）；用户问「贾宝玉和林黛玉什么关系」先用 action=query_person 查图再答，图里没有就直说不知道，绝不靠记忆编；action=list 看全图。闲聊提问、非小说场景不要往图谱里塞东西；拿不准人物关系时先问用户一句。",
     inputSchema: z.object({
       action: z
         .enum([
@@ -59,12 +60,13 @@ export const graphTools = {
           "delete_person",
           "delete_relation",
           "clear_graph",
+          "delete_book",
           "query_person",
           "list",
           "new_book",
         ])
         .describe(
-          "add_relation=新增关系，merge_person=别名合并（同一人不同称呼），update_person=改主名/备注/重要度，update_relation=修正已有关系，delete_person=删人物（连带关系），delete_relation=删单条关系，clear_graph=清空整本图谱（危险），query_person=查某人全部关系，list=看图谱全貌，new_book=新建一本书的图谱",
+          "add_relation=新增关系，merge_person=别名合并（同一人不同称呼），update_person=改主名/备注/重要度，update_relation=修正已有关系，delete_person=删人物（连带关系），delete_relation=删单条关系，clear_graph=清空整本图谱的内容（书档保留），delete_book=删整本书（书档连同内容，危险），query_person=查某人全部关系，list=看图谱全貌，new_book=新建一本书的图谱",
         ),
       book: z
         .string()
@@ -169,6 +171,7 @@ export const graphTools = {
         "delete_person",
         "delete_relation",
         "clear_graph",
+        "delete_book",
         "query_person",
         "list",
         "new_book",
@@ -176,6 +179,61 @@ export const graphTools = {
       if (typeof action !== "string" || !ACTIONS.has(action)) {
         return {
           error: `未知 action：${String(action ?? "（空）")}。可用：${[...ACTIONS].join(" / ")}`,
+        };
+      }
+
+      // delete_book 必须赶在下面的 resolveBookId 之前：删一本「不存在的书」时
+      // resolveBookId 会把目录里空的占位书改名成它再返回——那本占位书往往是
+      // 用户的默认书，改名即被删，数据凭空蒸发。所以删书走「只查不建」的
+      // 书名解析，查不到就如实报错。
+      if (action === "delete_book") {
+        const wanted = book?.trim() ?? "";
+        const books = listBooks();
+        let targets: Array<{
+          id: string;
+          title: string;
+          personCount: number;
+          relationCount: number;
+        }>;
+        if (wanted) {
+          const matches = books.filter((b) => b.title === wanted);
+          if (!matches.length) return { error: `没有找到《${wanted}》这本书` };
+          const empty = matches.filter((b) => b.personCount === 0 && b.relationCount === 0);
+          if (empty.length)
+            targets = empty; // 同名多本时只动空书档，有内容的绝不误删
+          else if (matches.length === 1) targets = matches;
+          else
+            return {
+              error: `有 ${matches.length} 本都叫《${wanted}》且都有内容，请说清删哪本（或到 /graph 页面按书删）`,
+            };
+        } else {
+          if (books.length !== 1)
+            return { error: "本机有多本书时必须用 book 指明删哪本（如「红楼梦」）" };
+          targets = books;
+        }
+        let persons = 0;
+        let relations = 0;
+        const titles: string[] = [];
+        for (const t of targets) {
+          const removed = deleteBook(t.id);
+          if (removed) {
+            persons += removed.persons;
+            relations += removed.relations;
+            titles.push(removed.title);
+          }
+        }
+        if (!titles.length) return { error: "这些书已不存在" };
+        const multi = titles.length > 1;
+        return {
+          ok: true,
+          summary:
+            `已删除${multi ? ` ${titles.length} 本书` : "整本书"}：《${titles.join("》《")}》` +
+            `（${persons} 个人物、${relations} 条关系，不可恢复）`,
+          graphDirty: true,
+          bookId: targets[0]?.id ?? "",
+          snapshot: getGraph(targets[0]?.id ?? ""),
+          categories: GRAPH_CATEGORIES,
+          deletedBooks: titles,
         };
       }
 

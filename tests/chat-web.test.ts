@@ -1502,3 +1502,43 @@ test("真实对话链路：ppt_save 产 pptx 时 SSE 带 ppt 预览与下载行"
   assert.equal(ppt!.count, 2);
   assert.equal(ppt!.slides[0]!.kind, "cover");
 });
+
+test("图谱删书接口：整本书连内容删、缺参 400、重复删 404", async () => {
+  const url = (await startChatWeb())!;
+  const { createBook, upsertPerson, addRelation, deleteBook } = await import(
+    "../src/core/graph-store"
+  );
+  const book = createBook("接口删的书");
+  upsertPerson(book.id, "甲", [], "");
+  addRelation(book.id, "甲", "乙", "family", "父亲", { evidence: "原文" });
+
+  // 缺 bookId：400，不动数据
+  const bad = await wfetch(`${url}/api/graph/book/delete`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  assert.equal(bad.status, 400);
+
+  // 正常删：回带书名与清掉的条数
+  const ok = await wfetch(`${url}/api/graph/book/delete`, {
+    method: "POST",
+    body: JSON.stringify({ bookId: book.id }),
+  });
+  assert.equal(ok.status, 200);
+  const payload = (await ok.json()) as {
+    ok: boolean;
+    deleted: { title: string; persons: number; relations: number };
+  };
+  assert.equal(payload.ok, true);
+  assert.equal(payload.deleted.title, "接口删的书");
+  assert.equal(payload.deleted.persons, 2, "甲 + addRelation 自动补的乙");
+  assert.equal(payload.deleted.relations, 1);
+
+  // 重复删同一本：404，且 store 里确实已经没了
+  const miss = await wfetch(`${url}/api/graph/book/delete`, {
+    method: "POST",
+    body: JSON.stringify({ bookId: book.id }),
+  });
+  assert.equal(miss.status, 404);
+  assert.equal(deleteBook(book.id), null);
+});

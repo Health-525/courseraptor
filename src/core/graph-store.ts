@@ -532,6 +532,30 @@ export function clearGraph(bookId: string): { persons: number; relations: number
   return { persons, relations };
 }
 
+/**
+ * 删掉整本书：书档连同它的人物、关系、记忆一起消失（不可恢复）。
+ *
+ * 与 clearGraph 的分工：clear 只清内容、书档留着（首访问会自动建的占位
+ * 书越攒越多，用户没处删）；delete 连书档一起删。命中返回书名与清掉的
+ * 条数，未命中返回 null——调用方（页面删除栏、工具）要能区分「删空了」
+ * 和「本来就没有」。
+ */
+export function deleteBook(
+  bookId: string,
+): { title: string; persons: number; relations: number } | null {
+  const state = readState();
+  const book = state.books.find((b) => b.id === bookId);
+  if (!book) return null;
+  const persons = state.persons.filter((p) => p.bookId === bookId).length;
+  const relations = state.relations.filter((r) => r.bookId === bookId).length;
+  state.books = state.books.filter((b) => b.id !== bookId);
+  state.persons = state.persons.filter((p) => p.bookId !== bookId);
+  state.relations = state.relations.filter((r) => r.bookId !== bookId);
+  state.memories = state.memories.filter((m) => m.bookId !== bookId);
+  writeState(state);
+  return { title: book.title, persons, relations };
+}
+
 /* ── 图谱快照 ─────────────────────────────────────────────── */
 
 /**

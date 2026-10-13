@@ -104,13 +104,25 @@ export function graphPage(
           font-family: var(--mono); text-transform: uppercase; }
 
   .gn-books { display: flex; flex-direction: column; gap: 6px; }
-  .gn-book { display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
-             padding: 9px 12px; border-radius: 8px; cursor: pointer; border: 1px solid transparent;
-             background: none; font-family: inherit; font-size: 14px; color: var(--ink-2); text-align: left;
+  .gn-book { display: flex; align-items: center; gap: 2px; border-radius: 8px;
+             border: 1px solid transparent;
              transition: background .15s ease, border-color .15s ease; }
   .gn-book:hover { background: var(--paper); }
-  .gn-book[aria-current="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-deep); }
-  .gn-book i { font-style: normal; font-family: var(--mono); font-size: 11px; color: var(--ink-3); flex: none; }
+  .gn-book[aria-current="true"] { background: var(--accent-soft); border-color: var(--accent); }
+  .gn-book[aria-current="true"] .gn-book-main { color: var(--accent-deep); }
+  .gn-book-main { flex: 1; min-width: 0; display: flex; justify-content: space-between; align-items: baseline;
+                  gap: 8px; padding: 9px 4px 9px 12px; border: none; background: none; cursor: pointer;
+                  font-family: inherit; font-size: 14px; color: var(--ink-2); text-align: left; }
+  .gn-book-main i { font-style: normal; font-family: var(--mono); font-size: 11px; color: var(--ink-3); flex: none; }
+  .gn-book-main i.empty-tag { font-family: var(--sans); }
+  .gn-book-del { flex: none; width: 26px; height: 26px; margin-right: 6px; border: none; border-radius: 6px;
+                 background: none; color: var(--ink-3); font-size: 15px; line-height: 1; cursor: pointer;
+                 opacity: 0; transition: opacity .15s ease, color .15s ease, background .15s ease; }
+  .gn-book:hover .gn-book-del { opacity: 1; }
+  .gn-book-del:focus-visible { opacity: 1; }
+  .gn-book-del:hover { color: var(--accent); background: var(--card); }
+  /* 触屏没有 hover，删除按钮常驻可见，别让手机用户没处删书 */
+  @media (hover: none) { .gn-book-del { opacity: .6; } }
 
   .gn-cats { display: flex; flex-direction: column; gap: 2px; }
   .gn-cat { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 8px;
@@ -271,7 +283,7 @@ export function graphPage(
       <button class="tbtn" id="btn-relayout" type="button" title="忘掉手动位置，重新自动布局">重新布局</button>
       <button class="tbtn" id="btn-fit" type="button" title="缩放以适应窗口（0）">适应窗口</button>
     </div>
-    <p class="board-hint" id="hint">拖动人物调整位置，位置自动记住；滚轮 / 双指缩放，双击节点居中；悬停高亮关系；点选人物或连线后可删除；顶栏可按人名查找。</p>
+    <p class="board-hint" id="hint">拖动人物调整位置，位置自动记住；滚轮 / 双指缩放，双击节点居中；悬停高亮关系；点选人物或连线后可删除；悬停左栏书名可删整本书；顶栏可按人名查找。</p>
     <div class="canvas-wrap" id="wrap">
       <div class="toast" id="toast"></div>
     </div>
@@ -391,9 +403,10 @@ export function graphPage(
     } catch (e) { /* 隐私模式等场景下记不住就记不住，不碍事 */ }
   }
 
-  function clearPos() {
+  function clearPos(bookId) {
     if (DEMO) return;
-    try { localStorage.removeItem(LS_PREFIX + (state.bookId || "")); } catch (e) {}
+    // 不传参 = 清当前书的；删书时传被删书的 id，避免删完还留一摞陈旧位置
+    try { localStorage.removeItem(LS_PREFIX + (bookId || state.bookId || "")); } catch (e) {}
   }
 
   /* ── 分层布局：BFS 定层 + 层内重心对齐
@@ -633,24 +646,46 @@ export function graphPage(
     booksEl.textContent = "";
     for (var i = 0; i < state.books.length; i++) {
       var b = state.books[i];
-      var btn = document.createElement("button");
-      btn.className = "gn-book";
-      btn.type = "button";
-      btn.setAttribute("aria-current", b.id === state.bookId ? "true" : "false");
+      var row = document.createElement("div");
+      row.className = "gn-book";
+      row.setAttribute("aria-current", b.id === state.bookId ? "true" : "false");
+      var main = document.createElement("button");
+      main.className = "gn-book-main";
+      main.type = "button";
       var nm = document.createElement("span");
       nm.textContent = "《" + b.title + "》";
       var ct = document.createElement("i");
-      ct.textContent = b.personCount + "/" + b.relationCount;
-      btn.appendChild(nm); btn.appendChild(ct);
+      if (b.personCount || b.relationCount) ct.textContent = b.personCount + "/" + b.relationCount;
+      else { ct.textContent = "空书档"; ct.className = "empty-tag"; }
+      main.appendChild(nm); main.appendChild(ct);
       (function (id) {
-        btn.addEventListener("click", function () {
+        main.addEventListener("click", function () {
           if (state.bookId === id || busy) return;
           state.bookId = id;
           viewTouched = false;
+          // 换书后旧选择已不属于当前书，清掉避免快捷键误删到别书头上
+          clearSel();
           Promise.resolve(fetchBook()).then(function () { fit(); });
         });
       })(b.id);
-      booksEl.appendChild(btn);
+      // 删整本书：悬停书名行出 ×，两步确认后连书档一起删（演示模式不给入口）
+      if (!DEMO) {
+        var del = document.createElement("button");
+        del.className = "gn-book-del";
+        del.type = "button";
+        del.title = "删除整本书";
+        del.setAttribute("aria-label", "删除整本书《" + b.title + "》");
+        del.textContent = "×";
+        (function (bk) {
+          del.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            armBookDelete(bk);
+          });
+        })(b);
+        row.appendChild(del);
+      }
+      row.appendChild(main);
+      booksEl.appendChild(row);
     }
   }
 
@@ -1174,6 +1209,14 @@ export function graphPage(
     }, 3200);
   }
 
+  function armBookDelete(b) {
+    if (!b || DEMO) return;
+    // 复用人物/关系的删除栏与两步确认，只是 sel.kind 换成 book
+    state.sel = { kind: "book", id: b.id, title: b.title, persons: b.personCount || 0, relations: b.relationCount || 0 };
+    applySelection();
+    armDelete();
+  }
+
   function renderDelBar() {
     var old = wrap.querySelector(".delbar");
     if (old) old.remove();
@@ -1183,7 +1226,9 @@ export function graphPage(
     var txt = document.createElement("b");
     txt.textContent = state.sel.kind === "person"
       ? "人物：" + state.sel.name
-      : "关系：" + (state.sel.from || "?") + " —" + (state.sel.label || "?") + "→ " + (state.sel.to || "?");
+      : state.sel.kind === "book"
+        ? "整本书：《" + state.sel.title + "》（" + state.sel.persons + " 人物 · " + state.sel.relations + " 关系，删后不可恢复）"
+        : "关系：" + (state.sel.from || "?") + " —" + (state.sel.label || "?") + "→ " + (state.sel.to || "?");
     var yes = document.createElement("button");
     yes.className = "tbtn danger" + (state.arm ? " solid" : "");
     yes.type = "button";
@@ -1207,6 +1252,21 @@ export function graphPage(
     var sel = state.sel;
     state.arm = false;
     clearTimeout(state._armT);
+    if (sel.kind === "book") {
+      busy = true;
+      api("/api/graph/book/delete", { method: "POST", body: JSON.stringify({ bookId: sel.id }) })
+        .then(function (d) {
+          state.sel = null;
+          clearPos(sel.id);
+          // 删的是当前书：交还 refresh 挑剩余书；全删完服务端会自动建「未命名」兜底
+          if (state.bookId === sel.id) state.bookId = null;
+          toast("已删除《" + (d && d.deleted ? d.deleted.title : sel.title) + "》整本书");
+          return refresh();
+        })
+        .catch(function (e) { toast(e.message || "删除失败"); })
+        .finally(function () { busy = false; renderDelBar(); render(); });
+      return;
+    }
     var path = sel.kind === "person" ? "/api/graph/person/delete" : "/api/graph/relation/delete";
     busy = true;
     api(path, { method: "POST", body: JSON.stringify({ bookId: state.bookId, id: sel.id }) })
@@ -1224,7 +1284,20 @@ export function graphPage(
   function fetchBook() {
     if (DEMO) { state.snapshot = DEMO_DATA; state.books = DEMO_DATA ? [{ id: DEMO_DATA.bookId, title: "红楼梦", personCount: DEMO_DATA.persons.length, relationCount: DEMO_DATA.relations.length }] : []; render(); return Promise.resolve(); }
     return api("/api/graph?bookId=" + encodeURIComponent(state.bookId || ""))
-      .then(function (d) { state.snapshot = d.snapshot; render(); });
+      .then(function (d) {
+        state.snapshot = d.snapshot;
+        // 删完全部书后服务端会兜底建一本「未命名」：认下它的 id 与书档，
+        // 否则左栏空着、画板却挂着别处的书，要等下次刷新才对得齐
+        if (d && d.bookId && !activeBook()) {
+          state.bookId = d.bookId;
+          if (d.book && !state.books.some(function (b) { return b.id === d.bookId; })) {
+            state.books.push({ id: d.book.id, title: d.book.title,
+                               personCount: (d.snapshot && d.snapshot.persons.length) || 0,
+                               relationCount: (d.snapshot && d.snapshot.relations.length) || 0 });
+          }
+        }
+        render();
+      });
   }
 
   function refresh() {
