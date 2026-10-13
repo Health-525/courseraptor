@@ -16,7 +16,7 @@
 
 [界面预览](#界面预览) · [核心特性](#核心特性) · [快速开始](#快速开始) · [隐私与安全](#隐私与安全) · [项目架构](#项目架构) · [文档](#文档) · [常见问题](#常见问题)
 
-**[⬇ 下载便携版（约 100MB）](https://github.com/Health-525/courseraptor/releases/latest)** · **[▶ 零凭证演示](#先零门槛体验可选)** · **[⭐ Star](https://github.com/Health-525/courseraptor)**
+**如果它帮到了你，希望帮我点个 [⭐ Star](https://github.com/Health-525/courseraptor)，让更多同学看到它**
 
 </div>
 
