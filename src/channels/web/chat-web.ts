@@ -233,8 +233,22 @@ let schedulePageHtml: string | null = null;
 let todosPageHtml: string | null = null;
 let graphPageHtml: string | null = null;
 
+/**
+ * 把请求目标拆成 pathname + 查询串。
+ *
+ * 页面路由必须拿 pathname 匹配：req.url 带查询串，`/graph?bookId=x` 拿整串
+ * 做 === 会 404（/api/* 一直是 startsWith 匹配，所以只有页面路由漏了）。
+ * 查询串不在这里消费——各页面自己在 location.search 里读自己的参数。
+ */
+function splitUrl(url: string): { pathname: string; search: string } {
+  const q = url.indexOf("?");
+  if (q < 0) return { pathname: url, search: "" };
+  return { pathname: url.slice(0, q), search: url.slice(q) };
+}
+
 async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
   const url = req.url ?? "";
+  const { pathname: pagePath } = splitUrl(url);
   if (req.method === "GET") {
     if (url.startsWith("/files/")) {
       await serveGeneratedFile(url.slice("/files/".length), res);
@@ -242,7 +256,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
     }
     // 静态端点（/app.js、marked、logo、PWA 清单）统一伺服，演示页共用
     if (serveStaticAsset(url, res)) return;
-    if (url === "/today" || url === "/today/") {
+    if (pagePath === "/today" || pagePath === "/today/") {
       // 独立日程页：今日头条/今日速览/临近考试，纯本地缓存渲染
       todayPageHtml ??= todayPage();
       res.writeHead(200, {
@@ -252,7 +266,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       res.end(withCsrf(todayPageHtml));
       return;
     }
-    if (url === "/schedule" || url === "/schedule/") {
+    if (pagePath === "/schedule" || pagePath === "/schedule/") {
       // 独立课表页：教学周导航 + 周课表网格，纯本地缓存渲染
       schedulePageHtml ??= schedulePage();
       res.writeHead(200, {
@@ -262,7 +276,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       res.end(withCsrf(schedulePageHtml));
       return;
     }
-    if (url === "/todos" || url === "/todos/") {
+    if (pagePath === "/todos" || pagePath === "/todos/") {
       // 独立待办页：分组清单与勾选/删除，纯本地存储渲染
       todosPageHtml ??= todosPage();
       res.writeHead(200, {
@@ -272,7 +286,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       res.end(withCsrf(todosPageHtml));
       return;
     }
-    if (url === "/knowledge" || url === "/knowledge/") {
+    if (pagePath === "/knowledge" || pagePath === "/knowledge/") {
       // 独立知识库页：对话中沉淀的知识条目，纯本地存储渲染
       knowledgePageHtml ??= knowledgePage();
       res.writeHead(200, {
@@ -282,8 +296,10 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       res.end(withCsrf(knowledgePageHtml));
       return;
     }
-    if (url === "/graph" || url === "/graph/") {
-      // 独立人物图谱页：分层布局关系图画板，纯本地存储渲染
+    if (pagePath === "/graph" || pagePath === "/graph/") {
+      // 独立人物图谱页：分层布局关系图画板，纯本地存储渲染。
+      // 查询串（?bookId=）不在这里消费——页面自己读 location.search，
+      // 这样深链既能在地址栏分享，也能在刷新后还原到同一本书。
       graphPageHtml ??= graphPage();
       res.writeHead(200, {
         "content-type": "text/html; charset=utf-8",

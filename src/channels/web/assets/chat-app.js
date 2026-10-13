@@ -931,7 +931,9 @@ function graphMiniCard(tl, graph) {
   head.appendChild(el2("graph-meta", `${visPersons.length} 人物 · ${relations.length} 关系`));
   const more = document.createElement("a");
   more.className = "tbtn";
-  more.href = "/graph";
+  /* 带 bookId：不带的话多本书时 /graph 只会开默认书，用户在对话里看的
+     这本书和画板打开的那本不是同一本 */
+  more.href = graph.bookId ? `/graph?bookId=${encodeURIComponent(graph.bookId)}` : "/graph";
   more.textContent = "打开画板";
   head.appendChild(more);
   card.appendChild(head);
@@ -1043,7 +1045,13 @@ function graphMiniCard(tl, graph) {
 
 function pptCard(tl, ppt, files) {
   if (!ppt?.slides?.length) return;
+  const deckId = pptDeckId(ppt, files);
   const card = el("pptcard");
+  /* 深链锚点：data-ppt-id 让 ?ppt= 能找回这张卡，__ppt/__files 让重开时
+     不必再解析一遍工具输出 */
+  card.dataset.pptId = deckId;
+  card.__ppt = ppt;
+  card.__files = files;
   const head = el("ppt-head");
   head.appendChild(el2("ppt-mark", "▦"));
   const cover = ppt.slides[0];
@@ -1069,7 +1077,13 @@ function pptCard(tl, ppt, files) {
   ppt.slides.forEach((s, i) => {
     const sl = el(`pptslide k-${s.kind}`);
     pptSlideInner(sl, s, false);
-    sl.addEventListener("click", () => pptView(ppt, i, files));
+    /* 可聚焦：CSS 里早有 :focus-visible 高亮，但一直忘了给 tabindex——
+       键盘用户 Tab 根本进不到预览入口，全屏关闭时也没法把焦点还回来 */
+    sl.tabIndex = 0;
+    sl.setAttribute("role", "button");
+    sl.setAttribute("aria-label", `第 ${i + 1} 页，点击全屏预览`);
+    /* 记住来源缩略图：关掉全屏把焦点还回来，键盘用户不丢位置 */
+    sl.addEventListener("click", () => pptView(ppt, i, files, deckId, { returnFocus: sl }));
     strip.appendChild(sl);
   });
   card.appendChild(strip);
@@ -1077,66 +1091,203 @@ function pptCard(tl, ppt, files) {
   scroll(false);
 }
 
-/* 全屏查看器：键盘 ←/→/Esc、触屏滑动、点底栏翻页，点暗处关闭 */
-function pptView(ppt, index, files) {
-  const old = document.querySelector(".pptview");
-  if (old) old.remove();
+/* ── PPT 全屏查看器 ──
+   打开态走查询串 ?ppt=<画册id>&p=<页号>，不占用 #hall=（那套 hash 归功能
+   大厅，两套导航各走各的通道才不互相顶掉）。pushState 压栈，于是浏览器后退
+   与手机返回键就是「关闭全屏」——和功能大厅的后退关闭是同一条心智；翻页只
+   replaceState，不把历史栈撑成一页一格。
+   画册 id 用成品文件名：同一份课件刷新前后不变，深链才站得住。没有成品
+   文件时才退回计数兜底（那种深链刷新后失效，但绝不会开错画册）。 */
+let pptSeq = 0;
+let pptLive = null; // 打开中的查看器 { ov, deck, ppt, files, i, thumbs, returnFocus }
+let pptPushed = false; // 本次打开是否真的压了历史栈（决定关闭时要不要 back）
+
+function pptDeckId(ppt, files) {
+  const named = files?.[0]?.name;
+  if (named) return named;
+  /* 没有成品文件时才用计数兜底：那种深链刷新后失效，但绝不会开错画册 */
+  pptSeq += 1;
+  return `ppt-${ppt.count}-${pptSeq}`;
+}
+function pptUrlId() {
+  return new URLSearchParams(location.search).get("ppt") || "";
+}
+function pptUrlPage() {
+  const n = Number(new URLSearchParams(location.search).get("p"));
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1;
+}
+function pptUrlFor(id, page) {
+  const u = new URL(location.href);
+  if (id) u.searchParams.set("ppt", id);
+  else u.searchParams.delete("ppt");
+  if (page > 0) u.searchParams.set("p", String(page));
+  else u.searchParams.delete("p");
+  return u.pathname + u.search + u.hash;
+}
+/* 按画册 id 找回对话里那张卡：深链「刷新还原 / 前进重进」时靠它重开 */
+function pptCardById(id) {
+  const cards = document.querySelectorAll(".pptcard[data-ppt-id]");
+  for (const c of cards) if (c.dataset.pptId === id) return c;
+  return null;
+}
+
+/* 键盘守卫：焦点在输入类控件里时，方向键/空格归控件自己（全屏开着也能
+   继续改搜索词），Esc 仍然放行——那是「关掉浮层」的通用手势 */
+function pptEditable(t) {
+  if (!t) return false;
+  const tag = t.tagName ? t.tagName : "";
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t.isContentEditable === true;
+}
+
+function pptView(ppt, index, files, deckId, opts) {
+  /* 换画册（或重复点开）：旧的不弹历史栈，只把新的一次压进去 */
+  if (pptLive) pptClose(pptLive, false);
   const total = ppt.slides.length;
   let i = Math.max(0, Math.min(index, total - 1));
   const dl = files?.[0];
+  const truncated = ppt.count > total; // 预览只带前 N 页，成品更厚
 
-  const ov = el("pptview");
+  const ov = el("pptv");
+  ov.setAttribute("role", "dialog");
+  ov.setAttribute("aria-modal", "true");
+  ov.setAttribute("aria-label", `${dl?.name || "PPT"} 全屏预览，共 ${total} 页`);
+  ov.dataset.deck = deckId;
+
+  /* 顶栏：文件名 + 当前页标题 + 预览截断说明 + 文件级动作 */
+  const top = el("pptv-top");
+  top.appendChild(el2("pptv-name", dl?.name || "PPT 预览"));
+  const ptitle = el2("pptv-ptitle", "");
+  top.appendChild(ptitle);
+  if (truncated) top.appendChild(el2("pptv-cap", `预览前 ${total} 页 · 全 ${ppt.count} 页`));
+  if (dl) {
+    const a = document.createElement("a");
+    a.className = "tbtn pptv-dl";
+    a.href = `/files/${encodeURIComponent(dl.name)}`;
+    a.setAttribute("download", dl.name);
+    a.textContent = "下载";
+    top.appendChild(a);
+  }
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "pptv-close";
+  close.textContent = "✕";
+  close.setAttribute("aria-label", "关闭全屏预览");
+  top.appendChild(close);
+
+  /* 舞台：尺寸由量出来的可用高度反算，不写死「减掉底栏 118px」 */
+  const body = el("pptv-body");
   const stage = el("pptv-stage");
+
+  /* 缩略图条：长课件一页页翻找不到北，给一条能直接跳的胶片 */
+  const rail = el("pptv-rail");
+  const thumbs = ppt.slides.map((s, k) => {
+    const t = el("pptslide pptv-thumb");
+    pptSlideInner(t, s, false);
+    /* 不作为 Tab 停靠点：方向键翻页已经覆盖了键盘路径，30 个缩略图逐个
+       Tab 过去只会把焦点陷阱变成耐力测试 */
+    t.tabIndex = -1;
+    t.setAttribute("aria-label", `跳到第 ${k + 1} 页`);
+    t.addEventListener("click", () => goTo(k));
+    rail.appendChild(t);
+    return t;
+  });
+
   const bar = el("pptv-bar");
   const prev = document.createElement("button");
   prev.type = "button";
   prev.className = "pptv-nav";
   prev.textContent = "‹";
+  prev.setAttribute("aria-label", "上一页");
   const counter = el2("pptv-count", "");
   const next = document.createElement("button");
   next.type = "button";
   next.className = "pptv-nav";
   next.textContent = "›";
-  const close = document.createElement("button");
-  close.type = "button";
-  close.className = "pptv-close";
-  close.textContent = "✕";
-
-  function render() {
-    stage.className = `pptv-stage k-${ppt.slides[i].kind}`;
-    while (stage.firstChild) stage.removeChild(stage.firstChild);
-    pptSlideInner(stage, ppt.slides[i], true);
-    counter.textContent = `${i + 1} / ${ppt.count || total}`;
-    prev.disabled = i === 0;
-    next.disabled = i === total - 1;
-  }
-  function go(d) {
-    const j = i + d;
-    if (j < 0 || j >= total) return;
-    i = j;
-    render();
-  }
-  function onKey(e) {
-    if (e.key === "Escape") shut();
-    else if (e.key === "ArrowLeft") go(-1);
-    else if (e.key === "ArrowRight") go(1);
-  }
-  function shut() {
-    document.removeEventListener("keydown", onKey);
-    ov.remove();
-  }
-
+  next.setAttribute("aria-label", "下一页");
   bar.appendChild(prev);
   bar.appendChild(counter);
   bar.appendChild(next);
-  if (dl) {
-    const a = document.createElement("a");
-    a.className = "tbtn";
-    a.href = `/files/${encodeURIComponent(dl.name)}`;
-    a.setAttribute("download", dl.name);
-    a.textContent = "下载";
-    bar.appendChild(a);
+
+  function render() {
+    const s = ppt.slides[i];
+    stage.className = `pptv-stage k-${s.kind}`;
+    while (stage.firstChild) stage.removeChild(stage.firstChild);
+    pptSlideInner(stage, s, true);
+    counter.textContent = `${i + 1} / ${total}`;
+    prev.disabled = i === 0;
+    next.disabled = i === total - 1;
+    ptitle.textContent = s.title || "";
+    ptitle.style.display = s.title ? "" : "none";
+    for (let k = 0; k < thumbs.length; k++) thumbs[k].classList.toggle("on", k === i);
+    /* 当前页滚进视：缩略图条很长时不让用户自己找 */
+    if (thumbs[i] && typeof thumbs[i].scrollIntoView === "function") {
+      thumbs[i].scrollIntoView({ block: "nearest", inline: "center" });
+    }
+    sizeStage();
   }
+  function goTo(k) {
+    const j = Math.max(0, Math.min(k, total - 1));
+    if (j === i) return;
+    i = j;
+    render();
+    /* 翻页只改地址不压栈：后退一步是关全屏，不是回上一页 */
+    history.replaceState(null, "", pptUrlFor(deckId, i + 1));
+  }
+  function go(d) {
+    goTo(i + d);
+  }
+  function onKey(e) {
+    if (pptEditable(e.target)) {
+      if (e.key === "Escape") shut();
+      return;
+    }
+    if (e.key === "Escape") shut();
+    else if (e.key === "ArrowLeft" || e.key === "PageUp") go(-1);
+    else if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") {
+      e.preventDefault();
+      go(1);
+    } else if (e.key === "Home") goTo(0);
+    else if (e.key === "End") goTo(total - 1);
+    else if (e.key === "Tab") trapFocus(e);
+  }
+  /* 焦点陷阱：Tab 在「关闭 / 上一页 / 下一页 / 下载」之间循环，不逃到
+     背后的对话里——模态浮层的基本体面 */
+  function trapFocus(e) {
+    const f = [close, prev, next];
+    if (dl) f.push(bar.querySelector(".pptv-dl") || ov.querySelector(".pptv-dl"));
+    const items = f.filter((n) => n && n.disabled !== true);
+    if (!items.length) return;
+    const first = items[0];
+    const last = items[items.length - 1];
+    const cur = document.activeElement;
+    if (e.shiftKey && (cur === first || !ov.contains(cur))) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && cur === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+  function shut() {
+    if (pptLive) pptClose(pptLive, true);
+  }
+
+  function sizeStage() {
+    const h = body.clientHeight;
+    const w = body.clientWidth;
+    if (h > 0 && w > 0) {
+      /* 写成 CSS 变量：.pptv-stage 的 width 兜底值还在样式表里，
+         量不到（旧引擎/首帧）时退回 94vw，不至于塌成一条线 */
+      ov.style.setProperty("--pptv-w", `${Math.min(w, Math.round((h * 16) / 9))}px`);
+    }
+    /* free 页的字号/线宽是按容器宽换算的：转屏、改窗口都得重算，
+       否则大图里的文字会停留在旧尺寸上发虚或溢出 */
+    pptFitFreePx(stage);
+  }
+  const ro = typeof ResizeObserver === "function" ? new ResizeObserver(sizeStage) : null;
+  if (ro) ro.observe(body);
+  else window.addEventListener("resize", sizeStage);
+
   prev.addEventListener("click", (e) => {
     e.stopPropagation();
     go(-1);
@@ -1146,8 +1297,9 @@ function pptView(ppt, index, files) {
     go(1);
   });
   close.addEventListener("click", shut);
+  /* 点暗处关闭：舞台自身不关（点内容不该误退），其余空白都算暗处 */
   ov.addEventListener("click", (e) => {
-    if (e.target === ov) shut();
+    if (e.target === ov || e.target === body || e.target === rail) shut();
   });
   /* 触屏左右滑动翻页（passive：只观察不拦截滚动） */
   let sx = null;
@@ -1164,12 +1316,97 @@ function pptView(ppt, index, files) {
     if (Math.abs(dx) > 40) go(dx < 0 ? 1 : -1);
     sx = null;
   });
-  document.addEventListener("keydown", onKey);
-  ov.appendChild(stage);
-  ov.appendChild(close);
+
+  ov.appendChild(top);
+  body.appendChild(stage);
+  ov.appendChild(body);
+  ov.appendChild(rail);
   ov.appendChild(bar);
   render();
   document.body.appendChild(ov);
+  /* 锁住背后滚动：fixed 遮罩挡不住滚轮滚 #log，桌面端一晃鼠标整页对话
+     就跟着跑——overflow:hidden 保留滚动位置，关掉时还在原处 */
+  document.body.classList.add("ppt-open");
+
+  pptLive = {
+    ov,
+    deck: deckId,
+    ppt,
+    files,
+    thumbs,
+    returnFocus: opts?.returnFocus ?? null,
+    ro,
+    onKey,
+    goTo,
+  };
+  document.addEventListener("keydown", onKey);
+
+  /* 打开即压栈：后退键从此有了「关全屏」这个动作 */
+  if (opts?.push !== false) {
+    history.pushState(null, "", pptUrlFor(deckId, i + 1));
+    pptPushed = true;
+  }
+  /* 不抢焦点：深链还原时用户可能正在打字（与 openHall 的 push 口径一致） */
+  if (opts?.focus !== false) close.focus();
+}
+
+/* pop 为真表示「用户主动关」——要把刚压进去的历史栈弹掉，后退键状态才
+   守恒；为假表示关闭由后退/换画册触发，历史已经回退过，不能再 back */
+function pptClose(live, pop) {
+  if (!live?.ov.isConnected) return;
+  pptLive = null;
+  /* keydown 监听挂在 document 上：不摘的话关掉浮层后方向键还在翻页，
+     而且每开一次就多挂一个，开三四次全乱 */
+  document.removeEventListener("keydown", live.onKey);
+  if (live.ro) live.ro.disconnect();
+  live.ov.remove();
+  document.body.classList.remove("ppt-open");
+  const back = live.returnFocus;
+  if (back && typeof back.focus === "function" && document.contains(back)) back.focus();
+  if (pop && pptPushed) {
+    pptPushed = false;
+    history.back();
+  }
+}
+
+/* 路由事件：查询串是 PPT 的导航通道，与 #hall= 的 hashchange 互不干扰 */
+window.addEventListener("popstate", () => {
+  const id = pptUrlId();
+  const live = pptLive;
+  if (!id) {
+    /* 后退到没有 ppt= 的地址：关全屏（历史已回退，不再 back） */
+    if (live) pptClose(live, false);
+    return;
+  }
+  const page = pptUrlPage();
+  if (live && live.deck === id) {
+    /* 同一画册换页（前进重进）：goTo 自带钳位与同页短路 */
+    live.goTo(page - 1);
+    return;
+  }
+  /* 深链直达或「前进」重进：按 id 找回对话里那张卡重开 */
+  const card = pptCardById(id);
+  if (card?.__ppt) pptView(card.__ppt, page - 1, card.__files || [], id, { push: false });
+});
+
+/* 深链直达：?ppt=xxx&p=n 打开页面就恢复全屏。与 #hall= 的启动还原同套路
+   ——都要等初始化脚本走完；卡片要等会话恢复后才在 DOM 里，所以重试几次，
+   找不到就清掉这个失效地址，别留个打不开的链接挂在地址栏。 */
+const pptBootId = pptUrlId();
+if (pptBootId) {
+  const pptBootTry = (n) => {
+    const card = pptCardById(pptBootId);
+    if (card?.__ppt) {
+      pptView(card.__ppt, pptUrlPage() - 1, card.__files || [], pptBootId, {
+        push: true,
+        focus: false,
+      });
+      return;
+    }
+    if (n > 0) setTimeout(() => pptBootTry(n - 1), 250);
+    else history.replaceState(null, "", pptUrlFor("", 0));
+  };
+  setTimeout(() => pptBootTry(6), 0);
 }
 /* 到点收尾：翻朱砂底 + 提示音 + 标题闪灯（切回页面自动复位）+ 一键接龙 */
 function pomoFinish(card) {
@@ -2546,7 +2783,8 @@ function buildGraphHall() {
 
       const go = document.createElement("a");
       go.className = "tbtn";
-      go.href = "/graph";
+      /* 与对话区图谱卡同一口径：带上当前书，画板才开对书 */
+      go.href = d.bookId ? `/graph?bookId=${encodeURIComponent(d.bookId)}` : "/graph";
       go.textContent = "打开完整画板";
       const foot = el("hall-graph-foot");
       foot.appendChild(go);

@@ -511,11 +511,29 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .pptslide.k-free .pt-logo { right: 7px; bottom: 6px; width: 13px; height: 13px; }
   .pptv-stage.k-free .pt-logo { right: 22px; bottom: 16px; width: 26px; height: 26px; }
 
-  /* 全屏查看器：暗纸压片 + 大幅幻灯片 + 底部翻页条；键盘 ←/→/Esc 与触屏滑动同效 */
-  .pptview { position: fixed; inset: 0; z-index: 70; background: rgba(37, 34, 28, 0.72);
-             display: flex; align-items: center; justify-content: center; }
-  .pptv-stage { width: 94vw; /* 旧引擎不认 min+dvh 的整行回退（同页 100vh→100dvh 约定） */
-                width: min(94vw, calc((100dvh - 118px) * 16 / 9));
+  /* 全屏查看器：顶栏（文件名/页题/动作）+ 舞台 + 缩略图条 + 底栏翻页。
+     flex column 而不是各块绝对定位——以前舞台宽写死
+     calc((100dvh - 118px) * 16 / 9)，那个 118px 是「猜底栏多高」，加一条
+     缩略图条就得改数，还只在桌面猜对；现在高度由 .pptv-body 量出来反算
+     （JS 侧 ResizeObserver 写 --pptv-w），窄屏与横屏一起对。
+     键盘 ←/→/PgUp/PgDn/Home/End/空格翻页、Esc 关；查询串 ?ppt=&p= 是它的
+     路由，后退即关闭。 */
+  .pptv { position: fixed; inset: 0; z-index: 70; background: rgba(37, 34, 28, 0.72);
+          display: flex; flex-direction: column; gap: 10px;
+          padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right))
+                   max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+          /* 遮罩自身不滚，也别把滚动手势透给背后的 #log */
+          overscroll-behavior: contain; }
+  .pptv-top { flex: none; display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .pptv-name { flex: none; max-width: 40vw; overflow: hidden; text-overflow: ellipsis;
+               white-space: nowrap; font-family: var(--kai); font-size: 15px;
+               letter-spacing: .04em; color: var(--paper); }
+  .pptv-ptitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+                 white-space: nowrap; font-size: 13px; color: #d8d2c4; }
+  .pptv-cap { flex: none; font-family: var(--mono); font-size: 12px; color: #c3bcab; }
+  .pptv-body { flex: 1; min-height: 0; display: flex; align-items: center;
+               justify-content: center; }
+  .pptv-stage { width: var(--pptv-w, 94vw); /* 旧引擎不认 dvh 的整行回退 */
                 aspect-ratio: 16 / 9; background: var(--card); border-radius: 6px;
                 overflow: hidden; position: relative;
                 box-shadow: 0 24px 72px rgba(0, 0, 0, 0.4); }
@@ -546,21 +564,58 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .pptv-stage .pt-table { margin-top: 18px; font-size: 14px; line-height: 1.5; }
   .pptv-stage .pt-table td { padding: 6px 10px; white-space: normal; }
   .pptv-stage.k-content .pt-logo { right: 22px; bottom: 16px; width: 26px; height: 26px; }
-  .pptv-bar { position: absolute; bottom: 20px; left: 0; right: 0; display: flex;
-              align-items: center; justify-content: center; gap: 12px; }
-  .pptv-nav, .pptv-close, .pptview a.tbtn { background: var(--card);
-                                            border: 1px solid transparent;
-                                            color: var(--ink); border-radius: 5px;
-                                            min-height: 36px; min-width: 36px;
-                                            padding: 4px 16px; font-size: 15px;
-                                            line-height: 1; cursor: pointer;
-                                            text-decoration: none; font-family: inherit; }
-  .pptview a.tbtn { font-size: 13px; display: inline-flex; align-items: center; }
-  .pptv-nav:hover, .pptv-close:hover, .pptview a.tbtn:hover { background: #fff; }
+
+  /* 缩略图条：复用对话区 .pptslide 那一整套版式（同源才不出现「预览和
+     全屏两张皮」），只在这里加「当前页」标记与横向滚动 */
+  .pptv-rail { flex: none; display: flex; gap: 10px; overflow-x: auto;
+               overscroll-behavior-x: contain; padding-bottom: 2px;
+               scrollbar-width: thin; scrollbar-color: var(--rule-2) transparent; }
+  .pptv-rail::-webkit-scrollbar { height: 8px; }
+  .pptv-rail::-webkit-scrollbar-track { background: transparent; }
+  .pptv-rail::-webkit-scrollbar-thumb { background: var(--rule-2); border-radius: 4px; }
+  .pptv-rail .pptslide { cursor: pointer; }
+  .pptv-rail .pptslide.on { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .pptv-bar { flex: none; display: flex; align-items: center;
+              justify-content: center; gap: 12px; }
+  .pptv-nav, .pptv-close, .pptv a.tbtn { background: var(--card);
+                                          border: 1px solid transparent;
+                                          color: var(--ink); border-radius: 5px;
+                                          min-height: 36px; min-width: 36px;
+                                          padding: 4px 16px; font-size: 15px;
+                                          line-height: 1; cursor: pointer;
+                                          text-decoration: none; font-family: inherit; }
+  .pptv a.tbtn { font-size: 13px; display: inline-flex; align-items: center; }
+  /* hover 用 token 不用硬编码 #fff：纸面提亮一档，暗底下也跟全局一致 */
+  .pptv-nav:hover, .pptv-close:hover, .pptv a.tbtn:hover { background: var(--paper-deep); }
   .pptv-nav:disabled { opacity: 0.35; cursor: default; background: var(--card); }
   .pptv-count { font-family: var(--mono); font-size: 13px; color: var(--paper);
                 min-width: 64px; text-align: center; }
-  .pptv-close { position: absolute; top: 16px; right: 18px; padding: 4px 12px; }
+  .pptv-close { padding: 4px 12px; }
+
+  /* 全屏打开时锁死背后滚动：#log 设 overflow:hidden 会保留滚动位置，
+     关掉浮层回到原处；否则桌面端滚轮一晃，整页对话跟着跑 */
+  body.ppt-open #log, body.ppt-open .hall-body, body.ppt-open .sess { overflow: hidden; }
+
+  @media (max-width: 640px) {
+    /* 手机竖屏：顶栏两行不至于把页题挤没 */
+    .pptv-top { flex-wrap: wrap; gap: 6px 10px; }
+    .pptv-ptitle { flex-basis: 100%; order: 3; }
+    /* 竖屏的 16:9 舞台受宽度所限，高不过 200px 出头；硬让它留在中间，
+       body 会空出 400px 以上的大片白。改成缩略图条接管剩余高度并允许多
+       行——舞台贴近顶栏，翻页导航反而更好使，页多时条内自己滚 */
+    .pptv-body { flex: 0 0 auto; }
+    .pptv-rail { flex: 1 1 auto; min-height: 0; flex-wrap: wrap;
+                 align-content: flex-start; overflow-x: hidden; overflow-y: auto;
+                 overscroll-behavior-y: contain; }
+    .pptv-rail .pptslide { width: 128px; }
+    .pptv-rail .pptslide .pt-title { font-size: 9px; }
+    .pptv-rail .pptslide .pt-sub { font-size: 5.5px; }
+    .pptv-rail .pptslide .pt-list { font-size: 5.5px; }
+    .pptv-rail .pptslide .pt-table { font-size: 4.5px; }
+    .pptv-rail .pptslide .pt-row .pt-li { font-size: 6px; }
+    .pptv-rail .pptslide .pt-num { width: 9px; height: 9px; font-size: 5px; }
+  }
 
   /* 思考过程：独立建模成草稿卡片。与工具卡片同族但更轻（虚线框、无底色），
      内容用楷体灰字小一号——正文是系统黑体 15px，这里是 --kai 13px，两级层次

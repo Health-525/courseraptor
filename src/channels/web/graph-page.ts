@@ -1281,6 +1281,25 @@ export function graphPage(
 
   /* ── 刷新 ── */
 
+  /* ── URL 深链：?bookId= 让画板可分享、可刷新还原 ──
+     地址栏跟着当前书走：从对话的图谱卡点「打开画板」带 id 进来，这里直接
+     选中那本书；手动切书也回写 URL，复制链接发给别人打开还是同一本书。
+     用 replaceState 而非 hash：查询串不进历史栈，后退不会在书与书之间
+     弹来弹去（那正是用户说的「路由有点问题」）。 */
+  var urlBook = "";
+  try {
+    var m = /(?:\\?|&)bookId=([^&]+)/.exec(location.search || "");
+    if (m) urlBook = decodeURIComponent(m[1]);
+  } catch (e) {}
+
+  function syncUrlBook() {
+    if (DEMO || !state.bookId || state.bookId === urlBook) return;
+    urlBook = state.bookId;
+    try {
+      history.replaceState(null, "", location.pathname + "?bookId=" + encodeURIComponent(state.bookId));
+    } catch (e) {}
+  }
+
   function fetchBook() {
     if (DEMO) { state.snapshot = DEMO_DATA; state.books = DEMO_DATA ? [{ id: DEMO_DATA.bookId, title: "红楼梦", personCount: DEMO_DATA.persons.length, relationCount: DEMO_DATA.relations.length }] : []; render(); return Promise.resolve(); }
     return api("/api/graph?bookId=" + encodeURIComponent(state.bookId || ""))
@@ -1296,6 +1315,7 @@ export function graphPage(
                                relationCount: (d.snapshot && d.snapshot.relations.length) || 0 });
           }
         }
+        syncUrlBook();
         render();
       });
   }
@@ -1305,7 +1325,13 @@ export function graphPage(
     return loadBooks()
       .then(function (books) {
         state.books = books || [];
-        if (!state.bookId && state.books.length) state.bookId = state.books[0].id;
+        // 深链优先：URL 里指定的书存在就开它；不在书单里（链接过期/换机）
+        // 才回落到默认书，回写 URL 时自然会把过期 id 换掉
+        if (urlBook && state.books.some(function (b) { return b.id === urlBook; })) {
+          state.bookId = urlBook;
+        } else if (!state.bookId && state.books.length) {
+          state.bookId = state.books[0].id;
+        }
         var b = activeBook();
         if (b && b.title === "未命名" && state.books.length > 1) state.bookId = state.books[1].id;
         return fetchBook();
