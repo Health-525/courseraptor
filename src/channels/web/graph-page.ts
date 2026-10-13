@@ -10,10 +10,17 @@
  * 写的分层算法（BFS 分层 + 层内排序 + 重心对齐），输出 SVG——功能上够用，
  * 且顺手拿到矢量缩放与打印清晰度。
  *
+ * 画板交互契约：
+ * - 布局只在「首次 / 重新布局 / 可见人物变化超过四成」时重算；其余时候
+ *   位置从 localStorage 按书恢复，刷新与 60 秒自动刷新都不复位。
+ * - 新增人物走增量放置（挂在已定位邻居旁边），不推倒重排——边聊边看图时
+ *   画面不会乱跳。
+ * - 拖动节点只改被拖节点与相连边，不重跑布局（早先每次 move 都整图重绘
+ *   且重跑 layout，拖动实际被布局冲掉，根本拖不动）。
+ *
  * 数据来自 GET /api/graph（纯本地 data/graph.json，不登录教务、不调模型），
- * 删除走 POST /api/graph/person|relation/delete。页面每 60 秒与切回标签页
- * 时自行刷新；拖动节点的位置记在内存（刷新即复位，不落盘——图谱本体才是
- * 权威，布局是视图状态）。
+ * 删除走 POST /api/graph/person|relation/delete（页面上二次确认后才发）。
+ * 页面每 60 秒与切回标签页时自行刷新。
  */
 
 import { GRAPH_CATEGORIES } from "../../core/graph-categories";
@@ -126,7 +133,20 @@ export function graphPage(
   .board-bar .bb-title { font-family: var(--kai); font-size: 17px; letter-spacing: 1px; }
   .board-bar .bb-count { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
   .board-bar .bb-spacer { flex: 1; }
-  .board-hint { font-size: 12px; color: var(--ink-3); padding: 0 20px; background: var(--paper); }
+  .board-hint { font-size: 12px; color: var(--ink-3); padding: 0 20px; background: var(--paper);
+                margin: 0; line-height: 1.6; }
+
+  .bb-search { display: inline-flex; align-items: center; gap: 6px; background: var(--card);
+               border: 1px solid var(--rule-2); border-radius: 8px; padding: 1px 8px; }
+  .bb-search:focus-within { border-color: var(--accent); }
+  .bb-search input { border: none; outline: none; background: none; font-family: inherit;
+                     font-size: 13px; width: 108px; color: var(--ink); padding: 5px 0; }
+  .bb-search .cnt { font-family: var(--mono); font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+
+  .bb-zoom { display: inline-flex; align-items: center; gap: 4px; }
+  .bb-zoom .tbtn { min-height: 30px; padding: 0 10px; font-size: 15px; line-height: 1; }
+  .bb-zpct { font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+             min-width: 40px; text-align: center; }
 
   .canvas-wrap { flex: 1; position: relative; overflow: hidden; background: var(--shade); touch-action: none; }
   .canvas-wrap svg { display: block; width: 100%; height: 100%; cursor: grab; }
@@ -136,7 +156,8 @@ export function graphPage(
   .edge-hit { fill: none; stroke: transparent; stroke-width: 14; cursor: pointer; }
   .edge-label { font-family: var(--sans); font-size: 10px; fill: #5C5142; text-anchor: middle;
                 dominant-baseline: central; pointer-events: none; }
-  .edge-label-bg { fill: #FBF7EC; fill-opacity: .96; stroke: #E1DCCF; stroke-width: .5; }
+  .edge-label-bg { fill: #FBF7EC; fill-opacity: .96; stroke: #E1DCCF; stroke-width: .5;
+                   pointer-events: none; }
 
   .node { cursor: move; }
   .node-box { fill: var(--card); stroke: var(--rule-2); stroke-width: 1; rx: 9; }
@@ -145,6 +166,15 @@ export function graphPage(
   .node-alias { font-family: var(--mono); font-size: 9px; fill: var(--ink-3); text-anchor: middle; pointer-events: none; }
   .node-note { font-family: var(--sans); font-size: 9px; fill: var(--ink-3); text-anchor: middle; pointer-events: none; }
   .node-imp { fill: var(--accent); }
+
+  /* 聚焦态：悬停人物 / 悬停连线 / 查找命中时，无关元素淡出 */
+  g.gedge, .node { transition: opacity .15s ease; }
+  .focusing .node:not(.hl):not(.nb) { opacity: .26; }
+  .focusing g.gedge:not(.hl) { opacity: .07; }
+  .node.hl .node-box { stroke: var(--accent); stroke-width: 2; }
+  g.gedge.hl .edge { stroke-width: 2.6; }
+  g.gedge.sel .edge { stroke-width: 2.6; }
+  g.gedge.sel .edge-label { fill: var(--accent-deep); }
 
   .empty { position: absolute; inset: 0; display: flex; flex-direction: column;
            align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 24px; }
@@ -156,11 +186,15 @@ export function graphPage(
   .delbar { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%);
             display: flex; gap: 10px; align-items: center; background: var(--card);
             border: 1px solid var(--rule-2); border-radius: 999px; padding: 8px 10px 8px 18px;
-            box-shadow: 0 10px 28px rgba(50, 42, 31, 0.12); font-size: 13px; max-width: calc(100% - 40px); }
+            box-shadow: 0 10px 28px rgba(50, 42, 31, 0.12); font-size: 13px; max-width: calc(100% - 40px);
+            /* 只有按钮可点：条子浮在画布上，别把底下的节点一起挡住吞掉 */
+            pointer-events: none; }
+  .delbar .tbtn { pointer-events: auto; }
   .delbar b { font-weight: 500; }
   .delbar .tbtn { min-height: 30px; padding: 3px 12px; font-size: 13px; border-radius: 999px; }
   .delbar .tbtn.danger { border-color: var(--accent); color: var(--accent); }
   .delbar .tbtn.danger:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .delbar .tbtn.danger.solid { background: var(--accent); color: #fff; border-color: var(--accent); }
   .delbar .tbtn.ghost { border-color: transparent; color: var(--ink-3); }
   .delbar .tbtn.ghost:hover { background: var(--paper); border-color: var(--rule-2); }
 
@@ -173,6 +207,11 @@ export function graphPage(
     main { grid-template-columns: 1fr; }
     .gn-rail { position: static; max-height: none; min-height: 0; border-right: none;
                border-bottom: 1px solid var(--rule); }
+    /* 画板在窄屏是独立一行，不给下限高度 flex:1 会塌成 0，SVG 直接消失 */
+    .board { min-height: 72vh; }
+    .board-bar { padding: 10px 14px; gap: 8px; }
+    .board-hint { padding: 0 14px; }
+    .bb-search input { width: 80px; }
   }
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
@@ -220,10 +259,19 @@ export function graphPage(
       <span class="bb-title" id="bb-title">—</span>
       <span class="bb-count" id="bb-count"></span>
       <span class="bb-spacer"></span>
-      <button class="tbtn" id="btn-relayout" type="button">重新布局</button>
-      <button class="tbtn" id="btn-fit" type="button">适应窗口</button>
+      <span class="bb-search">
+        <input id="q" type="search" placeholder="查找人物" autocomplete="off" aria-label="按人名或别名查找">
+        <span class="cnt" id="q-cnt"></span>
+      </span>
+      <span class="bb-zoom">
+        <button class="tbtn" id="btn-zout" type="button" title="缩小（-）">−</button>
+        <span class="bb-zpct" id="zoom-pct">100%</span>
+        <button class="tbtn" id="btn-zin" type="button" title="放大（+）">＋</button>
+      </span>
+      <button class="tbtn" id="btn-relayout" type="button" title="忘掉手动位置，重新自动布局">重新布局</button>
+      <button class="tbtn" id="btn-fit" type="button" title="缩放以适应窗口（0）">适应窗口</button>
     </div>
-    <p class="board-hint" id="hint">拖动人物可调整位置；点选人物或连线后可删除。位置只在本页有效，刷新即复位。</p>
+    <p class="board-hint" id="hint">拖动人物调整位置，位置自动记住；滚轮 / 双指缩放，双击节点居中；悬停高亮关系；点选人物或连线后可删除；顶栏可按人名查找。</p>
     <div class="canvas-wrap" id="wrap">
       <div class="toast" id="toast"></div>
     </div>
@@ -239,15 +287,19 @@ export function graphPage(
 
   var NODE_W = 150, NODE_H = 58, RANK_GAP = 130, NODE_GAP = 22, PAD = 40;
   var SVG_NS = "http://www.w3.org/2000/svg";
+  var LS_PREFIX = "raptor-graph-pos-v1:";
 
   var el = function (id) { return document.getElementById(id); };
   var wrap = el("wrap"), booksEl = el("books"), catsEl = el("cats");
   var toastEl = el("toast"), titleEl = el("bb-title"), countEl = el("bb-count");
-  var hintEl = el("hint");
+  var hintEl = el("hint"), qEl = el("q"), qCnt = el("q-cnt"), zoomEl = el("zoom-pct");
 
-  var state = { bookId: null, snapshot: null, books: [], hidden: {}, sel: null };
+  var state = { bookId: null, snapshot: null, books: [], hidden: {}, sel: null,
+                arm: false, vd: { persons: [], relations: [] } };
   var view = { x: 0, y: 0, k: 1 };
-  var svg = null, gRoot = null, pos = {}, drag = null, panning = null, busy = false;
+  var svg = null, gRoot = null, pos = {}, drag = null, panning = null, pinch = null, busy = false;
+  var nodeEls = {}, edgeEls = {}, pointers = {}, query = "", viewTouched = false;
+  var emptyOn = false;
 
   function el1(tag, cls) { var n = document.createElementNS(SVG_NS, tag); if (cls) n.setAttribute("class", cls); return n; }
 
@@ -297,20 +349,65 @@ export function graphPage(
     return state.books[0] || null;
   }
 
+  function findPersonById(id) {
+    var s = state.snapshot;
+    if (!s) return null;
+    for (var i = 0; i < s.persons.length; i++) if (s.persons[i].id === id) return s.persons[i];
+    return null;
+  }
+
+  /* ── 位置记忆（localStorage，按书存）
+     布局是视图状态而非数据，但「刷新即复位」逼着人每次重排，所以按书记住。
+     只认「当前可见人物全都有存档」的快照；新增人物走增量放置，不推倒重排。 */
+
+  function loadPos(ids) {
+    if (DEMO) return null;
+    try {
+      var raw = localStorage.getItem(LS_PREFIX + (state.bookId || ""));
+      if (!raw) return null;
+      var saved = JSON.parse(raw);
+      if (!saved || typeof saved !== "object") return null;
+      var out = {}, have = 0;
+      for (var i = 0; i < ids.length; i++) {
+        var p = saved[ids[i]];
+        if (p && typeof p.x === "number" && typeof p.y === "number" && isFinite(p.x) && isFinite(p.y)) {
+          out[ids[i]] = { x: p.x, y: p.y };
+          have++;
+        }
+      }
+      return { pos: out, have: have };
+    } catch (e) { return null; }
+  }
+
+  function savePos() {
+    if (DEMO) return;
+    try {
+      var out = {};
+      for (var id in pos) {
+        if (!pos[id]) continue;
+        out[id] = { x: Math.round(pos[id].x * 10) / 10, y: Math.round(pos[id].y * 10) / 10 };
+      }
+      localStorage.setItem(LS_PREFIX + (state.bookId || ""), JSON.stringify(out));
+    } catch (e) { /* 隐私模式等场景下记不住就记不住，不碍事 */ }
+  }
+
+  function clearPos() {
+    if (DEMO) return;
+    try { localStorage.removeItem(LS_PREFIX + (state.bookId || "")); } catch (e) {}
+  }
+
   /* ── 分层布局：BFS 定层 + 层内重心对齐
      替代 dagre：图规模（几百节点）下够用，且不引依赖。
      无向关系入度出度都算，避免孤立成孤岛 */
-  function layout(snapshot, persons, edges) {
+  function layout(persons, edges) {
     var byId = {};
     for (var i = 0; i < persons.length; i++) byId[persons[i].id] = persons[i];
 
     var deg = {}, adj = {};
     for (var k in byId) { deg[k] = 0; adj[k] = []; }
-    var pairs = [];
     for (var j = 0; j < edges.length; j++) {
       var e = edges[j];
       if (!byId[e.source] || !byId[e.target] || e.source === e.target) continue;
-      pairs.push([e.source, e.target]);
       deg[e.source]++; deg[e.target]++;
       adj[e.source].push(e.target);
       adj[e.target].push(e.source);
@@ -389,19 +486,94 @@ export function graphPage(
       }
     }
 
-    // 各层整体垂直居中对齐到共同中线：分层布局不居中会整体偏上
-    var center = 0;
-    for (var idc in pos) center += pos[idc].y + NODE_H / 2;
-    center = center / Math.max(1, Object.keys(pos).length);
-    for (var idd in pos) pos[idd].y = pos[idd].y + center - NODE_H / 2 - PAD;
+    // 整体对齐：把包围盒顶端挪到 PAD。按节点中心求均值会偏（均值不是边缘），
+    // 收敛后各层分布早已不匀，只有包围盒能保证顶端不悬空、不陷进负坐标——
+    // 早先这里用均值平移还把符号写反了，图形被整体推到 y≈1000+，fit() 按
+    // (0,0) 原点居中直接失效，「适应窗口」收不进来，下半图点不到
+    var minY = 1e9;
+    for (var idc in pos) minY = Math.min(minY, pos[idc].y);
+    var dy = PAD - minY;
+    for (var idd in pos) pos[idd].y = pos[idd].y + dy;
+  }
 
-    var maxX = 0, minY = 1e9, maxY = -1e9;
-    for (var id5 in pos) {
-      maxX = Math.max(maxX, pos[id5].x + NODE_W);
-      minY = Math.min(minY, pos[id5].y);
-      maxY = Math.max(maxY, pos[id5].y + NODE_H);
+  function boundsOf() {
+    var minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9, any = false;
+    for (var id in pos) {
+      if (!pos[id]) continue;
+      any = true;
+      minX = Math.min(minX, pos[id].x);
+      minY = Math.min(minY, pos[id].y);
+      maxX = Math.max(maxX, pos[id].x + NODE_W);
+      maxY = Math.max(maxY, pos[id].y + NODE_H);
     }
-    return { w: maxX + PAD, h: maxY - minY + PAD * 2, pairs: pairs };
+    if (!any) return { w: 0, h: 0, minX: 0, minY: 0 };
+    return { w: maxX - minX + PAD * 2, h: maxY - minY + PAD * 2, minX: minX, minY: minY };
+  }
+
+  function freeSpot(x, y, placed) {
+    for (var guard = 0; guard < 60; guard++) {
+      var clash = false;
+      for (var i = 0; i < placed.length; i++) {
+        if (Math.abs(placed[i].x - x) < NODE_W + 10 && Math.abs(placed[i].y - y) < NODE_H + 10) { clash = true; break; }
+      }
+      if (!clash) break;
+      y += NODE_H + NODE_GAP;
+    }
+    return { x: x, y: y };
+  }
+
+  /* 决定这一帧的位置：全量重排 / 读档 / 增量补放。
+     增量放置让「对话里刚加了一个人」只长一个新节点，不推倒重排。 */
+  function positionsFor(vd) {
+    var ids = [];
+    for (var i = 0; i < vd.persons.length; i++) ids.push(vd.persons[i].id);
+    var saved = loadPos(ids);
+    if (!saved || saved.have === 0 || saved.have < ids.length * 0.6) {
+      pos = {};
+      layout(vd.persons, vd.relations);
+      return;
+    }
+    pos = {};
+    for (var k in saved.pos) pos[k] = { x: saved.pos[k].x, y: saved.pos[k].y };
+    var byId = {};
+    for (var i2 = 0; i2 < vd.persons.length; i2++) byId[vd.persons[i2].id] = vd.persons[i2];
+    var adj = {};
+    for (var j = 0; j < vd.relations.length; j++) {
+      var e = vd.relations[j];
+      if (!byId[e.sourceId] || !byId[e.targetId] || e.sourceId === e.targetId) continue;
+      (adj[e.sourceId] || (adj[e.sourceId] = [])).push(e.targetId);
+      (adj[e.targetId] || (adj[e.targetId] = [])).push(e.sourceId);
+    }
+    var placed = [], maxX = 0;
+    for (var id in pos) { placed.push({ x: pos[id].x, y: pos[id].y }); maxX = Math.max(maxX, pos[id].x + NODE_W); }
+    for (var m = 0; m < ids.length; m++) {
+      var pid = ids[m];
+      if (pos[pid]) continue;
+      var nb = adj[pid] || [], sx = 0, sy = 0, c = 0;
+      for (var n = 0; n < nb.length; n++) {
+        var q = pos[nb[n]];
+        if (q) { sx += q.x; sy += q.y; c++; }
+      }
+      var fin = c > 0
+        ? freeSpot(sx / c + NODE_W + RANK_GAP, sy / c, placed)
+        : freeSpot(maxX + NODE_W + RANK_GAP, PAD, placed);
+      pos[pid] = fin;
+      placed.push(fin);
+      maxX = Math.max(maxX, fin.x + NODE_W);
+    }
+  }
+
+  /* 连线几何：从右侧出、左侧入；目标在左侧时改走左侧出线，线不会从卡片里穿出来 */
+  function edgeGeom(a, b) {
+    var x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2;
+    var x2 = b.x, y2 = b.y + NODE_H / 2;
+    var flip = false;
+    if (x2 < x1) { flip = true; x1 = a.x; x2 = b.x + NODE_W; }
+    var mid = (x1 + x2) / 2;
+    var d = flip
+      ? "M" + x1 + " " + y1 + " C" + (x1 - 45) + " " + y1 + " " + (x2 + 45) + " " + y2 + " " + x2 + " " + y2
+      : "M" + x1 + " " + y1 + " C" + mid + " " + y1 + " " + mid + " " + y2 + " " + x2 + " " + y2;
+    return { d: d };
   }
 
   /* ── 渲染 ── */
@@ -425,6 +597,7 @@ export function graphPage(
     var book = activeBook();
     titleEl.textContent = book ? "《" + book.title + "》" : "未选择";
     var vd = visibleData();
+    state.vd = vd;
     var shown = vd.relations.length;
     countEl.textContent = vd.persons.length + " 人物 · " + shown + " 关系" + (s && shown < s.relations.length ? "（已隐藏 " + (s.relations.length - shown) + " 条）" : "");
 
@@ -440,6 +613,7 @@ export function graphPage(
     if (vd.persons.length) { if (emptyOn) { hintEl.style.display = ""; emptyOn = false; } return; }
     emptyOn = true;
     hintEl.style.display = "none";
+    clearHover();
     var d = document.createElement("div");
     d.className = "empty";
     var h = document.createElement("h2");
@@ -454,7 +628,6 @@ export function graphPage(
     wrap.appendChild(d);
     if (svg) { svg.remove(); svg = null; }
   }
-  var emptyOn = false;
 
   function renderBooks() {
     booksEl.textContent = "";
@@ -473,7 +646,8 @@ export function graphPage(
         btn.addEventListener("click", function () {
           if (state.bookId === id || busy) return;
           state.bookId = id;
-          fetchBook();
+          viewTouched = false;
+          Promise.resolve(fetchBook()).then(function () { fit(); });
         });
       })(b.id);
       booksEl.appendChild(btn);
@@ -510,52 +684,46 @@ export function graphPage(
     }
   }
 
-  function drawBoard(vd) {
-    if (!svg) {
-      svg = el1("svg");
-      gRoot = el1("g");
-      svg.appendChild(gRoot);
-      wrap.appendChild(svg);
-      bindBoardEvents();
-    }
+  function ensureBoard() {
+    if (svg) return;
+    svg = el1("svg");
+    svg.setAttribute("role", "application");
+    svg.setAttribute("aria-label", "人物关系画板");
+    gRoot = el1("g");
+    svg.appendChild(gRoot);
+    wrap.appendChild(svg);
+    bindBoardEvents();
+  }
+
+  /* keep=true：保留当前 pos 只重画（拖动落点、删除后刷新等），不重算布局 */
+  function drawBoard(vd, keep) {
+    ensureBoard();
     gRoot.textContent = "";
+    nodeEls = {}; edgeEls = {};
 
-    if (!vd.persons.length) { applyView(); return; }
+    if (!vd.persons.length) { state._board = null; applyView(); return; }
 
-    pos = {};
-    var lay = layout(state.snapshot, vd.persons, vd.relations);
+    if (!keep) positionsFor(vd);
+
+    var byId = {};
+    for (var i = 0; i < vd.persons.length; i++) byId[vd.persons[i].id] = vd.persons[i];
     // 标签占位表：每轮重绘重建，用于关系词之间的纵向避让
     var labelSlots = [];
 
     // 连线在下、节点在上：SVG 无 z-index，全靠插入顺序
-    var byId = {};
-    for (var i = 0; i < vd.persons.length; i++) byId[vd.persons[i].id] = vd.persons[i];
-
     for (var j = 0; j < vd.relations.length; j++) {
       var r = vd.relations[j];
-      var a = pos[r.sourceId], b = pos[r.targetId];
-      if (!a || !b) continue;
+      var pa = pos[r.sourceId], pb = pos[r.targetId];
+      if (!pa || !pb) continue;
       var cat = CATEGORIES[r.category] || CATEGORIES.other;
-      var x1 = a.x + NODE_W, y1 = a.y + NODE_H / 2;
-      var x2 = b.x, y2 = b.y + NODE_H / 2;
-      // 从右侧出、左侧入：目标在左侧时改走左侧出线，线不会从卡片里穿出来
-      var flip = false;
-      if (x2 < x1) { flip = true; x1 = a.x; x2 = b.x + NODE_W; y1 = a.y + NODE_H / 2; y2 = b.y + NODE_H / 2; }
-      var mid = (x1 + x2) / 2;
-      var d = flip
-        ? "M" + x1 + " " + y1 + " C" + (x1 - 45) + " " + y1 + " " + (x2 + 45) + " " + y2 + " " + x2 + " " + y2
-        : "M" + x1 + " " + y1 + " C" + mid + " " + y1 + " " + mid + " " + y2 + " " + x2 + " " + y2;
+      var gm = edgeGeom(pa, pb);
 
-      var hit = el1("path", "edge-hit");
-      hit.setAttribute("d", d);
-      hit.addEventListener("click", (function (rel) {
-        return function (ev) { ev.stopPropagation(); selectRel(rel.id); };
-      })(r.id));
-      gRoot.appendChild(hit);
+      var ge = el1("g", "gedge");
+      ge.setAttribute("data-rel", r.id);
+      var tt = el1("title");
+      tt.textContent = (r.sourceName || "?") + " —" + (r.label || "?") + "→ " + (r.targetName || "?");
+      ge.appendChild(tt);
 
-      var path = el1("path", "edge");
-      path.setAttribute("d", d);
-      path.setAttribute("stroke", cat.color);
       if (r.directed) {
         var mk = el1("marker");
         mk.setAttribute("id", "arw-" + r.id);
@@ -567,16 +735,20 @@ export function graphPage(
         mp.setAttribute("d", "M0 0 L10 5 L0 10 z");
         mp.setAttribute("fill", cat.color);
         mk.appendChild(mp);
-        gRoot.appendChild(mk);
-        path.setAttribute("marker-end", "url(#arw-" + r.id + ")");
+        ge.appendChild(mk);
       }
-      gRoot.appendChild(path);
+
+      var path = el1("path", "edge");
+      path.setAttribute("d", gm.d);
+      path.setAttribute("stroke", cat.color);
+      if (r.directed) path.setAttribute("marker-end", "url(#arw-" + r.id + ")");
+      ge.appendChild(path);
 
       // 关系词标签：落在曲线 38% 处而非正中。加白底免得压线看不清。
       // 中点对「多边共用同一端点」是重灾区——宝玉连着十几个人，中点全撞在
       // 一处变成一团糊字，所以按 x/y 占位做纵向避让。
-      var lx = a.x + (x2 - a.x) * 0.38 + NODE_W / 2;
-      var ly = a.y + (y2 - a.y) * 0.38 + NODE_H / 2;
+      var lx = pa.x + (pb.x - pa.x) * 0.38 + NODE_W / 2;
+      var ly = pa.y + (pb.y - pa.y) * 0.38 + NODE_H / 2;
       var label = r.label || "";
       var wpx = label.length * 11 + 12;
       for (var guard = 0; guard < 12; guard++) {
@@ -593,11 +765,22 @@ export function graphPage(
       bg.setAttribute("x", lx - wpx / 2); bg.setAttribute("y", ly - 9);
       bg.setAttribute("width", wpx); bg.setAttribute("height", 18);
       bg.setAttribute("rx", 4);
-      gRoot.appendChild(bg);
+      ge.appendChild(bg);
       var tx = el1("text", "edge-label");
       tx.setAttribute("x", lx); tx.setAttribute("y", ly);
       tx.textContent = label;
-      gRoot.appendChild(tx);
+      ge.appendChild(tx);
+
+      // 命中区放最上面（组内最后）：透明粗线在细线底下会点不中
+      var hit = el1("path", "edge-hit");
+      hit.setAttribute("d", gm.d);
+      hit.addEventListener("click", (function (rel) {
+        return function (ev) { ev.stopPropagation(); selectRel(rel.id); };
+      })(r));
+      ge.appendChild(hit);
+
+      gRoot.appendChild(ge);
+      edgeEls[r.id] = { g: ge, a: r.sourceId, b: r.targetId, path: path, hit: hit, bg: bg, tx: tx, w: wpx };
     }
 
     for (var m = 0; m < vd.persons.length; m++) {
@@ -605,8 +788,12 @@ export function graphPage(
       var p0 = pos[p.id];
       if (!p0) continue;
       var g = el1("g", "node");
-      if (state.sel && state.sel.kind === "person" && state.sel.id === p.id) g.classList.add("sel");
+      g.setAttribute("data-pid", p.id);
       g.setAttribute("transform", "translate(" + p0.x + "," + p0.y + ")");
+      var ntt = el1("title");
+      ntt.textContent = p.name + (p.note ? " · " + p.note : "") +
+        (p.aliases && p.aliases.length ? "（" + p.aliases.join("、") + "）" : "");
+      g.appendChild(ntt);
 
       var box = el1("rect", "node-box");
       box.setAttribute("width", NODE_W);
@@ -644,19 +831,37 @@ export function graphPage(
         g.appendChild(dot);
       }
 
-      g.addEventListener("pointerdown", (function (pid, pp) {
-        return function (ev) { startNodeDrag(ev, pid, pp); };
-      })(p.id, p));
+      nodeEls[p.id] = g;
       gRoot.appendChild(g);
     }
 
-    state._board = { w: lay.w, h: lay.h };
+    var b = boundsOf();
+    state._board = { w: b.w, h: b.h, minX: b.minX, minY: b.minY };
+    savePos();
+    applySelection();
     applyView();
+    if (query) applySearch();
+  }
+
+  /* 拖动中只刷相连的边与标签（不做全局避让，落点那一帧才重排） */
+  function refreshEdge(rid) {
+    var e = edgeEls[rid];
+    if (!e) return;
+    var pa = pos[e.a], pb = pos[e.b];
+    if (!pa || !pb) return;
+    var d = edgeGeom(pa, pb).d;
+    e.path.setAttribute("d", d);
+    e.hit.setAttribute("d", d);
+    var lx = pa.x + (pb.x - pa.x) * 0.38 + NODE_W / 2;
+    var ly = pa.y + (pb.y - pa.y) * 0.38 + NODE_H / 2;
+    e.bg.setAttribute("x", lx - e.w / 2); e.bg.setAttribute("y", ly - 9);
+    e.tx.setAttribute("x", lx); e.tx.setAttribute("y", ly);
   }
 
   function applyView() {
     if (!svg) return;
     gRoot.setAttribute("transform", "translate(" + view.x + "," + view.y + ") scale(" + view.k + ")");
+    if (zoomEl) zoomEl.textContent = Math.round(view.k * 100) + "%";
   }
 
   function fit() {
@@ -667,54 +872,224 @@ export function graphPage(
     var k = Math.min(r.width / b.w, r.height / b.h, 1.1);
     k = Math.max(k, 0.12);
     view.k = k;
-    view.x = (r.width - b.w * k) / 2;
-    view.y = (r.height - b.h * k) / 2;
+    // 图形坐标不从 (0,0 起步（布局对齐到 PAD、拖动还能拖成负数），
+    // 居中必须把包围盒原点一起补偿掉，否则「适应窗口」收不进下半张图
+    view.x = (r.width - b.w * k) / 2 - b.minX * k;
+    view.y = (r.height - b.h * k) / 2 - b.minY * k;
+    viewTouched = false;
     applyView();
+  }
+
+  function zoomAt(factor, cx, cy) {
+    var k2 = Math.min(2.5, Math.max(0.12, view.k * factor));
+    // 以 (cx,cy) 为锚点缩放：view.x/y 按新旧比例补偿，图形不会从锚点飘走
+    view.x = cx - (cx - view.x) * (k2 / view.k);
+    view.y = cy - (cy - view.y) * (k2 / view.k);
+    view.k = k2;
+    viewTouched = true;
+    applyView();
+  }
+
+  function zoomBy(factor) {
+    var r = wrap.getBoundingClientRect();
+    zoomAt(factor, r.width / 2, r.height / 2);
+  }
+
+  function centerOn(id) {
+    var p0 = pos[id];
+    if (!p0) return;
+    var r = wrap.getBoundingClientRect();
+    view.x = r.width / 2 - (p0.x + NODE_W / 2) * view.k;
+    view.y = r.height / 2 - (p0.y + NODE_H / 2) * view.k;
+    viewTouched = true;
+    applyView();
+  }
+
+  /* ── 聚焦高亮（悬停 / 查找共用） ── */
+
+  function clearHover() {
+    if (!gRoot) return;
+    gRoot.classList.remove("focusing");
+    var olds = gRoot.querySelectorAll(".hl, .nb");
+    for (var i = 0; i < olds.length; i++) olds[i].classList.remove("hl", "nb");
+  }
+
+  function hoverNode(pid) {
+    if (drag || panning || pinch) return;
+    clearHover();
+    var near = {}; near[pid] = 1;
+    var rels = state.vd.relations || [];
+    for (var i = 0; i < rels.length; i++) {
+      if (rels[i].sourceId === pid) near[rels[i].targetId] = 1;
+      if (rels[i].targetId === pid) near[rels[i].sourceId] = 1;
+    }
+    gRoot.classList.add("focusing");
+    for (var id in nodeEls) {
+      if (id === pid) nodeEls[id].classList.add("hl");
+      else if (near[id]) nodeEls[id].classList.add("nb");
+    }
+    for (var rid in edgeEls) {
+      var e = edgeEls[rid];
+      if (e.a === pid || e.b === pid) e.g.classList.add("hl");
+    }
+  }
+
+  function hoverEdge(rid) {
+    if (drag || panning || pinch) return;
+    var e = edgeEls[rid];
+    if (!e) return;
+    clearHover();
+    gRoot.classList.add("focusing");
+    e.g.classList.add("hl");
+    if (nodeEls[e.a]) nodeEls[e.a].classList.add("hl");
+    if (nodeEls[e.b]) nodeEls[e.b].classList.add("hl");
+  }
+
+  function matchIds() {
+    if (!query) return [];
+    var out = [];
+    var ps = state.vd.persons || [];
+    for (var i = 0; i < ps.length; i++) {
+      var p = ps[i];
+      var hay = p.name + " " + (p.aliases || []).join(" ");
+      if (hay.toLowerCase().indexOf(query) >= 0) out.push(p.id);
+    }
+    return out;
+  }
+
+  function applySearch() {
+    clearHover();
+    if (!query) { qCnt.textContent = ""; return; }
+    var hits = matchIds();
+    qCnt.textContent = hits.length ? hits.length + " 个" : "无匹配";
+    if (!hits.length) return;
+    gRoot.classList.add("focusing");
+    for (var i = 0; i < hits.length; i++) {
+      var g = nodeEls[hits[i]];
+      if (g) g.classList.add("hl");
+    }
   }
 
   /* ── 交互 ── */
 
+  function pointerCount() { var n = 0; for (var k in pointers) n++; return n; }
+
+  function pinchGeom() {
+    var ids = Object.keys(pointers);
+    var p1 = pointers[ids[0]], p2 = pointers[ids[1]];
+    var dx = p2.x - p1.x, dy = p2.y - p1.y;
+    return { dist: Math.max(1, Math.sqrt(dx * dx + dy * dy)),
+             mid: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 } };
+  }
+
   function bindBoardEvents() {
+    // 悬停高亮：挂在 svg 上靠事件冒泡收集节点/连线，空白处即清除
+    svg.addEventListener("pointerover", function (ev) {
+      if (drag || panning || pinch) return;
+      var t = ev.target;
+      if (!t || !t.closest) return;
+      var n = t.closest(".node");
+      if (n) { hoverNode(n.getAttribute("data-pid")); return; }
+      var e = t.closest("g.gedge");
+      if (e) { hoverEdge(e.getAttribute("data-rel")); return; }
+      clearHover();
+    });
+    svg.addEventListener("pointerout", function (ev) {
+      if (drag || panning || pinch) return;
+      var to = ev.relatedTarget;
+      if (to && svg.contains(to)) return;
+      clearHover();
+    });
+
     svg.addEventListener("pointerdown", function (ev) {
-      if (ev.target.closest(".node")) return;
+      pointers[ev.pointerId] = { x: ev.clientX, y: ev.clientY };
+      // 第二根手指落下即转入双指捏合，取消节点拖动与平移
+      if (pointerCount() >= 2 && !pinch) {
+        drag = null; panning = null;
+        svg.classList.remove("dragging");
+        var ps = pinchGeom();
+        var r = wrap.getBoundingClientRect();
+        pinch = { d0: ps.dist, mx: ps.mid.x - r.left, my: ps.mid.y - r.top,
+                  vx: view.x, vy: view.y, vk: view.k, pmx: ps.mid.x, pmy: ps.mid.y };
+        try { svg.setPointerCapture(ev.pointerId); } catch (e2) {}
+        return;
+      }
+      var nodeEl = ev.target && ev.target.closest ? ev.target.closest(".node") : null;
+      if (nodeEl) { startNodeDrag(ev, nodeEl.getAttribute("data-pid")); return; }
       clearSel();
       panning = { x: ev.clientX, y: ev.clientY, vx: view.x, vy: view.y };
       svg.classList.add("dragging");
-      svg.setPointerCapture(ev.pointerId);
+      try { svg.setPointerCapture(ev.pointerId); } catch (e3) {}
     });
+
     svg.addEventListener("pointermove", function (ev) {
-      if (!panning) return;
-      view.x = panning.vx + (ev.clientX - panning.x);
-      view.y = panning.vy + (ev.clientY - panning.y);
-      applyView();
+      if (pointers[ev.pointerId]) {
+        pointers[ev.pointerId].x = ev.clientX;
+        pointers[ev.pointerId].y = ev.clientY;
+      }
+      if (pinch) { doPinch(); return; }
+      if (drag) { moveNode(ev); return; }
+      if (panning) {
+        view.x = panning.vx + (ev.clientX - panning.x);
+        view.y = panning.vy + (ev.clientY - panning.y);
+        viewTouched = true;
+        applyView();
+      }
     });
-    var endPan = function (ev) {
-      if (!panning) return;
-      panning = null;
-      svg.classList.remove("dragging");
+
+    var endPtr = function (ev) {
+      delete pointers[ev.pointerId];
+      if (drag) endNodeDrag(ev);
+      else if (panning) {
+        panning = null;
+        svg.classList.remove("dragging");
+      }
+      if (pinch && pointerCount() < 2) pinch = null;
       try { svg.releasePointerCapture(ev.pointerId); } catch (e) {}
     };
-    svg.addEventListener("pointerup", endPan);
-    svg.addEventListener("pointercancel", endPan);
+    svg.addEventListener("pointerup", endPtr);
+    svg.addEventListener("pointercancel", endPtr);
+
     svg.addEventListener("wheel", function (ev) {
       ev.preventDefault();
       var r = wrap.getBoundingClientRect();
-      var mx = ev.clientX - r.left, my = ev.clientY - r.top;
-      var k2 = Math.min(2.5, Math.max(0.12, view.k * (ev.deltaY < 0 ? 1.12 : 1 / 1.12)));
-      // 以指针为锚点缩放：view.x/y 按新旧比例补偿，图形不会从指针下飘走
-      view.x = mx - (mx - view.x) * (k2 / view.k);
-      view.y = my - (my - view.y) * (k2 / view.k);
-      view.k = k2;
-      applyView();
+      zoomAt(ev.deltaY < 0 ? 1.12 : 1 / 1.12, ev.clientX - r.left, ev.clientY - r.top);
     }, { passive: false });
+
+    svg.addEventListener("dblclick", function (ev) {
+      var r = wrap.getBoundingClientRect();
+      var t = ev.target;
+      var nodeEl = t && t.closest ? t.closest(".node") : null;
+      if (nodeEl) {
+        var id = nodeEl.getAttribute("data-pid");
+        if (view.k < 1) view.k = 1;
+        centerOn(id);
+        return;
+      }
+      zoomAt(1.35, ev.clientX - r.left, ev.clientY - r.top);
+    });
   }
 
-  function startNodeDrag(ev, pid, person) {
-    ev.stopPropagation();
-    selectPerson(pid, person);
+  function doPinch() {
+    if (!pinch) return;
+    var ps = pinchGeom();
+    var r = wrap.getBoundingClientRect();
+    var mx = ps.mid.x - r.left, my = ps.mid.y - r.top;
+    var k2 = Math.min(2.5, Math.max(0.12, pinch.vk * (ps.dist / pinch.d0)));
+    // 以起始中点为锚点缩放，再叠加中点的位移当平移
+    view.k = k2;
+    view.x = pinch.mx - (pinch.mx - pinch.vx) * (k2 / pinch.vk) + (mx - pinch.mx);
+    view.y = pinch.my - (pinch.my - pinch.vy) * (k2 / pinch.vk) + (my - pinch.my);
+    viewTouched = true;
+    applyView();
+  }
+
+  function startNodeDrag(ev, pid) {
     var p0 = pos[pid];
+    if (!p0) return;
+    selectPerson(pid);
     drag = { pid: pid, sx: ev.clientX, sy: ev.clientY, ox: p0.x, oy: p0.y, moved: false };
-    svg.setPointerCapture(ev.pointerId);
+    try { svg.setPointerCapture(ev.pointerId); } catch (e) {}
     svg.classList.add("dragging");
   }
 
@@ -723,10 +1098,17 @@ export function graphPage(
     var dx = (ev.clientX - drag.sx) / view.k;
     var dy = (ev.clientY - drag.sy) / view.k;
     if (Math.abs(dx) > 2 || Math.abs(dy) > 2) drag.moved = true;
-    pos[drag.pid].x = drag.ox + dx;
-    pos[drag.pid].y = drag.oy + dy;
-    drawBoard(visibleData());
-    svg.classList.add("dragging");
+    var p0 = pos[drag.pid];
+    p0.x = drag.ox + dx;
+    p0.y = drag.oy + dy;
+    var g = nodeEls[drag.pid];
+    if (g) g.setAttribute("transform", "translate(" + p0.x + "," + p0.y + ")");
+    // 只重画相连的边：整图重绘 + 重跑布局会把位置冲掉（老 bug），且拖动会卡
+    for (var rid in edgeEls) {
+      var e = edgeEls[rid];
+      if (e.a === drag.pid || e.b === drag.pid) refreshEdge(rid);
+    }
+    viewTouched = true;
   }
 
   function endNodeDrag(ev) {
@@ -736,14 +1118,16 @@ export function graphPage(
     svg.classList.remove("dragging");
     try { svg.releasePointerCapture(ev.pointerId); } catch (e) {}
     if (!wasMoved) return;
-    // 拖完重排连线：整图重绘但保留 pos（布局函数只在 relayout 时重置）
-    drawBoard(visibleData());
+    // 落点后整图重绘一轮（标签避让 + 记住位置），但保留 pos 不重排
+    drawBoard(state.vd, true);
   }
 
-  function selectPerson(id, person) {
-    state.sel = { kind: "person", id: id, name: person.name };
+  function selectPerson(id) {
+    var p = findPersonById(id);
+    if (!p) return;
+    state.sel = { kind: "person", id: id, name: p.name };
+    applySelection();
     renderDelBar();
-    render();
   }
 
   function selectRel(id) {
@@ -753,15 +1137,41 @@ export function graphPage(
     for (var i = 0; i < s.relations.length; i++) if (s.relations[i].id === id) r = s.relations[i];
     if (!r) return;
     state.sel = { kind: "relation", id: id, label: r.label, from: r.sourceName, to: r.targetName };
+    applySelection();
     renderDelBar();
-    render();
   }
 
   function clearSel() {
     if (!state.sel) return;
     state.sel = null;
+    state.arm = false;
+    applySelection();
     renderDelBar();
-    render();
+  }
+
+  /* 选中只改样式与删除栏，不重渲书目/类别/画板——老代码整页 render，切个人选整图闪 */
+  function applySelection() {
+    for (var id in nodeEls) {
+      var on = !!state.sel && state.sel.kind === "person" && state.sel.id === id;
+      if (on) nodeEls[id].classList.add("sel");
+      else nodeEls[id].classList.remove("sel");
+    }
+    for (var rid in edgeEls) {
+      var on2 = !!state.sel && state.sel.kind === "relation" && state.sel.id === rid;
+      if (on2) edgeEls[rid].g.classList.add("sel");
+      else edgeEls[rid].g.classList.remove("sel");
+    }
+  }
+
+  function armDelete() {
+    if (!state.sel || DEMO) return;
+    state.arm = true;
+    renderDelBar();
+    clearTimeout(state._armT);
+    state._armT = setTimeout(function () {
+      state.arm = false;
+      renderDelBar();
+    }, 3200);
   }
 
   function renderDelBar() {
@@ -775,10 +1185,14 @@ export function graphPage(
       ? "人物：" + state.sel.name
       : "关系：" + (state.sel.from || "?") + " —" + (state.sel.label || "?") + "→ " + (state.sel.to || "?");
     var yes = document.createElement("button");
-    yes.className = "tbtn danger";
+    yes.className = "tbtn danger" + (state.arm ? " solid" : "");
     yes.type = "button";
-    yes.textContent = "删除";
-    yes.addEventListener("click", doDelete);
+    yes.textContent = state.arm ? "确认删除" : "删除";
+    // 两步确认：误触一次不会真删，3 秒内不确认自动收起
+    yes.addEventListener("click", function () {
+      if (!state.arm) { armDelete(); return; }
+      doDelete();
+    });
     var no = document.createElement("button");
     no.className = "tbtn ghost";
     no.type = "button";
@@ -791,6 +1205,8 @@ export function graphPage(
   function doDelete() {
     if (!state.sel || busy || DEMO) { toast("演示模式不能删除"); return; }
     var sel = state.sel;
+    state.arm = false;
+    clearTimeout(state._armT);
     var path = sel.kind === "person" ? "/api/graph/person/delete" : "/api/graph/relation/delete";
     busy = true;
     api(path, { method: "POST", body: JSON.stringify({ bookId: state.bookId, id: sel.id }) })
@@ -821,32 +1237,58 @@ export function graphPage(
         if (b && b.title === "未命名" && state.books.length > 1) state.bookId = state.books[1].id;
         return fetchBook();
       })
-      .then(function () { if (state._board) fit(); });
+      .then(function () { if (state._board && !viewTouched) fit(); });
   }
 
   el("btn-relayout").addEventListener("click", function () {
-    state._board = null;
+    clearPos();
     render();
     fit();
   });
   el("btn-fit").addEventListener("click", fit);
+  el("btn-zin").addEventListener("click", function () { zoomBy(1.25); });
+  el("btn-zout").addEventListener("click", function () { zoomBy(1 / 1.25); });
   el("btn-export").addEventListener("click", function () {
     if (DEMO) { toast("演示模式没有可导出的数据"); return; }
     window.open("/api/graph/export?bookId=" + encodeURIComponent(state.bookId || ""), "_blank");
   });
 
-  // 节点拖动的 move/up 挂在 svg 上（指针捕获后事件仍指向 svg）
-  document.addEventListener("pointermove", moveNode);
-  document.addEventListener("pointerup", endNodeDrag);
+  qEl.addEventListener("input", function () {
+    query = qEl.value.trim().toLowerCase();
+    applySearch();
+  });
+  qEl.addEventListener("keydown", function (ev) {
+    if (ev.key === "Enter") {
+      var hits = matchIds();
+      if (hits.length) { selectPerson(hits[0]); centerOn(hits[0]); }
+      ev.preventDefault();
+    } else if (ev.key === "Escape") {
+      qEl.value = ""; query = ""; applySearch(); qEl.blur();
+    }
+  });
 
-  window.addEventListener("resize", function () { if (state._board) fit(); });
+  document.addEventListener("keydown", function (ev) {
+    var t = ev.target;
+    var tag = t && t.tagName ? t.tagName : "";
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+      if (ev.key === "Escape" && t.blur) t.blur();
+      return;
+    }
+    if (ev.key === "Escape") { clearSel(); }
+    else if (ev.key === "+" || ev.key === "=") { zoomBy(1.25); }
+    else if (ev.key === "-" || ev.key === "_") { zoomBy(1 / 1.25); }
+    else if (ev.key === "0") { fit(); }
+    else if (ev.key === "Delete" || ev.key === "Backspace") { if (state.sel) armDelete(); }
+  });
+
+  window.addEventListener("resize", function () { if (state._board && !viewTouched) fit(); });
   document.addEventListener("visibilitychange", function () {
-    if (!document.hidden && !busy) refresh();
+    if (!document.hidden && !busy && !drag && !pinch) refresh();
   });
 
   refresh().then(function () {
     if (state._board) fit();
-    setInterval(function () { if (!document.hidden && !busy && !drag) refresh(); }, 60000);
+    setInterval(function () { if (!document.hidden && !busy && !drag && !pinch) refresh(); }, 60000);
   });
 })();
 </script>
