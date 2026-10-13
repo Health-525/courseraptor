@@ -8,6 +8,7 @@ import { appendRound, contextMessages, DEFAULT_ID } from "../../core/chat-sessio
 import { maybeAutoTitle } from "../../core/session-titles";
 import { getUploads, type WebUpload } from "../../core/workspace-data";
 import { agentProvider, type ChatStreamableAgent } from "./web-agent-gate";
+import { graphPayloadOfToolOutput } from "./web-graph-payload";
 import { json } from "./web-http";
 import { pptPreviewOfToolOutput } from "./web-ppt-preview";
 import { translateStream } from "./web-stream-translate";
@@ -206,6 +207,8 @@ async function runTurn(
       const files = filesOfToolOutput(output);
       const pomodoro = pomodoroOfToolOutput(output);
       const ppt = pptPreviewOfToolOutput(output);
+      // 图谱变更：快照过 web-graph-payload 的严格校验后才透出，前端对话区当场重绘
+      const graph = graphPayloadOfToolOutput(output);
       // open_panel：模型点名的面板随事件带给前端自动推出（同 NEED_SETUP 的 panel 通道）
       const openPanel = openPanelIdOf(toolName, clock.inputOf(toolCallId));
       return {
@@ -215,6 +218,8 @@ async function runTurn(
         ...(pomodoro ? { pomodoro } : {}),
         // pptx 成品带预览载荷：前端渲染可翻页的幻灯片预览卡
         ...(ppt ? { ppt } : {}),
+        // 人物图谱变更：对话里每建一条关系，右侧画板当场长出节点与连线
+        ...(graph ? { graph } : {}),
         // manage_pomodoro 的取消/查询也可能改了状态：让页面把
         // 顶部恢复卡等处的倒计时卡对表收掉（10 秒轮询的即时版）
         ...(toolName === "manage_pomodoro" ? { pomoSync: true } : {}),
