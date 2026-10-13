@@ -46,7 +46,7 @@ If you are building agents yourself, the repo doubles as a reference implementat
 | Who is related to whom in this book? | A reading character graph: dictate people and relations as you read ("Bao Yu is Jia Mu's grandson") and they land in a local graph — extraction only, never the model's book knowledge (no spoilers, no pollution); 6 relation categories, a `/graph` canvas, and a live mini-graph redrawn in chat |
 | Can it help me study? | Study-coach mode with methods loaded on demand, so they never occupy the standing context |
 
-The kernel ships **20 tools out of the box**, covering timetables, files and tables, document generation, sandboxed computation, memory, the knowledge base, todos, the study coach, reading character graphs, and settings. See [capabilities](docs/capabilities.md) for the full table.
+The kernel ships **21 tools out of the box**, covering timetables, files and tables, document generation, sandboxed computation, memory, the knowledge base, todos, the study coach, the teaching-skill library, reading character graphs, and settings. See [capabilities](docs/capabilities.md) for the full table.
 
 ## Try it without credentials
 

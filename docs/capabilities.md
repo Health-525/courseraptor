@@ -122,7 +122,8 @@
 - **检验**：答对追问「为什么」防蒙对，答错先给提示不直接给答案；检验知识是按表面特征还是深层原理组织
 - **实践编排**：备考走考试型路径（模板题→变式→交叉→整卷模拟，标建议用时，高频考点优先，错题归因）；练能力走应用型路径
 - **事实优先**：排复习计划前先 `get_schedule` 看真实课程安排、把范围对齐到课表实际进度
-- `read_learning_reference` 工具 | 六篇认知科学参考按需加载：深度理解 / 考试专项策略 / 笔记与阅读系统 / 记忆与专注机制 / 知识结构五维诊断 / 练习编排——只载当前需要的一篇，不占常驻上下文
+- `read_learning_reference` 工具 | 七篇认知科学参考按需加载：深度理解 / 考试专项策略 / 笔记与阅读系统 / 记忆与专注机制 / 知识结构五维诊断 / 练习编排 / 习题课诊断补差——只载当前需要的一篇，不占常驻上下文
+- `read_skill` 工具 | 十篇教学法技能按需加载（原文来自 OpenMAIC 开源 skill 集，MIT）：费曼学习法 / 理解本位设计 UbD / 螺旋式复习 / 学会学习 / 大师讲授 / 互动工作坊 / 职业实训 / 深度交互 / 社会情感学习 / 打造个人技能——管课堂流程与讲法编排，与上一条的方法论分工不同；只收教学法，课堂文档构建类不收
 - 讲透的知识点、错题归因结论，用户认可后可经 `manage_knowledge` 沉淀进知识库，考前直接翻
 
 ---
@@ -205,12 +206,12 @@ npm run qq
 
 ---
 
-## 🧰 开箱工具分层（共 20 个）
+## 🧰 开箱工具分层（共 21 个）
 
-- **内核 18 个**（`src/core/tools/`，与学校无关）：文件与数据四件套（`read_local_file` / `query_table` / `run_js` / `manage_attachments`）、文档写作与转换（`generate_document` / `convert_document`）、PPT 课件两件套（`ppt_preview` / `ppt_save`）、`save_memory`、`manage_todos`、`manage_knowledge`、`manage_graph`、`manage_pomodoro`、`read_learning_reference`、`open_settings`、`open_panel`、`get_weather`、`get_time`
+- **内核 19 个**（`src/core/tools/`，与学校无关）：文件与数据四件套（`read_local_file` / `query_table` / `run_js` / `manage_attachments`）、文档写作与转换（`generate_document` / `convert_document`）、PPT 课件两件套（`ppt_preview` / `ppt_save`）、`save_memory`、`manage_todos`、`manage_knowledge`、`manage_graph`、`manage_pomodoro`、`read_learning_reference`、`read_skill`、`open_settings`、`open_panel`、`get_weather`、`get_time`
 - **课表与校历 2 个**：`get_schedule`（只读本地导入的课表缓存）、`set_holidays`（放假 / 调休落盘）
 
-全部 20 个都只读写本地数据：课表来自你在网页端导入的缓存，其余能力走本机文件、沙箱计算与本地 JSON。
+全部 21 个都只读写本地数据：课表来自你在网页端导入的缓存，其余能力走本机文件、沙箱计算与本地 JSON。
 
 ---
 
