@@ -7,6 +7,10 @@
  */
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 
 const { graphPage } = await import("../src/channels/web/graph-page");
@@ -50,6 +54,21 @@ test("内联脚本自洽：不再开 script 标签、CSRF 读取点在位", () =
   assert.ok(script.length > 5000, "内联脚本被截断了？");
   assert.ok(!script.includes("<script"), "内联脚本里不允许再开 script 标签");
   assert.ok(script.includes('meta[name="csrf-token"]'), "删除请求要读 CSRF meta");
+});
+
+test("内联脚本语法自检：模板字符串转义错误必须当场发现", () => {
+  const html = graphPage();
+  const start = html.indexOf("<script>");
+  const end = html.indexOf("</script>");
+  assert.ok(start > 0 && end > start, "页面必须有一段内联脚本");
+  const code = html.slice(start + 8, end);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-graph-page-"));
+  const file = path.join(dir, "inline.js");
+  fs.writeFileSync(file, code, "utf8");
+  // 页面脚本住在模板字符串里，TS 编译期看不见：正则转义写错（如 \? 被吃成 ?）
+  // 只会在浏览器里炸 SyntaxError，整个画板白屏——对话页早有这道 --check，
+  // 图谱页补上（与 chat-web.test.ts 里知识库页同一手法）
+  execFileSync(process.execPath, ["--check", file], { stdio: "pipe" });
 });
 
 test("类别闭集嵌入页面（图例与连线配色同源）", () => {
