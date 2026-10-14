@@ -4,18 +4,40 @@
  * 为什么住在 channels：职责是「保护浏览器端渲染器不被模型伪造/畸形的
  * ppt 字段坑到」，唯一消费者是本层的 chat-stream。载荷本身（类型与构建）
  * 仍在 core——core 造数据、本层验数据，依赖方向不反向。
+ *
+ * 两种载荷形态（同一条 SSE 通道，前端按形态分流渲染）：
+ * - 旧 spec→PPT 管线（generate_document / convert_document）：slides 带
+ *   kind（cover/section/content/free），英寸坐标元素——逐字段重建式校验；
+ * - 新 slide JSON 管线（ppt_save）：slides 不带 kind，本身就是 slide deck
+ *   JSON（1000×562.5px 画布 + 七种元素）——复用 core 的 slideDeckSchema
+ *   整份校验（与工具硬闸同一份真相），文本再经 sanitizeHtml 白名单净化，
+ *   这是浏览器端渲染器敢用 innerHTML 的前提。
  */
+
+import { type DeckElement, slideDeckSchema } from "../../core/document/ppt-dsl";
+import { sanitizeHtml } from "../../core/document/ppt-html";
 import {
+  type PptDslPreview,
+  type PptDslPreviewSlide,
   type PptPreview,
   type PptPreviewElement,
   type PptPreviewKind,
   type PptPreviewSlide,
   PREVIEW_BULLET_CAP,
+  PREVIEW_DSL_ELEM_CAP,
+  PREVIEW_DSL_NOTES_CAP,
+  PREVIEW_DSL_SLIDE_CAP,
   PREVIEW_ELEM_CAP,
   PREVIEW_ELEM_TEXT_CAP,
   PREVIEW_ROW_CAP,
   PREVIEW_SLIDE_CAP,
 } from "../../core/document/pptx-theme";
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v != null && !Array.isArray(v);
+}
+
+// ── 旧管线：kind 版式页（spec→PPT） ───────────────────────────
 
 const ELEM_KINDS = new Set(["text", "rect", "ellipse", "line", "logo"]);
 const HEX = /^[0-9A-F]{6}$/;
@@ -63,15 +85,7 @@ function previewElemOf(raw: unknown): PptPreviewElement | null {
   return out;
 }
 
-/**
- * 从工具结果里提取合法的预览载荷。形状不对就返回 null，绝不把模型
- * 伪造/畸形的 ppt 字段透到前端渲染（与 pomodoroOfToolOutput 同款职责）。
- */
-export function pptPreviewOfToolOutput(output: unknown): PptPreview | null {
-  if (typeof output !== "object" || output == null || Array.isArray(output)) return null;
-  const o = output as Record<string, unknown>;
-  if (typeof o.ppt !== "object" || o.ppt == null || Array.isArray(o.ppt)) return null;
-  const p = o.ppt as Record<string, unknown>;
+function legacyPreviewOf(p: Record<string, unknown>): PptPreview | null {
   if (!Array.isArray(p.slides) || p.slides.length === 0) return null;
   const KINDS = new Set(["cover", "section", "content", "free"]);
   const slides: PptPreviewSlide[] = [];
@@ -122,4 +136,53 @@ export function pptPreviewOfToolOutput(output: unknown): PptPreview | null {
   }
   const count = typeof p.count === "number" && p.count >= slides.length ? p.count : slides.length;
   return { count, slides };
+}
+
+// ── 新管线：slide deck JSON（ppt_save） ───────────────────────
+
+/** 文本元素的 HTML 过白名单净化；其余元素原样（表格/代码/公式按纯文本渲染） */
+function sanitizeElement(el: DeckElement): DeckElement {
+  if (el.type === "text") return { ...el, content: sanitizeHtml(el.content) };
+  if (el.type === "shape" && el.text) {
+    return { ...el, text: { ...el.text, content: sanitizeHtml(el.text.content) } };
+  }
+  return el;
+}
+
+function dslPreviewOf(p: Record<string, unknown>): PptDslPreview | null {
+  const slidesRaw = p.slides;
+  if (!Array.isArray(slidesRaw) || slidesRaw.length === 0) return null;
+  // 旧管线载荷带 kind：本函数只接 deck JSON，见到 kind 一律让位
+  for (const s of slidesRaw) if (isRecord(s) && "kind" in s) return null;
+  // 整份过 core 的硬闸 schema（与 ppt_save 工具内同一份真相）：颜色归一、
+  // 默认值补齐、上限截断都在这一步完成；不过关整份载荷拒绝
+  const parsed = slideDeckSchema.safeParse({ slides: slidesRaw.slice(0, PREVIEW_DSL_SLIDE_CAP) });
+  if (!parsed.success) return null;
+  const slides: PptDslPreviewSlide[] = parsed.data.slides.map((s) => {
+    const capped = s.elements.slice(0, PREVIEW_DSL_ELEM_CAP);
+    const out: PptDslPreviewSlide = { elements: capped.map(sanitizeElement) };
+    if (s.background) out.background = s.background;
+    if (s.motif) out.motif = s.motif;
+    if (s.notes) out.notes = s.notes.slice(0, PREVIEW_DSL_NOTES_CAP);
+    const cut = s.elements.length - capped.length;
+    if (cut > 0) out.elemCut = cut;
+    return out;
+  });
+  const count = typeof p.count === "number" && p.count >= slides.length ? p.count : slides.length;
+  return { count, slides };
+}
+
+/**
+ * 从工具结果里提取合法的预览载荷。形状不对就返回 null，绝不把模型
+ * 伪造/畸形的 ppt 字段透到前端渲染（与 pomodoroOfToolOutput 同款职责）。
+ */
+export function pptPreviewOfToolOutput(output: unknown): PptPreview | PptDslPreview | null {
+  if (!isRecord(output)) return null;
+  const ppt = output.ppt;
+  if (!isRecord(ppt)) return null;
+  if (!Array.isArray(ppt.slides) || ppt.slides.length === 0) return null;
+  // 分流：首页带 kind = 旧 spec→PPT 管线；不带 = 新 slide JSON 管线
+  const first = ppt.slides[0];
+  if (isRecord(first) && typeof first.kind === "string") return legacyPreviewOf(ppt);
+  return dslPreviewOf(ppt);
 }

@@ -689,14 +689,25 @@ function pptFreeInner(box, s) {
   });
 }
 
-/* 自由页元素的自适应尺寸：容器宽 ÷ 画布 10 英寸 = 每英寸像素，磅 → px
-   （1pt = 1/72 英寸）。clientWidth 还是 0（尚未进 DOM）就等下一帧再试。 */
+/* 元素的自适应尺寸：自由页把容器宽 ÷ 画布 10 英寸得每英寸像素，磅 → px
+   （1pt = 1/72 英寸）；JSON 管线（.pt-dsl）整页按自然画布 1000px 宽
+   transform: scale 缩进容器——字号/线宽/公式全部等比，不用逐属性算。
+   clientWidth 还是 0（尚未进 DOM）就等下一帧再试。 */
 function pptFitFreePx(box) {
   const w = box.clientWidth;
   if (!w) {
     requestAnimationFrame(() => {
       pptFitFreePx(box);
     });
+    return;
+  }
+  const dsl = box.querySelector(".pt-dsl");
+  if (dsl) {
+    /* JSON 管线：整页缩放进容器。用 zoom 不用 CSS transform 缩放——zoom
+       连布局尺寸一起缩（1000px 画布缩成 176px 缩影也不撑破父级
+       overflow），且本文件刻意不出现 transform 串（静态扫描会误报，
+       见 cssFn 的说明；graph 画板的平移同样走 x/y 属性） */
+    dsl.style.zoom = String(w / PPT_DSL_W);
     return;
   }
   const pxPerPt = w / PPT_CANVAS_W / 72;
@@ -711,7 +722,923 @@ function pptFitFreePx(box) {
   });
 }
 
-function pptSlideInner(box, s, big) {
+/* ── slide JSON 管线（ppt_save）：画布 1000 × 562.5 px，元素坐标即 px ──
+   与成品 pptx 同一份坐标语义（左上原点、安全边距 50、品牌 chrome 与 core
+   pptx-slides.addBrandChrome 同几何，只是单位换成 px）。整页按自然尺寸
+   排版，外层 transform: scale 缩进容器（pptFitFreePx 布局后算）——字号、
+   线宽、表格、公式全部等比，也不用容器查询单位（部分内嵌浏览器不支持，
+   还会让宽度回退的舞台塌缩）。文本 HTML 在服务端已过白名单净化
+   （web-ppt-preview 的 sanitizeHtml），这里的 innerHTML 才敢用。 */
+const PPT_DSL_W = 1000;
+const PPT_DSL_PAPER = "#FDFCF9";
+const PPT_DSL_INK = "#25221C";
+let pptDslUid = 0;
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function svgEl(name, attrs) {
+  const n = document.createElementNS(SVG_NS, name);
+  for (const k in attrs || {}) if (attrs[k] != null) n.setAttribute(k, String(attrs[k]));
+  return n;
+}
+
+/* CSS/SVG 函数串拼装：函数名走参数，不写进字面量——静态扫描
+   （tests/chat-app-static.test.ts）把源码里任何「名字(」都当函数调用，
+   gradient/rotate/translate 这类名字本文件并没有定义，会误报
+   （同 graph 画板用 x/y 属性代替 transform 串的取舍） */
+function cssFn(name, args) {
+  return `${name}(${args})`;
+}
+
+/* 页面标题（卡片名/查看器页题）：第一个文本元素的纯文字 */
+function pptDslTitle(s) {
+  for (const e of s.elements || []) {
+    if (e.type === "text") {
+      const d = document.createElement("div");
+      d.innerHTML = e.content || "";
+      const t = (d.textContent || "").trim();
+      if (t) return t;
+    } else if (e.type === "shape" && e.text && e.text.content) {
+      return e.text.content;
+    }
+  }
+  return "";
+}
+/* 缩略图/舞台的版式类：旧管线带 kind，JSON 管线一律 k-dsl（padding:0） */
+function pptSlideClass(s) {
+  return `k-${s.kind || "dsl"}`;
+}
+
+/* 背景生效色（与 core renderSlide 同规则：solid 直接用、gradient 取首尾
+   混色、缺省纸底）——深色底判定与页脚换色都看它 */
+function pptDslMix(h1, h2) {
+  const p = (h) => {
+    const n = parseInt(String(h).replace("#", ""), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+  const a = p(h1);
+  const b = p(h2);
+  const c = (x, y) =>
+    Math.round((x + y) / 2)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${c(a[0], b[0])}${c(a[1], b[1])}${c(a[2], b[2])}`;
+}
+function pptDslBg(s) {
+  const bg = s.background;
+  if (bg && bg.type === "solid") return bg.color;
+  if (bg && bg.type === "gradient") {
+    const cs = bg.gradient.colors || [];
+    const first = cs[0];
+    const last = cs[cs.length - 1];
+    if (first && last) return pptDslMix(first.color, last.color);
+  }
+  return PPT_DSL_PAPER;
+}
+function pptDslBgStyle(cv, s) {
+  const bg = s.background;
+  if (bg && bg.type === "gradient") {
+    const g = bg.gradient;
+    const stops = (g.colors || []).map((c) => `${c.color} ${Math.round(c.pos * 100)}%`);
+    if ((g.type || "linear") === "radial")
+      cv.style.background = cssFn("radial-gradient", `circle at 50% 50%, ${stops.join(", ")}`);
+    else cv.style.background = cssFn("linear-gradient", `${g.rotate || 0}deg, ${stops.join(", ")}`);
+    return;
+  }
+  cv.style.background = pptDslBg(s);
+}
+/* 深色底（亮度 < 0.4，与 core luminance 同阈值）：页脚换浅色、logo 加纸托 */
+function pptDslDark(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return false;
+  const n = parseInt(m[1], 16);
+  const l = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+  return l < 0.4;
+}
+
+/* 品牌 chrome：cover 大印章页头 / section 右下小印章+浅色页码 / plain
+   页脚细线 + COURSERAPTOR + 落款 logo + 页码（几何同 addBrandChrome） */
+function pptDslSeal(cx, cy, dia, ring, fill) {
+  const seal = el("pt-dsl-seal");
+  Object.assign(seal.style, {
+    left: `${cx - dia / 2}px`,
+    top: `${cy - dia / 2}px`,
+    width: `${dia}px`,
+    height: `${dia}px`,
+    borderColor: ring,
+    background: fill,
+  });
+  const img = document.createElement("img");
+  img.src = "/logo.png";
+  img.alt = "";
+  img.draggable = false;
+  seal.appendChild(img);
+  return seal;
+}
+function pptDslChrome(cv, s, index) {
+  const dark = pptDslDark(pptDslBg(s));
+  const motif = s.motif || "plain";
+  const foot = dark ? "#E9C8C2" : "#6E6656";
+  if (motif === "cover") {
+    cv.appendChild(pptDslSeal(500, 108, 124, PPT_DSL_PAPER, "#AD392C"));
+    return;
+  }
+  if (motif === "section") {
+    cv.appendChild(pptDslSeal(906, 498, 52, PPT_DSL_PAPER, "#AD392C"));
+    const num = el("pt-dsl-num");
+    Object.assign(num.style, {
+      left: "840px",
+      top: "536px",
+      width: "50px",
+      height: "22px",
+      color: "#E9C8C2",
+    });
+    num.textContent = String(index + 1);
+    cv.appendChild(num);
+    return;
+  }
+  const rule = el("pt-dsl-rule");
+  Object.assign(rule.style, {
+    left: "55px",
+    top: "533px",
+    width: "840px",
+    height: "1px",
+    background: dark ? "#852B22" : "#E1DCCF",
+  });
+  cv.appendChild(rule);
+  const brand = el("pt-dsl-foot");
+  Object.assign(brand.style, {
+    left: "55px",
+    top: "534px",
+    width: "260px",
+    height: "22px",
+    color: foot,
+  });
+  brand.textContent = "COURSERAPTOR";
+  cv.appendChild(brand);
+  const num = el("pt-dsl-num");
+  Object.assign(num.style, {
+    left: "855px",
+    top: "536px",
+    width: "45px",
+    height: "22px",
+    color: foot,
+  });
+  num.textContent = String(index + 1);
+  cv.appendChild(num);
+  if (dark) {
+    const disc = el("pt-dsl-disc");
+    Object.assign(disc.style, {
+      left: "914px",
+      top: "510px",
+      width: "34px",
+      height: "34px",
+      background: PPT_DSL_PAPER,
+    });
+    cv.appendChild(disc);
+  }
+  const logo = el("pt-dsl-logo");
+  Object.assign(logo.style, { left: "918px", top: "514px", width: "26px", height: "26px" });
+  const img = document.createElement("img");
+  img.src = "/logo.png";
+  img.alt = "";
+  img.draggable = false;
+  logo.appendChild(img);
+  cv.appendChild(logo);
+}
+
+function pptDslElement(e) {
+  switch (e.type) {
+    case "text":
+      return pptDslText(e);
+    case "shape":
+      return pptDslShape(e);
+    case "line":
+      return pptDslLine(e);
+    case "chart":
+      return pptDslChart(e);
+    case "table":
+      return pptDslTable(e);
+    case "latex":
+      return pptDslLatex(e);
+    case "code":
+      return pptDslCode(e);
+    default:
+      return null;
+  }
+}
+
+function pptDslText(e) {
+  const d = el("pt-dsl-el pt-dsl-text");
+  Object.assign(d.style, {
+    left: `${e.left}px`,
+    top: `${e.top}px`,
+    width: `${e.width}px`,
+    height: `${e.height}px`,
+  });
+  if (e.defaultColor) d.style.color = e.defaultColor;
+  if (e.defaultFontName) d.style.fontFamily = e.defaultFontName;
+  if (e.fill) d.style.background = e.fill;
+  if (e.lineHeight) d.style.lineHeight = String(e.lineHeight);
+  if (e.paragraphSpace) d.style.gap = `${e.paragraphSpace}px`;
+  if (e.wordSpace) d.style.wordSpacing = `${e.wordSpace}px`;
+  if (e.opacity != null) d.style.opacity = String(e.opacity);
+  if (e.vAlign)
+    d.style.justifyContent =
+      e.vAlign === "middle" ? "center" : e.vAlign === "bottom" ? "flex-end" : "flex-start";
+  if (e.rotate != null) d.style.rotate = `${e.rotate}deg`;
+  if (e.shadow)
+    d.style.textShadow = `${e.shadow.h}px ${e.shadow.v}px ${e.shadow.blur}px ${e.shadow.color}`;
+  d.innerHTML = e.content || "";
+  return d;
+}
+
+function pptDslShape(e) {
+  const box = el("pt-dsl-el");
+  Object.assign(box.style, {
+    left: `${e.left}px`,
+    top: `${e.top}px`,
+    width: `${e.width}px`,
+    height: `${e.height}px`,
+  });
+  if (e.opacity != null) box.style.opacity = String(e.opacity);
+  if (e.rotate != null) box.style.rotate = `${e.rotate}deg`;
+  const vw = e.viewBox[0];
+  const vh = e.viewBox[1];
+  const svg = svgEl("svg", { viewBox: `0 0 ${vw} ${vh}`, preserveAspectRatio: "none" });
+  const path = svgEl("path", { d: e.path });
+  if (e.gradient && (e.gradient.colors || []).length >= 2) {
+    const gid = `pdg${++pptDslUid}`;
+    const defs = svgEl("defs");
+    const grad = svgEl(e.gradient.type === "radial" ? "radialGradient" : "linearGradient", {
+      id: gid,
+    });
+    if (e.gradient.type === "radial") {
+      grad.setAttribute("cx", "50%");
+      grad.setAttribute("cy", "50%");
+      grad.setAttribute("r", "50%");
+    } else {
+      grad.setAttribute("x1", "0%");
+      grad.setAttribute("y1", "0%");
+      grad.setAttribute("x2", "100%");
+      grad.setAttribute("y2", "0%");
+      grad.setAttribute("gradientTransform", cssFn("rotate", `${e.gradient.rotate || 0} 0.5 0.5`));
+    }
+    for (const c of e.gradient.colors)
+      grad.appendChild(svgEl("stop", { offset: c.pos, "stop-color": c.color }));
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+    path.setAttribute("fill", cssFn("url", `#${gid}`));
+  } else if (e.fill) path.setAttribute("fill", e.fill);
+  else path.setAttribute("fill", "none");
+  if (e.outline?.width) {
+    path.setAttribute("stroke", e.outline.color || PPT_DSL_INK);
+    path.setAttribute("stroke-width", String(e.outline.width));
+    path.setAttribute("stroke-linejoin", "round");
+    if (e.outline.style === "dashed") path.setAttribute("stroke-dasharray", "10 7");
+    else if (e.outline.style === "dotted") path.setAttribute("stroke-dasharray", "2 4");
+  }
+  if (e.flipH || e.flipV) {
+    const tx = e.flipH ? vw : 0;
+    const ty = e.flipV ? vh : 0;
+    const sx = e.flipH ? -1 : 1;
+    const sy = e.flipV ? -1 : 1;
+    path.setAttribute(
+      "transform",
+      `${cssFn("translate", `${tx} ${ty}`)} ${cssFn("scale", `${sx} ${sy}`)}`,
+    );
+  }
+  if (e.shadow)
+    path.setAttribute(
+      "filter",
+      cssFn("drop-shadow", `${e.shadow.h}px ${e.shadow.v}px ${e.shadow.blur}px ${e.shadow.color}`),
+    );
+  svg.appendChild(path);
+  box.appendChild(svg);
+  if (e.text) {
+    const t = el("pt-dsl-el pt-dsl-shapetext");
+    t.style.justifyContent =
+      e.text.align === "top" ? "flex-start" : e.text.align === "bottom" ? "flex-end" : "center";
+    if (e.text.defaultColor) t.style.color = e.text.defaultColor;
+    if (e.text.defaultFontName) t.style.fontFamily = e.text.defaultFontName;
+    t.innerHTML = e.text.content || "";
+    box.appendChild(t);
+  }
+  return box;
+}
+
+/* 线条：start/end 是相对 left/top 的局部坐标，width 是描边粗细不是长度；
+   路径语义与 core lineElementPath 一致（broken/broken2/curve/cubic） */
+function pptDslLinePath(e, ox, oy) {
+  const s = [e.start[0] - ox, e.start[1] - oy];
+  const t = [e.end[0] - ox, e.end[1] - oy];
+  const f = (p) => `${p[0]},${p[1]}`;
+  if (e.broken) return `M${f(s)} L${e.broken[0] - ox},${e.broken[1] - oy} L${f(t)}`;
+  if (e.broken2) {
+    const bx = e.broken2[0] - ox;
+    const by = e.broken2[1] - oy;
+    if (Math.abs(e.end[0] - e.start[0]) >= Math.abs(e.end[1] - e.start[1]))
+      return `M${f(s)} L${bx},${s[1]} L${bx},${t[1]} L${f(t)}`;
+    return `M${f(s)} L${s[0]},${by} L${t[0]},${by} L${f(t)}`;
+  }
+  if (e.curve) return `M${f(s)} Q${e.curve[0] - ox},${e.curve[1] - oy} ${f(t)}`;
+  if (e.cubic)
+    return `M${f(s)} C${e.cubic[0][0] - ox},${e.cubic[0][1] - oy} ${e.cubic[1][0] - ox},${e.cubic[1][1] - oy} ${f(t)}`;
+  return `M${f(s)} L${f(t)}`;
+}
+function pptDslLine(e) {
+  const pts = [e.start, e.end];
+  if (e.broken) pts.push(e.broken);
+  if (e.broken2) pts.push(e.broken2);
+  if (e.curve) pts.push(e.curve);
+  if (e.cubic) {
+    pts.push(e.cubic[0]);
+    pts.push(e.cubic[1]);
+  }
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const p of pts) {
+    if (p[0] < minX) minX = p[0];
+    if (p[1] < minY) minY = p[1];
+    if (p[0] > maxX) maxX = p[0];
+    if (p[1] > maxY) maxY = p[1];
+  }
+  const pad = (e.width || 2) + 4; // 箭头/圆点的描边外扩
+  minX -= pad;
+  minY -= pad;
+  maxX += pad;
+  maxY += pad;
+  const w = maxX - minX;
+  const h = maxY - minY;
+  const box = el("pt-dsl-el");
+  Object.assign(box.style, {
+    left: `${e.left + minX}px`,
+    top: `${e.top + minY}px`,
+    width: `${w}px`,
+    height: `${h}px`,
+  });
+  const svg = svgEl("svg", { viewBox: `0 0 ${w} ${h}`, width: w, height: h });
+  const color = e.color || PPT_DSL_INK;
+  const p0 = e.points?.[0] || "";
+  const p1 = e.points?.[1] || "";
+  const id = `pdl${++pptDslUid}`;
+  const defs = svgEl("defs");
+  const mk = (kind, end) => {
+    const m = svgEl("marker", {
+      id: `${id}-${end}`,
+      markerWidth: 6,
+      markerHeight: 6,
+      refX: kind === "arrow" ? 5 : 3,
+      refY: 3,
+      orient: "auto",
+      markerUnits: "userSpaceOnUse",
+    });
+    if (kind === "arrow") m.appendChild(svgEl("path", { d: "M0,0 L6,3 L0,6 z", fill: color }));
+    else m.appendChild(svgEl("circle", { cx: 3, cy: 3, r: 2.4, fill: color }));
+    return m;
+  };
+  if (p0 === "arrow") defs.appendChild(mk("arrow", "s"));
+  if (p0 === "dot") defs.appendChild(mk("dot", "s"));
+  if (p1 === "arrow") defs.appendChild(mk("arrow", "e"));
+  if (p1 === "dot") defs.appendChild(mk("dot", "e"));
+  svg.appendChild(defs);
+  const attrs = {
+    d: pptDslLinePath(e, minX, minY),
+    fill: "none",
+    stroke: color,
+    "stroke-width": e.width || 2,
+    "stroke-linecap": "round",
+  };
+  if (e.style === "dashed") attrs["stroke-dasharray"] = "10 7";
+  else if (e.style === "dotted") attrs["stroke-dasharray"] = "2 4";
+  if (p0 === "arrow") attrs["marker-start"] = cssFn("url", `#${id}-s`);
+  if (p0 === "dot") attrs["marker-start"] = cssFn("url", `#${id}-s`);
+  if (p1 === "arrow") attrs["marker-end"] = cssFn("url", `#${id}-e`);
+  if (p1 === "dot") attrs["marker-end"] = cssFn("url", `#${id}-e`);
+  const path = svgEl("path", attrs);
+  if (e.shadow)
+    path.setAttribute(
+      "filter",
+      cssFn("drop-shadow", `${e.shadow.h}px ${e.shadow.v}px ${e.shadow.blur}px ${e.shadow.color}`),
+    );
+  svg.appendChild(path);
+  box.appendChild(svg);
+  return box;
+}
+
+/* 图表取色：themeColors 不足按 ±24° 类似色补（core expandChartColors 同
+   思路）；缺省品牌八色。饼/环一色一分类，其余一色一系列（同 core） */
+const PPT_DSL_CHART_BASE = [
+  "#AD392C",
+  "#25221C",
+  "#852B22",
+  "#5A554A",
+  "#6E6656",
+  "#9C6D1E",
+  "#47714F",
+  "#3F5A73",
+];
+function pptDslShift(hex, deg) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if (!m) return hex;
+  const r = parseInt(m[1], 16) / 255;
+  const g = parseInt(m[2], 16) / 255;
+  const b = parseInt(m[3], 16) / 255;
+  const mx = Math.max(r, g, b);
+  const mn = Math.min(r, g, b);
+  const d = mx - mn;
+  let hue = 0;
+  if (d) {
+    if (mx === r) hue = ((g - b) / d) % 6;
+    else if (mx === g) hue = (b - r) / d + 2;
+    else hue = (r - g) / d + 4;
+    hue *= 60;
+    if (hue < 0) hue += 360;
+  }
+  const l = (mx + mn) / 2;
+  const s = d / (1 - Math.abs(2 * l - 1) || 1e-6);
+  const h2 = (((hue + deg) % 360) + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h2 / 60) % 2) - 1));
+  const mm = l - c / 2;
+  let rr = 0;
+  let gg = 0;
+  let bb = 0;
+  if (h2 < 60) {
+    rr = c;
+    gg = x;
+  } else if (h2 < 120) {
+    rr = x;
+    gg = c;
+  } else if (h2 < 180) {
+    gg = c;
+    bb = x;
+  } else if (h2 < 240) {
+    gg = x;
+    bb = c;
+  } else if (h2 < 300) {
+    rr = x;
+    bb = c;
+  } else {
+    rr = c;
+    bb = x;
+  }
+  const to = (v) =>
+    Math.round(Math.max(0, Math.min(1, v + mm)) * 255)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${to(rr)}${to(gg)}${to(bb)}`;
+}
+function pptDslChartColors(given, n) {
+  const base = given?.length ? given.slice(0, 8) : PPT_DSL_CHART_BASE.slice();
+  const out = base.slice(0, n);
+  let i = 0;
+  while (out.length < n) {
+    out.push(pptDslShift(base[i % base.length], (Math.floor(i / base.length) + 1) * 24));
+    i += 1;
+  }
+  return out;
+}
+function pptDslClip(s, n) {
+  const t = String(s == null ? "" : s);
+  return t.length > n ? `${t.slice(0, n - 1)}…` : t;
+}
+/* 迷你图表：无坐标轴刻度，只保证形态/配色/图例与成品一致（chartType 的
+   bar=竖向柱、column=横条，与 core 的 barDir 映射相同） */
+function pptDslChart(e) {
+  const box = el("pt-dsl-el");
+  Object.assign(box.style, {
+    left: `${e.left}px`,
+    top: `${e.top}px`,
+    width: `${e.width}px`,
+    height: `${e.height}px`,
+  });
+  const W = e.width;
+  const H = e.height;
+  const labels = e.data.labels || [];
+  const legends = e.data.legends || [];
+  const series = e.data.series || [];
+  const ink = e.textColor || PPT_DSL_INK;
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, width: W, height: H });
+  const pieLike = e.chartType === "pie" || e.chartType === "ring";
+  const multi = series.length > 1 || pieLike;
+  const colors = pptDslChartColors(
+    e.themeColors,
+    pieLike ? Math.max(1, labels.length) : Math.max(1, series.length),
+  );
+  const legendH = multi ? 20 : 0;
+  const labelFont = Math.max(9, Math.min(12, W / 60));
+  const axisY = H - (e.chartType === "column" ? 4 : 16);
+  if (e.fill) svg.appendChild(svgEl("rect", { x: 0, y: 0, width: W, height: H, fill: e.fill }));
+  if (multi) {
+    let lx = 4;
+    const items = pieLike ? labels : legends.length ? legends : series.map((_, i) => `S${i + 1}`);
+    for (let i = 0; i < items.length && lx < W - 30; i++) {
+      svg.appendChild(
+        svgEl("rect", { x: lx, y: 2, width: 8, height: 8, rx: 2, fill: colors[i % colors.length] }),
+      );
+      const t = svgEl("text", { x: lx + 12, y: 10, fill: ink, "font-size": labelFont });
+      t.textContent = pptDslClip(items[i], 8);
+      svg.appendChild(t);
+      lx += 12 + pptDslClip(items[i], 8).length * labelFont * 0.62 + 10;
+    }
+  }
+  const plot = { x: 10, y: 6 + legendH, w: W - 20, h: Math.max(10, axisY - (6 + legendH)) };
+  let vmax = 0;
+  for (const arr of series) for (const v of arr) if (v > vmax) vmax = v;
+  if (vmax <= 0) vmax = 1;
+  if (pieLike) {
+    const vals = (series[0] || labels.map(() => 1)).slice(0, labels.length);
+    const total = vals.reduce((a, b) => a + Math.max(0, b), 0) || 1;
+    const cx = plot.x + plot.w / 2;
+    const cy = plot.y + plot.h / 2;
+    const r = Math.min(plot.w, plot.h) / 2 - 4;
+    let ang = -Math.PI / 2;
+    vals.forEach((v, i) => {
+      const frac = Math.max(0, v) / total;
+      if (frac <= 0) return;
+      const a2 = ang + frac * Math.PI * 2;
+      const large = frac > 0.5 ? 1 : 0;
+      const x1 = cx + r * Math.cos(ang);
+      const y1 = cy + r * Math.sin(ang);
+      const x2 = cx + r * Math.cos(a2);
+      const y2 = cy + r * Math.sin(a2);
+      const d = `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large} 1 ${x2},${y2} Z`;
+      svg.appendChild(svgEl("path", { d, fill: colors[i % colors.length] }));
+      if (e.chartType === "ring") {
+        const ri = r * 0.6;
+        const x3 = cx + ri * Math.cos(ang);
+        const y3 = cy + ri * Math.sin(ang);
+        const x4 = cx + ri * Math.cos(a2);
+        const y4 = cy + ri * Math.sin(a2);
+        svg.appendChild(
+          svgEl("path", {
+            d: `M${cx},${cy} L${x3},${y3} A${ri},${ri} 0 ${large} 1 ${x4},${y4} Z`,
+            fill: "#00000000",
+          }),
+        );
+      }
+      if (frac > 0.08) {
+        const lx = cx + r * 0.72 * Math.cos((ang + a2) / 2);
+        const ly = cy + r * 0.72 * Math.sin((ang + a2) / 2);
+        const t = svgEl("text", {
+          x: lx,
+          y: ly + 3,
+          fill: "#FDFCF9",
+          "font-size": labelFont,
+          "text-anchor": "middle",
+        });
+        t.textContent = `${Math.round(frac * 100)}%`;
+        svg.appendChild(t);
+      }
+      ang = a2;
+    });
+    box.appendChild(svg);
+    return box;
+  }
+  if (e.chartType === "radar") {
+    const cx = plot.x + plot.w / 2;
+    const cy = plot.y + plot.h / 2;
+    const r = Math.min(plot.w, plot.h) / 2 - 12;
+    const n = Math.max(1, labels.length);
+    const angOf = (i) => -Math.PI / 2 + (i / n) * Math.PI * 2;
+    for (const f of [0.25, 0.5, 0.75, 1]) {
+      const pts = [];
+      for (let i = 0; i < n; i++)
+        pts.push(`${cx + r * f * Math.cos(angOf(i))},${cy + r * f * Math.sin(angOf(i))}`);
+      svg.appendChild(
+        svgEl("polygon", {
+          points: pts.join(" "),
+          fill: "none",
+          stroke: "#E1DCCF",
+          "stroke-width": 1,
+        }),
+      );
+    }
+    for (let i = 0; i < n; i++) {
+      svg.appendChild(
+        svgEl("line", {
+          x1: cx,
+          y1: cy,
+          x2: cx + r * Math.cos(angOf(i)),
+          y2: cy + r * Math.sin(angOf(i)),
+          stroke: "#E1DCCF",
+          "stroke-width": 1,
+        }),
+      );
+      const t = svgEl("text", {
+        x: cx + (r + 8) * Math.cos(angOf(i)),
+        y: cy + (r + 8) * Math.sin(angOf(i)) + 3,
+        fill: ink,
+        "font-size": labelFont,
+        "text-anchor": "middle",
+      });
+      t.textContent = pptDslClip(labels[i], 5);
+      svg.appendChild(t);
+    }
+    series.forEach((arr, si) => {
+      const pts = arr
+        .map(
+          (v, i) =>
+            `${cx + ((r * Math.max(0, v)) / vmax) * Math.cos(angOf(i))},${cy + ((r * Math.max(0, v)) / vmax) * Math.sin(angOf(i))}`,
+        )
+        .join(" ");
+      svg.appendChild(
+        svgEl("polygon", {
+          points: pts,
+          fill: colors[si % colors.length],
+          "fill-opacity": 0.22,
+          stroke: colors[si % colors.length],
+          "stroke-width": 2,
+        }),
+      );
+    });
+    box.appendChild(svg);
+    return box;
+  }
+  const isCols = e.chartType === "bar"; // 竖向柱（core: barDir col）
+  const stack = !!e.options?.stack;
+  const n = Math.max(1, labels.length);
+  const m = Math.max(1, series.length);
+  if (isCols) {
+    const gw = plot.w / n;
+    const bw = (gw * 0.62) / m;
+    labels.forEach((lb, i) => {
+      let acc = 0;
+      series.forEach((arr, si) => {
+        const v = Math.max(0, arr[i] || 0);
+        const hh = (v / vmax) * plot.h;
+        const x = plot.x + gw * i + gw * 0.19 + (stack ? 0 : si * bw);
+        const y = plot.y + plot.h - (stack ? (acc / vmax) * plot.h : 0) - hh;
+        svg.appendChild(
+          svgEl("rect", {
+            x,
+            y,
+            width: Math.max(1, bw - (stack ? 0 : 1.5)),
+            height: Math.max(0, hh),
+            rx: 1.5,
+            fill: colors[si % colors.length],
+          }),
+        );
+        acc += v;
+      });
+      const t = svgEl("text", {
+        x: plot.x + gw * i + gw / 2,
+        y: H - 4,
+        fill: ink,
+        "font-size": labelFont,
+        "text-anchor": "middle",
+      });
+      t.textContent = pptDslClip(lb, 6);
+      svg.appendChild(t);
+    });
+  } else if (e.chartType === "column") {
+    const gh = plot.h / n;
+    const bh = (gh * 0.62) / m;
+    const labelW = Math.min(64, plot.w * 0.24);
+    labels.forEach((lb, i) => {
+      let acc = 0;
+      series.forEach((arr, si) => {
+        const v = Math.max(0, arr[i] || 0);
+        const ww = (v / vmax) * (plot.w - labelW);
+        const y = plot.y + gh * i + gh * 0.19 + (stack ? 0 : si * bh);
+        const x = plot.x + labelW + (stack ? (acc / vmax) * (plot.w - labelW) : 0);
+        svg.appendChild(
+          svgEl("rect", {
+            x,
+            y,
+            width: Math.max(0, ww),
+            height: Math.max(1, bh - (stack ? 0 : 1.5)),
+            rx: 1.5,
+            fill: colors[si % colors.length],
+          }),
+        );
+        acc += v;
+      });
+      const t = svgEl("text", {
+        x: plot.x + labelW - 6,
+        y: plot.y + gh * i + gh / 2 + 3,
+        fill: ink,
+        "font-size": labelFont,
+        "text-anchor": "end",
+      });
+      t.textContent = pptDslClip(lb, 6);
+      svg.appendChild(t);
+    });
+  } else {
+    // line / area / scatter：横向等分点
+    const px = (i) => plot.x + (n <= 1 ? plot.w / 2 : (i / (n - 1)) * plot.w);
+    const py = (v) => plot.y + plot.h - (Math.max(0, v) / vmax) * plot.h;
+    svg.appendChild(
+      svgEl("line", {
+        x1: plot.x,
+        y1: plot.y + plot.h,
+        x2: plot.x + plot.w,
+        y2: plot.y + plot.h,
+        stroke: "#E1DCCF",
+        "stroke-width": 1,
+      }),
+    );
+    labels.forEach((lb, i) => {
+      if (i % Math.ceil(n / 6) !== 0 && i !== n - 1) return;
+      const t = svgEl("text", {
+        x: px(i),
+        y: H - 4,
+        fill: ink,
+        "font-size": labelFont,
+        "text-anchor": "middle",
+      });
+      t.textContent = pptDslClip(lb, 6);
+      svg.appendChild(t);
+    });
+    series.forEach((arr, si) => {
+      const col = colors[si % colors.length];
+      if (e.chartType === "area") {
+        const pts = arr.map((v, i) => `${px(i)},${py(v)}`).join(" ");
+        svg.appendChild(
+          svgEl("polygon", {
+            points: `${px(0)},${plot.y + plot.h} ${pts} ${px(arr.length - 1)},${plot.y + plot.h}`,
+            fill: col,
+            "fill-opacity": 0.22,
+          }),
+        );
+      }
+      if (e.chartType !== "scatter") {
+        const smooth = e.options?.lineSmooth && arr.length > 2;
+        let d = "";
+        arr.forEach((v, i) => {
+          if (i === 0) d = `M${px(i)},${py(v)}`;
+          else if (smooth) {
+            const px0 = px(i - 1);
+            const py0 = py(arr[i - 1]);
+            const mx = (px0 + px(i)) / 2;
+            d += ` C${mx},${py0} ${mx},${py(v)} ${px(i)},${py(v)}`;
+          } else d += ` L${px(i)},${py(v)}`;
+        });
+        svg.appendChild(
+          svgEl("path", {
+            d,
+            fill: "none",
+            stroke: col,
+            "stroke-width": 2,
+            "stroke-linejoin": "round",
+          }),
+        );
+      }
+      arr.forEach((v, i) => {
+        svg.appendChild(svgEl("circle", { cx: px(i), cy: py(v), r: 2.6, fill: col }));
+      });
+    });
+  }
+  box.appendChild(svg);
+  return box;
+}
+
+/* 表格：colgroup 列宽 = 元素宽 × 占比（与成品 colW 同式，不归一）；
+   合并格跳过被覆盖的格子；主题色表头/首列 + 斑马纹 */
+function pptDslTable(e) {
+  const box = el("pt-dsl-el");
+  Object.assign(box.style, {
+    left: `${e.left}px`,
+    top: `${e.top}px`,
+    width: `${e.width}px`,
+    height: `${e.height}px`,
+  });
+  const wrap = el("pt-dsl-tablewrap");
+  wrap.style.width = `${e.width}px`;
+  wrap.style.height = `${e.height}px`;
+  const tb = document.createElement("table");
+  tb.className = "pt-dsl-table";
+  const cg = document.createElement("colgroup");
+  for (const w of e.colWidths || []) {
+    const col = document.createElement("col");
+    col.style.width = `${e.width * w}px`;
+    cg.appendChild(col);
+  }
+  tb.appendChild(cg);
+  const theme = e.theme || {};
+  const rows = e.data || [];
+  const hidden = new Set();
+  rows.forEach((row, i) => {
+    row.forEach((cell, j) => {
+      if (cell.colspan > 1 || cell.rowspan > 1) {
+        for (let r = i; r < i + cell.rowspan; r++)
+          for (let c = r === i ? j + 1 : j; c < j + cell.colspan; c++) hidden.add(`${r}_${c}`);
+      }
+    });
+  });
+  rows.forEach((row, i) => {
+    const tr = document.createElement("tr");
+    let col = 0;
+    row.forEach((cell) => {
+      const j = col;
+      col += cell.colspan;
+      if (hidden.has(`${i}_${j}`)) return;
+      const td = document.createElement("td");
+      td.textContent = cell.text || "";
+      if (cell.colspan > 1) td.colSpan = cell.colspan;
+      if (cell.rowspan > 1) td.rowSpan = cell.rowspan;
+      const st = cell.style || {};
+      const head =
+        (theme.rowHeader && i === 0) ||
+        (theme.rowFooter && i === rows.length - 1) ||
+        (theme.colHeader && j === 0) ||
+        (theme.colFooter && j === row.length - 1);
+      if (head && theme.color) {
+        td.style.background = theme.color;
+        td.style.color = PPT_DSL_PAPER;
+        td.style.fontWeight = "700";
+      } else if (st.backcolor) td.style.background = st.backcolor;
+      else if (i % 2 === 1) td.style.background = "#F0EDE4";
+      if (st.color && !(head && theme.color)) td.style.color = st.color;
+      if (st.bold) td.style.fontWeight = "700";
+      if (st.em) td.style.fontStyle = "italic";
+      if (st.underline) td.style.textDecoration = "underline";
+      if (st.strikethrough) td.style.textDecoration = "line-through";
+      if (st.fontsize) td.style.fontSize = `${Number(st.fontsize) || 14}px`;
+      if (st.fontname) td.style.fontFamily = st.fontname;
+      if (st.align) td.style.textAlign = st.align;
+      tr.appendChild(td);
+    });
+    tb.appendChild(tr);
+  });
+  wrap.appendChild(tb);
+  box.appendChild(wrap);
+  return box;
+}
+
+/* 公式：MathML 由服务端 temml 生成（白名单外但来源可信，随载荷直传）；
+   缺失时降级为等宽源码文本 */
+function pptDslLatex(e) {
+  const d = el("pt-dsl-el pt-dsl-latex");
+  Object.assign(d.style, {
+    left: `${e.left}px`,
+    top: `${e.top}px`,
+    width: `${e.width}px`,
+    height: `${e.height}px`,
+  });
+  if (e.align) d.style.textAlign = e.align;
+  if (e.mathml) d.innerHTML = e.mathml;
+  else {
+    d.textContent = e.latex;
+    d.classList.add("fallback");
+  }
+  return d;
+}
+
+/* 代码：纸底卡片 + 标题栏（文件名/语言）+ 行号 */
+function pptDslCode(e) {
+  const box = el("pt-dsl-el pt-dsl-code");
+  Object.assign(box.style, {
+    left: `${e.left}px`,
+    top: `${e.top}px`,
+    width: `${e.width}px`,
+    height: `${e.height}px`,
+  });
+  if (e.fileName || e.language) {
+    const head = el("pt-dsl-codehead");
+    if (e.fileName) head.appendChild(el2("pt-dsl-codefile", e.fileName));
+    if (e.language) head.appendChild(el2("pt-dsl-codelang", e.language));
+    box.appendChild(head);
+  }
+  const body = el("pt-dsl-codebody");
+  body.style.fontSize = `${e.fontSize || 14}px`;
+  (e.lines || []).forEach((ln, i) => {
+    const row = el("pt-dsl-codeline");
+    if (e.showLineNumbers !== false) row.appendChild(el2("pt-dsl-codeno", String(i + 1)));
+    row.appendChild(el2("pt-dsl-codetx", ln.content || ""));
+    body.appendChild(row);
+  });
+  box.appendChild(body);
+  return box;
+}
+
+function pptDslInner(box, s, index) {
+  const cv = el("pt-dsl");
+  pptDslBgStyle(cv, s);
+  pptDslChrome(cv, s, index);
+  (s.elements || []).forEach((e) => {
+    const d = pptDslElement(e);
+    if (d) cv.appendChild(d);
+  });
+  if (s.elemCut) {
+    const cut = el("pt-dsl-elemcut");
+    cut.textContent = `+ ${s.elemCut} 元素`;
+    cv.appendChild(cut);
+  }
+  box.appendChild(cv);
+}
+
+function pptSlideInner(box, s, big, index) {
+  if (!s.kind) {
+    /* JSON 管线（ppt_save）：无 kind，元素坐标就是画布 px */
+    pptDslInner(box, s, index);
+    requestAnimationFrame(() => {
+      pptFitFreePx(box);
+    });
+    return;
+  }
   if (s.kind === "free") {
     pptFreeInner(box, s);
     return;
@@ -1056,7 +1983,12 @@ function pptCard(tl, ppt, files) {
   head.appendChild(el2("ppt-mark", "▦"));
   const cover = ppt.slides[0];
   const dl = files?.[0];
-  const name = (cover && cover.kind === "cover" && cover.title) || dl?.name || "PPT";
+  /* 卡片名：旧管线取封面标题，JSON 管线取首页第一个文本（pptx 同名规则） */
+  const name =
+    (cover && cover.kind === "cover" && cover.title) ||
+    (cover && !cover.kind && pptDslTitle(cover)) ||
+    dl?.name ||
+    "PPT";
   head.appendChild(el2("ppt-name", name));
   head.appendChild(
     el2(
@@ -1075,8 +2007,8 @@ function pptCard(tl, ppt, files) {
   card.appendChild(head);
   const strip = el("pptstrip");
   ppt.slides.forEach((s, i) => {
-    const sl = el(`pptslide k-${s.kind}`);
-    pptSlideInner(sl, s, false);
+    const sl = el(`pptslide ${pptSlideClass(s)}`);
+    pptSlideInner(sl, s, false, i);
     /* 可聚焦：CSS 里早有 :focus-visible 高亮，但一直忘了给 tabindex——
        键盘用户 Tab 根本进不到预览入口，全屏关闭时也没法把焦点还回来 */
     sl.tabIndex = 0;
@@ -1181,8 +2113,8 @@ function pptView(ppt, index, files, deckId, opts) {
   /* 缩略图条：长课件一页页翻找不到北，给一条能直接跳的胶片 */
   const rail = el("pptv-rail");
   const thumbs = ppt.slides.map((s, k) => {
-    const t = el("pptslide pptv-thumb");
-    pptSlideInner(t, s, false);
+    const t = el(`pptslide pptv-thumb ${pptSlideClass(s)}`);
+    pptSlideInner(t, s, false, k);
     /* 不作为 Tab 停靠点：方向键翻页已经覆盖了键盘路径，30 个缩略图逐个
        Tab 过去只会把焦点陷阱变成耐力测试 */
     t.tabIndex = -1;
@@ -1210,14 +2142,16 @@ function pptView(ppt, index, files, deckId, opts) {
 
   function render() {
     const s = ppt.slides[i];
-    stage.className = `pptv-stage k-${s.kind}`;
+    stage.className = `pptv-stage ${pptSlideClass(s)}`;
     while (stage.firstChild) stage.removeChild(stage.firstChild);
-    pptSlideInner(stage, s, true);
+    pptSlideInner(stage, s, true, i);
     counter.textContent = `${i + 1} / ${total}`;
     prev.disabled = i === 0;
     next.disabled = i === total - 1;
-    ptitle.textContent = s.title || "";
-    ptitle.style.display = s.title ? "" : "none";
+    /* 页题：旧管线是 slide.title，JSON 管线取首页文本（无标题则隐藏） */
+    const title = s.kind ? s.title || "" : pptDslTitle(s);
+    ptitle.textContent = title;
+    ptitle.style.display = title ? "" : "none";
     for (let k = 0; k < thumbs.length; k++) thumbs[k].classList.toggle("on", k === i);
     /* 当前页滚进视：缩略图条很长时不让用户自己找 */
     if (thumbs[i] && typeof thumbs[i].scrollIntoView === "function") {

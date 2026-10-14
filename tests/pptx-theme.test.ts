@@ -203,8 +203,10 @@ test("pptPreviewOfToolOutput：合法载荷放行、畸形载荷拒绝", () => {
   });
   assert.ok(good);
   assert.equal(good.count, 2);
-  assert.deepEqual(good.slides[1]!.bullets, ["一"], "非字符串要点应被滤掉");
-  assert.equal(good.slides[1]!.table?.rows.length, 1);
+  const s1 = good.slides[1]!;
+  assert.ok("kind" in s1, "旧管线载荷带 kind");
+  assert.deepEqual(s1.bullets, ["一"], "非字符串要点应被滤掉");
+  assert.equal(s1.table?.rows.length, 1);
 
   // free 页（代码工具 blank 页）：标题可缺省，元素逐个校验
   const free = pptPreviewOfToolOutput({
@@ -256,12 +258,47 @@ test("工具接线：ppt_save 的 pptx 带 ppt 载荷，generate_document 不再
   const { coreTools } = await import("../src/core/tools");
   const save = (coreTools.ppt_save as unknown as { execute: (i: unknown) => Promise<any> }).execute;
   const g = await save({
-    code: 'pptx.cover({ title: "工具层课件" }); pptx.section("章节"); pptx.bullets({ title: "要点", points: ["一", "二"] });',
+    deck: {
+      slides: [
+        {
+          motif: "cover",
+          elements: [
+            {
+              type: "text",
+              left: 100,
+              top: 220,
+              width: 800,
+              height: 120,
+              content: "<p>工具层课件</p>",
+            },
+          ],
+        },
+        {
+          motif: "section",
+          elements: [
+            { type: "text", left: 100, top: 220, width: 800, height: 80, content: "<p>章节</p>" },
+          ],
+        },
+        {
+          elements: [
+            { type: "text", left: 100, top: 80, width: 800, height: 60, content: "<p>要点</p>" },
+            {
+              type: "text",
+              left: 100,
+              top: 180,
+              width: 800,
+              height: 160,
+              content: "<ul><li>一</li><li>二</li></ul>",
+            },
+          ],
+        },
+      ],
+    },
   });
   assert.equal(g.ok, true, `生成应成功，实为 ${JSON.stringify(g)}`);
   assert.ok(g.ppt, "pptx 结果应带预览载荷");
   assert.equal(g.ppt.count, 3, "封面 + 章节页 + 内容页");
-  assert.equal(g.ppt.slides[0].kind, "cover");
+  assert.equal(g.ppt.slides[0].motif, "cover");
   assert.ok(fs.existsSync(g.path));
 
   const gen = (coreTools.generate_document as unknown as { execute: (i: unknown) => Promise<any> })
