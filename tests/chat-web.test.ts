@@ -1488,7 +1488,36 @@ test("真实对话链路：ppt_save 产 pptx 时 SSE 带 ppt 预览与下载行"
   const realOutput = await (
     coreTools.ppt_save as unknown as { execute: (i: unknown) => Promise<any> }
   ).execute({
-    code: 'pptx.cover({ title: "链路课件" }); pptx.bullets({ title: "要点", points: ["一", "二"] });',
+    deck: {
+      slides: [
+        {
+          motif: "cover",
+          elements: [
+            {
+              type: "text",
+              left: 100,
+              top: 220,
+              width: 800,
+              height: 120,
+              content: "<p>链路课件</p>",
+              defaultColor: "#FDFCF9",
+            },
+          ],
+        },
+        {
+          elements: [
+            {
+              type: "text",
+              left: 100,
+              top: 80,
+              width: 800,
+              height: 60,
+              content: "<p>要点</p>",
+            },
+          ],
+        },
+      ],
+    },
   });
   assert.equal(realOutput.ok, true, `工具执行应成功，实为 ${JSON.stringify(realOutput)}`);
 
@@ -1521,11 +1550,14 @@ test("真实对话链路：ppt_save 产 pptx 时 SSE 带 ppt 预览与下载行"
   const files = toolEnd.files as Array<{ name: string }> | undefined;
   assert.ok(files?.length, "SSE 应带 files 下载行");
   assert.match(String(files![0]!.name), /链路课件.*\.pptx/);
-  // 预览载荷：封面在前、count 与工具输出一致
-  const ppt = toolEnd.ppt as { count: number; slides: Array<{ kind: string }> } | undefined;
+  // 预览载荷：封面在前、count 与工具输出一致（JSON 管线无 kind，靠 motif/elements）
+  const ppt = toolEnd.ppt as
+    | { count: number; slides: Array<{ motif?: string; elements: Array<{ type: string }> }> }
+    | undefined;
   assert.ok(ppt, "SSE 应带 ppt 预览载荷");
   assert.equal(ppt!.count, 2);
-  assert.equal(ppt!.slides[0]!.kind, "cover");
+  assert.equal(ppt!.slides[0]!.motif, "cover");
+  assert.equal(ppt!.slides[0]!.elements[0]!.type, "text");
 });
 
 test("图谱删书接口：整本书连内容删、缺参 400、重复删 404", async () => {

@@ -19,7 +19,8 @@ import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 
 import { loadLogoDataUri } from "../brand";
-import type { PptOp, PptProgram } from "./ppt-program";
+import type { DeckBackground, DeckElement, SlideDeck } from "./ppt-dsl";
+import { latexToMathML } from "./ppt-latex";
 import type { DocumentSpec, SlideSpec, TableSpec } from "./types";
 
 const require = createRequire(import.meta.url);
@@ -218,76 +219,49 @@ export function buildPptPreview(spec: DocumentSpec): PptPreview {
   };
 }
 
-/** 从代码工具的 op 程序构建预览载荷（renderPptxProgram 的同一份输入） */
-export function buildProgramPreview(program: PptProgram): PptPreview {
-  const slides: PptPreviewSlide[] = [];
-  for (const op of program.ops.slice(0, PREVIEW_SLIDE_CAP)) {
-    slides.push(previewOfOp(op));
-  }
-  return { count: program.ops.length, slides };
+// ── slide JSON 预览载荷（JSON 管线：ppt_save / convert_document） ──
+
+/** 预览载荷的体量上限：SSE 每轮对话都过一遍，全文留在成品文件里 */
+export const PREVIEW_DSL_SLIDE_CAP = 30;
+export const PREVIEW_DSL_ELEM_CAP = 30;
+export const PREVIEW_DSL_NOTES_CAP = 500;
+
+export interface PptDslPreviewSlide {
+  background?: DeckBackground;
+  motif?: "cover" | "section" | "plain";
+  elements: DeckElement[];
+  notes?: string;
+  /** 被截断的元素数（>0 时前端显示「+N 元素」） */
+  elemCut?: number;
 }
 
-function previewOfOp(op: PptOp): PptPreviewSlide {
-  if (op.op === "cover")
-    return previewOfPlanned({
-      kind: "cover",
-      title: op.title,
-      author: op.author,
-      notes: op.notes,
-    });
-  if (op.op === "section")
-    return previewOfPlanned({ kind: "section", title: op.title, notes: op.notes });
-  if (op.op === "bullets")
-    return previewOfPlanned({
-      kind: "content",
-      title: op.title,
-      subtitle: op.subtitle,
-      bullets: op.points,
-      notes: op.notes,
-    });
-  if (op.op === "table")
-    return previewOfPlanned({
-      kind: "content",
-      title: op.title,
-      subtitle: op.subtitle,
-      table: { headers: op.headers, rows: op.rows },
-      notes: op.notes,
-    });
-  const out: PptPreviewSlide = { kind: "free" };
-  if (op.title) out.title = op.title;
-  if (op.notes) out.notes = op.notes;
-  if (op.elements.length) {
-    out.elements = op.elements.slice(0, PREVIEW_ELEM_CAP).map((e) => {
-      const el: PptPreviewElement = {
-        kind: e.kind,
-        x: e.x,
-        y: e.y,
-        w: e.w,
-        h: e.h,
-      };
-      if (e.kind === "text") {
-        el.text =
-          e.text.length > PREVIEW_ELEM_TEXT_CAP
-            ? `${e.text.slice(0, PREVIEW_ELEM_TEXT_CAP)}…`
-            : e.text;
-        if (e.size !== undefined) el.size = e.size;
-        if (e.color) el.color = e.color;
-        if (e.bold) el.bold = e.bold;
-        if (e.align) el.align = e.align;
-        if (e.valign) el.valign = e.valign;
-        if (e.font) el.font = e.font;
-      } else if (e.kind !== "logo") {
-        if (e.fill) el.fill = e.fill;
-        if (e.line) el.line = e.line;
-        if (e.lineW !== undefined) el.lineW = e.lineW;
-        if (e.rotate !== undefined) el.rotate = e.rotate;
-      }
-      return el;
-    });
-    const cut = op.elements.length - out.elements.length;
+export interface PptDslPreview {
+  /** 成品实际总页数（预览数组可能少于它） */
+  count: number;
+  slides: PptDslPreviewSlide[];
+}
+
+/** 从 slide deck 构建网页预览载荷（renderSlidesDeck 的同一份输入） */
+export function buildSlidesPreview(deck: SlideDeck): PptDslPreview {
+  const slides: PptDslPreviewSlide[] = [];
+  for (const s of deck.slides.slice(0, PREVIEW_DSL_SLIDE_CAP)) {
+    const capped = s.elements.slice(0, PREVIEW_DSL_ELEM_CAP);
+    const out: PptDslPreviewSlide = { elements: capped.map(previewElement) };
+    if (s.background) out.background = s.background;
+    if (s.motif) out.motif = s.motif;
+    if (s.notes) out.notes = s.notes.slice(0, PREVIEW_DSL_NOTES_CAP);
+    const cut = s.elements.length - capped.length;
     if (cut > 0) out.elemCut = cut;
+    slides.push(out);
   }
-  return out;
+  return { count: deck.slides.length, slides };
+}
+
+/** 公式元素补 MathML 预览串（浏览器原生渲染；temml 失败就留空，前端降级源码文本） */
+function previewElement(el: DeckElement): DeckElement {
+  if (el.type !== "latex") return el;
+  const mathml = latexToMathML(el.latex);
+  return mathml ? { ...el, mathml } : el;
 }
 
 // ── pptx 渲染 ─────────────────────────────────────────────────
@@ -313,7 +287,7 @@ const FONT_KAI = "KaiTi";
 
 /** pptxgenjs 实例/页的最小结构面：渲染函数只用这些成员，选项都是宽 Record
  *  （pptxgenjs 自带类型过重，CJS require 拿到的也是 any，这里收窄成结构闸） */
-interface PptxSlide {
+export interface PptxSlide {
   background: { color: string };
   addText(
     text: string | Array<{ text: string; options: Record<string, unknown> }>,
@@ -322,10 +296,11 @@ interface PptxSlide {
   addShape(kind: string, opts?: Record<string, unknown>): void;
   addImage(opts: Record<string, unknown>): void;
   addTable(rows: unknown[], opts?: Record<string, unknown>): void;
+  addChart(type: string, data: unknown[], opts?: Record<string, unknown>): void;
   addNotes(text: string): void;
 }
 
-interface PptxDeck {
+export interface PptxDeck {
   layout: string;
   defineSlideMaster(def: Record<string, unknown>): void;
   addSlide(opts?: { masterName?: string }): PptxSlide;
@@ -336,7 +311,7 @@ interface PptxDeck {
  * 朱砂印章：圆形裁切 logo + 描边圈、整章旋转 -7°——课表导出 classic 页头
  * 的同款印章，PPT 的签名 motif。logo 缺失时跳过，不破坏版式。
  */
-function addSeal(
+export function addSeal(
   slide: PptxSlide,
   cx: number,
   cy: number,
@@ -375,7 +350,7 @@ function addSeal(
  * 注意 rels 里是相对目标（../media/xxx.png），替换必须按 media/ 段匹配，
  * 只删文件不修 rels 会留下悬空引用，PowerPoint 打开就是破损图片。
  */
-async function dedupeMedia(buf: Buffer): Promise<Buffer> {
+export async function dedupeMedia(buf: Buffer): Promise<Buffer> {
   const JSZip = requireAny("jszip") as typeof import("jszip");
   const zip = await JSZip.loadAsync(buf);
   const keepByHash = new Map<string, string>();
@@ -407,14 +382,20 @@ async function dedupeMedia(buf: Buffer): Promise<Buffer> {
   return Buffer.from(await zip.generateAsync({ type: "nodebuffer" }));
 }
 
-/** 品牌画布：pptxgenjs 实例 + 三张母版（封面/章节/内容）+ 印章 logo */
-function newBrandDeck(): { pptx: PptxDeck; logo: string | null } {
+/** 裸 deck：pptxgenjs 实例 + 印章 logo，不挂母版（自由版式的 slide JSON 渲染器用） */
+export function newPptxDeck(): { pptx: PptxDeck; logo: string | null } {
   // pptxgenjs 互操作形状不定（CJS default / 具名都有过），收窄成「零参构造出结构闸」
   const mod = requireAny("pptxgenjs") as { default?: unknown };
   const Ctor = (mod.default ?? mod) as new () => PptxDeck;
   const pptx = new Ctor();
   pptx.layout = "LAYOUT_16x9";
   const logo = loadLogoDataUri();
+  return { pptx, logo };
+}
+
+/** 品牌画布：pptxgenjs 实例 + 三张母版（封面/章节/内容）+ 印章 logo（spec 路径用） */
+function newBrandDeck(): { pptx: PptxDeck; logo: string | null } {
+  const { pptx, logo } = newPptxDeck();
 
   // 内容页母版：页脚细线（功能性分隔，不是装饰色带）+ 品牌字 + 圆形小 logo 落款 + 页码
   pptx.defineSlideMaster({
@@ -688,76 +669,6 @@ function addContentSlide(pptx: PptxDeck, s: ContentInput): void {
   if (s.notes) slide.addNotes(s.notes);
 }
 
-/** 自由版式页：内容页母版打底（页脚/页码品牌感不断档），元素按代码任意排布 */
-function addBlankSlide(
-  pptx: PptxDeck,
-  op: Extract<PptOp, { op: "blank" }>,
-  logo: string | null,
-): void {
-  const slide = pptx.addSlide({ masterName: "PPT_CONTENT" });
-  slide.background = { color: PPT_THEME.paper };
-  if (op.title) {
-    slide.addText(op.title, {
-      x: 0.55,
-      y: 0.4,
-      w: 8.9,
-      h: 0.85,
-      fontSize: contentTitleSize(op.title),
-      bold: true,
-      color: PPT_THEME.ink,
-      valign: "bottom",
-      fontFace: FONT,
-      margin: 0,
-    });
-  }
-  for (const e of op.elements) {
-    if (e.kind === "text") {
-      slide.addText(e.text, {
-        x: e.x,
-        y: e.y,
-        w: e.w,
-        h: e.h,
-        fontSize: e.size ?? 14,
-        color: e.color ?? PPT_THEME.ink,
-        bold: e.bold === true,
-        align: e.align ?? "left",
-        valign: e.valign ?? "top",
-        fontFace: e.font === "kai" ? FONT_KAI : FONT,
-        margin: 0,
-        ...(e.wrap === false ? { wrap: false } : {}),
-      });
-    } else if (e.kind === "logo") {
-      if (logo) slide.addImage({ data: logo, x: e.x, y: e.y, w: e.w, h: e.h, rounding: true });
-    } else if (e.kind === "line") {
-      slide.addShape("line", {
-        x: e.x,
-        y: e.y,
-        w: e.w,
-        h: e.h,
-        line: { color: e.line ?? PPT_THEME.rule, width: e.lineW ?? 1 },
-      });
-    } else {
-      slide.addShape(e.kind, {
-        x: e.x,
-        y: e.y,
-        w: e.w,
-        h: e.h,
-        ...(e.fill ? { fill: { color: e.fill } } : { fill: { type: "none" } }),
-        ...(e.line || (!e.fill && e.kind === "rect")
-          ? {
-              line: {
-                color: e.line ?? PPT_THEME.rule,
-                width: e.lineW ?? 1,
-              },
-            }
-          : {}),
-        ...(e.rotate !== undefined ? { rotate: e.rotate } : {}),
-      });
-    }
-  }
-  if (op.notes) slide.addNotes(op.notes);
-}
-
 /** 主题化渲染：版式计划 → pptx 字节（pptxgenjs，16:9 = 10 × 5.625"） */
 export async function renderPptxThemed(spec: DocumentSpec): Promise<Buffer> {
   const { pptx, logo } = newBrandDeck();
@@ -765,43 +676,6 @@ export async function renderPptxThemed(spec: DocumentSpec): Promise<Buffer> {
     if (s.kind === "cover") addCoverSlide(pptx, s, logo);
     else if (s.kind === "section") addSectionSlide(pptx, s, logo);
     else addContentSlide(pptx, s);
-  }
-  return writeDeck(pptx);
-}
-
-/** 代码工具路径：op 程序 → pptx 字节（与 spec 路径同一套母版/印章/去重） */
-export async function renderPptxProgram(program: PptProgram): Promise<Buffer> {
-  const { pptx, logo } = newBrandDeck();
-  for (const op of program.ops) {
-    switch (op.op) {
-      case "cover":
-        addCoverSlide(pptx, op, logo);
-        break;
-      case "section":
-        addSectionSlide(pptx, op, logo);
-        break;
-      case "bullets":
-        addContentSlide(pptx, {
-          title: op.title,
-          subtitle: op.subtitle,
-          bullets: op.points,
-          notes: op.notes,
-          bodySize: bulletsBodySize(op.points.length),
-        });
-        break;
-      case "table":
-        addContentSlide(pptx, {
-          title: op.title,
-          subtitle: op.subtitle,
-          table: { headers: op.headers, rows: op.rows },
-          notes: op.notes,
-          bodySize: tableBodySize(op.rows.length),
-        });
-        break;
-      case "blank":
-        addBlankSlide(pptx, op, logo);
-        break;
-    }
   }
   return writeDeck(pptx);
 }

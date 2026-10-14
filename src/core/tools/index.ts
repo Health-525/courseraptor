@@ -6,7 +6,7 @@
  * 这里只聚合 14 个通用模块：
  * - files.ts      本地文件 / 表格查询 / 沙箱 JS / 附件管理（4）
  * - document.ts   文档生成 / 格式转换（2，Word/Excel/PDF；PPT 见 ppt.ts）
- * - ppt.ts        PPT 课件代码工具：干跑自检 / 落盘（2）
+ * - ppt.ts        PPT 课件工具：slide deck JSON 干跑自检 / 渲染落盘（2）
  * - memory.ts     长期记忆（1）
  * - reminders.ts  待办（1）
  * - knowledge.ts  知识库（1）

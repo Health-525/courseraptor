@@ -511,6 +511,69 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .pptslide.k-free .pt-logo { right: 7px; bottom: 6px; width: 13px; height: 13px; }
   .pptv-stage.k-free .pt-logo { right: 22px; bottom: 16px; width: 26px; height: 26px; }
 
+  /* ── slide JSON 管线（ppt_save）：元素坐标就是 1000×562.5 画布 px，整页
+     按自然尺寸排版后 transform: scale 缩进容器（chat-app.js 的 pptFitFreePx
+     布局后算 k = 容器宽/1000）——字号/线宽/表格/公式全部等比，与成品 pptx
+     同一份坐标语义；品牌 chrome 与 core pptx-slides.addBrandChrome 同几何
+     （单位 px），缩影条与全屏舞台共用这一套 ── */
+  .pptslide.k-dsl, .pptv-stage.k-dsl { padding: 0; }
+  .pt-dsl { position: absolute; left: 0; top: 0; width: 1000px; height: 562.5px;
+            transform-origin: top left; overflow: hidden;
+            font-family: "Microsoft YaHei", sans-serif; color: #25221C; }
+  .pt-dsl-el { position: absolute; box-sizing: border-box; }
+  .pt-dsl-text { display: flex; flex-direction: column; overflow: hidden;
+                 font-size: 16px; line-height: 1.5; }
+  .pt-dsl-text p { margin: 0; }
+  .pt-dsl-text ul, .pt-dsl-text ol { margin: 0; padding-left: 1.4em; }
+  .pt-dsl-text li { margin: 0; }
+  .pt-dsl-text a { color: inherit; }
+  .pt-dsl svg { display: block; }
+  .pt-dsl-shapetext { display: flex; flex-direction: column; align-items: center;
+                      justify-content: center; text-align: center; padding: 10px;
+                      font-size: 16px; line-height: 1.5; overflow: hidden; }
+  /* 印章（封面大印章/章节页小印章，旋转 -7° 同成品） */
+  .pt-dsl-seal { position: absolute; border-radius: 50%; border: 2px solid #AD392C;
+                 display: flex; align-items: center; justify-content: center;
+                 transform: rotate(-7deg); overflow: hidden; }
+  .pt-dsl-seal img { width: 80%; height: 80%; border-radius: 50%; display: block; }
+  /* 页脚三件套：细线 + COURSERAPTOR + 页码（深色底自动浅色，JS 侧判定） */
+  .pt-dsl-rule { position: absolute; }
+  .pt-dsl-foot { position: absolute; font-family: var(--mono); font-size: 8.5px;
+                 letter-spacing: 2px; line-height: 22px; }
+  .pt-dsl-num { position: absolute; font-family: var(--mono); font-size: 9px;
+                line-height: 22px; text-align: right; }
+  .pt-dsl-disc { position: absolute; border-radius: 50%; }
+  .pt-dsl-logo { position: absolute; border-radius: 50%; overflow: hidden; }
+  .pt-dsl-logo img { width: 100%; height: 100%; border-radius: 50%; display: block; }
+  .pt-dsl-elemcut { position: absolute; right: 12px; bottom: 10px;
+                    font-family: var(--mono); font-size: 10px; color: #6E6656; }
+  /* 公式：MathML 原生渲染；temml 失败降级等宽源码 */
+  .pt-dsl-latex { display: flex; align-items: center; overflow: hidden; font-size: 20px; }
+  .pt-dsl-latex.fallback { font-family: var(--mono); font-size: 14px; color: #5A554A; }
+  /* 代码卡片：纸底 + 标题栏 + 行号 */
+  .pt-dsl-code { background: #FDFCF9; border: 1px solid #E1DCCF; border-radius: 4px;
+                 overflow: hidden; display: flex; flex-direction: column; }
+  .pt-dsl-codehead { flex: none; display: flex; align-items: center; gap: 8px;
+                     height: 32px; padding: 0 12px; background: #F0EDE4;
+                     border-bottom: 1px solid #E1DCCF; }
+  .pt-dsl-codefile { font-size: 13px; color: #25221C; }
+  .pt-dsl-codelang { margin-left: auto; font-family: var(--mono); font-size: 11px;
+                     color: #6E6656; }
+  .pt-dsl-codebody { flex: 1; overflow: hidden; padding: 8px 0;
+                     font-family: Consolas, "Courier New", monospace; }
+  .pt-dsl-codeline { display: flex; line-height: 1.5; }
+  .pt-dsl-codeno { flex: none; width: 34px; text-align: right; padding-right: 10px;
+                   color: #6E6656; user-select: none; }
+  .pt-dsl-codetx { flex: 1; padding-right: 12px; color: #25221C;
+                   white-space: pre; overflow: hidden; }
+  /* 表格：colgroup 列宽 = 元素宽 × 占比（与成品 colW 同式，不归一），
+     主题色表头/首列 + 斑马纹 */
+  .pt-dsl-tablewrap { overflow: hidden; }
+  .pt-dsl-table { border-collapse: collapse; table-layout: fixed; width: auto; }
+  .pt-dsl-table td { border: 1px solid #E1DCCF; padding: 4px 8px; font-size: 14px;
+                     line-height: 1.4; color: #25221C; overflow: hidden;
+                     white-space: nowrap; text-overflow: ellipsis; }
+
   /* 全屏查看器：顶栏（文件名/页题/动作）+ 舞台 + 缩略图条 + 底栏翻页。
      flex column 而不是各块绝对定位——以前舞台宽写死
      calc((100dvh - 118px) * 16 / 9)，那个 118px 是「猜底栏多高」，加一条
