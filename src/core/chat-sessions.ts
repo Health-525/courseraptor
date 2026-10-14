@@ -22,6 +22,7 @@ import type { ModelMessage } from "ai";
 import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
 import { logger } from "./logger";
 import { dataDir } from "./paths";
+import { type LedgerEntry, pushLedger } from "./session-ledger";
 
 function storePath(): string {
   return path.join(dataDir(), "chat-sessions.json");
@@ -49,6 +50,12 @@ export interface ChatSession {
   createdAt: number;
   updatedAt: number;
   messages: StoredMessage[];
+  /**
+   * 状态台账：本会话里已生效、但可能已滑出 CONTEXT_WINDOW 的写操作一行摘要。
+   * 与 messages 分开存——它不是聊天记录，是「这些事已经做过了」的事实清单，
+   * 生命周期也不同（只增不删、上限 LEDGER_MAX）。见 core/session-ledger.ts。
+   */
+  ledger?: LedgerEntry[];
 }
 
 /** 列表接口返回的瘦身元数据（不含正文） */
@@ -200,6 +207,8 @@ export function appendRound(
   opts: {
     titlePrefix?: string;
     attachments?: Array<{ id: string; name: string; storedPath: string }>;
+    /** 本轮成功执行的状态改动（一行一条），落进会话台账 */
+    ledger?: string[];
   } = {},
 ): void {
   const list = readSessions();
@@ -221,6 +230,9 @@ export function appendRound(
     if (think) msg.think = think;
     s.messages.push(msg);
   }
+  if (opts.ledger?.length) {
+    for (const line of opts.ledger) s.ledger = pushLedger(s.ledger, line, now);
+  }
   if (!s.title) {
     const firstUser = s.messages.find((m) => m.role === "user");
     if (firstUser) s.title = titleOf(firstUser.text, opts.titlePrefix);
@@ -230,6 +242,15 @@ export function appendRound(
   }
   s.updatedAt = now;
   writeSessions(list.sort(byRecent).slice(0, MAX_SESSIONS));
+}
+
+/**
+ * 读会话台账（给下一轮渲染进提示词用）。会话不存在返回空数组。
+ * 与 contextMessages 分开：台账不是历史，是「已生效但可能已滑出上下文」
+ * 的事实清单——两者混在一起会让模型把它当成用户说过的话。
+ */
+export function ledgerOf(id: string): LedgerEntry[] {
+  return getSession(id)?.ledger ?? [];
 }
 
 /**
