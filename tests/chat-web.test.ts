@@ -208,6 +208,78 @@ test("SSE 流式回传文本与工具状态，历史逐轮累积", async () => {
   assert.match(String(r2.events.at(-1)?.t), /end/);
 });
 
+test("空产出：既无正文也无工具调用时发 err 提示，且这一轮不进历史", async () => {
+  const calls: unknown[][] = [];
+  setChatAgent({
+    stream({ messages }: { messages?: unknown[] }) {
+      calls.push(messages ?? []);
+      // 模型跑完了却什么都没给（模型侧异常/空响应）
+      async function* gen() {
+        yield { type: "finish" };
+      }
+      return Promise.resolve({ fullStream: gen() });
+    },
+  });
+
+  const url = (await startChatWeb())!;
+  const r1 = await post(url, { message: "在吗" });
+  assert.equal(r1.status, 200);
+  // 必须有可操作的提示，否则用户只看到 spinner 转完就消失
+  const err = r1.events.find((e) => e.t === "err");
+  assert.ok(err, `空产出应发 err 事件，实际事件：${r1.events.map((e) => e.t).join(",")}`);
+  assert.match(String(err.v), /没有返回内容/);
+  assert.match(String(err.v), /重发/, "提示要说清怎么试");
+  assert.ok(
+    r1.events.some((e) => e.t === "end"),
+    "end 事件仍要照发，前端据此收尾",
+  );
+
+  // 空产出不入库：下一轮的历史里不该出现这条悬空提问
+  // （历史里可能有前面用例留下的轮次，所以只断言「没有在吗」，
+  //  而不是断言历史为空——那会依赖用例执行顺序）
+  const r2 = await post(url, { message: "再问一次" });
+  const secondCall = calls[1] as { role: string; content: unknown }[];
+  assert.ok(secondCall.length > 0, "第二轮仍要带上历史");
+  assert.ok(
+    !secondCall.some((m) => String(m.content).includes("在吗")),
+    "空轮次不应留下「用户问了但没有回应」的悬空历史",
+  );
+  assert.ok(
+    secondCall.some((m) => String(m.content).includes("再问一次")),
+    "当前提问应在最后",
+  );
+});
+
+test("空产出判定不误伤：只有工具调用、模型没说话不算空", async () => {
+  setChatAgent({
+    stream() {
+      async function* gen() {
+        yield { type: "tool-call", toolCallId: "t1", toolName: "get_schedule" };
+        yield {
+          type: "tool-result",
+          toolCallId: "t1",
+          toolName: "get_schedule",
+          output: { term: "2026-2027-1", total: 5 },
+        };
+        yield { type: "finish" };
+      }
+      return Promise.resolve({ fullStream: gen() });
+    },
+  });
+
+  const url = (await startChatWeb())!;
+  const r1 = await post(url, { message: "查课表" });
+  assert.ok(
+    r1.events.some((e) => e.t === "tool"),
+    "工具卡应该照常渲染",
+  );
+  assert.equal(
+    r1.events.find((e) => e.t === "err"),
+    undefined,
+    "有工具活动时不该再补空产出提示",
+  );
+});
+
 test("open_panel 工具结果事件携带 panel 字段：网页端据此推出对应面板", async () => {
   // 对话里说「打开课表」：agent 调 open_panel，SSE tool 事件带 panel=schedule
   setChatAgent({

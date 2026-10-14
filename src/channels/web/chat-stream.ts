@@ -5,6 +5,7 @@ import type http from "node:http";
 import type { ModelMessage } from "ai";
 import { type AttachmentResult, openLocalFile } from "../../core/attachments";
 import { appendRound, contextMessages, DEFAULT_ID, ledgerOf } from "../../core/chat-sessions";
+import { EMPTY_TURN_HINT } from "../../core/empty-turn";
 import { ledgerBlock, ledgerLine } from "../../core/session-ledger";
 import { maybeAutoTitle } from "../../core/session-titles";
 import { getUploads, type WebUpload } from "../../core/workspace-data";
@@ -206,7 +207,7 @@ async function runTurn(
   // 本轮成功改了状态的一行摘要；轮次跑完随 appendRound 一起落盘
   const ledgerLines: string[] = [];
 
-  const { text, think, failure } = await translateStream(agent, {
+  const { text, think, failure, empty } = await translateStream(agent, {
     messages,
     signal,
     send,
@@ -243,13 +244,19 @@ async function runTurn(
       NEED_SETUP_RE.test(msg) ? { panel: "settings" } : {},
   });
 
+  // 空产出：模型这一轮什么都没给（无正文/无思考/无工具调用）。必须给一条
+  // 能照做的提示——否则用户只看到 spinner 转完就消失，无从判断是模型挂了
+  // 还是自己的问题。前端 err 事件走红色提示行（lineBad），无需改前端。
   if (failure) send({ t: "err", v: failure });
+  else if (empty) send({ t: "err", v: EMPTY_TURN_HINT });
   send({ t: "end", dur: Date.now() - startedAt, sid: sessionId });
 
   // 完整跑完的一轮才进历史（中断的半截回复会污染下一轮上下文）；
   // 落盘在 chat-sessions 里做，重启后历史仍在。思考跟着同一轮的助手消息
-  // 存成 think 字段，只给界面回看，不会再被喂回模型
-  if (!signal.aborted) {
+  // 存成 think 字段，只给界面回看，不会再被喂回模型。
+  // 空产出也不入库：模型没答，写进去只会让下一轮上下文里出现一条
+  // 「用户问了 X」却没有任何回应的悬空对话，诱导模型重复发问。
+  if (!signal.aborted && !empty) {
     appendRound(sessionId, message, text.trim() ? text : null, think.trim() || null, {
       attachments: uploads.map(({ id, name, storedPath }) => ({ id, name, storedPath })),
       ...(ledgerLines.length ? { ledger: ledgerLines } : {}),

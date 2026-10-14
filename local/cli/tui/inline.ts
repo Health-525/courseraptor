@@ -28,6 +28,7 @@
 
 import readline from "node:readline";
 import { PassThrough } from "node:stream";
+import { EMPTY_TURN_HINT, isEmptyTurn } from "../../../src/core/empty-turn";
 import type { LoopTimeoutConfig } from "../../../src/core/loop-timeout";
 import { abortFailure, streamTimeoutConfig } from "../../../src/core/loop-timeout";
 import { CYAN, DIM, GREEN, RED, RESET, YELLOW } from "./color";
@@ -463,6 +464,11 @@ export async function runInlineTUI(options: {
     let wroteText = false;
     let usage: { inputTokens?: number; outputTokens?: number } | undefined;
     let failure: string | null = null;
+    // 空产出判定（与网页端同一条判据，见 core/empty-turn.ts）：跑完却
+    // 没正文、没思考、没工具调用。行内渲染下更明显——光秃秃一行
+    // 「完成 · 0.4s」，用户无从判断发生了什么。
+    let thinkChars = 0;
+    let hadToolCall = false;
 
     rl.pause();
     try {
@@ -480,6 +486,7 @@ export async function runInlineTUI(options: {
         switch (p.type) {
           case "tool-call": {
             const name = p.toolName ?? "tool";
+            hadToolCall = true;
             if (p.toolCallId) toolStart.set(p.toolCallId, Date.now());
             const input = summarizeInput(p.input);
             write(`  ${DIM}⟳ ${name}${input ? ` ${input}` : ""}…${RESET}\n`);
@@ -511,9 +518,11 @@ export async function runInlineTUI(options: {
             break;
           }
           case "reasoning-delta": {
-            // 默认不展示推理过程，与原 TUI 的 reasoning:"hidden" 一致
+            // 默认不展示推理过程，与原 TUI 的 reasoning:"hidden" 一致。
+            // 但仍要计量：思考卡是界面上可见的痕迹，有思考就不算空产出
+            const t = deltaOf(p);
+            if (t) thinkChars += t.length;
             if (process.env.RAPTOR_TUI_REASONING === "1") {
-              const t = deltaOf(p);
               if (t) write(`${DIM}${t}${RESET}`);
             }
             break;
@@ -550,9 +559,20 @@ export async function runInlineTUI(options: {
             : (err?.message ?? String(e));
       }
     } finally {
+      // 空产出补一句可操作提示（与网页端同一判据）；有 failure 时不叠加，
+      // 否则用户会同时看到两条解释同一件事的红字
+      const empty = isEmptyTurn({
+        hasText: wroteText,
+        hasThink: thinkChars > 0,
+        hadToolCall,
+        failure,
+        aborted: abort.signal.aborted,
+      });
       if (wroteText) write("\n");
       if (failure) {
         write(`  ${RED}✗ ${failure}${RESET}\n`);
+      } else if (empty) {
+        write(`  ${RED}✗ ${oneLine(EMPTY_TURN_HINT, 200)}${RESET}\n`);
       }
       const total = fmtDuration(Date.now() - startedAt);
       const tokens =

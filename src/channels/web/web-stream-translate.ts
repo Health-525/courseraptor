@@ -9,6 +9,8 @@
  * 骨架只负责「事件类型 → SSE 载荷」的公共部分与工具耗时配对，不碰
  * 会话落盘、附件预解析等各自的收尾逻辑。
  */
+
+import { isEmptyTurn } from "../../core/empty-turn";
 import type { LoopTimeoutConfig } from "../../core/loop-timeout";
 import { abortFailure, streamTimeoutConfig } from "../../core/loop-timeout";
 import {
@@ -40,6 +42,12 @@ export interface StreamTranslation {
   think: string;
   /** 失败信息（流内 error 事件与agent 抛错都归入这里）；null 表示成功跑完 */
   failure: string | null;
+  /**
+   * 空产出：这一轮既无正文、无思考、无任何工具调用，也没有自己的错误
+   * 文案（模型侧异常、过滤、空响应）。调用方据此给用户一条可操作的提示，
+   * 而不是让「发出去 → 什么都没发生」的黑箱留在界面上。
+   */
+  empty: boolean;
 }
 
 export interface ToolClock {
@@ -96,6 +104,7 @@ export async function translateStream<M>(
   let text = "";
   let think = "";
   let failure: string | null = null;
+  let hadToolCall = false;
 
   try {
     // 流式看门狗随每次 stream 调用带上：首 chunk / chunk 间隔超时会把
@@ -131,6 +140,7 @@ export async function translateStream<M>(
           break;
         }
         case "tool-call": {
+          hadToolCall = true;
           toolStart.start(p.toolCallId, p.toolName, p.input);
           send({
             t: "tool",
@@ -197,5 +207,15 @@ export async function translateStream<M>(
     }
   }
 
-  return { text, think, failure };
+  // 空产出判定：跑完了却什么都没发生（详见 core/empty-turn.ts 的判据与边界）。
+  // 放在 try/catch 之后——失败与中止都有各自口径，不在这里叠加第二条提示。
+  const empty = isEmptyTurn({
+    hasText: text.trim().length > 0,
+    hasThink: think.trim().length > 0,
+    hadToolCall,
+    failure,
+    aborted: signal.aborted,
+  });
+
+  return { text, think, failure, empty };
 }
