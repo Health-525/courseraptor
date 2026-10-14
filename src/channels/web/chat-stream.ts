@@ -4,7 +4,8 @@
 import type http from "node:http";
 import type { ModelMessage } from "ai";
 import { type AttachmentResult, openLocalFile } from "../../core/attachments";
-import { appendRound, contextMessages, DEFAULT_ID } from "../../core/chat-sessions";
+import { appendRound, contextMessages, DEFAULT_ID, ledgerOf } from "../../core/chat-sessions";
+import { ledgerBlock, ledgerLine } from "../../core/session-ledger";
 import { maybeAutoTitle } from "../../core/session-titles";
 import { getUploads, type WebUpload } from "../../core/workspace-data";
 import { agentProvider, type ChatStreamableAgent } from "./web-agent-gate";
@@ -193,11 +194,17 @@ async function runTurn(
 ): Promise<void> {
   // 预解析注入：agent 不必先调一次 read_local_file 才知道文件里是什么
   const attachmentContext = await preparseUploads(uploads);
+  // 状态台账：把「本会话已生效但可能已滑出 40 条窗口的写操作」摆在用户消息
+  // 尾部。必须在**本轮执行前**快照——本轮的新改动要在下一轮才注入，否则
+  // 模型会看到自己「还没做」的事就摆在眼前。
+  const ledgerContext = ledgerBlock(ledgerOf(sessionId));
   const messages: ModelMessage[] = [
     ...contextMessages(sessionId),
-    { role: "user", content: message + attachmentContext },
+    { role: "user", content: message + attachmentContext + ledgerContext },
   ];
   const startedAt = Date.now();
+  // 本轮成功改了状态的一行摘要；轮次跑完随 appendRound 一起落盘
+  const ledgerLines: string[] = [];
 
   const { text, think, failure } = await translateStream(agent, {
     messages,
@@ -211,6 +218,11 @@ async function runTurn(
       const graph = graphPayloadOfToolOutput(output);
       // open_panel：模型点名的面板随事件带给前端自动推出（同 NEED_SETUP 的 panel 通道）
       const openPanel = openPanelIdOf(toolName, clock.inputOf(toolCallId));
+      // 状态台账：写操作成功后记一行「改了什么」（查询类工具不进台账）
+      if (toolName) {
+        const line = ledgerLine(toolName, clock.inputOf(toolCallId), output);
+        if (line) ledgerLines.push(line);
+      }
       return {
         // 有成品文件时前端在工具卡下方渲染下载行
         ...(files.length ? { files } : {}),
@@ -240,6 +252,7 @@ async function runTurn(
   if (!signal.aborted) {
     appendRound(sessionId, message, text.trim() ? text : null, think.trim() || null, {
       attachments: uploads.map(({ id, name, storedPath }) => ({ id, name, storedPath })),
+      ...(ledgerLines.length ? { ledger: ledgerLines } : {}),
     });
     // 落盘后顺手让模型给会话定个像样的标题（首轮触发一次即定题）
     await maybeAutoTitle(sessionId);
