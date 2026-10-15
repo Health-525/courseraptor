@@ -52,12 +52,12 @@ OpenMAIC 是「把任何主题或文档变成互动式 AI 课堂」的开源平�
 
 - **`feynman-learning` / `understanding-by-design` / `spiral-curriculum` / `learning-to-learn`** —— 与本项目已内置的 `meta-learning`（认知科学元学习教练，MIT-0，changer-changer）**重复**。两套学习法提示词并行会互相打架，要学费曼技法用 `deep-understanding` 参考篇即可。
 - **`stage-design` / `stage-dsl` / `slide-dsl` / `page-clone` / `pro-editing` / `style-clone` / `teacher-style-clone` / `pptx-import`** —— 绑死 OpenMAIC 的课堂文档模型（stage/scene/action）与工具链（`create_stage`/`patch_stage`/`read_stage`），本项目没有这套数据模型。
-- **`k12-core-literacy-planning` / `social-emotional-learning` / `lecture-style` / `workshop-style` / `vocational` / `deep-interactive`** —— 场景不符：本项目是对话式校园 agent（课表/待办/知识/图谱/PPT/番茄钟），不是 K12 课堂产品，课型分野无意义。
+- **`k12-core-literacy-planning` / `social-emotional-learning` / `lecture-style` / `workshop-style` / `vocational` / `deep-interactive`** —— 场景不符：本项目是对话式校园 agent（课表/待办/知识/PPT/番茄钟），不是 K12 课堂产品，课型分野无意义。
 
 ## 顺带值得学的写法
 
 1. **description 即路由**：每个 skill 的 frontmatter 都写清 Use when / Do not use when —— 这是 skill 能否被正确触发的关键。
 2. **底层流程 + 主题 skill 两层**：`stage-design` 是地板，主题 skill 建在它之上并互相引用。
-3. **规划语言红线**：`Concept Spine`、`revisit` 等教师侧黑话不得出现在学生可见内容里（本项目对应：图谱/PPT 产出物的内部标签不得外漏）。
+3. **规划语言红线**：`Concept Spine`、`revisit` 等教师侧黑话不得出现在学生可见内容里（本项目对应：PPT 产出物的内部标签不得外漏）。
 4. **能力边界如实声明**：如「生成式页面无法实时判分」——不过度承诺。
 5. **完成前逐条验收清单**：每个 skill 末尾一份 checklist。

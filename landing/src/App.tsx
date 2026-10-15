@@ -176,7 +176,7 @@ function App() {
             <aside className="shot-tag tag-b"><span className="tape" aria-hidden="true"></span>聊过的知识自动沉淀，<b>flomo 式知识库</b></aside>
             <aside className="shot-tag tag-c"><span className="tape" aria-hidden="true"></span>课表图<b>直接发在对话里</b></aside>
           </figure>
-          <p className="hero-note-fine">开箱 21 个内置工具 · 12 家模型厂商 · 终端 / 网页 / QQ 三端同一份记忆 · 凭证 AES-256-GCM 加密不出本机</p>
+          <p className="hero-note-fine">开箱 20 个内置工具 · 12 家模型厂商 · 终端 / 网页 / QQ 三端同一份记忆 · 凭证 AES-256-GCM 加密不出本机</p>
         </section>
         <div className="tape-band" aria-hidden="true"><div className="wrap tape-inner"><span>课表与考试</span><span>✳</span><span>成绩与学籍</span><span>✳</span><span>通知与待办</span><span>✳</span><span>日历与知识库</span></div></div>
         <section className="section wrap screen" id="features" aria-labelledby="features-title">
