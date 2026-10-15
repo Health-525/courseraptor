@@ -85,7 +85,7 @@ The browser UI usually runs at `http://localhost:3210`; follow the actual startu
 ├── bin/raptor.cjs        # Global CLI entry (npm link)
 ├── docs/                 # Assets & extended docs
 ├── skills/               # Bundled skill packages: timetable image export
-│                         # and meta-learning
+│                         # learning skills + export-schedule
 ├── obsidian/             # Obsidian plugin (fourth entrance: sidebar chat +
 │                         # today-schedule/todo insertion; own npm project)
 ├── src/

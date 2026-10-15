@@ -1,32 +1,40 @@
 /**
- * 教学法技能库的**收录清单与原文清洗规则**——生成器与测试共用同一份，
- * 免得两边各写一套导致漂移。
+ * 运行时技能库的**收录清单与原文清洗规则**——生成器与测试共用同一份。
  *
- * 为什么要清洗：OpenMAIC 的 skill 正文里通篇是它自己工具链的调用步骤
- * （create_stage / set_roster / generate_scene / read_stage…）。原样喂给
- * 本项目的模型，它会照着去调**不存在的工具**——这是最典型的 agent 幻觉
- * 来源。所以入库时做两件事，且只做这两件：
- *   1. 丢掉纯平台流程的章节（它们对教学法零贡献）；
- *   2. 把剩下的工具名换成中文动作描述，保留教学原意。
- * 教学原则、页面节奏、验收清单等一律原样保留。
+ * 目录约定：skills/<id>/SKILL.md 平级存放（OpenMAIC 原文已从 openmaic/ 迁出）。
+ * 为什么要清洗：OpenMAIC 正文里通篇是它自己工具链的调用步骤；原样喂给
+ * 本项目模型会去调不存在的工具。清洗只做两件事：
+ *   1. 丢掉纯平台流程的章节；
+ *   2. 把剩下的工具名换成中文动作描述。
  *
- * skills/openmaic/ 里的**原文一字未改**，清洗只发生在内联进运行时的常量里。
+ * 本期 allowlist：学习类 6 篇 + export-schedule（课表卡片）。
  */
 
 export interface SkillSource {
-  /** 与 skills/openmaic/<id>/ 同名 */
+  /** 与 skills/<id>/ 同名 */
   id: string;
   /** 何时读它（拼进工具 description） */
   when: string;
-  /** 整节丢弃的章节标题（纯平台流程，教学上无贡献） */
+  /** 整节丢弃的章节标题（纯平台流程 / 外部 CLI 话术） */
   dropSections: string[];
 }
 
+/** 当前进 agent 的 skill（改这里 → 重跑 build-skill-library） */
 export const SKILL_SOURCES: SkillSource[] = [
   {
     id: "feynman-learning",
     when: "费曼学习法/讲给外行听/暴露理解缺口",
     dropSections: ["搭建与验收"],
+  },
+  {
+    id: "learning-to-learn",
+    when: "把学习策略与元认知嵌进某次讲解",
+    dropSections: [],
+  },
+  {
+    id: "zone-of-proximal-development",
+    when: "习题诊断/讲题补差/最近发展区带练",
+    dropSections: ["落到 OpenMAIC 页面"],
   },
   {
     id: "understanding-by-design",
@@ -36,36 +44,17 @@ export const SKILL_SOURCES: SkillSource[] = [
   {
     id: "spiral-curriculum",
     when: "螺旋式复习/概念跨课升阶/多课概念重访",
-    // 第二层是逐页生成课堂的工具调用序列；第一层架构设计保留（已替换工具名）
     dropSections: ["第二层：Generate Lessons"],
   },
   {
-    id: "learning-to-learn",
-    when: "把学习策略与元认知嵌进某次讲解",
-    dropSections: [],
+    id: "curriculum-planner",
+    when: "系列复习/多日学习计划/先签核再执行",
+    dropSections: ["`ask_user` ends the run", "The execution loop", "When something fails"],
   },
   {
-    id: "lecture-style",
-    when: "大师讲透/系统讲解一条线/讲透某个主题",
-    dropSections: ["Carrying the style into the generators"],
-  },
-  {
-    id: "workshop-style",
-    when: "动手实操/边做边学/工作坊式带练",
-    dropSections: ["Carrying the style into the generators"],
-  },
-  { id: "vocational", when: "职业技能实训/实验操作步骤/安全边界与判断", dropSections: [] },
-  { id: "deep-interactive", when: "机制动手/模拟与可操作演示/理化生编程", dropSections: [] },
-  {
-    id: "social-emotional-learning",
-    when: "学习情绪与压力管理/拖延与自控",
-    dropSections: [],
-  },
-  {
-    id: "build-personal-skill",
-    when: "从我的记录提炼个人偏好/专属学习法",
-    // Workflow 章节保留：它就是真正的操作流程，只需把工具名换成中文动作描述
-    dropSections: [],
+    id: "export-schedule",
+    when: "导出课表图/课表卡片/本周或整学期课表图片",
+    dropSections: ["仓库内调用", "打成独立技能包（供他人下载）"],
   },
 ];
 
@@ -141,7 +130,7 @@ function dropSections(body: string, titles: string[]): string {
   return kept.join("\n");
 }
 
-/** 原文 → 可入内联常量���正文 */
+/** 原文 → 可入内联常量的正文 */
 export function sanitizeBody(id: string, raw: string, sources: SkillSource[]): string {
   const src = sources.find((s) => s.id === id);
   if (!src) throw new Error(`未登记的 skill：${id}`);
@@ -150,11 +139,19 @@ export function sanitizeBody(id: string, raw: string, sources: SkillSource[]): s
   for (const [from, to] of TOOL_RENAMES) {
     body = body.split(from).join(to || from);
   }
-  // 清掉因丢节留下的悬空小标题引用行（如「先加载 `/stage-design`」）
   body = body
     .split("\n")
     .filter((l) => !/先加载\s*`?\/?(stage-design|curriculum-planner|slide-dsl|stage-dsl)/.test(l))
     .join("\n");
+
+  if (id === "export-schedule") {
+    body = `${body}
+
+## CourseRaptor 对话内用法
+
+在本产品对话中**不要跑 CLI / 不要开浏览器截图**。用户要课表图或课表卡片时，直接调用工具 \`export_schedule_image\`（读本地课表缓存渲染，与网页「本周图片 / 整学期图片」同一渲染器）。缺缓存时如实告诉用户先导入或查询课表，不要编造课表。`;
+  }
+
   const ghosts = GHOST_TOOLS.filter((g) => body.includes(g));
   if (ghosts.length) {
     throw new Error(`${id}: 清洗后仍残留 OpenMAIC 工具名 ${ghosts.join("、")}`);

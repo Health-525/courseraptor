@@ -255,8 +255,10 @@ test("pptPreviewOfToolOutput：合法载荷放行、畸形载荷拒绝", () => {
 });
 
 test("工具接线：ppt_save 的 pptx 带 ppt 载荷，generate_document 不再产出课件", async () => {
+  // PPT 暂未注册进 coreTools，但源码与渲染管线保留——直接测 pptTools
+  const { pptTools } = await import("../src/core/tools/ppt");
   const { coreTools } = await import("../src/core/tools");
-  const save = (coreTools.ppt_save as unknown as { execute: (i: unknown) => Promise<any> }).execute;
+  const save = (pptTools.ppt_save as unknown as { execute: (i: unknown) => Promise<any> }).execute;
   const g = await save({
     deck: {
       slides: [

@@ -43,10 +43,17 @@
 
 模型直接输出 slide JSON（`{slides:[{background?, motif?, notes?, elements}]}`，画布 1000×562.5px、安全边距 50px），由渲染器映射为 pptx——不写代码、不跑沙箱。自动套**品牌课件模板**「纸墨朱砂」（每页可选 motif：封面/章节页朱砂整版大印章、内容页页脚细线 + COURSERAPTOR + 落款 logo + 页码），网页端内嵌可翻页预览（与成品同一份坐标语义）。
 
+> **暂未对 agent 开放**：`ppt_preview` / `ppt_save` 源码与网页预览管线仍保留，当前不注册进工具表。交付物请用 Word / Excel / PDF。
+
+---
+
+## 📅 课表图（课表卡片）
+
 | 工具 | 说明 | 典型耗时 |
 |------|------|----------|
-| `ppt_preview` | 干跑 slide deck JSON（不落盘）：逐页摘要（motif + 元素计数）+ 设计警告（越界/文本高度不足/图表数据不一致/列宽和不为 1），写完先自检 | <1s |
-| `ppt_save` | 渲染成 .pptx 落盘 `data/generated/` 并返回路径 + 翻页预览载荷。七种元素：text（内联 HTML 富文本）/ shape（SVG path 任意形状 + 渐变）/ line（折线/曲线/箭头）/ chart（柱/条/折线/面积/饼/环/雷达/散点）/ table（合并格 + 主题色表头）/ latex（可编辑公式）/ code（纸底代码卡片）。结构不合法直接拒绝落盘 | ~1-2s |
+| `export_schedule_image` | 读本地课表缓存渲染 PNG/SVG（红头档案 / 彩色课格；单周或整学期），与网页「本周图片」同渲染器 | ~1s |
+
+独立技能包见 [`skills/export-schedule/`](../skills/export-schedule/)。
 
 ---
 
@@ -100,18 +107,23 @@
 
 ---
 
-## 🧠 学习教练（期末备考）
+## 🧠 学习辅导（OpenMAIC 学习类 skill，按需一篇）
 
-对话里出现学习类请求时，agent 自动切换「学习教练」模式（认知科学方法论，源自 [meta-learning 技能](../skills/meta-learning/)，原作者 [changer-changer](https://github.com/changer-changer)，MIT-0）——不需要任何开关：
+学习类请求时 agent 先调 `read_skill` 加载对应篇目再答（一次一篇；教务查询与闲聊不套）。原文平级存放于 `skills/<id>/`，来源 [THU-MAIC/OpenMAIC](https://github.com/THU-MAIC/OpenMAIC)（MIT）。
 
-- **触发**：讲解知识点 / 问学习方法 / 备考复习策略 / 出题带练 / 上传讲义课件说「帮我学」；查课表与闲聊不套用
-- **教学**：直觉先于形式（先图像/类比后公式），讲清「为什么需要、什么时候失效」，预警最常见的迷思概念
-- **检验**：答对追问「为什么」防蒙对，答错先给提示不直接给答案；检验知识是按表面特征还是深层原理组织
-- **实践编排**：备考走考试型路径（模板题→变式→交叉→整卷模拟，标建议用时，高频考点优先，错题归因）；练能力走应用型路径
-- **事实优先**：排复习计划前先 `get_schedule` 看真实课程安排、把范围对齐到课表实际进度
-- `read_learning_reference` 工具 | 七篇认知科学参考按需加载：深度理解 / 考试专项策略 / 笔记与阅读系统 / 记忆与专注机制 / 知识结构五维诊断 / 练习编排 / 习题课诊断补差——只载当前需要的一篇，不占常驻上下文
-- `read_skill` 工具 | 十篇教学法技能按需加载（原文来自 OpenMAIC 开源 skill 集，MIT）：费曼学习法 / 理解本位设计 UbD / 螺旋式复习 / 学会学习 / 大师讲授 / 互动工作坊 / 职业实训 / 深度交互 / 社会情感学习 / 打造个人技能——管课堂流程与讲法编排，与上一条的方法论分工不同；只收教学法，课堂文档构建类不收
-- 讲透的知识点、错题归因结论，用户认可后可经 `manage_knowledge` 沉淀进知识库，考前直接翻
+本期 allowlist：
+
+| skill | 场景 |
+|-------|------|
+| `feynman-learning` | 费曼循环 / 讲给外行听 |
+| `learning-to-learn` | 学习策略与元认知 |
+| `zone-of-proximal-development` | 习题诊断与补差 |
+| `understanding-by-design` | UbD 逆向设计 |
+| `spiral-curriculum` | 螺旋式复习 |
+| `curriculum-planner` | 系列计划先签核 |
+| `export-schedule` | 课表图说明（产出请调 `export_schedule_image`） |
+
+讲透的知识点、用户认可的错题归因，可经 `manage_knowledge` 沉淀。
 
 ---
 
@@ -193,12 +205,12 @@ npm run qq
 
 ---
 
-## 🧰 开箱工具分层（共 20 个）
+## 🧰 开箱工具分层
 
-- **内核 18 个**（`src/core/tools/`，与学校无关）：文件与数据四件套（`read_local_file` / `query_table` / `run_js` / `manage_attachments`）、文档写作与转换（`generate_document` / `convert_document`）、PPT 课件两件套（`ppt_preview` / `ppt_save`）、`save_memory`、`manage_todos`、`manage_knowledge`、`manage_pomodoro`、`read_learning_reference`、`read_skill`、`open_settings`、`open_panel`、`get_weather`、`get_time`
-- **课表与校历 2 个**：`get_schedule`（只读本地导入的课表缓存）、`set_holidays`（放假 / 调休落盘）
+- **内核**（`src/core/tools/`，与学校无关）：文件与数据四件套（`read_local_file` / `query_table` / `run_js` / `manage_attachments`）、文档写作与转换（`generate_document` / `convert_document`）、`export_schedule_image`、`save_memory`、`manage_todos`、`manage_knowledge`、`manage_pomodoro`、`read_skill`、`open_settings`、`open_panel`、`get_weather`、`get_time`
+- **课表与校历**：`get_schedule`（只读本地导入的课表缓存）、`set_holidays`（放假 / 调休落盘）
 
-全部 20 个都只读写本地数据：课表来自你在网页端导入的缓存，其余能力走本机文件、沙箱计算与本地 JSON。
+全部只读写本地数据：课表来自网页端导入缓存，其余走本机文件、沙箱计算与本地 JSON。PPT 工具源码保留、暂未挂入 agent。
 
 ---
 
@@ -215,7 +227,7 @@ npm run qq
 ```
 ├── bin/raptor.cjs           # 全局命令入口（npm link 后任意目录敲 raptor）
 ├── docs/                    # 文档与素材（能力清单 / 配置参考 / 使用指南等）
-├── skills/                  # 独立技能包：export-schedule（课表图导出）/ meta-learning（元学习）
+├── skills/                  # 平级 skill：学习类 OpenMAIC + export-schedule（课表图）等
 ├── src/                     # 公用核心（与运行形态无关）
 │   ├── core/                # 内核
 │   │   ├── agent.ts         # agent 定义（系统提示词 + 工具装配）
