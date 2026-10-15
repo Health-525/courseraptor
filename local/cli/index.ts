@@ -13,108 +13,28 @@
  */
 
 import "../../src/adapters";
-import { createRaptorAgent } from "../../src/core/agent";
 import { config } from "../../src/core/config";
-import { loadCredentialsStore, saveCredentialsStore } from "../../src/core/credentials";
 import { flushCapturedSession } from "../../src/core/memory/shortterm";
-import { ensureModelAvailable } from "../../src/core/models";
 import { runDeepSeekKeySetup } from "../../src/core/onboarding";
 import { school } from "../../src/core/school";
-import {
-  checkForUpdate,
-  formatUpdateBadge,
-  formatUpdateBanner,
-  type UpdateInfo,
-} from "../../src/core/update-check";
+import { formatUpdateBadge } from "../../src/core/update-check";
 import { runUpdateCommand } from "../../src/core/updater";
-import { pingUsage } from "../../src/core/usage-ping";
+import { bootstrapHost } from "../host/boot";
 import { SLASH_COMMANDS } from "./tui/slash-menu";
 import { schoolConfigured } from "./tui/welcome";
-
-// 更新检查先发出，与凭证加载/agent 构建并行跑，后面收结果
-const updatePromise = checkForUpdate();
-
-// 匿名使用情况上报（随机设备号+版本，24h 一次，失败静默，RAPTOR_NO_TELEMETRY=1 可关）
-void pingUsage();
 
 // 教务账号与模型 API Key 不再在终端做首次引导（用户 2026-10-04 指示「新手引导
 // 不要了，直接进界面」）：启动零提问，未配置的凭证都在网页「设置」里补填；
 // 终端侧重试入口仍是 /key 命令。
+//
+// 启动序列（适配器 → 更新检查/上报 → 模型退役检测 → 会话命名 maker → QQ 桥
+// → 建 agent → 起网页 → 待办提醒调度）统一抽到共享引导 bootstrapHost：桌面版
+// 后端（local/host/headless.ts）复用同一份，保证本地版行为零改动。
+const { agent, updateInfo, webUrl } = await bootstrapHost();
 
-const updateInfo: UpdateInfo | null = await updatePromise;
-if (updateInfo) {
-  // 行内模式可见；卡片模式每帧清屏，靠下面 title 里的徽标常驻
-  console.log(formatUpdateBanner(updateInfo));
-}
-
-// 模型退役检测：DeepSeek 上下架型号后，本地存着的旧 id 会让每次对话直接
-// 报错。启动时强制拉一次实时清单，已退役的自动迁到当前默认型号并落盘；
-// 断网/Key 失效时检测不动配置（ensureModelAvailable 只认 live 清单）。
-// 必须赶在 agent / QQ 桥 / 网页构建之前，三个渠道才都拿到迁移后的模型。
-if (config.deepseekApiKey) {
-  const drift = await ensureModelAvailable({
-    current: config.model,
-    providerId: config.providerId,
-    baseUrl: config.providerBaseUrl,
-    apiKey: config.deepseekApiKey,
-  });
-  if (drift.migrated) {
-    config.model = drift.model;
-    const providerModels = {
-      ...(loadCredentialsStore()?.providerModels ?? {}),
-      [config.providerId]: drift.model,
-    };
-    saveCredentialsStore({ model: drift.model, modelOverride: true, providerModels });
-    console.log(`🔄 ${drift.message}\n`);
-  }
-}
-
-// 会话自动命名 maker：直调模型 API（不带工具），失败静默——标题还有首问
-// 兜底。网页与 QQ 桥落的是同一份档案，注册表也共用（src/session-titles.ts），
-// 装配赶在 QQ 桥启动之前
-await import("../../src/core/session-titles").then(({ installDefaultTitleMaker }) =>
-  installDefaultTitleMaker(),
-);
-
-// QQ 渠道：日志写 qq-bridge.log，不干扰终端渲染
-if (config.qqBotAppId && config.qqBotAppSecret) {
-  const { startQQBridge } = await import("../qq/bridge");
-  const { createQQFileLogger } = await import("../qq/logger");
-  startQQBridge({ logger: createQQFileLogger() }).catch((e) => {
-    console.error(`[qq] 桥启动失败（终端对话不受影响）：${(e as Error).message.slice(0, 120)}`);
-  });
-}
-
-const agent = await createRaptorAgent();
-
-// 网页对话窗口：浏览器打开即聊（地址显示在欢迎卡片下方），起不来不影响终端。
-// 网页用**独立实例且不注入上次会话记录**：它每轮都带该会话自己的完整历史，
-// 而 session.json 是全局单文件，注入进来等于让别的会话的尾巴污染当前会话。
-const { setChatAgent, setChatAgentRefresher, setQQBridgeLauncher, startChatWeb } = await import(
-  "../../src/channels/web/chat-web"
-);
-setChatAgent(await createRaptorAgent(undefined, { carryOver: false }));
-// 换模型即重建 agent 给网页用；终端 TUI 持有的是上面这个实例，重启后才用新模型
-setChatAgentRefresher(async () => {
-  setChatAgent(await createRaptorAgent(undefined, { carryOver: false }));
-});
-// 桥热启动是宿主职责（web 不 import local/）：设置页存 QQ 凭证后懒加载拉起
-setQQBridgeLauncher(() =>
-  import("../qq/bridge").then(({ ensureQQBridgeOnline }) => ensureQQBridgeOnline()),
-);
-startChatWeb()
-  .then((url) => {
-    // 未选学校时不再有终端引导与提示信息，只报网页地址；
-    // 教务账号与模型 Key 都在网页「设置」里配
-    if (url && !schoolConfigured()) console.log(`💬 网页对话：${url}`);
-  })
-  .catch(() => {});
-
-// 待办到期提醒：每小时扫描「距到期 ≤ 7 天」的未完成待办（每天最多一次，
-// 桌面通知 + QQ 推送）。QQ 桥在线时进程在 TUI 退出后仍存活，提醒也随之持续
-void import("../../src/core/todo-reminders").then(({ startTodoReminderScheduler }) =>
-  startTodoReminderScheduler(),
-);
+// 未选学校时不再有终端引导与提示信息，只报网页地址；
+// 教务账号与模型 Key 都在网页「设置」里配
+if (webUrl && !schoolConfigured()) console.log(`💬 网页对话：${webUrl}`);
 
 /**
  * UI 切换外层循环：全屏卡片（@ai-sdk/tui）和行内渲染器可运行时互切。

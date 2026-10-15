@@ -75,8 +75,9 @@ test("长期记忆不受影响：关掉注入后角色设定仍在", async () =>
 });
 
 test("装配点：网页注册的是 carryOver=false 实例，TUI 保持默认注入", async () => {
+  // 装配点已从 local/cli/index.ts 抽到共享引导 local/host/boot.ts（TUI 与桌面后端复用）
   const src = fs.readFileSync(
-    path.join(import.meta.dirname, "..", "local", "cli", "index.ts"),
+    path.join(import.meta.dirname, "..", "local", "host", "boot.ts"),
     "utf8",
   );
   assert.match(
