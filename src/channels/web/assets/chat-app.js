@@ -5300,6 +5300,10 @@ function settingsDirty() {
   const customModelEl = document.getElementById("customModelId");
   const savedUrl = setStatus?.provider ? setStatus.provider.customBaseUrl || "" : "";
   return !!(
+    (schoolOptions.length > 0 && schoolCurrent !== schoolSaved) ||
+    document.getElementById("sJwglUser")?.value.trim() ||
+    document.getElementById("sJwglPass")?.value ||
+    (schoolCurrent === "custom" && document.getElementById("customSchoolName")?.value.trim()) ||
     providerCurrent !== providerSaved ||
     (providerCurrent === "custom" &&
       customUrlEl &&
@@ -5404,6 +5408,11 @@ function runDiagnostic(target, buttonId, stateId) {
 document
   .getElementById("testDeepseek")
   .addEventListener("click", () => runDiagnostic("deepseek", "testDeepseek", "diagDeepseek"));
+/* 教务连接检测：用当前已保存（或本次刚保存）的学号密码试登录一次 */
+const testJwglBtn = document.getElementById("testJwgl");
+if (testJwglBtn) {
+  testJwglBtn.addEventListener("click", () => runDiagnostic("jwgl", "testJwgl", "diagJwgl"));
+}
 
 /* ── 自绘下拉：原生 <select> 点开的选项列表浏览器不让改样式，换成与
    会话 ⋯ 菜单同一语言的纸片浮层。按钮 aria-expanded 标记开合；键盘
@@ -5689,8 +5698,98 @@ if (modelSelectBtn) {
   });
 }
 
+/* ── 学校栏（设置第一栏）：可选学校 ≥2（本地装了学校插件）才有意义；
+   公开仓库只有「其他学校」一项时整个栏目隐藏（#311 的收敛口径保持不变）。
+   数据与保存全走 /api/settings 的 school 块与 schoolId 字段，服务端
+   负责运行期切换与教务账号按学校分槽，这里只做预览与收集 ── */
+let schoolOptions = [];
+let schoolCurrent = ""; // 预览选中（保存时才提交切换）
+let schoolSaved = ""; // 服务端当前生效
+function schoolLabelOf(id) {
+  const o = schoolOptions.find((x) => x.id === id);
+  return o ? o.name : id;
+}
+function schoolManualPick() {
+  const o = schoolOptions.find((x) => x.id === schoolCurrent);
+  return !!o?.manual;
+}
+function applySchoolUi() {
+  const btn = document.getElementById("schoolSelect");
+  if (btn) btn.textContent = schoolLabelOf(schoolCurrent) || "—";
+  const isCustom = schoolCurrent === "custom";
+  const nameRow = document.getElementById("customSchoolRow");
+  if (nameRow) nameRow.hidden = !isCustom;
+  const cityRow = document.getElementById("customCityRow");
+  if (cityRow) cityRow.hidden = !isCustom;
+  const jwglRows = document.getElementById("jwglRows");
+  if (jwglRows) jwglRows.hidden = schoolManualPick();
+}
+function renderCurJwgl(d) {
+  const cur = document.getElementById("curJwgl");
+  const nameCur = document.getElementById("curSchoolName");
+  const jwgl = d?.jwgl;
+  if (nameCur) {
+    const picked = schoolOptions.find((x) => x.id === schoolCurrent);
+    nameCur.textContent = picked?.note || "";
+  }
+  if (!cur) return;
+  if (schoolManualPick()) {
+    cur.textContent = "「其他学校」不登录教务系统：课表用「本地数据」栏的导入功能手动导入。";
+    return;
+  }
+  cur.textContent = jwgl?.configured
+    ? `已保存 ${jwgl.username}（${jwgl.sourceLabel}）；留空不修改`
+    : "还没有保存教务账号：填好学号与密码，点「保存设置」后即可查询课表与成绩。";
+}
+function fillSchool(d) {
+  const s = d?.school;
+  const tab = document.getElementById("setTabSchool");
+  if (!tab) return;
+  const list = Array.isArray(s?.options)
+    ? s.options.filter((o) => o && typeof o.id === "string")
+    : [];
+  /* 只有一项可选（公开版仅 custom）＝没有可选的：整栏收起，设置页维持三栏 */
+  if (list.length < 2) {
+    tab.hidden = true;
+    return;
+  }
+  tab.hidden = false;
+  schoolOptions = list;
+  schoolSaved = s.current || "custom";
+  if (!schoolOptions.some((o) => o.id === schoolCurrent)) schoolCurrent = schoolSaved;
+  const nameEl = document.getElementById("customSchoolName");
+  if (nameEl) nameEl.value = s.custom?.name || "";
+  const cityEl = document.getElementById("customCity");
+  if (cityEl) cityEl.value = s.custom?.city || "";
+  applySchoolUi();
+  renderCurJwgl(d);
+}
+function pickSchool(id) {
+  if (id === schoolCurrent) return;
+  schoolCurrent = id;
+  applySchoolUi();
+  renderCurJwgl(setStatus);
+}
+const schoolSelectBtn = document.getElementById("schoolSelect");
+if (schoolSelectBtn) {
+  bindDdBtn(schoolSelectBtn);
+  schoolSelectBtn.addEventListener("click", () => {
+    if (!schoolOptions.length) return;
+    toggleDd(
+      schoolSelectBtn,
+      schoolOptions.map((o) => ({
+        id: o.id,
+        label: o.name,
+        note: o.manual ? "手动导入课表" : o.note,
+        on: o.id === schoolCurrent,
+      })),
+      pickSchool,
+    );
+  });
+}
+
 /* ── 设置栏目切换：点左列目录，右列换内容。「保存设置」只属于
-   凭证类栏目（模型 / QQ）；本地数据即改即存，不亮保存 ── */
+   凭证类栏目（学校 / 模型 / QQ）；本地数据即改即存，不亮保存 ── */
 const setTabs = [...document.querySelectorAll(".set-tab")];
 let setLastTab = "model"; // 记住上次停留的栏目，进设置直达上次位置
 function setTab(name) {
@@ -5705,7 +5804,7 @@ function setTab(name) {
   for (const pane of document.querySelectorAll(".set-pane")) {
     pane.classList.toggle("on", pane.dataset.pane === name);
   }
-  document.getElementById("saveSettings").hidden = !["model", "qq"].includes(name);
+  document.getElementById("saveSettings").hidden = !["school", "model", "qq"].includes(name);
 }
 for (const tab of setTabs) tab.addEventListener("click", () => setTab(tab.dataset.pane));
 /* 方向键在栏目间移动焦点：大厅里目录是横排（左右）+ 窄屏也是横排，竖排同样支持上下 */
@@ -5729,6 +5828,9 @@ function renderSetDots(d) {
   };
   mark("model", !!d.deepseek?.configured, false);
   mark("qq", !!d.qq?.configured, true);
+  /* 学校栏：其他学校（manual）没有教务账号概念，恒视为已配；
+     真实学校以教务账号是否保存为准——没保存就亮朱砂提醒行动 */
+  mark("school", !!d.school?.manual || !!d.jwgl?.configured, false);
 }
 
 /* 课表导入状态行（设置 → 本地数据）：有缓存提示可重导，没缓存引导导入 */
@@ -5780,6 +5882,12 @@ function showSettings() {
   sQQAppId.value = "";
   sQQSecret.value = "";
   sQQPass.value = "";
+  const sJwglUserEl = document.getElementById("sJwglUser");
+  if (sJwglUserEl) sJwglUserEl.value = "";
+  const sJwglPassEl = document.getElementById("sJwglPass");
+  if (sJwglPassEl) sJwglPassEl.value = "";
+  const diagJwglEl = document.getElementById("diagJwgl");
+  if (diagJwglEl) diagJwglEl.textContent = "";
   document.getElementById("diagDeepseek").textContent = "";
   document.getElementById("diagSchool").textContent = "";
   refreshData();
@@ -5790,6 +5898,7 @@ function showSettings() {
       renderSetDots(d);
       applySchoolState(d.school);
       fillProviders(d);
+      fillSchool(d);
       renderCurKey(d);
       refreshQuota();
       applyProviderUi();
@@ -5886,6 +5995,30 @@ document.getElementById("clearFiles").title =
 document.getElementById("clearAllData").title = "清空全部本地会话、附件、生成文件和待办；不可恢复";
 document.getElementById("saveSettings").addEventListener("click", () => {
   const body = {};
+  /* 学校栏：下拉选成别的学校＝保存时提交切换（服务端运行期换适配器，
+     教务账号按学校分槽换载）；其他学校的名称/城市随选一起保存 */
+  if (schoolCurrent !== schoolSaved) body.schoolId = schoolCurrent;
+  if (schoolCurrent === "custom") {
+    const cnEl = document.getElementById("customSchoolName");
+    const ccEl = document.getElementById("customCity");
+    const cn = cnEl ? cnEl.value.trim() : "";
+    const cc = ccEl ? ccEl.value.trim() : "";
+    if (cn) body.customSchoolName = cn;
+    if (cc) body.customCity = cc;
+  }
+  const sJwglUserEl = document.getElementById("sJwglUser");
+  const sJwglPassEl = document.getElementById("sJwglPass");
+  const ju = sJwglUserEl ? sJwglUserEl.value.trim() : "";
+  const jp = sJwglPassEl ? sJwglPassEl.value : "";
+  if (ju || jp) {
+    if (!ju || !jp) {
+      setMsg.className = "setmsg";
+      setMsg.textContent = "学号与教务密码需要一起填写。";
+      return;
+    }
+    body.jwglUsername = ju;
+    body.jwglPassword = jp;
+  }
   const k = sKey.value.trim();
   if (k) body.apiKey = k;
   /* 供应商与自定义端点：本地版随保存提交（托管版走 /api/provider，不进这里） */
@@ -5947,6 +6080,11 @@ document.getElementById("saveSettings").addEventListener("click", () => {
         if (d.status.school) {
           applySchoolState(d.status.school);
         }
+        fillSchool(d.status);
+        const jwglUserEl = document.getElementById("sJwglUser");
+        if (jwglUserEl) jwglUserEl.value = "";
+        const jwglPassEl = document.getElementById("sJwglPass");
+        if (jwglPassEl) jwglPassEl.value = "";
         fillProviders(d.status);
         renderCurKey(d.status);
         refreshQuota();

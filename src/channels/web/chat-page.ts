@@ -1656,11 +1656,25 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     <div id="hallSettings" hidden>
       <div class="set-frame">
         <nav class="set-tabs" id="setTabs" role="tablist" aria-label="设置栏目">
+          <button class="set-tab" type="button" role="tab" id="setTabSchool" aria-controls="setPaneSchool" aria-selected="false" data-pane="school" hidden><i class="sdot" aria-hidden="true"></i>学校</button>
           <button class="set-tab on" type="button" role="tab" id="setTabModel" aria-controls="setPaneModel" aria-selected="true" data-pane="model"><i class="sdot" aria-hidden="true"></i>AI 模型</button>
           <button class="set-tab" type="button" role="tab" id="setTabQQ" aria-controls="setPaneQQ" aria-selected="false" data-pane="qq"><i class="sdot" aria-hidden="true"></i>QQ 机器人</button>
           <button class="set-tab" type="button" role="tab" id="setTabData" aria-selected="false" data-pane="data">本地数据</button>
         </nav>
         <div class="set-main">
+          <section class="set-pane" id="setPaneSchool" role="tabpanel" aria-labelledby="setTabSchool" data-pane="school">
+            <p class="dlg-intro">选择你就读的学校：已适配的学校保存教务账号后，课表、成绩、考试与教务通知都能直接问；「其他学校」用手动导入课表。选择与账号仅加密保存在当前电脑。</p>
+            <label class="fld"><span>学校</span><button type="button" class="dd-btn" id="schoolSelect" aria-haspopup="listbox" aria-expanded="false" ${demo ? "disabled" : ""}></button></label>
+            <div class="cur" id="curSchoolName"></div>
+            <label class="fld" id="customSchoolRow" hidden><span>学校名称</span><input id="customSchoolName" type="text" autocomplete="off" spellcheck="false" placeholder="显示在界面与回复里的学校名（自定）" ${demo ? "disabled" : ""}></label>
+            <label class="fld" id="customCityRow" hidden><span>所在城市</span><input id="customCity" type="text" autocomplete="off" spellcheck="false" placeholder="如：南京（天气与默认时区用）" ${demo ? "disabled" : ""}></label>
+            <div id="jwglRows">
+              <label class="fld"><span>学号</span><input id="sJwglUser" type="text" autocomplete="off" spellcheck="false" placeholder="教务系统的学号" ${demo ? "disabled" : ""}></label>
+              <label class="fld"><span>教务密码</span><span class="fld-row"><input id="sJwglPass" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyeJwglPass" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
+              <div class="cur" id="curJwgl"></div>
+              <div class="diagrow"><button class="tbtn" id="testJwgl" type="button" ${demo ? "disabled" : ""}>检测教务连接</button><span class="diagstate" id="diagJwgl"></span></div>
+            </div>
+          </section>
           <section class="set-pane on" id="setPaneModel" role="tabpanel" aria-labelledby="setTabModel" data-pane="model">
             <p class="dlg-intro" id="dsIntro">模型服务支持多家供应商（DeepSeek、通义千问、智谱 GLM、Kimi 等），也可填自定义 OpenAI 兼容端点。API Key 与所选型号仅加密保存在当前电脑，留空即保持不变。</p>
             <label class="fld"><span>供应商</span><button type="button" class="dd-btn" id="providerSelect" aria-haspopup="listbox" aria-expanded="false"></button></label>
