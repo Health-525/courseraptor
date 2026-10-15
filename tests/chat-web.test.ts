@@ -1173,6 +1173,10 @@ test("GET /today 返回独立日程页：语法自检 + 聊天页有入口", asy
   assert.ok(!chat.includes('id="openHallM"'), "窄屏顶栏不应再有独立大厅按钮（避免与 ☰ 抽屉重复）");
   assert.match(chat, /class="hall" id="hall"/, "功能大厅抽屉应存在");
   assert.match(chat, /id="hallSettings"/, "设置面板应常驻在功能大厅抽屉里");
+  // 学校栏：模板常驻（默认 hidden），chat-app.js 按 school.options ≥2 决定显示
+  assert.match(chat, /id="setTabSchool"/, "设置栏目应含学校栏（本地装了插件才显示）");
+  assert.match(chat, /id="schoolSelect"/, "学校栏应有学校下拉按钮");
+  assert.match(chat, /id="testJwgl"/, "学校栏应有教务连接检测按钮");
   assert.ok(!chat.includes('id="openSettings"'), "侧栏不应再有独立的设置按钮");
   assert.match(appjs, /today: \(\) => briefOf\(\)\.then\(buildToday\)/, "面板注册表应包含今日日程");
   assert.match(appjs, /const TOOL_PANEL = \{/, "应有工具→面板刷新映射");

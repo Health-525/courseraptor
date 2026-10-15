@@ -273,6 +273,24 @@ test("大厅面板不挂「完整页」跳转：每个功能只在抽屉里看�
   assert.match(src, /refresh\.textContent = "↻ 刷新";/);
 });
 
+test("设置页学校栏：本地装了插件（可选 ≥2）才显示，切换与教务账号走 /api/settings", () => {
+  const src = fs.readFileSync(APP_JS, "utf8");
+  // 数据源与填充：/api/settings 的 school 块
+  assert.match(src, /function fillSchool\(d\) \{/);
+  // 公开版只有「其他学校」一项：整栏隐藏，保持 #311 的三栏口径
+  assert.match(src, /if \(list\.length < 2\) \{/);
+  assert.match(src, /tab\.hidden = true/, "选项不足时学校栏应隐藏");
+  // 下拉选择与保存提交：schoolId 走保存按钮，教务账号成对提交
+  assert.match(src, /body\.schoolId = schoolCurrent/);
+  assert.match(src, /body\.jwglUsername = ju/);
+  assert.match(src, /学号与教务密码需要一起填写/);
+  // 其他学校的名称/城市随选一起保存；manual 选中时教务表单隐藏
+  assert.match(src, /body\.customSchoolName = cn/);
+  assert.match(src, /jwglRows\.hidden = schoolManualPick\(\)/);
+  // 栏目切换把学校栏算进「凭证类栏目」，保存按钮亮起
+  assert.match(src, /\["school", "model", "qq"\]\.includes\(name\)/);
+});
+
 test("教务通知卡按学校显隐：newsReady 门禁接线齐全，没接入的学校不出卡", () => {
   const src = fs.readFileSync(APP_JS, "utf8");
   // 门槛函数：以服务端算好的 school.newsReady 为准，演示页放行
