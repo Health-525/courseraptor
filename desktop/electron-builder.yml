@@ -1,5 +1,8 @@
 appId: com.courseraptor.desktop
 productName: CourseRaptor
+# 关掉 asar：Windows 杀软会把 .asar 当压缩包实时扫描并锁住，导致 EBUSY；
+# 且本项目后端本就是明文源码 + node_modules，解开存放与便携包形态一致。
+asar: false
 directories:
   output: release
 files:
