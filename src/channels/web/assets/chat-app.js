@@ -706,7 +706,7 @@ function pptFitFreePx(box) {
     /* JSON 管线：整页缩放进容器。用 zoom 不用 CSS transform 缩放——zoom
        连布局尺寸一起缩（1000px 画布缩成 176px 缩影也不撑破父级
        overflow），且本文件刻意不出现 transform 串（静态扫描会误报，
-       见 cssFn 的说明；graph 画板的平移同样走 x/y 属性） */
+       见 cssFn 的说明；SVG 节点的平移同样走 x/y 属性） */
     dsl.style.zoom = String(w / PPT_DSL_W);
     return;
   }
@@ -744,7 +744,7 @@ function svgEl(name, attrs) {
 /* CSS/SVG 函数串拼装：函数名走参数，不写进字面量——静态扫描
    （tests/chat-app-static.test.ts）把源码里任何「名字(」都当函数调用，
    gradient/rotate/translate 这类名字本文件并没有定义，会误报
-   （同 graph 画板用 x/y 属性代替 transform 串的取舍） */
+   （SVG 节点平移同理：用 x/y 属性代替 transform 串） */
 function cssFn(name, args) {
   return `${name}(${args})`;
 }
@@ -1716,260 +1716,6 @@ function pptSlideInner(box, s, big, index) {
   box.appendChild(pptLogo());
 }
 
-/* 人物图谱迷你卡：对话里每次图谱变更就地重绘一张 SVG 小图。
-   布局与 /graph 独立页同算法（BFS 分层 + 层内重心对齐），但省掉
-   拖拽/缩放/删除——那是独立页的事，这里只做「当场看见长出来」。 */
-const GRAPH_CAT_COLORS = {
-  family: "#bf4d28",
-  romance: "#c4566e",
-  friendship: "#47714f",
-  conflict: "#3f5a73",
-  hierarchy: "#9c6d1e",
-  other: "#857f74",
-};
-/* 类别中文名：与 core/graph-categories.ts 的 GRAPH_CATEGORIES 同名同序，
-   两处各存一份是刻意的——前端是无模块的静态资产，不能 import */
-const GRAPH_CAT_NAMES = {
-  family: "血缘亲属",
-  romance: "婚姻爱情",
-  friendship: "友情同盟",
-  conflict: "敌对冲突",
-  hierarchy: "尊卑从属",
-  other: "其他",
-};
-const GRAPH_SVG_NS = "http://www.w3.org/2000/svg";
-
-function graphMiniLayout(persons, relations) {
-  const byId = new Map(persons.map((p) => [p.id, p]));
-  const deg = new Map(persons.map((p) => [p.id, 0]));
-  const adj = new Map(persons.map((p) => [p.id, []]));
-  for (const r of relations) {
-    if (!byId.has(r.sourceId) || !byId.has(r.targetId) || r.sourceId === r.targetId) continue;
-    deg.set(r.sourceId, (deg.get(r.sourceId) || 0) + 1);
-    deg.set(r.targetId, (deg.get(r.targetId) || 0) + 1);
-    adj.get(r.sourceId).push(r.targetId);
-    adj.get(r.targetId).push(r.sourceId);
-  }
-  /* 重要度 + 度数高的当根，起始层更贴近真实中心 */
-  const roots = persons
-    .slice()
-    .sort(
-      (a, b) =>
-        (deg.get(b.id) || 0) - (deg.get(a.id) || 0) || (b.importance || 1) - (a.importance || 1),
-    )
-    .slice(0, Math.max(1, Math.ceil(persons.length / 8)))
-    .map((p) => p.id);
-
-  const rank = new Map();
-  const queue = [];
-  for (const id of roots) {
-    if (!rank.has(id)) {
-      rank.set(id, 0);
-      queue.push(id);
-    }
-  }
-  for (let qi = 0; qi < queue.length; qi++) {
-    const id = queue[qi];
-    for (const nb of adj.get(id) || []) {
-      if (!rank.has(nb)) {
-        rank.set(nb, rank.get(id) + 1);
-        queue.push(nb);
-      }
-    }
-  }
-  let maxRank = 0;
-  for (const v of rank.values()) maxRank = Math.max(maxRank, v);
-  for (const p of persons) if (!rank.has(p.id)) rank.set(p.id, maxRank + 1);
-
-  const layers = [];
-  for (const p of persons) {
-    const lv = rank.get(p.id);
-    if (!layers[lv]) layers[lv] = [];
-    layers[lv].push(p);
-  }
-  const NW = 116;
-  const NH = 34;
-  const pos = new Map();
-  for (let l = 0; l < layers.length; l++) {
-    const cur = layers[l];
-    if (!cur) continue;
-    cur.sort((a, b) => (b.importance || 1) - (a.importance || 1) || a.name.localeCompare(b.name));
-    for (let i = 0; i < cur.length; i++) {
-      pos.set(cur[i].id, { x: l * (NW + 44), y: i * (NH + 14) });
-    }
-  }
-  /* 重心对齐几轮收敛，让连线少交叉 */
-  for (let pass = 0; pass < 3; pass++) {
-    for (let l = 1; l < layers.length; l++) {
-      const cur = layers[l];
-      if (!cur) continue;
-      for (const p of cur) {
-        let sum = 0;
-        let cnt = 0;
-        for (const nb of adj.get(p.id) || []) {
-          if (rank.get(nb) === l - 1 && pos.has(nb)) {
-            sum += pos.get(nb).y;
-            cnt++;
-          }
-        }
-        if (cnt) pos.get(p.id).y = sum / cnt;
-      }
-      cur.sort((a, b) => pos.get(a.id).y - pos.get(b.id).y);
-      for (let i = 1; i < cur.length; i++) {
-        const need = NH + 14;
-        if (pos.get(cur[i].id).y - pos.get(cur[i - 1].id).y < need)
-          pos.get(cur[i].id).y = pos.get(cur[i - 1].id).y + need;
-      }
-    }
-  }
-  return { pos, NW, NH };
-}
-
-function graphMiniCard(tl, graph) {
-  const persons = graph.persons || [];
-  const relations = graph.relations || [];
-  if (!persons.length) return;
-
-  const used = new Set();
-  for (const r of relations) {
-    used.add(r.sourceId);
-    used.add(r.targetId);
-  }
-  const visPersons = persons.filter((p) => used.has(p.id) || relations.length === 0);
-  if (!visPersons.length) return;
-
-  const { pos, NW, NH } = graphMiniLayout(visPersons, relations);
-
-  let maxX = 0;
-  let maxY = 0;
-  for (const p of visPersons) {
-    const q = pos.get(p.id);
-    if (!q) continue;
-    maxX = Math.max(maxX, q.x + NW);
-    maxY = Math.max(maxY, q.y + NH);
-  }
-  const W = maxX + 8;
-  const H = maxY + 8;
-
-  const card = el("graphcard");
-  const head = el("graph-head");
-  head.appendChild(el2("graph-mark", "⌗"));
-  head.appendChild(el2("graph-name", "人物图谱"));
-  head.appendChild(el2("graph-meta", `${visPersons.length} 人物 · ${relations.length} 关系`));
-  const more = document.createElement("a");
-  more.className = "tbtn";
-  /* 带 bookId：不带的话多本书时 /graph 只会开默认书，用户在对话里看的
-     这本书和画板打开的那本不是同一本 */
-  more.href = graph.bookId ? `/graph?bookId=${encodeURIComponent(graph.bookId)}` : "/graph";
-  more.textContent = "打开画板";
-  head.appendChild(more);
-  card.appendChild(head);
-
-  const canvas = el("graph-scroll");
-  const svg = document.createElementNS(GRAPH_SVG_NS, "svg");
-  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  svg.setAttribute("width", String(W));
-  svg.setAttribute("height", String(H));
-  svg.setAttribute("role", "img");
-  svg.setAttribute(
-    "aria-label",
-    `人物关系图，${visPersons.length} 个人物、${relations.length} 条关系`,
-  );
-
-  const mk = (tag, attrs) => {
-    const n = document.createElementNS(GRAPH_SVG_NS, tag);
-    for (const k in attrs) n.setAttribute(k, String(attrs[k]));
-    return n;
-  };
-
-  for (const r of relations) {
-    const a = pos.get(r.sourceId);
-    const b = pos.get(r.targetId);
-    if (!a || !b) continue;
-    const color = GRAPH_CAT_COLORS[r.category] || GRAPH_CAT_COLORS.other;
-    const x1 = a.x + NW;
-    const y1 = a.y + NH / 2;
-    const x2 = b.x;
-    const y2 = b.y + NH / 2;
-    let d;
-    if (x2 < x1) {
-      const fx = a.x;
-      const tx = b.x + NW;
-      d = `M${fx} ${a.y + NH / 2} C${fx - 34} ${a.y + NH / 2} ${tx + 34} ${b.y + NH / 2} ${tx} ${b.y + NH / 2}`;
-    } else {
-      const mid = (x1 + x2) / 2;
-      d = `M${x1} ${y1} C${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`;
-    }
-    svg.appendChild(mk("path", { d, fill: "none", stroke: color, "stroke-width": "1.4" }));
-    if (r.label) {
-      const lx = (a.x + b.x) / 2 + NW / 2;
-      const ly = (a.y + b.y) / 2 + NH / 2;
-      const w = r.label.length * 9 + 8;
-      svg.appendChild(
-        mk("rect", {
-          x: lx - w / 2,
-          y: ly - 7.5,
-          width: w,
-          height: 15,
-          rx: 3,
-          fill: "#FBF7EC",
-          stroke: "#E1DCCF",
-          "stroke-width": "0.5",
-        }),
-      );
-      const t = mk("text", {
-        x: lx,
-        y: ly,
-        "font-size": "9",
-        fill: "#5C5142",
-        "text-anchor": "middle",
-        "dominant-baseline": "central",
-      });
-      t.textContent = r.label;
-      svg.appendChild(t);
-    }
-  }
-
-  for (const p of visPersons) {
-    const q = pos.get(p.id);
-    if (!q) continue;
-    // 节点组用 x/y 平移而非 transform 串：SVG 语义相同，还避开了静态扫描
-    // 把模板串里的 SVG 变换函数误判成 JS 函数调用
-    const g = mk("g", { x: q.x, y: q.y });
-    g.appendChild(
-      mk("rect", {
-        x: 0,
-        y: 0,
-        width: NW,
-        height: NH,
-        rx: 7,
-        fill: "#FFFFFF",
-        stroke: "#C9C1AF",
-        "stroke-width": "1",
-      }),
-    );
-    const nm = mk("text", {
-      x: NW / 2,
-      y: NH / 2,
-      "font-size": "12",
-      fill: "#25221C",
-      "text-anchor": "middle",
-      "dominant-baseline": "central",
-    });
-    nm.textContent = p.name.length > 9 ? `${p.name.slice(0, 9)}…` : p.name;
-    g.appendChild(nm);
-    for (let d = 0; d < Math.min(3, Math.max(1, p.importance || 1)); d++) {
-      g.appendChild(mk("circle", { cx: NW - 8 - d * 5.5, cy: 9, r: 2, fill: "#AD392C" }));
-    }
-    svg.appendChild(g);
-  }
-
-  canvas.appendChild(svg);
-  card.appendChild(canvas);
-  tl.appendChild(card);
-  scroll(false);
-}
-
 function pptCard(tl, ppt, files) {
   if (!ppt?.slides?.length) return;
   const deckId = pptDeckId(ppt, files);
@@ -2911,9 +2657,6 @@ const HALL_CARDS = [
   { id: "news", t: "教务通知", d: "教务处官网最新通知，标记需要行动的", group: "学习安排" },
   { id: "todos", t: "待办", d: "逾期置顶，按今天 / 明天分组", group: "效率工具" },
   { id: "knowledge", t: "知识库", d: "按课程归类，可搜可展开全文", group: "效率工具" },
-  /* 人物图谱：读书时口述的人物关系，当场长成关系图画板；对话里说一句
-     「宝玉是贾母的孙子」，卡片就在下方同步重绘，不必切到独立页 */
-  { id: "graph", t: "人物图谱", d: "读书口述的人物关系画板", group: "效率工具" },
   /* 大厅入口按需求下架（2026-09-22）：宫格不再展示番茄钟；对话里说「来一个番茄钟」
      照常可用——manage_pomodoro 工具、SSE 事件、对话内 .pomo 倒计时卡与
      buildPomodoro 面板逻辑全部保留，恢复展示只需去掉 hidden 标记 */
@@ -3148,27 +2891,9 @@ function hallSkel() {
   for (let i = 0; i < 3; i++) sk.appendChild(document.createElement("i"));
   return sk;
 }
-function hallFullPage(panel) {
-  /* 课表/待办/知识各有独立完整页；今日日程/考试合用 /today；
-     图谱是画板独立页 /graph；番茄钟/成绩/通知没有独立完整页：
-     工具条不挂「完整页」链接 */
-  if (panel === "schedule") return "/schedule";
-  if (panel === "todos") return "/todos";
-  if (panel === "knowledge") return "/knowledge";
-  if (panel === "graph") return "/graph";
-  if (panel === "pomodoro" || panel === "grades" || panel === "news" || panel === "usage")
-    return "";
-  return "/today";
-}
-function hallMore(panel) {
-  const a = document.createElement("a");
-  a.className = "hall-more";
-  a.href = hallFullPage(panel);
-  a.textContent = "完整页 →";
-  a.setAttribute("aria-label", `在完整页打开${HALL_TITLES[panel] || panel}`);
-  return a;
-}
-/* 面板工具条：左侧条数，右侧刷新 + 完整页；刷新清掉 brief 缓存重取 */
+/* 面板工具条：左侧条数，右侧刷新；刷新清掉 brief 缓存重取。
+    各面板就在抽屉里看全部内容（2026-10-15 按需求下架了跳独立整页的入口：
+    每个功能不再离开大厅） */
 function hallToolbar(panel, countText) {
   const bar = el("hall-toolbar");
   const count = el2("hall-count", countText || "");
@@ -3185,13 +2910,11 @@ function hallToolbar(panel, countText) {
     renderHall(true);
   });
   bar.appendChild(refresh);
-  const more = hallFullPage(panel);
-  if (more) bar.appendChild(hallMore(panel));
   return bar;
 }
 
 /* 各面板的构建函数：入参是 /api/today 的 Brief（番茄钟除外，走自己的接口）。
-   只返回列表内容；工具条（条数 + 刷新 + 完整页）由 renderHall 统一补。 */
+   只返回列表内容；工具条（条数 + 刷新）由 renderHall 统一补。 */
 function buildToday(b) {
   const wrap = el("");
   /* 日期题注与课表面板的天头同一语言：等宽小字 + 朱砂点亮 */
@@ -3616,157 +3339,6 @@ function hallKnowEmpty() {
     HALL_DEMO ? null : () => hallFocusChat("记住："),
   );
 }
-/* 人物图谱面板（功能大厅抽屉）：只做「快速看一眼 + 跳完整画板」。
-   完整版在 /graph 独立页——那里能拖节点、切类别、逐条删除，抽屉里
-   塞不下这些交互，硬塞只会让两个地方都难用。
-   演示模式也走同一路径：演示服务内置 /api/graph（一本虚构红楼梦），
-   抽屉里照样能预览缩略画板，不再是「演示环境没有数据」的干空态。 */
-function buildGraphHall() {
-  const wrap = el("");
-  return fetch("/api/graph")
-    .then((r) => r.json())
-    .then((d) => {
-      const snapshot = d.snapshot || { persons: [], relations: [] };
-      const books = d.book ? [d.book] : [];
-      if (!snapshot.persons.length) {
-        wrap.appendChild(
-          hallEmpty(
-            "⌗",
-            "图谱还是空的",
-            "在对话里告诉 agent 书中的人物关系，比如「宝玉是贾母的孙子」，图谱会当场长出节点与连线。",
-          ),
-        );
-        return wrap;
-      }
-
-      const head = el("hall-sec");
-      head.appendChild(el2("hall-sec-t", `《${d.book?.title || "未命名"}》`));
-      head.appendChild(
-        el2(
-          "hall-sec-d",
-          `${snapshot.persons.length} 个人物 · ${snapshot.relations.length} 条关系`,
-        ),
-      );
-      wrap.appendChild(head);
-
-      /* 复用对话区的迷你 SVG 布局，画一张缩略全图 */
-      const persons = snapshot.persons;
-      const relations = snapshot.relations;
-      const used = new Set();
-      for (const r of relations) {
-        used.add(r.sourceId);
-        used.add(r.targetId);
-      }
-      const visPersons = persons.filter((p) => used.has(p.id) || relations.length === 0);
-      if (visPersons.length) {
-        const { pos, NW, NH } = graphMiniLayout(visPersons, relations);
-        let maxX = 0;
-        let maxY = 0;
-        for (const p of visPersons) {
-          const q = pos.get(p.id);
-          if (!q) continue;
-          maxX = Math.max(maxX, q.x + NW);
-          maxY = Math.max(maxY, q.y + NH);
-        }
-        const W = maxX + 8;
-        const H = maxY + 8;
-        const box = el("hall-graph");
-        const svg = document.createElementNS(GRAPH_SVG_NS, "svg");
-        svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-        svg.setAttribute("width", "100%");
-        svg.setAttribute("role", "img");
-        svg.setAttribute("aria-label", `人物关系图，${visPersons.length} 个人物`);
-        svg.style.height = "auto";
-        svg.style.maxHeight = "360px";
-        const mk = (tag, attrs) => {
-          const n = document.createElementNS(GRAPH_SVG_NS, tag);
-          for (const k in attrs) n.setAttribute(k, String(attrs[k]));
-          return n;
-        };
-        for (const r of relations) {
-          const a = pos.get(r.sourceId);
-          const b = pos.get(r.targetId);
-          if (!a || !b) continue;
-          const color = GRAPH_CAT_COLORS[r.category] || GRAPH_CAT_COLORS.other;
-          const x1 = a.x + NW;
-          const y1 = a.y + NH / 2;
-          let d;
-          if (b.x < a.x) {
-            const fx = a.x;
-            const tx = b.x + NW;
-            d = `M${fx} ${a.y + NH / 2} C${fx - 34} ${a.y + NH / 2} ${tx + 34} ${b.y + NH / 2} ${tx} ${b.y + NH / 2}`;
-          } else {
-            const mid = (x1 + b.x) / 2;
-            d = `M${x1} ${y1} C${mid} ${y1} ${mid} ${b.y + NH / 2} ${b.x} ${b.y + NH / 2}`;
-          }
-          svg.appendChild(mk("path", { d, fill: "none", stroke: color, "stroke-width": "1.4" }));
-        }
-        for (const p of visPersons) {
-          const q = pos.get(p.id);
-          if (!q) continue;
-          const g = mk("g", { x: q.x, y: q.y });
-          g.appendChild(
-            mk("rect", {
-              x: 0,
-              y: 0,
-              width: NW,
-              height: NH,
-              rx: 7,
-              fill: "#FFFFFF",
-              stroke: "#C9C1AF",
-              "stroke-width": "1",
-            }),
-          );
-          const nm = mk("text", {
-            x: NW / 2,
-            y: NH / 2,
-            "font-size": "12",
-            fill: "#25221C",
-            "text-anchor": "middle",
-            "dominant-baseline": "central",
-          });
-          nm.textContent = p.name.length > 9 ? `${p.name.slice(0, 9)}…` : p.name;
-          g.appendChild(nm);
-          svg.appendChild(g);
-        }
-        box.appendChild(svg);
-        wrap.appendChild(box);
-      }
-      void books;
-
-      /* 类别图例：一眼看出六类各有多少条 */
-      const legend = el("hall-graph-legend");
-      for (const key in GRAPH_CAT_COLORS) {
-        let n = 0;
-        for (const r of relations) if (r.category === key) n++;
-        if (!n) continue;
-        const item = el("hall-graph-cat");
-        const sw = el2("hall-graph-sw", "");
-        sw.style.background = GRAPH_CAT_COLORS[key];
-        item.appendChild(sw);
-        item.appendChild(el2("hall-graph-cn", `${GRAPH_CAT_NAMES[key]} ${n}`));
-        legend.appendChild(item);
-      }
-      if (legend.childNodes.length) wrap.appendChild(legend);
-
-      const go = document.createElement("a");
-      go.className = "tbtn";
-      /* 与对话区图谱卡同一口径：带上当前书，画板才开对书 */
-      go.href = d.bookId ? `/graph?bookId=${encodeURIComponent(d.bookId)}` : "/graph";
-      go.textContent = "打开完整画板";
-      const foot = el("hall-graph-foot");
-      foot.appendChild(go);
-      wrap.appendChild(foot);
-      return wrap;
-    })
-    .catch(() => {
-      wrap.appendChild(
-        hallEmpty("⌗", "图谱读不出来", "data/graph.json 可能已损坏，请检查本机数据目录。"),
-      );
-      return wrap;
-    });
-}
-
 function buildKnowledge(b) {
   /* 演示环境没有 /api/knowledge 接口：保持 brief 速览（只读，带日期） */
   if (HALL_DEMO) {
@@ -3784,7 +3356,7 @@ function buildKnowledge(b) {
     return wrap;
   }
   /* 正式环境：全量列表 + 分类筛 + 两步删除（与 /knowledge 页同一防误删口径）；
-     条目多时厅内只展前 30 条，余下走完整页，避免抽屉过长 */
+     条目多时厅内只展前 30 条，避免抽屉过长 */
   return fetch("/api/knowledge")
     .then((r) => r.json())
     .then((d) => {
@@ -3811,7 +3383,9 @@ function buildKnowledge(b) {
       wrap.appendChild(box);
       if (entries.length > LIMIT) {
         wrap.appendChild(
-          hallNote(`仅显示前 ${LIMIT} 条，共 ${entries.length} 条；完整检索去知识库完整页。`),
+          hallNote(
+            `仅显示前 ${LIMIT} 条，共 ${entries.length} 条；在对话里说「查笔记」可检索全部内容。`,
+          ),
         );
       }
       return wrap;
@@ -4285,7 +3859,6 @@ const HALL_PANELS = {
   news: buildNews,
   todos: () => briefOf().then((b) => buildTodoList(b.todos)),
   knowledge: () => briefOf().then(buildKnowledge),
-  graph: buildGraphHall,
   pomodoro: buildPomodoro,
   usage: buildUsage,
 };
@@ -4309,7 +3882,7 @@ function hallListTotal(node, panel) {
   }
   return items;
 }
-/* 面板装配：工具条（条数 + 刷新 + 完整页）+ 搜索框 + 列表内容 */
+/* 面板装配：工具条（条数 + 刷新）+ 搜索框 + 列表内容 */
 function hallMountPanel(dyn, panel, node) {
   const total = hallListTotal(node, panel);
   dyn.innerHTML = "";
@@ -4818,7 +4391,6 @@ const TOOL_PANEL = {
   get_exams: "exams",
   manage_todos: "todos",
   manage_knowledge: "knowledge",
-  manage_graph: "graph",
   manage_pomodoro: "pomodoro",
   get_grades: "grades",
   get_news: "news",
@@ -6667,8 +6239,6 @@ async function send(text) {
             if (ev.pomodoro) pomoCard(shell.tl, ev.pomodoro);
             /* pptx 成品：下载行之外再出一张可翻页的幻灯片预览卡 */
             if (ev.ppt) pptCard(shell.tl, ev.ppt, ev.files);
-            /* 图谱变更：对话里就地重绘迷你关系图，与文字回复流并行 */
-            if (ev.graph) graphMiniCard(shell.tl, ev.graph);
             /* 对话里取消了番茄钟：立即对表收掉页面其他位置的倒计时卡 */
             if (ev.pomoSync) pomoSync();
             /* 工具改了数据（加待办、起番茄钟……）：面板开着就刷新，没开着就作废缓存。

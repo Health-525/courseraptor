@@ -104,26 +104,22 @@ test("GET 四张独立页同样禁缓存（都内嵌 CSRF token）", async () =>
 
 test("页面路由按 pathname 匹配：带查询串的深链不再 404", async () => {
   const url = (await startChatWeb())!;
-  // 图谱卡「打开画板」带 ?bookId= 跳过来；以前五个页面路由都拿含查询串的
+  // 各独立页带查询串跳转；以前页面路由都拿含查询串的
   // req.url 做 === 精确匹配，这些深链一律落到 404 not found
-  const graph = await fetch(`${url}/graph?bookId=book-123`);
-  assert.equal(graph.status, 200, "/graph?bookId= 应返回页面本体");
-  assert.match(graph.headers.get("content-type") ?? "", /html/);
-  assert.equal(graph.headers.get("cache-control"), "no-store");
-  // 其余四页同一个病：查询串是页面自己解析的参数，不该被路由层吃掉
+  // 查询串是页面自己解析的参数，不该被路由层吃掉
   for (const p of ["/today?x=1", "/schedule?week=3", "/todos?a=b", "/knowledge?q=test"]) {
     const res = await fetch(`${url}${p}`);
     assert.equal(res.status, 200, p);
     assert.equal(res.headers.get("cache-control"), "no-store", p);
   }
   // 尾斜杠 + 查询串也要认
-  assert.equal((await fetch(`${url}/graph/?bookId=book-123`)).status, 200);
-  // 前缀相近的路径不能被误当成 /graph：未知 GET 本来就走 SPA 兜底回对话页，
-  // 这里要的是「兜底页不是图谱页」——谁把路由放宽成 startsWith 就会现形
-  const near = await fetch(`${url}/graphx?bookId=1`);
+  assert.equal((await fetch(`${url}/todos/?a=b`)).status, 200);
+  // 前缀相近的路径不能被误当成已知页面：未知 GET 本来就走 SPA 兜底回对话页，
+  // 这里要的是「兜底页不是日程页」——谁把路由放宽成 startsWith 就会现形
+  const near = await fetch(`${url}/todayx?x=1`);
   assert.equal(near.status, 200);
   const nearHtml = await near.text();
-  assert.ok(!nearHtml.includes("人物图谱 · CourseRaptor"), "/graphx 不能被当成图谱页");
+  assert.ok(!nearHtml.includes("今日速览"), "/todayx 不能被当成日程页");
   assert.ok(nearHtml.includes("marked.min.js"), "兜底应回到对话页");
 });
 
@@ -1252,19 +1248,11 @@ test("GET /todos 返回独立待办页：语法自检 + 勾选删除走 /api/rem
     fs.writeFileSync(f, code, "utf8");
     execFileSync(process.execPath, ["--check", f], { stdio: "pipe" });
   });
-  // 大厅面板的「完整页」应指向各自独立页，不再挤在 /today（接线在 chat-app.js）
+  // 大厅面板不再挂「完整页」跳转（2026-10-15 下架）：每个功能只在抽屉里看
   const appjs = await (await fetch(`${url}/app.js`)).text();
-  assert.match(
-    appjs,
-    /panel === "schedule"\) return "\/schedule"/,
-    "课表面板完整页应指向 /schedule",
-  );
-  assert.match(appjs, /panel === "todos"\) return "\/todos"/, "待办面板完整页应指向 /todos");
-  assert.match(
-    appjs,
-    /panel === "knowledge"\) return "\/knowledge"/,
-    "知识库面板完整页应指向 /knowledge",
-  );
+  assert.ok(!appjs.includes("hallFullPage"), "hallFullPage 应已删除");
+  assert.ok(!appjs.includes("hall-more"), "「完整页 →」链接应已删除");
+  assert.ok(appjs.includes("hallToolbar"), "面板工具条（条数 + 刷新）应仍在");
 });
 
 test("GET /api/grades 纯缓存读取（无缓存时 savedAt=null，绝不登录教务）", async () => {
@@ -1630,44 +1618,4 @@ test("真实对话链路：ppt_save 产 pptx 时 SSE 带 ppt 预览与下载行"
   assert.equal(ppt!.count, 2);
   assert.equal(ppt!.slides[0]!.motif, "cover");
   assert.equal(ppt!.slides[0]!.elements[0]!.type, "text");
-});
-
-test("图谱删书接口：整本书连内容删、缺参 400、重复删 404", async () => {
-  const url = (await startChatWeb())!;
-  const { createBook, upsertPerson, addRelation, deleteBook } = await import(
-    "../src/core/graph-store"
-  );
-  const book = createBook("接口删的书");
-  upsertPerson(book.id, "甲", [], "");
-  addRelation(book.id, "甲", "乙", "family", "父亲", { evidence: "原文" });
-
-  // 缺 bookId：400，不动数据
-  const bad = await wfetch(`${url}/api/graph/book/delete`, {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
-  assert.equal(bad.status, 400);
-
-  // 正常删：回带书名与清掉的条数
-  const ok = await wfetch(`${url}/api/graph/book/delete`, {
-    method: "POST",
-    body: JSON.stringify({ bookId: book.id }),
-  });
-  assert.equal(ok.status, 200);
-  const payload = (await ok.json()) as {
-    ok: boolean;
-    deleted: { title: string; persons: number; relations: number };
-  };
-  assert.equal(payload.ok, true);
-  assert.equal(payload.deleted.title, "接口删的书");
-  assert.equal(payload.deleted.persons, 2, "甲 + addRelation 自动补的乙");
-  assert.equal(payload.deleted.relations, 1);
-
-  // 重复删同一本：404，且 store 里确实已经没了
-  const miss = await wfetch(`${url}/api/graph/book/delete`, {
-    method: "POST",
-    body: JSON.stringify({ bookId: book.id }),
-  });
-  assert.equal(miss.status, 404);
-  assert.equal(deleteBook(book.id), null);
 });

@@ -396,22 +396,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .pptstrip { display: flex; gap: 10px; padding: 12px 14px; overflow-x: auto;
               scroll-snap-type: x proximity; }
 
-  /* ── 人物图谱迷你卡：与 pptcard 同款档案卡壳，主体是可横滑的 SVG 画板。
-     节点保持原尺寸不缩放——缩了就看不清人名了，横滑比缩小有用 ── */
-  .graphcard { margin: 4px 0 9px; border: 1px solid var(--rule-2);
-               border-top: 2px solid var(--accent); background: var(--card);
-               box-shadow: var(--shadow-sm); }
-  .graph-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px;
-                border-bottom: 1px dashed var(--rule); }
-  .graph-mark { flex: none; color: var(--accent); font-size: 14px; }
-  .graph-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-                white-space: nowrap; font-family: var(--kai); font-size: 15px;
-                letter-spacing: .04em; }
-  .graph-meta { flex: none; font-family: var(--mono); font-size: 12px;
-                color: var(--ink-3); }
-  .graph-scroll { padding: 12px 14px; overflow-x: auto; background: var(--shade); }
-  .graph-scroll svg { display: block; }
-
   /* ── 朱砂印章：圆形裁切 logo + 描边圈、整章旋转 -7°（课表导出同款，签名 motif） ── */
   .pt-seal { position: absolute; display: flex; align-items: center; justify-content: center;
              border: 2px solid var(--accent); border-radius: 50%; background: var(--card); }
@@ -1187,7 +1171,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-gh.gh-star { margin-top: 6px; }
   .gh-star svg { color: var(--accent); transition: transform .2s ease; }
   .gh-star:hover svg { transform: scale(1.2); }
-  /* 面板工具条：条数在左，刷新与完整页在右；粘在面板顶部方便长列表回看。
+  /* 面板工具条：条数在左，刷新在右；粘在面板顶部方便长列表回看。
      z-index 必须显式给：行内动作按钮（原文/删除/.ics）带 opacity .45 各自成合成组，
      光靠 sticky 的默认绘制顺序压不住，滚动时会从工具条上穿模 */
   .hall-toolbar { position: sticky; top: -16px; z-index: 1; display: flex; align-items: center;
@@ -1201,12 +1185,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
                   min-height: 30px; padding: 3px 10px; border-radius: 4px; cursor: pointer; }
   .hall-refresh:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
   .hall-refresh:disabled { opacity: .5; cursor: default; }
-  .hall-more { flex: none; display: inline-flex; align-items: center; gap: 4px;
-               font-family: var(--mono); font-size: 12px; color: var(--ink-2);
-               border: 1px solid var(--rule); background: var(--card);
-               border-radius: 4px; padding: 4px 10px; min-height: 30px;
-               text-decoration: none; }
-  .hall-more:hover { border-color: var(--accent); color: var(--accent); }
   /* 面板内搜索：贴在工具条下方一起粘住，长列表边滚边滤 */
   .hall-search { display: flex; margin: 0 0 10px; }
   .hall-search input { flex: 1; min-width: 0; border: 1px solid var(--rule);
@@ -1388,18 +1366,6 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .hall-empty .he-s { margin-top: 4px; font-family: var(--mono); font-size: 12px;
                       color: var(--ink-3); line-height: 1.7; }
   .hall-empty .tbtn { margin-top: 10px; min-height: 32px; padding: 4px 14px; font-size: 12px; }
-  /* 人物图谱面板：缩略画板铺满抽屉宽（宽高比由 SVG 自身决定），
-     下面跟类别图例与跳转按钮 */
-  .hall-graph { border: 1px solid var(--rule-2); border-radius: 4px;
-                background: var(--shade); padding: 10px; overflow-x: auto; }
-  .hall-graph svg { display: block; }
-  .hall-graph-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 10px;
-                       font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
-  .hall-graph-cat { display: flex; align-items: center; gap: 5px; }
-  .hall-graph-sw { width: 9px; height: 9px; border-radius: 2px; }
-  .hall-graph-foot { margin-top: 12px; }
-  .hall-graph-foot .tbtn { min-height: 32px; padding: 4px 14px; font-size: 12px;
-                           text-decoration: none; }
   /* 大厅里的设置：抽屉不宽，栏目目录改横排（沿用窄屏设置的形态），
      字段与检测行等内部样式原样复用 */
   .hall .set-frame { flex-direction: column; gap: 0; }
@@ -1551,7 +1517,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   @media (hover: none) {
     .hall-del { min-height: 36px; padding: 6px 12px; }
     .hall-ics { min-height: 36px; }
-    .hall-back, .hall-refresh, .hall-more, .hall-pomo-cancel { min-height: 38px; }
+    .hall-back, .hall-refresh, .hall-pomo-cancel { min-height: 38px; }
     .hall-cat { min-height: 34px; }
     .dclose { min-width: 40px; min-height: 40px; }
     .sess .sx { padding: 6px 10px; }

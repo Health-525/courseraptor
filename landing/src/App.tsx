@@ -196,15 +196,15 @@ function App() {
               <div className="capability-head">
                 <div>
                   <p className="eyebrow">FULL TOOLBELT / 全景能力</p>
-                  <h3>开箱 21 个工具——从课表到备考，一套内核。</h3>
+                  <h3>开箱 20 个工具——从课表到备考，一套内核。</h3>
                 </div>
-                <p className="capability-note">21 个全部学校无关、只读写本地数据（内核 19 + 课表与校历 2）· <a href="https://github.com/Health-525/courseraptor/blob/main/docs/capabilities.md">完整清单与使用边界 ↗</a></p>
+                <p className="capability-note">20 个全部学校无关、只读写本地数据（内核 18 + 课表与校历 2）· <a href="https://github.com/Health-525/courseraptor/blob/main/docs/capabilities.md">完整清单与使用边界 ↗</a></p>
               </div>
               <div className="capability-grid">
                 <div className="capability"><span>课表与校历 <em>×2</em></span><p>按教学周查课、放假调休一句话落盘；今日页、周课表、课表图片与 .ics 导出都以它为准。</p></div>
                 <div className="capability"><span>文件与数据 <em>×4</em></span><p>本地文件读取、Excel 筛选查询、沙箱 JS 计算、附件缓存管理。</p></div>
                 <div className="capability"><span>文档与课件 <em>×4</em></span><p>Word / Excel / PDF 生成与跨格式互转；PPT 写代码排版、套品牌课件模板，网页里直接翻页预览。</p></div>
-                <div className="capability"><span>记忆 · 待办 · 知识 · 图谱 <em>×4</em></span><p>两层记忆、待办双通道到期提醒、按课程归类的知识库、读书人物关系图谱。</p></div>
+                <div className="capability"><span>记忆 · 待办 · 知识 <em>×3</em></span><p>两层记忆、待办双通道到期提醒、按课程归类的知识库。</p></div>
                 <div className="capability"><span>学习与效率 <em>×5</em></span><p>学习教练方法库、教学技能库（费曼式讲透、螺旋复习、大师讲授、实操带练）、番茄钟、面板一句话推出、设置即改即存。</p></div>
                 <div className="capability"><span>时间与天气 <em>×2</em></span><p>模型的唯一时钟（教学周推算）、天气与带伞穿衣建议。</p></div>
               </div>

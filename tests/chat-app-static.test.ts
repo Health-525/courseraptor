@@ -263,18 +263,14 @@ test("PPT 全屏查看器：深链路由、锁滚、焦点与 a11y 四件套齐�
   assert.match(src, /thumbs\[k\]\.classList\.toggle\("on", k === i\)/);
 });
 
-test("图谱卡与图谱面板都带 bookId 跳 /graph：多本书不开错书", () => {
+test("大厅面板不挂「完整页」跳转：每个功能只在抽屉里看（2026-10-15 下架）", () => {
   const src = fs.readFileSync(APP_JS, "utf8");
-  // 对话区迷你卡：不带 bookId 时 /graph 只会开默认书
-  assert.match(
-    src,
-    /more\.href = graph\.bookId \? `\/graph\?bookId=\$\{encodeURIComponent\(graph\.bookId\)\}` : "\/graph";/,
-  );
-  // 功能大厅里的图谱面板：同一口径
-  assert.match(
-    src,
-    /go\.href = d\.bookId \? `\/graph\?bookId=\$\{encodeURIComponent\(d\.bookId\)\}` : "\/graph";/,
-  );
+  // 跳转入口已整个删掉：不再有 hallFullPage / hallMore / 「完整页 →」链接
+  assert.ok(!src.includes("hallFullPage"), "hallFullPage 应已删除");
+  assert.ok(!src.includes("hall-more"), "「完整页 →」链接应已删除");
+  assert.ok(!/完整页/.test(src), "不应再提「完整页」");
+  // 工具条只剩条数 + 刷新
+  assert.match(src, /refresh\.textContent = "↻ 刷新";/);
 });
 
 test("教务通知卡按学校显隐：newsReady 门禁接线齐全，没接入的学校不出卡", () => {
