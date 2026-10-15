@@ -25,6 +25,11 @@ nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+  # 产物名固定无空格：latest.yml 的 url 必须与磁盘/上传文件名逐字一致，
+  # 否则 electron-updater 找不到安装包（默认名带空格会被 url 写成连字符）
+  artifactName: courseraptor-v${version}-desktop-win-x64-setup.${ext}
+portable:
+  artifactName: courseraptor-v${version}-desktop-win-x64.${ext}
 publish:
   provider: github
   owner: Health-525
