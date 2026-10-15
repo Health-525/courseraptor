@@ -12,6 +12,7 @@
     "preview:readme": "node scripts/preview-readme.mjs",
     "qq": "tsx local/qq/bridge.ts",
     "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint && npm run verify:imports",
     "build:skill-library": "node --import tsx scripts/build-skill-library.ts",
     "lint": "biome check --error-on-warnings",
     "lint:fix": "biome check --write",
@@ -78,6 +79,9 @@
     "tsx": "^4.23.15",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.6.5"
+  },
+  "overrides": {
+    "image-size": "^2.0.4"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
