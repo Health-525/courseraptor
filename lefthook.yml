@@ -9,5 +9,5 @@ pre-commit:
 
 pre-push:
   commands:
-    typecheck:
-      run: npm run typecheck
+    check:
+      run: npm run check

@@ -50,7 +50,10 @@ jobs:
       # （test:coverage 本身就会执行全量测试，不再单独跑一遍 npm test）
       - run: npm run test:coverage
       # critical 阻断，high 及以下仅体现在输出里
-      # 已知项：image-size（pptxgenjs 传递依赖）2 个 high DoS，等上游出修复版即可消除
+      # 已治理：xlsx 走 SheetJS 官方 CDN tarball（npm registry 停在 0.18.x，带 CVE）；
+      # image-size 经 overrides 钉到 ^2.0.4（pptxgenjs 传递依赖的 high DoS 已消除）。
+      # 遗留接受项：sprintf-js（mammoth→argparse 传递依赖）moderate ReDoS，
+      # 上游全部版本受影响、无补丁版；且仅 mammoth 的 CLI 路径会用到，程序化调用不触达。
       - run: npm run audit:prod
 
   # Obsidian 插件子包：独立 lockfile，此前完全不在 CI 内（构建坏了无人知道）
