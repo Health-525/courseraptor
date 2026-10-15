@@ -12,8 +12,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { writeFileAtomicSync } from "./atomic-write";
 import { PROJECT_ROOT } from "./config";
-// QQ 推送走 core 内的渠道端口（实现由宿主注册），core 不 import local/
-import { sendQQPush } from "./notify";
+// QQ 推送 / 桌面通知走 core 内的渠道端口（实现由宿主注册），core 不 import local/
+import { sendDesktopNotification, sendQQPush } from "./notify";
 import { listReminders, type Reminder } from "./workspace-data";
 
 const DAY_MS = 86_400_000;
@@ -106,10 +106,14 @@ export function windowsToast(title: string, body: string): void {
   );
 }
 
-/** 默认通知出口：每条一个桌面 toast，再往 QQ 推一条合并清单 */
+/** 默认通知出口：每条一个桌面通知，再往 QQ 推一条合并清单 */
 async function defaultNotify(items: Reminder[], now: Date): Promise<void> {
   for (const r of items) {
-    windowsToast("CourseRaptor 待办提醒", `「${r.title}」${dueText(r, now)}`);
+    const title = "CourseRaptor 待办提醒";
+    const body = `「${r.title}」${dueText(r, now)}`;
+    // 桌面宿主注册了端口就由它接管（转 Electron 原生通知）；否则回退
+    // PowerShell toast——非桌面环境行为与历史完全一致
+    if (!sendDesktopNotification(title, body)) windowsToast(title, body);
   }
   const lines = items.map((r) => `• ${r.title} — ${dueText(r, now)}`).join("\n");
   await sendQQPush(`⏰ 待办提醒（未来 7 天内到期）\n${lines}`).catch(() => {});
