@@ -234,7 +234,8 @@ export function buildPortable({ keep = false } = {}) {
   console.log(
     `\n上传命令：\n  gh release upload v${version} "${finalZip}" --clobber --repo Health-525/courseraptor`,
   );
-  return { finalZip, artifact: ARTIFACT, version };
+  // portableDir 仅在 keep 时有效（否则工作区已被清理）；桌面打包复用它取 app/ 与 runtime/
+  return { finalZip, artifact: ARTIFACT, version, portableDir: keep ? portable : null };
 }
 
 // 直接运行时走 CLI；被 import 时只导出 buildPortable / PORTABLE_TOP_DIR。

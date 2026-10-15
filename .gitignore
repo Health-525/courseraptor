@@ -49,3 +49,10 @@ semantic-review/
 
 # jscpd 复制粘贴检测的本地报告
 .jscpd-report/
+
+# ── 桌面版（desktop/ 独立 npm 工程，产物不入库）────────────────────
+# dist/ 由 desktop 的 npm run build 产出；release/ 是 electron-builder 的
+# 安装包输出；build-resources/ 由 scripts/package-desktop.mjs 临时填充再清掉
+/desktop/dist/
+/desktop/release/
+/desktop/build-resources/
