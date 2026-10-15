@@ -3,7 +3,6 @@
  *
  * 支持的技能（skills/<名>/ 为源码，package/ 为独立包门面）：
  * - export-schedule  课表图片导出（读本地缓存渲染 PNG/SVG；不带参数时的默认目标）
- * - meta-learning    学习教练（纯提示词技能：无 scripts，SKILL.md + references 整拷）
  *
  * 产物（默认在 dist/ 下）：
  * - dist/skill/<名>/    可整目录拷进各 agent 工具技能目录的技能
@@ -202,11 +201,6 @@ const SKILL_DEFS = {
     // PNG 原生模块：win32-x64 二进制随包（约 +4.5MB），mac/Linux 运行时降级 SVG
     resvg: { packages: ["@resvg/resvg-js", "@resvg/resvg-js-win32-x64-msvc"] },
     selfCheck: { args: ["--help"], expect: [/--mode/] },
-  },
-  "meta-learning": {
-    // 纯提示词技能：无 scripts/bundle/.env，SKILL.md + README + references 整拷即技能本体
-    promptOnly: true,
-    references: true,
   },
 };
 

@@ -103,6 +103,7 @@ function ledgerCategory(
     case "generate_document":
     case "convert_document":
     case "ppt_save":
+    case "export_schedule_image":
       return PREFIX.artifact;
     default:
       return undefined;
@@ -125,7 +126,8 @@ function describe(toolName: string, action: string, input: unknown, output: unkn
   if (
     toolName === "generate_document" ||
     toolName === "convert_document" ||
-    toolName === "ppt_save"
+    toolName === "ppt_save" ||
+    toolName === "export_schedule_image"
   ) {
     const fmt = str(o.format) || str(i.format) || str(i.target);
     const file = str(o.filename) || str(i.filename) || "未命名";

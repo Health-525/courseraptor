@@ -47,7 +47,7 @@
 
 ## 核心特性
 
-开箱 20 个工具，覆盖课表、文件表格、文档生成、沙箱计算、记忆、知识库、待办、学习教练、教学技能库与设置，配置好模型 Key 就能直接对话。完整参数、耗时、环境变量与工具清单见 [能力文档](docs/capabilities.md)。
+开箱工具覆盖课表、课表图、文件表格、文档生成、沙箱计算、记忆、知识库、待办、学习技能库（按需加载）与设置，配置好模型 Key 就能直接对话。完整参数、耗时、环境变量与工具清单见 [能力文档](docs/capabilities.md)。
 
 - **课表导入** —— 粘贴或上传任意格式课表（文字 / Excel / CSV / PDF / Word），AI 解析成结构化课表；拿不准先追问、不瞎猜，预览逐行确认后入库，今日页、周课表与课表图片都基于它
 - **文件与表格** —— 读本地 Word / PDF / Excel / Markdown，长文分页、关键词定位；千行大表按条件取行，不整本塞给模型
@@ -56,7 +56,7 @@
 - **两层记忆** —— 会话跨重启续聊，长期事实自主维护（「上次说的报销截止是哪天」直接问）；全部本地 JSON、无数据库
 - **知识库** —— 知识点在对话里自动沉淀、按课表真实课程归类；flomo 式独立页，发布框 + 标签侧栏 + 热力带
 - **待办** —— 四端同步，到期桌面通知 + QQ 主动推送，可导出 `.ics`
-- **学习教练** —— 学习类对话自动切换：直觉先于形式、答错先给提示；备考按「模板 → 变式 → 整卷」编排
+- **学习辅导** —— 学习类对话按需加载 OpenMAIC 学习 skill（费曼 / 习题诊断 / UbD / 螺旋复习等），一次一篇
 - **终端 · 网页 · QQ · Obsidian** —— 四个入口共享同一内核与记忆：TUI 首屏即今日课表、网页功能大厅、QQ 官方机器人（白名单制、零封号）、Obsidian 侧栏对话与日程插入笔记（[插件指南](obsidian/README.md)）
 - **网页功能大厅** —— 今日日程 / 课表 / 待办 / 知识库 / 番茄钟 / 用量统计等面板，每个面板就在大厅抽屉里看全（2026-10 起不再跳独立整页）；会话搜索、改名、置顶；文件拖进输入框即上传
 - **多厂商模型** —— 12 家国内厂商（默认 DeepSeek）+ 自定义 OpenAI 兼容端点：Key 独立加密保存、切换不丢，网页端下拉即切
@@ -109,7 +109,7 @@ npm run demo
 下面两个独立技能包与学校无关、仓库已内置，可整份拷到 `~/.claude/skills/`、`~/.zcode/skills/` 等目录给别的 agent 用，或从 [Releases](https://github.com/Health-525/courseraptor/releases) 下载 zip：
 
 - [`skills/export-schedule/`](skills/export-schedule/) —— 把课表缓存渲染成图片供下载，适配各平台聊天里直接发图看课表的场景（`npm run package:skill -- export-schedule` 构建）
-- [`skills/meta-learning/`](skills/meta-learning/) —— 学习教练：认知科学驱动的元学习引擎（深度教学 / 知识结构诊断 / 考试型刻意练习编排），辅助期末备考，原作者 [changer-changer](https://github.com/changer-changer)（MIT-0）。raptor agent 已内置触发：说「帮我复习高数」「讲解一下傅里叶变换」自动进入学习教练模式，方法论经 `read_learning_reference` 按需加载（详见 [能力文档](docs/capabilities.md)）
+- [`skills/feynman-learning/`](skills/feynman-learning/) 等 —— OpenMAIC 学习类 skill（平级存放，MIT）；agent 经 `read_skill` 按需加载。课表图见 [`skills/export-schedule/`](skills/export-schedule/) 与工具 `export_schedule_image`（详见 [能力文档](docs/capabilities.md)）
 
 <details>
 <summary><b>系统要求</b>（点开查看）</summary>

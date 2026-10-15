@@ -45,7 +45,7 @@ export const TOOL_TIMEOUT_OVERRIDES_MS: Readonly<Record<string, number>> = {
   // 文档三件套：渲染/转换大文件时分钟级是正常的
   generate_document: 10 * 60_000,
   convert_document: 10 * 60_000,
-  ppt_save: 10 * 60_000,
+  export_schedule_image: 2 * 60_000,
 };
 
 /** 等模型首个内容 chunk 的上限（流式）。深思模型首 token 分钟级合法，故放宽到 2 分钟 */
