@@ -53,6 +53,8 @@ npm run desktop:backend
 # 主仓根目录执行：先构建便携后端，再交给 electron-builder
 npm run desktop:dist          # 产物在 desktop/release/
 npm run desktop:dist -- --keep  # 保留 desktop/build-resources/ 便于排查
+# IDE/杀软咬住仓库目录导致 EBUSY 时，把输出改到扫描之外的目录：
+npm run desktop:dist -- --out "$env:TEMP\raptor-desktop-out"
 ```
 
 产物为 NSIS 安装包 + portable exe，命名沿用 `courseraptor-vX.Y.Z-desktop-win-x64.*`，
