@@ -1548,9 +1548,9 @@ test("真实对话链路：ppt_save 产 pptx 时 SSE 带 ppt 预览与下载行"
   // 用真实的 ppt_save execute 产出工具结果（而非手造形状），桩 agent 只负责
   // 把它按 tool-result 事件吐回——验证「用户真说一句话 → 工具执行 → SSE 透传
   // ppt 载荷 + files」全链路。
-  const { coreTools } = await import("../src/core/tools");
+  const { pptTools } = await import("../src/core/tools/ppt");
   const realOutput = await (
-    coreTools.ppt_save as unknown as { execute: (i: unknown) => Promise<any> }
+    pptTools.ppt_save as unknown as { execute: (i: unknown) => Promise<any> }
   ).execute({
     deck: {
       slides: [

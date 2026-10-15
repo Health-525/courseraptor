@@ -1,9 +1,7 @@
 /**
  * 文档写作工具：generate_document / convert_document
  *
- * PPT 课件已拆出去：生成走 ppt.ts（ppt_preview/ppt_save 输出 slide deck
- * JSON），这里只管 Word/Excel/PDF 的 blocks/sheets 直出与跨格式转换
- * （convert 的 pptx 目标仍走 spec→PPT 的旧主题渲染，两条管线并存）。
+ * 只管 Word/Excel/PDF。PPT 生成工具（ppt.ts）源码保留、暂未注册进 coreTools。
  */
 
 import { tool } from "ai";
@@ -16,7 +14,7 @@ export const documentTools = {
   /** 生成文档（Word/Excel/PDF 成品文件；PPT 用 ppt_save 输出 slide deck JSON） */
   generate_document: tool({
     description:
-      "AI 辅助写作：按结构化内容直接产出成品文件，支持 Word(docx)/Excel(xlsx)/PDF 三种格式，中文原生可写。学生要「一份报告 / 表格 / 简历模板」等交付物时用。落盘到本机 data/generated 并返回完整路径。docx/pdf 用 blocks（标题/正文/列表/表格/分页），xlsx 用 sheets。PPT 课件不在这里——用 ppt_save 输出 slide deck JSON 生成（见其说明）。",
+      "AI 辅助写作：按结构化内容直接产出成品文件，支持 Word(docx)/Excel(xlsx)/PDF 三种格式，中文原生可写。学生要「一份报告 / 表格 / 简历模板」等交付物时用。落盘到本机 data/generated 并返回完整路径。docx/pdf 用 blocks（标题/正文/列表/表格/分页），xlsx 用 sheets。当前不提供 PPT 课件生成。",
     inputSchema: z.object({
       format: z.enum(["docx", "xlsx", "pdf"]).describe("目标文件格式"),
       title: z.string().optional().describe("文档主标题（Word/PDF 顶部）"),
