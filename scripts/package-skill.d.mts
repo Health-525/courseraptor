@@ -1,7 +1,7 @@
 /** scripts/package-skill.mjs 的类型声明 */
 
 export interface SkillPackageResult {
-  /** 技能名（export-schedule / meta-learning） */
+  /** 技能名（当前：export-schedule） */
   skill: string;
   version: string;
   /** 可整目录拷进 ~/.workbuddy/skills/ 的技能目录 */

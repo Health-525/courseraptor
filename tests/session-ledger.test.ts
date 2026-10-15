@@ -216,7 +216,7 @@ test("闭集登记的工具名都是真实装配给 agent 的工具（重命名�
     "manage_pomodoro",
     "generate_document",
     "convert_document",
-    "ppt_save",
+    "export_schedule_image",
   ]) {
     assert.ok(name in assembled, `台账登记了未装配的工具：${name}`);
   }

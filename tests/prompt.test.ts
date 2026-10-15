@@ -82,15 +82,13 @@ test("事实纪律段：先筛后查、时效事实标待核实、不覆盖用�
   assert.match(s, /不写分数、置信度百分比/, "报告不写分数与置信度");
 });
 
-test("学习教练段：计划先签核后执行、讲习题先诊断再补差", () => {
+test("学习辅导段：按需 read_skill，多步计划先签核", () => {
   const s = basePrompt();
-  assert.match(s, /计划先签核后执行/, "多步计划要先给方案等确认");
-  assert.match(s, /等用户确认或调整后再展开执行/, "签核后才执行");
-  assert.match(s, /不用问.*可跳过|直接给.*可跳过/, "用户明确要求时可跳过签核");
-  assert.match(s, /讲习题先诊断再补差/, "习题类请求走诊断补差流程");
-  assert.match(s, /diagnostic-drill/, "指向新增的第七篇参考");
-  assert.match(s, /表面特征不同的题独立复检/, "复检必须换题");
-  assert.match(s, /用户只要单道题的讲解就直接讲/, "单题请求不启动整套循环");
+  assert.match(s, /read_skill/, "学习类请求应先读 skill");
+  assert.match(s, /一次只取当前需要的一篇/, "按需一篇");
+  assert.match(s, /先给方案请用户确认再展开/, "多步计划先签核");
+  assert.match(s, /直接给.*可跳过/, "用户明确要求时可跳过签核");
+  assert.doesNotMatch(s, /read_learning_reference|diagnostic-drill/, "旧 meta-learning 引用应清除");
 });
 
 test("知识库段：入库要附来源行，依据不明写待核实", () => {

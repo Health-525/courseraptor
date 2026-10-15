@@ -57,7 +57,7 @@ test("落地页与技能包不进学生端安装包", () => {
     "landing/node_modules/react/index.js",
     "landing/dist/index.html",
     "skills/export-schedule/SKILL.md",
-    "skills/meta-learning/SKILL.md",
+    "skills/feynman-learning/SKILL.md",
   ]) {
     assert.equal(shouldPackagePath(file), false, file);
   }

@@ -59,7 +59,7 @@ test("默认配置：无环境变量时工具 5 分钟、首 chunk 2 分钟、ch
     tools: {
       generate_documentMs: 10 * 60_000,
       convert_documentMs: 10 * 60_000,
-      ppt_saveMs: 10 * 60_000,
+      export_schedule_imageMs: 2 * 60_000,
     },
   });
   const stream = streamTimeoutConfig();
@@ -99,7 +99,7 @@ test("per-tool 覆盖键形状：工具名+Ms 且工具名是真实的 core 工�
     assert.ok(name in coreTools, `覆盖键 ${key} 去掉 Ms 后不是真实工具名：${name}`);
   }
   // 三件套长任务必须榜上有名（漏一个 = 那个工具的预算悄悄回落到默认）
-  for (const name of ["generate_document", "convert_document", "ppt_save"]) {
+  for (const name of ["generate_document", "convert_document", "export_schedule_image"]) {
     assert.ok(`${name}Ms` in toolTimeoutConfig().tools, `${name} 缺少长任务覆盖`);
   }
 });
