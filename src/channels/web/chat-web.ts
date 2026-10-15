@@ -42,16 +42,6 @@ import {
 import { config } from "../../core/config";
 import { loadGradesCache } from "../../core/grades-cache";
 import {
-  deleteBook,
-  deletePerson,
-  deleteRelation,
-  exportGraph,
-  getBook,
-  getGraph,
-  listBooks,
-  resolveBookId,
-} from "../../core/graph-store";
-import {
   addKnowledge,
   clearKnowledge,
   deleteKnowledge,
@@ -97,7 +87,6 @@ import {
   SESSION_ID_RE,
   SESSIONS_PREFIX,
 } from "./chat-stream";
-import { graphPage } from "./graph-page";
 import { knowledgePage } from "./knowledge-page";
 import { schedulePage } from "./schedule-page";
 import { buildTodayBrief } from "./today-brief";
@@ -231,12 +220,11 @@ let todayPageHtml: string | null = null;
 let knowledgePageHtml: string | null = null;
 let schedulePageHtml: string | null = null;
 let todosPageHtml: string | null = null;
-let graphPageHtml: string | null = null;
 
 /**
  * 把请求目标拆成 pathname + 查询串。
  *
- * 页面路由必须拿 pathname 匹配：req.url 带查询串，`/graph?bookId=x` 拿整串
+ * 页面路由必须拿 pathname 匹配：req.url 带查询串，带参数的页面拿整串
  * 做 === 会 404（/api/* 一直是 startsWith 匹配，所以只有页面路由漏了）。
  * 查询串不在这里消费——各页面自己在 location.search 里读自己的参数。
  */
@@ -296,45 +284,8 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       res.end(withCsrf(knowledgePageHtml));
       return;
     }
-    if (pagePath === "/graph" || pagePath === "/graph/") {
-      // 独立人物图谱页：分层布局关系图画板，纯本地存储渲染。
-      // 查询串（?bookId=）不在这里消费——页面自己读 location.search，
-      // 这样深链既能在地址栏分享，也能在刷新后还原到同一本书。
-      graphPageHtml ??= graphPage();
-      res.writeHead(200, {
-        "content-type": "text/html; charset=utf-8",
-        "cache-control": "no-store",
-      });
-      res.end(withCsrf(graphPageHtml));
-      return;
-    }
     if (url === "/api/knowledge") {
       json(res, { entries: listKnowledge() });
-      return;
-    }
-    if (url === "/api/graph/books") {
-      // 图谱页左栏书目：纯本地 data/graph.json，不登录任何系统
-      json(res, listBooks());
-      return;
-    }
-    if (url === "/api/graph" || url.startsWith("/api/graph?")) {
-      // 画板数据：bookId 缺省落到当前默认书，省得页面自己算
-      const requested = new URL(url, "http://localhost").searchParams.get("bookId") ?? undefined;
-      const bookId = resolveBookId(requested || undefined);
-      json(res, { bookId, book: getBook(bookId), snapshot: getGraph(bookId) });
-      return;
-    }
-    if (url === "/api/graph/export" || url.startsWith("/api/graph/export?")) {
-      // 导出为附件下载（按人名落盘，换库也能导入）
-      const requested = new URL(url, "http://localhost").searchParams.get("bookId") ?? "";
-      const bookId = resolveBookId(requested || undefined);
-      const book = getBook(bookId);
-      res.writeHead(200, {
-        "content-type": "application/json; charset=utf-8",
-        "content-disposition": `attachment; filename="graph-${encodeURIComponent(book?.title ?? bookId)}.json"`,
-        "cache-control": "no-store",
-      });
-      res.end(JSON.stringify(exportGraph(bookId), null, 2));
       return;
     }
     // 功能大厅「用量统计」面板：只读 token-usage 记账（快照前先冲刷 pending）
@@ -784,66 +735,6 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
         json(res, { reminder }, 201);
       } catch (error) {
         json(res, { error: error instanceof Error ? error.message : "创建提醒失败" }, 400);
-      }
-      return;
-    }
-    if (url === "/api/graph/person/delete") {
-      // 画板点选删除：连带其全部关系，服务端重算关系数回传
-      try {
-        const body = (await jsonBody(req, 8_192)) as { bookId?: unknown; id?: unknown };
-        const bookId = typeof body.bookId === "string" ? body.bookId : resolveBookId();
-        if (typeof body.id !== "string" || !body.id) {
-          json(res, { error: "缺少人物 id" }, 400);
-          return;
-        }
-        const person = getGraph(bookId).persons.find((p) => p.id === body.id);
-        if (!person) {
-          json(res, { error: "图谱里没有这个人物" }, 404);
-          return;
-        }
-        const removedRelations = deletePerson(bookId, body.id);
-        json(res, { ok: true, deleted: person.name, removedRelations });
-      } catch (error) {
-        json(res, { error: error instanceof Error ? error.message : "删除失败" }, 400);
-      }
-      return;
-    }
-    if (url === "/api/graph/relation/delete") {
-      try {
-        const body = (await jsonBody(req, 8_192)) as { bookId?: unknown; id?: unknown };
-        const bookId = typeof body.bookId === "string" ? body.bookId : resolveBookId();
-        if (typeof body.id !== "string" || !body.id) {
-          json(res, { error: "缺少关系 id" }, 400);
-          return;
-        }
-        const deleted = deleteRelation(bookId, body.id);
-        if (!deleted) {
-          json(res, { error: "这条关系已不存在" }, 404);
-          return;
-        }
-        json(res, { ok: true, deleted });
-      } catch (error) {
-        json(res, { error: error instanceof Error ? error.message : "删除失败" }, 400);
-      }
-      return;
-    }
-    if (url === "/api/graph/book/delete") {
-      // 画板左栏删整本书：书档连同其人物/关系/记忆一起删，不可恢复
-      // （页面删除栏两步确认后才发请求；工具侧走 manage_graph delete_book）
-      try {
-        const body = (await jsonBody(req, 8_192)) as { bookId?: unknown };
-        if (typeof body.bookId !== "string" || !body.bookId) {
-          json(res, { error: "缺少书 id" }, 400);
-          return;
-        }
-        const removed = deleteBook(body.bookId);
-        if (!removed) {
-          json(res, { error: "这本书已不存在" }, 404);
-          return;
-        }
-        json(res, { ok: true, deleted: removed });
-      } catch (error) {
-        json(res, { error: error instanceof Error ? error.message : "删除失败" }, 400);
       }
       return;
     }

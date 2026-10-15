@@ -21,14 +21,9 @@ const { LEDGER_MAX, LEDGER_RENDER, didMutate, ledgerBlock, ledgerLine, pushLedge
 
 // ── 闭集：查得到但不记 ───────────────────────────────────
 
-test("查询类动作不进台账：list / query_person / status / list（番茄钟）", () => {
+test("查询类动作不进台账：list / status / list（番茄钟）", () => {
   assert.equal(ledgerLine("manage_todos", { action: "list" }, { ok: true }), null);
   assert.equal(ledgerLine("manage_knowledge", { action: "list" }, { ok: true }), null);
-  assert.equal(
-    ledgerLine("manage_graph", { action: "query_person", name: "宝玉" }, { ok: true }),
-    null,
-  );
-  assert.equal(ledgerLine("manage_graph", { action: "list" }, { ok: true }), null);
   assert.equal(ledgerLine("save_memory", { action: "list" }, { ok: true }), null);
   assert.equal(
     ledgerLine("manage_pomodoro", { action: "status" }, { summary: "还剩 12 分钟" }),
@@ -56,25 +51,17 @@ test("写操作成功即记，并带上分类前缀", () => {
   );
   assert.ok(todo?.startsWith("【待办】"), `待办台账行应带前缀，实际 ${todo}`);
 
-  const graph = ledgerLine(
-    "manage_graph",
-    { action: "add_relation", book: "红楼梦", from: "宝玉", to: "贾母", label: "孙子" },
-    { ok: true, summary: "已添加 1 条关系" },
+  const know = ledgerLine(
+    "manage_knowledge",
+    { action: "add" },
+    { ok: true, summary: "已入库 1 条知识" },
   );
-  assert.ok(graph?.startsWith("【图谱】"), `图谱台账行应带前缀，实际 ${graph}`);
+  assert.ok(know?.startsWith("【知识库】"), `知识库台账行应带前缀，实际 ${know}`);
 });
 
 test("失败不记：工具以 {error} 形态返回失败（不抛异常）时不进台账", () => {
   assert.equal(
     ledgerLine("manage_todos", { action: "add" }, { error: "add 需要 items（至少一条待办）" }),
-    null,
-  );
-  assert.equal(
-    ledgerLine(
-      "manage_graph",
-      { action: "add_relation", from: "宝玉" },
-      { ok: false, error: "缺少 to" },
-    ),
     null,
   );
   // 空白 error 不算失败（有些工具返回 error: "" 表示无错）
@@ -139,26 +126,11 @@ test("日期在台账里压成 月-日：不让 ISO 全串占掉一行预算", (
   assert.ok(!line?.includes("T23:59"), `不该带时间部分，实际 ${line}`);
 });
 
-test("图谱危险动作要说清不可恢复：delete_book / clear_graph", () => {
-  const del = ledgerLine("manage_graph", { action: "delete_book", book: "红楼梦" }, { ok: true });
-  assert.ok(
-    del?.includes("红楼梦") && del?.includes("不可恢复"),
-    `删书档行应点明不可恢复，实际 ${del}`,
-  );
-
-  const clear = ledgerLine("manage_graph", { action: "clear_graph", book: "红楼梦" }, { ok: true });
-  assert.ok(
-    clear?.includes("清空") && clear?.includes("书档保留"),
-    `清空行应点明书档保留，实际 ${clear}`,
-  );
-});
-
 // ── 入参形状 robustness ──────────────────────────────────
 
 test("入参形状意外不崩：缺字段 / 类型不对 / 空输入都只是少记，不抛", () => {
   for (const bad of [undefined, null, {}, "string", 42, [], { action: 123 }]) {
     assert.doesNotThrow(() => ledgerLine("manage_todos", bad, { ok: true }));
-    assert.doesNotThrow(() => ledgerLine("manage_graph", bad, bad));
     assert.doesNotThrow(() => ledgerLine("generate_document", bad, bad));
   }
   // 缺 title 的 add 不该编出「undefined」字样
@@ -239,7 +211,6 @@ test("闭集登记的工具名都是真实装配给 agent 的工具（重命名�
   for (const name of [
     "manage_todos",
     "manage_knowledge",
-    "manage_graph",
     "save_memory",
     "set_holidays",
     "manage_pomodoro",

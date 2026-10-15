@@ -2,10 +2,10 @@
  * 会话状态台账（state ledger）——治长会话里的「我还没记过」式自相矛盾
  *
  * 问题：网页端每轮只把最后 CONTEXT_WINDOW（40）条历史喂给模型。一条会话
- * 聊到后面，最早那些轮次里的**状态改动**（记过的待办、落盘的知识、图谱里
- * 建过的关系、set_holidays 登记的放假安排）就滑出了上下文——但它们**确实
- * 生效在磁盘上**。于是模型会说出「我还没帮你记过这条待办」「红楼梦图谱里
- * 没有宝玉和贾母的关系」，而用户明明刚让它记过。这是自相矛盾，不是幻觉。
+ * 聊到后面，最早那些轮次里的**状态改动**（记过的待办、落盘的知识、
+ * set_holidays 登记的放假安排）就滑出了上下文——但它们**确实
+ * 生效在磁盘上**。于是模型会说出「我还没帮你记过这条待办」，而用户
+ * 明明刚让它记过。这是自相矛盾，不是幻觉。
  *
  * 做法（对应上游 OpenMAIC 的 whiteboard-ledger 思路）：把每轮**成功执行
  * 的状态改动**压成一行中文事实，追加进会话档案；下一轮开始前把最近若干
@@ -67,15 +67,10 @@ function shortDate(iso: string): string {
   return m ? `${Number(m[2])}-${Number(m[3])}` : iso.slice(0, 16);
 }
 
-function bookOf(input: Record<string, unknown>): string {
-  return str(input.book) || "当前书";
-}
-
 /** 目录前缀：让台账一眼能分类，也提醒模型这是「本地存储里的东西」 */
 const PREFIX = {
   todos: "待办",
   knowledge: "知识库",
-  graph: "图谱",
   memory: "长期记忆",
   calendar: "校历",
   pomodoro: "番茄钟",
@@ -98,9 +93,6 @@ function ledgerCategory(
       return action === "list" ? undefined : PREFIX.todos;
     case "manage_knowledge":
       return action === "list" ? undefined : PREFIX.knowledge;
-    case "manage_graph":
-      // query_person / list 是只读；其余动作都改变图谱内容
-      return action === "query_person" || action === "list" ? undefined : PREFIX.graph;
     case "save_memory":
       return action === "list" ? undefined : PREFIX.memory;
     case "set_holidays":
@@ -187,36 +179,6 @@ function describe(toolName: string, action: string, input: unknown, output: unkn
       return title ? `知识「${title}」已更新` : "一条知识已更新";
     }
     return "知识库已更新";
-  }
-  if (toolName === "manage_graph") {
-    const book = `《${bookOf(i)}》`;
-    if (action === "add_relation") {
-      const from = str(i.from);
-      const to = str(i.to);
-      const label = str(i.label);
-      if (from && to) return `${book}已添加关系：${from} —${label || "相关"}→ ${to}`;
-      const batch = arr(i.relations).length;
-      return batch ? `${book}已添加 ${batch} 条关系` : `${book}已添加关系`;
-    }
-    if (action === "new_book") return `已新建书档${book}`;
-    if (action === "delete_book") return `已删除书档${book}（内容不可恢复）`;
-    if (action === "clear_graph") return `${book}内容已清空（书档保留）`;
-    if (action === "delete_person") {
-      const name = str(i.name);
-      return name ? `${book}已删除人物「${name}」` : `${book}已删除一个人物`;
-    }
-    if (action === "update_person") {
-      const name = str(i.newName) || str(i.name);
-      return name ? `${book}人物「${name}」已修改` : `${book}已修改一个人物`;
-    }
-    if (action === "merge_person") {
-      const alias = str(i.alias);
-      const canonical = str(i.canonical);
-      return alias && canonical ? `${book}别名合并：${alias} → ${canonical}` : `${book}已合并别名`;
-    }
-    if (action === "delete_relation") return `${book}已删除一条关系`;
-    if (action === "update_relation") return `${book}已修正一条关系`;
-    return `${book}已更新`;
   }
   return "已完成一次写入";
 }

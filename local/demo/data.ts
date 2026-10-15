@@ -4,7 +4,6 @@
  */
 
 import type { BriefCourse, BriefDay, TodayBrief } from "../../src/channels/web/today-brief";
-import type { GraphPerson, GraphSnapshot } from "../../src/core/graph-store";
 import type { KnowledgeEntry } from "../../src/core/knowledge";
 
 export const DEMO_PERIOD_TIMES: Record<string, string> = {
@@ -439,98 +438,6 @@ export function demoExams(now: Date) {
       isToday: false,
     },
   ];
-}
-
-/** 演示图谱：一本《红楼梦》虚构快照，覆盖六类关系与有向/无向两种边。
- *  与真实 store 输出同形（relations 带 sourceName/targetName），演示服务
- *  同时喂给 /graph 页内嵌数据与 /api/graph（大厅缩略画板）。 */
-const DEMO_GRAPH_BOOK_ID = "demo-book-honglou";
-
-export function demoGraph(): GraphSnapshot {
-  const t0 = Date.UTC(2026, 9, 1, 12, 0, 0);
-  const person = (
-    id: string,
-    name: string,
-    aliases: string[],
-    note: string,
-    importance: number,
-  ): GraphPerson => ({
-    id,
-    bookId: DEMO_GRAPH_BOOK_ID,
-    name,
-    aliases,
-    note,
-    importance,
-    createdAt: t0,
-  });
-  const persons: GraphPerson[] = [
-    person("demo-p-1", "贾母", ["史太君"], "荣国府老祖宗", 3),
-    person("demo-p-2", "贾宝玉", ["宝二爷", "怡红公子"], "荣国府二少爷", 3),
-    person("demo-p-3", "林黛玉", ["颦儿"], "寄居荣国府的表小姐", 3),
-    person("demo-p-4", "薛宝钗", ["宝姐姐"], "薛家小姐", 2),
-    person("demo-p-5", "王夫人", [], "贾宝玉之母", 2),
-    person("demo-p-6", "贾政", [], "贾宝玉之父", 2),
-    person("demo-p-7", "王熙凤", ["凤姐儿"], "荣国府管家奶奶", 2),
-    person("demo-p-8", "史湘云", ["云姑娘"], "贾母侄孙女", 1),
-    person("demo-p-9", "晴雯", [], "贾宝玉的丫鬟", 1),
-    person("demo-p-10", "紫鹃", [], "林黛玉的丫鬟", 1),
-    person("demo-p-11", "贾环", [], "贾政庶子", 1),
-  ];
-  const rel = (
-    id: string,
-    sourceId: string,
-    targetId: string,
-    category: GraphSnapshot["relations"][number]["category"],
-    label: string,
-    directed: boolean,
-    evidence: string,
-  ) => ({
-    id,
-    bookId: DEMO_GRAPH_BOOK_ID,
-    sourceId,
-    targetId,
-    category,
-    label,
-    directed,
-    evidence,
-    chapter: "",
-    createdAt: t0,
-    sourceName: persons.find((p) => p.id === sourceId)?.name ?? "",
-    targetName: persons.find((p) => p.id === targetId)?.name ?? "",
-  });
-  return {
-    bookId: DEMO_GRAPH_BOOK_ID,
-    version: 1,
-    persons,
-    relations: [
-      rel("demo-r-1", "demo-p-1", "demo-p-2", "family", "祖孙", false, "宝玉是贾母的孙子"),
-      rel("demo-r-2", "demo-p-1", "demo-p-3", "family", "外祖母", true, "黛玉是贾母的外孙女"),
-      rel("demo-r-3", "demo-p-1", "demo-p-8", "family", "侄孙女", true, "湘云是贾母的侄孙女"),
-      rel("demo-r-4", "demo-p-5", "demo-p-2", "family", "母子", true, "王夫人是宝玉的母亲"),
-      rel("demo-r-5", "demo-p-6", "demo-p-2", "family", "父子", true, "贾政是宝玉的父亲"),
-      rel("demo-r-6", "demo-p-5", "demo-p-6", "romance", "夫妻", true, "贾政与王夫人是夫妻"),
-      rel("demo-r-7", "demo-p-3", "demo-p-2", "romance", "恋人", true, "黛玉与宝玉青梅竹马"),
-      rel("demo-r-8", "demo-p-4", "demo-p-2", "romance", "未婚妻", true, "宝钗是宝玉的未婚妻"),
-      rel("demo-r-9", "demo-p-3", "demo-p-4", "friendship", "知交", false, "黛玉与宝钗义结金兰"),
-      rel("demo-r-10", "demo-p-3", "demo-p-8", "friendship", "诗友", false, "黛玉与湘云联诗"),
-      rel("demo-r-11", "demo-p-2", "demo-p-7", "family", "堂嫂", true, "凤姐是宝玉的堂嫂"),
-      rel("demo-r-12", "demo-p-2", "demo-p-9", "hierarchy", "主仆", true, "晴雯是宝玉的丫鬟"),
-      rel("demo-r-13", "demo-p-3", "demo-p-10", "hierarchy", "主仆", true, "紫鹃是黛玉的丫鬟"),
-      rel("demo-r-14", "demo-p-6", "demo-p-11", "family", "父子", true, "贾环是贾政的庶子"),
-      rel("demo-r-15", "demo-p-11", "demo-p-2", "conflict", "兄弟不合", false, "贾环与宝玉不和"),
-    ],
-  };
-}
-
-/** 演示图谱的书目行（/api/graph/books 用，与真实 store 同形） */
-export function demoGraphBook() {
-  return {
-    id: DEMO_GRAPH_BOOK_ID,
-    title: "红楼梦",
-    createdAt: Date.UTC(2026, 9, 1, 12, 0, 0),
-    personCount: 11,
-    relationCount: 15,
-  };
 }
 
 /** 演示通知：3 条虚构条目，不含任何真实链接 */
