@@ -90,7 +90,7 @@ npm link           # 注册全局命令（一次即可，任意目录可用）
 raptor             # 启动；项目内也可 npm run dev
 ```
 
-常用脚本：`npm run doctor`（环境自检）· `npm test`（node:test）· `npm run test:coverage`（同测试，带覆盖率门槛）· `npm run typecheck && npm run lint`（类型 + Biome 检查）。
+常用脚本：`npm run doctor`（环境自检）· `npm test`（node:test）· `npm run test:coverage`（同测试，带覆盖率门槛）· `npm run typecheck && npm run lint`（类型 + Biome 检查）· `npm run desktop:dev`（桌面版开发，见 [`desktop/README.md`](desktop/README.md)）。
 
 ### 先零门槛体验（可选）
 
@@ -164,6 +164,7 @@ npm run demo
 ├── docs/               # 文档与素材
 ├── skills/             # 独立技能包：课表图导出 / 元学习
 ├── obsidian/           # Obsidian 插件（第四端入口：侧栏对话 + 日程/待办插入笔记，独立 npm 工程）
+├── desktop/            # 桌面版（Electron 薄壳：窗口/托盘/原生通知/自动更新，独立 npm 工程）
 ├── src/                # 公用核心（与运行形态无关）
 │   ├── core/           # 内核：agent/记忆/日历/文档/附件/知识库等 + 通用工具
 │   └── channels/       # 输出渠道：web（网页版）
