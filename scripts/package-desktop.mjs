@@ -8,7 +8,10 @@
  *   2) 把便携 zip 拷到 desktop/build-resources/payload.zip（单文件做 extraResources。
  *      不能直接拷 app/、runtime/ 目录树：electron-builder 对目录名 node_modules
  *      是整棵硬丢弃，目录树进包必然缺依赖）
- *   3) npm --prefix desktop run build  （typecheck + esbuild 打主进程）
+ *   2b) 从 README logo 现生成 build-resources/icon.ico（NSIS 只认 .ico；多尺寸
+ *      16/32/48/256 PNG-in-ICO，不入库，构建期现做，与 package-exe.mjs 同款写法）
+ *   3) npm --prefix desktop run build  （typecheck + esbuild 打主进程；
+ *      electron-updater 已 bundle 进 dist/main.js，不依赖外部 node_modules）
  *   4) electron-builder                （cwd=desktop，读 electron-builder.yml；
  *      输出目录默认 desktop/release；可用 --out <目录> 输出到别处，
  *      避开对仓库目录实时扫描咬住 .asar 的 EBUSY 问题）
@@ -28,7 +31,7 @@
  */
 
 import { execSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildPortable } from "./package-portable.mjs";
@@ -65,12 +68,20 @@ function run() {
   mkdirSync(RESOURCES, { recursive: true });
   copyFileSync(finalZip, path.join(RESOURCES, "payload.zip"));
 
+  console.log("②b README logo → 多尺寸 ICO（NSIS 安装包图标）...");
+  makeIconIco(path.join(ROOT, "docs", "courseraptor-logo.png"), path.join(RESOURCES, "icon.ico"));
+
   try {
     console.log("③ 构建桌面主进程（typecheck + esbuild）...");
     execSync("npm run build", { cwd: DESKTOP, stdio: "inherit" });
 
     console.log("④ electron-builder 打安装包 ...");
     console.log(`   输出目录：${outDir}`);
+    // 先清掉上次的半成品：win-unpacked 残留会让 electron-builder 误判为已构建完成，
+    // 直接跳过 NSIS/portable 产物（上次只出 win-unpacked 没出 setup 就是这么来的）
+    for (const stale of ["win-unpacked", "win-unpacked.tmp"]) {
+      rmSync(path.join(outDir, stale), { recursive: true, force: true });
+    }
     // 注意：--out 不是 electron-builder 参数；用 -c.directories.output 重定向输出
     execSync(`npx electron-builder --publish=never -c.directories.output="${outDir}"`, {
       cwd: DESKTOP,
@@ -93,4 +104,72 @@ try {
 } catch (e) {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
+}
+
+/**
+ * README logo → 多尺寸 ICO（16/32/48/256，PNG-in-ICO 写法，与 package-exe.mjs 同款）。
+ * 缩放用 System.Drawing（本脚本只跑 Windows，与 exe 打包同款写法）；单尺寸 PNG
+ * 直接拼 ICO（Vista+ 支持）会让任务栏小图标糊成一团，故此处必须多尺寸。
+ */
+function makeIconIco(pngSrc, icoOut) {
+  if (!existsSync(pngSrc)) throw new Error(`缺少应用图标源图：${pngSrc}`);
+  const sizes = [16, 32, 48, 256];
+  const dir = path.dirname(icoOut);
+  const ps1 = path.join(dir, "icon-resize.ps1");
+  writeFileSync(
+    ps1,
+    [
+      "param([string]$src, [string]$outDir)",
+      "$ErrorActionPreference='Stop'",
+      "Add-Type -AssemblyName System.Drawing",
+      "$img = [System.Drawing.Image]::FromFile($src)",
+      `foreach ($s in ${sizes.join(",")}) {`,
+      "  $bmp = New-Object System.Drawing.Bitmap $s, $s",
+      "  $g = [System.Drawing.Graphics]::FromImage($bmp)",
+      "  $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic",
+      "  $g.DrawImage($img, 0, 0, $s, $s)",
+      "  $g.Dispose()",
+      '  $bmp.Save((Join-Path $outDir ("icon-$s.png")), [System.Drawing.Imaging.ImageFormat]::Png)',
+      "  $bmp.Dispose()",
+      "}",
+      "$img.Dispose()",
+    ].join("\r\n"),
+    "utf8",
+  );
+  try {
+    execSync(
+      `powershell -NoProfile -ExecutionPolicy Bypass -File "${ps1}" -src "${pngSrc}" -outDir "${dir}"`,
+      {
+        stdio: "inherit",
+      },
+    );
+    const images = sizes.map((s) => {
+      const png = readFileSync(path.join(dir, `icon-${s}.png`));
+      rmSync(path.join(dir, `icon-${s}.png`), { force: true });
+      return { size: s, png };
+    });
+    const count = images.length;
+    const headerLen = 6 + 16 * count;
+    const header = Buffer.alloc(headerLen);
+    header.writeUInt16LE(0, 0);
+    header.writeUInt16LE(1, 2);
+    header.writeUInt16LE(count, 4);
+    let offset = headerLen;
+    images.forEach(({ size, png }, i) => {
+      const o = 6 + 16 * i;
+      header.writeUInt8(size >= 256 ? 0 : size, o);
+      header.writeUInt8(size >= 256 ? 0 : size, o + 1);
+      header.writeUInt8(0, o + 2);
+      header.writeUInt8(0, o + 3);
+      header.writeUInt16LE(1, o + 4);
+      header.writeUInt16LE(32, o + 6);
+      header.writeUInt32LE(png.length, o + 8);
+      header.writeUInt32LE(offset, o + 12);
+      offset += png.length;
+    });
+    writeFileSync(icoOut, Buffer.concat([header, ...images.map((i) => i.png)]));
+    console.log(`   图标已生成：${icoOut}（${sizes.join("/")}px）`);
+  } finally {
+    rmSync(ps1, { force: true });
+  }
 }

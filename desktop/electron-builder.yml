@@ -16,19 +16,32 @@ files:
 extraResources:
   - from: build-resources/payload.zip
     to: payload.zip
-  # 应用图标直用仓库里的项目 logo（docs/courseraptor-logo.png，与 README 同一张），
-  # 不复制第二份避免漂移；运行期主进程从 resources/icon.png 读取
+  # 运行期窗口/托盘图标：直用 README 的项目 logo（docs/courseraptor-logo.png），
+  # 不复制第二份避免漂移
   - from: ../docs/courseraptor-logo.png
     to: icon.png
 win:
   target:
     - nsis
     - portable
-  icon: ../docs/courseraptor-logo.png
+  # 安装包/程序图标：NSIS 只认 .ico，打包时由 scripts/package-desktop.mjs
+  # 从 README logo 现生成 build-resources/icon.ico（不入库，避免二进制漂移）
+  icon: build-resources/icon.ico
+  requestedExecutionLevel: asInvoker
 nsis:
-  oneClick: false
+  # 一键安装：双击即装到用户目录，全程无管理员提权、无选项页
+  oneClick: true
   perMachine: false
-  allowToChangeInstallationDirectory: true
+  allowToChangeInstallationDirectory: false
+  # 卸载保留 %APPDATA%/CourseRaptor（后端运行环境 + 用户数据），重装/升级不丢数据
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: CourseRaptor
+  # 装完直接启动（首启解压 payload 较久，窗口先给加载态顶着，见 main.ts）
+  runAfterFinish: true
+  installerIcon: build-resources/icon.ico
+  uninstallerIcon: build-resources/icon.ico
   # 产物名固定无空格：latest.yml 的 url 必须与磁盘/上传文件名逐字一致，
   # 否则 electron-updater 找不到安装包（默认名带空格会被 url 写成连字符）
   artifactName: courseraptor-v${version}-desktop-win-x64-setup.${ext}

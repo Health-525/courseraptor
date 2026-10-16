@@ -57,15 +57,19 @@ npm run desktop:dist -- --keep  # 保留 desktop/build-resources/ 便于排查
 npm run desktop:dist -- --out "$env:TEMP\raptor-desktop-out"
 ```
 
-产物为 NSIS 安装包 + portable exe，命名沿用 `courseraptor-vX.Y.Z-desktop-win-x64.*`，
-与现有便携包并存，一起走 `gh release upload`。自动更新走 `electron-updater` + GitHub
+产物为**一键安装**的 NSIS 安装包（`oneClick: true`：双击即装到用户目录、
+无管理员提权、无选项页、装完直接启动）+ portable exe，命名沿用
+`courseraptor-vX.Y.Z-desktop-win-x64.*`，与现有便携包并存，一起走
+`gh release upload`。自动更新走 `electron-updater` + GitHub
 Release（`electron-builder.yml` 的 `publish` 段）。
 
 ### 应用图标
 
-直接复用仓库里的项目 logo `docs/courseraptor-logo.png`（与 README 同一张）——`electron-builder.yml`
-的 `win.icon` 与 `extraResources` 都指向它，不复制第二份避免漂移。dev 模式下窗口/托盘图标
-也从该文件读取（缺失时托盘走透明兜底，不影响运行）。
+直接复用 README 的项目 logo `docs/courseraptor-logo.png`：打包时
+`scripts/package-desktop.mjs` 从它现生成多尺寸 `build-resources/icon.ico`
+（16/32/48/256，构建完即清，不入库）；运行期窗口/托盘从
+`extraResources/icon.png`（同一张 PNG）读取。dev 模式下也从该文件读取
+（缺失时托盘走透明兜底，不影响运行）。
 
 ## 安全边界（不变式）
 

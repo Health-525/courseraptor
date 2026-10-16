@@ -30,8 +30,22 @@ let restarts = 0;
 
 const MAX_RESTARTS = 5;
 
+/**
+ * 首启加载态：安装后首次启动要解压百兆 payload（一两分钟），窗口在后端 ready
+ * 前先顶着这个纯 CSS 本地页，避免用户对着空白窗口干等。ready 后 loadURL 替换。
+ */
+const LOADING_PAGE =
+  "data:text/html;charset=utf-8," +
+  encodeURIComponent(
+    `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>CourseRaptor</title>` +
+      `<style>body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a;color:#e2e8f0;font-family:system-ui,"Microsoft YaHei",sans-serif}` +
+      `.wrap{text-align:center}.spin{width:44px;height:44px;margin:0 auto 20px;border:4px solid #334155;border-top-color:#38bdf8;border-radius:50%;animation:rot 0.9s linear infinite}` +
+      `@keyframes rot{to{transform:rotate(360deg)}}h1{font-size:20px;margin:0 0 8px}p{font-size:13px;color:#94a3b8;margin:0}</style></head>` +
+      `<body><div class="wrap"><div class="spin"></div><h1>CourseRaptor 启动中…</h1><p>首次启动需解压内置运行环境，请稍候一两分钟</p></div></body></html>`,
+  );
+
 function iconPath(): string {
-  // prod 从 extraResources 注入的 icon.png 读；dev 直接指向仓库里的项目 logo
+  // prod 从 extraResources 注入的 icon.png（README logo）读；dev 直接指向仓库里同一张
   return isDev
     ? path.resolve(__dirname, "..", "..", "docs", "courseraptor-logo.png")
     : path.join(process.resourcesPath, "icon.png");
@@ -107,6 +121,8 @@ function createWindow(): void {
     void shell.openExternal(url);
     return { action: "deny" };
   });
+  // 先顶加载态（首启解压慢）；后端 ready 后 loadURL 换成真实页面
+  void win.loadURL(LOADING_PAGE);
 }
 
 function startBackendAsync(): void {
@@ -202,7 +218,8 @@ interface AutoUpdaterLike {
 function loadAutoUpdater(): AutoUpdaterLike | null {
   if (isDev) return null; // dev 无打包产物，跳过
   try {
-    // 运行期解析：生产依赖里带 electron-updater，dev 未装时静默跳过
+    // 运行期解析：electron-updater 已由 esbuild 打进 dist（见 esbuild.config.mjs），
+    // 此处按需 require；dev 下同样走 bundle，无外部依赖
     // biome-ignore lint/style/noCommonJs: 条件加载可选依赖
     const mod = require("electron-updater") as { autoUpdater: AutoUpdaterLike };
     return mod.autoUpdater;
