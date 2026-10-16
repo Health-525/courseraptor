@@ -2831,7 +2831,7 @@ function hallKnowledgeItem(k) {
   renderText(false);
   if (k.source) text.title = `来源：${k.source}`;
   main.appendChild(text);
-  if (k.file && k.file.name) {
+  if (k.file?.name) {
     const file = document.createElement("a");
     file.className = "hm hall-know-file";
     file.href = `/api/knowledge/${encodeURIComponent(k.id)}/file`;
