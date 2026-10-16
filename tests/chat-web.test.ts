@@ -1069,6 +1069,35 @@ test("工具结果带成品文件时 SSE 透出 files（两种返回形状都认
   assert.equal(byId.x1?.files, undefined, "generated 目录外的路径不得出现在 files 里");
 });
 
+test("课表图同时带顶层路径和 file 对象时只透出一次", async () => {
+  const pngPath = await seedGeneratedFile("schedule-week7.png", "png-bytes");
+  setChatAgent({
+    stream() {
+      async function* gen() {
+        yield { type: "tool-call", toolCallId: "img1", toolName: "export_schedule_image" };
+        yield {
+          type: "tool-result",
+          toolCallId: "img1",
+          toolName: "export_schedule_image",
+          output: {
+            file: { filename: "schedule-week7.png", filePath: pngPath, bytes: 9 },
+            filename: "schedule-week7.png",
+            path: pngPath,
+            bytes: 9,
+          },
+        };
+        yield { type: "finish" };
+      }
+      return Promise.resolve({ fullStream: gen() });
+    },
+  });
+
+  const url = (await startChatWeb())!;
+  const r = await post(url, { message: "导出课表图", sessionId: "files-img" });
+  const end = r.events.find((e) => e.t === "tool" && e.phase === "end");
+  assert.deepEqual(end?.files, [{ name: "schedule-week7.png", size: 9 }]);
+});
+
 test("GET /files/<名> 下载 generated 内的成品：类型、附件头与内容正确", async () => {
   await seedGeneratedFile(
     "calendar-2026-1.ics",

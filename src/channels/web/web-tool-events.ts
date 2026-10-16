@@ -57,7 +57,8 @@ export function previewJson(v: unknown, max = 1200): string {
 /**
  * 从工具结果里提取可下载的成品（网页端下载按钮的数据源）。
  * 兼容两种返回形状：文档工具的顶层 {filename, path} 与
- * export_calendar 的 {file: {filename, filePath, bytes}}；
+ * export_calendar / export_schedule_image 的 {file: {filename, filePath, bytes}}。
+ * 同一文件名只保留一条（课表图两种形状会同时出现）。
  * 路径不在 generated 目录内的一律不透出。
  */
 /** 工具因凭证未配置而失败的口径：命中时 SSE 事件带 panel=settings，网页端自动推出设置面板 */
@@ -80,9 +81,11 @@ export function filesOfToolOutput(output: unknown): Array<{ name: string; size: 
   if (typeof output !== "object" || output == null || Array.isArray(output)) return [];
   const o = output as Record<string, unknown>;
   const out: Array<{ name: string; size: number }> = [];
+  const seen = new Set<string>();
   const push = (name: unknown, p: unknown, size: unknown) => {
-    if (typeof name !== "string" || !name) return;
+    if (typeof name !== "string" || !name || seen.has(name)) return;
     if (typeof p !== "string" || !insideGenerated(p)) return;
+    seen.add(name);
     out.push({ name, size: typeof size === "number" ? size : 0 });
   };
   push(o.filename, o.path, o.bytes);
