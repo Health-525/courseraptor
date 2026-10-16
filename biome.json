@@ -7,7 +7,7 @@
   },
   "files": {
     "ignoreUnknown": true,
-    "includes": ["src/**", "local/**", "tests/**", "scripts/**", "bin/**"]
+    "includes": ["src/**", "local/**", "tests/**", "scripts/**", "bin/**", "!**/.worktrees"]
   },
   "formatter": {
     "enabled": true,
