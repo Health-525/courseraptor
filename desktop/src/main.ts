@@ -12,6 +12,7 @@
 import path from "node:path";
 import { BrowserWindow, Notification, app, dialog, ipcMain, shell, type Tray } from "electron";
 import { type BackendHandle, startBackend } from "./backend";
+import { ensureBackendExtracted } from "./payload";
 import { createTray } from "./tray";
 
 const isDev = !app.isPackaged;
@@ -22,26 +23,29 @@ process.env.RAPTOR_DATA_DIR = dataDir;
 let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let backend: BackendHandle | null = null;
+// 后端就绪后再给用户看窗口：首启要解压百兆 payload，先给个加载态窗口顶着
+let backendStarting = false;
 let quitting = false;
 let restarts = 0;
 
 const MAX_RESTARTS = 5;
-
-function appPath(): string {
-  return isDev ? path.resolve(__dirname, "..", "..") : path.join(process.resourcesPath, "app");
-}
-
-function nodeBin(): string {
-  const exe = process.platform === "win32" ? "node.exe" : "node";
-  // dev 用系统 node（依赖 PATH，仓库里有 tsx）；prod 用打包内置的 Node 24
-  return isDev ? exe : path.join(process.resourcesPath, "runtime", exe);
-}
 
 function iconPath(): string {
   // prod 从 extraResources 注入的 icon.png 读；dev 直接指向仓库里的项目 logo
   return isDev
     ? path.resolve(__dirname, "..", "..", "docs", "courseraptor-logo.png")
     : path.join(process.resourcesPath, "icon.png");
+}
+
+/** dev = 仓库根 + 系统 node；prod = 解压到用户目录的 payload + 内置 Node 24 */
+async function resolveBackend(): Promise<{ appPath: string; nodeBin: string }> {
+  if (isDev) {
+    return {
+      appPath: path.resolve(__dirname, "..", ".."),
+      nodeBin: process.platform === "win32" ? "node.exe" : "node",
+    };
+  }
+  return ensureBackendExtracted(path.join(process.resourcesPath, "payload.zip"));
 }
 
 // ── 单实例：第二个实例把已有窗口唤到前台，不再开新进程 ──
@@ -54,7 +58,7 @@ if (!app.requestSingleInstanceLock()) {
 
 function onReady(): void {
   createWindow();
-  startOnce();
+  void startBackendAsync();
   tray = createTray(iconPath(), {
     onShow: showWindow,
     onOpenDataDir: () => void shell.openPath(dataDir),
@@ -105,10 +109,29 @@ function createWindow(): void {
   });
 }
 
-function startOnce(): void {
+function startBackendAsync(): void {
+  // 同一时间只起一个后端：watchdog 重启和首启只会有一个在跑
+  if (backendStarting) return;
+  backendStarting = true;
+  win?.webContents.executeJavaScript(
+    `document.title="CourseRaptor（后端启动中…）"`,
+  ).catch(() => {});
+  resolveBackend()
+    .then(({ appPath, nodeBin }) => startOnce(appPath, nodeBin))
+    .catch((e: unknown) => {
+      backendStarting = false;
+      dialog.showErrorBox(
+        "CourseRaptor 后端启动失败",
+        e instanceof Error ? e.message : String(e),
+      );
+    });
+}
+
+function startOnce(appPath: string, nodeBin: string): void {
+  backendStarting = false;
   backend = startBackend({
-    appPath: appPath(),
-    nodeBin: nodeBin(),
+    appPath,
+    nodeBin,
     env: { ...process.env, RAPTOR_DATA_DIR: dataDir },
     onMessage: (m) => {
       if (m.type === "ready") {
@@ -132,10 +155,10 @@ function startOnce(): void {
         );
         return;
       }
-      // 指数退避：1s → 2s → 4s → … 上限 30s
+      // 指数退避：1s → 2s → 4s → … 上限 30s（寻址已解析，直接传回 startOnce）
       const delay = Math.min(30_000, 1000 * 2 ** restarts);
       setTimeout(() => {
-        if (!quitting) startOnce();
+        if (!quitting) startBackendAsync();
       }, delay);
     },
   });

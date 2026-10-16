@@ -8,13 +8,14 @@ directories:
 files:
   - dist/**/*
   - package.json
-# 后端源码 + 生产依赖（build-resources/app）与内置 Node 24 运行时（build-resources/runtime）
-# 由 scripts/package-desktop.mjs 复用 buildPortable() 产出后放到这里
+# 后端 = buildPortable() 产出的便携包整包 payload.zip（单文件）。
+# 不能直接拷 app/、runtime/ 目录树：electron-builder 的拷贝过滤对目录名
+# node_modules 是整棵硬丢弃（filter 配什么都没用），目录树进包必然缺依赖；
+# 单文件 payload 走 extraResources 畅通无阻，首次启动由主进程解到用户目录
+# （见 src/payload.ts），升级按应用版本分目录、旧数据不动。
 extraResources:
-  - from: build-resources/app
-    to: app
-  - from: build-resources/runtime
-    to: runtime
+  - from: build-resources/payload.zip
+    to: payload.zip
   # 应用图标直用仓库里的项目 logo（docs/courseraptor-logo.png，与 README 同一张），
   # 不复制第二份避免漂移；运行期主进程从 resources/icon.png 读取
   - from: ../docs/courseraptor-logo.png

@@ -24,6 +24,9 @@ export interface BackendHandle {
 /**
  * 拉起后端 Node host（local/host/headless.ts）。tsx 的解析复用 bin/raptor.cjs
  * 的稳健写法：从 appPath 解析出 tsx 入口的绝对路径再 --import，避免依赖 cwd。
+ *
+ * 生产依赖注意：tsx 必须落在根 package.json 的 dependencies 里（它正是如此），
+ * 否则便携包/桌面包的 npm ci --omit=dev 会把它裁掉，后端起不来。
  */
 export function startBackend(opts: BackendOptions): BackendHandle {
   const req = createRequire(path.join(opts.appPath, "package.json"));
