@@ -458,25 +458,49 @@ function lineBad(tl, text, mark) {
   scroll(false);
 }
 
-/* ── 成品文件下载行：工具结果带 files 时渲染在工具卡下方 ── */
+/* ── 成品文件：工具结果带 files 时渲染在工具卡下方。
+   图片直接预览；其余类型仍是附件条。同名文件只出一次。 ── */
 function fmtSize(n) {
   if (!n) return "";
   return n >= 1048576
     ? `${(n / 1048576).toFixed(1)} MB`
     : `${Math.max(1, Math.round(n / 1024))} KB`;
 }
+function isPreviewImage(name) {
+  return /\.(png|jpe?g|gif|webp|svg)$/i.test(name || "");
+}
+function fileDownloadLink(f) {
+  const a = document.createElement("a");
+  a.className = "tbtn";
+  a.href = `/files/${encodeURIComponent(f.name)}`;
+  a.setAttribute("download", f.name);
+  a.textContent = "下载";
+  return a;
+}
 function fileRows(tl, files) {
+  const seen = new Set();
   files.forEach((f) => {
+    if (!f?.name || seen.has(f.name)) return;
+    seen.add(f.name);
+    const href = `/files/${encodeURIComponent(f.name)}`;
+    if (isPreviewImage(f.name)) {
+      const card = el("fimg");
+      const img = document.createElement("img");
+      img.src = href;
+      img.alt = f.name;
+      card.appendChild(img);
+      const row = el("frow");
+      row.appendChild(el2("fmark", "🖼"));
+      row.appendChild(el2("fname", f.name + (f.size ? `（${fmtSize(f.size)}）` : "")));
+      row.appendChild(fileDownloadLink(f));
+      card.appendChild(row);
+      tl.appendChild(card);
+      return;
+    }
     const row = el("frow");
     row.appendChild(el2("fmark", "📎"));
-    const nm = el2("fname", f.name + (f.size ? `（${fmtSize(f.size)}）` : ""));
-    row.appendChild(nm);
-    const a = document.createElement("a");
-    a.className = "tbtn";
-    a.href = `/files/${encodeURIComponent(f.name)}`;
-    a.setAttribute("download", f.name);
-    a.textContent = "下载";
-    row.appendChild(a);
+    row.appendChild(el2("fname", f.name + (f.size ? `（${fmtSize(f.size)}）` : "")));
+    row.appendChild(fileDownloadLink(f));
     tl.appendChild(row);
   });
   scroll(false);
