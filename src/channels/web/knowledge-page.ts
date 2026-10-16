@@ -662,7 +662,7 @@ function entryEl(item, order) {
       card.appendChild(toggle);
     }
   }
-  if (item.file && item.file.name && !DEMO_DATA) {
+  if (item.file?.name && !DEMO_DATA) {
     const file = el("a", "k-file", "原件 · " + item.file.name);
     file.href = "/api/knowledge/" + encodeURIComponent(item.id) + "/file";
     file.target = "_blank";
