@@ -28,10 +28,16 @@ const { webUrl } = await bootstrapHost();
 if (webUrl) emit({ type: "ready", url: webUrl });
 else emit({ type: "log", level: "error", text: "网页服务启动失败：无法监听本机端口" });
 
+// 常驻句柄：chat-web 的 server 是 unref 的（终端 UI 退出时进程该走就走），
+// headless 里网页服务就是唯一常驻服务，事件循环空了进程会以 0 退出、
+// 窗口停在加载页。挂一个永不触发的定时器钉住事件循环；shutdown 时清掉。
+const keepAlive = setInterval(() => {}, 2 ** 31 - 1);
+
 let shuttingDown = false;
 async function shutdown(): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
+  clearInterval(keepAlive);
   try {
     await flushCapturedSession();
   } catch {
