@@ -1347,6 +1347,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   /* 知识条目排版：卡片内边距与行距略放宽（分类/日期不上卡，辨类走顶部 chips） */
   .hall-item.know { padding: 11px 13px; margin-bottom: 8px; }
   .hall-item.know .hm { margin-top: 6px; line-height: 1.75; }
+  .hall-know-file { display: block; margin-top: 4px; }
   /* 知识正文里的自动链接：朱砂深色 + 下划线区分正文，新标签打开不打断对话 */
   .hall-item .hm a { color: var(--accent-deep); text-decoration: underline;
                      text-underline-offset: 2px; overflow-wrap: anywhere; }

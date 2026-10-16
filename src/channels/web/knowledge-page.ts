@@ -236,6 +236,9 @@ export function knowledgePage(
   .k-text a { color: var(--accent-deep); text-decoration: underline;
               text-underline-offset: 2px; }
   .k-text a:hover { color: var(--accent); }
+  .k-file { display: inline-block; margin-top: 8px; font-size: 13px; color: var(--accent-deep);
+            text-decoration: underline; text-underline-offset: 2px; }
+  .k-file:hover { color: var(--accent); }
   .k-text.clamp { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical;
                   overflow: hidden; }
   .k-toggle { justify-self: start; background: none; border: none; padding: 2px 0;
@@ -497,7 +500,7 @@ function filtered() {
   if (keyword) {
     const kw = keyword.toLowerCase();
     list = list.filter((e) =>
-      (e.title + "\\n" + e.content + "\\n" + (e.category || "未分类")).toLowerCase().includes(kw));
+      (e.title + "\\n" + e.content + "\\n" + (e.category || "未分类") + "\\n" + ((e.file && e.file.name) || "")).toLowerCase().includes(kw));
   }
   return [...list].sort((a, b) => b.updatedAt - a.updatedAt);
 }
@@ -658,6 +661,13 @@ function entryEl(item, order) {
       });
       card.appendChild(toggle);
     }
+  }
+  if (item.file?.name && !DEMO_DATA) {
+    const file = el("a", "k-file", "原件 · " + item.file.name);
+    file.href = "/api/knowledge/" + encodeURIComponent(item.id) + "/file";
+    file.target = "_blank";
+    file.rel = "noopener noreferrer";
+    card.appendChild(file);
   }
   const foot = el("div", "k-foot");
   const tag = el("button", "k-tag" + (item.category ? "" : " none"), "# " + (item.category || "未分类"));
