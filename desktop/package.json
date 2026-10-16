@@ -1,0 +1,26 @@
+{
+  "name": "courseraptor-desktop",
+  "version": "0.6.1",
+  "private": true,
+  "description": "CourseRaptor 桌面版（Electron 薄壳）：复用现成 Web UI + Node 后端，加窗口/托盘/通知/自动更新",
+  "author": "jiangshu",
+  "license": "MIT",
+  "main": "dist/main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs && electron .",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && node esbuild.config.mjs production",
+    "dist": "npm run build && electron-builder"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "builtin-modules": "^5.4.0",
+    "electron": "^44.7.2",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  }
+}

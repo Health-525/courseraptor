@@ -72,3 +72,24 @@ jobs:
       - run: npm ci --prefix obsidian
       - run: npm run obsidian:build
 
+  # 桌面版子包：独立 lockfile；只做 typecheck + 主进程打包（不出安装包，
+  # 装包需内置 Node 运行时，留给发版流程 scripts/package-desktop.mjs）
+  desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      # npm ci 而非 npm install：electron-builder 的 peer 依赖 electron-winstaller
+      # 带 win32 限定的 optional 链（@electron/windows-sign 等），ubuntu 上 npm ci
+      # 校验 lock 一致性时要求其完整、而任意平台生成 lock 都不会写入——npm install
+      # 不做该校验且安装行为一致（lock 基本同步），desktop job 只 typecheck+esbuild
+      - run: npm install --prefix desktop --no-audit --no-fund
+      - run: npm run desktop:build
+
