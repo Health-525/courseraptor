@@ -250,4 +250,60 @@ test("入库纪律：content 要求附来源行，无法确定时写「来源：
   const arr = items.unwrap?.() ?? items;
   const contentDesc = arr.element.shape.content.meta?.()?.description ?? "";
   assert.match(contentDesc, /末尾附一行「来源：/, "content 字段说明里也要给出来源行示例");
+  assert.match(desc, /filePath/, "用户明确要求记下文件时才传路径");
+});
+
+test("记下上传原件：只收用户发来的文件，删笔记不删上传，没再传文件就保留原件", async () => {
+  const { saveUpload } = await import("../src/core/workspace-data");
+  const upload = saveUpload("高数极限.pdf", "application/pdf", Buffer.from("%PDF-1.4 limit"));
+  const saved = await manage.execute({
+    action: "add",
+    items: [
+      {
+        title: "极限讲义",
+        content: "第 3 章极限，用户要求记下原件。\n来源：高数极限.pdf",
+        subject: "高数",
+        filePath: upload.storedPath,
+      },
+    ],
+  });
+  assert.equal(saved.ok, true);
+  const hit = listKnowledge().find((e) => e.title === "极限讲义");
+  assert.equal(hit?.category, "高等数学");
+  assert.equal(hit?.file?.name, "高数极限.pdf");
+  assert.ok(hit?.file?.storedName);
+  const copy = path.join(tmpData, "knowledge-files", hit!.file!.storedName);
+  assert.equal(fs.readFileSync(copy, "utf8"), "%PDF-1.4 limit");
+  assert.ok(fs.existsSync(upload.storedPath), "上传区原件还在");
+
+  const listed = await manage.execute({ action: "list", keyword: "高数极限.pdf" });
+  const shown = listed.knowledge as Array<{ file?: { name: string; storedName?: string } }>;
+  assert.equal(shown[0]?.file?.name, "高数极限.pdf");
+  assert.equal(shown[0]?.file?.storedName, undefined, "对外不暴露磁盘文件名");
+
+  await manage.execute({
+    action: "add",
+    items: [
+      { title: "极限讲义", content: "补充一句说明。\n来源：高数极限.pdf", subject: "高等数学" },
+    ],
+  });
+  const kept = listKnowledge().find((e) => e.title === "极限讲义");
+  assert.equal(kept?.file?.storedName, hit?.file?.storedName, "没再传文件时原件保留");
+
+  const outsider = path.join(tmpData, "not-an-upload.pdf");
+  fs.writeFileSync(outsider, "nope");
+  const rejected = await manage.execute({
+    action: "add",
+    items: [{ title: "不该入库", content: "随便一份路径", filePath: outsider }],
+  });
+  assert.match(String(rejected.error), /只能保存用户这次发来的文件/);
+  assert.equal(
+    listKnowledge().some((e) => e.title === "不该入库"),
+    false,
+  );
+
+  const removed = await manage.execute({ action: "delete", id: kept!.id });
+  assert.equal(removed.ok, true);
+  assert.equal(fs.existsSync(copy), false, "删笔记时清掉知识库副本");
+  assert.ok(fs.existsSync(upload.storedPath), "不碰用户上传区的原件");
 });
