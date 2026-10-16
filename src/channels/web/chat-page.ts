@@ -301,7 +301,11 @@ export function chatPage(options: { demo?: boolean } = {}): string {
               line-height: 1.6; color: var(--ink-2);
               white-space: pre-wrap; word-break: break-all; }
 
-  /* 成品文件下载行：工具卡片下方一枚「附件条」，与工具卡同宽同族 */
+  /* 成品文件：图片先出预览，底下仍留下载条；其它类型只有附件条 */
+  .fimg { margin-bottom: 9px; border: 1px solid var(--rule-2); background: var(--card); }
+  .fimg img { display: block; width: 100%; height: auto; max-height: 520px;
+              object-fit: contain; background: var(--paper); }
+  .fimg .frow { margin-bottom: 0; border: none; border-top: 1px solid var(--rule); }
   .frow { display: flex; align-items: center; gap: 10px; margin-bottom: 9px;
           border: 1px solid var(--rule-2); background: var(--card);
           padding: 9px 12px; font-family: var(--mono); font-size: 12px;
