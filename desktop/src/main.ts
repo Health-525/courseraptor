@@ -218,8 +218,8 @@ interface AutoUpdaterLike {
 function loadAutoUpdater(): AutoUpdaterLike | null {
   if (isDev) return null; // dev 无打包产物，跳过
   try {
-    // 运行期解析：electron-updater 已由 esbuild 打进 dist（见 esbuild.config.mjs），
-    // 此处按需 require；dev 下同样走 bundle，无外部依赖
+    // 运行期解析：electron-updater 是 external，electron-builder 按生产依赖
+    // 自动拷进 resources/app/node_modules，安装版 require 直接命中
     // biome-ignore lint/style/noCommonJs: 条件加载可选依赖
     const mod = require("electron-updater") as { autoUpdater: AutoUpdaterLike };
     return mod.autoUpdater;
