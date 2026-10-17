@@ -33,6 +33,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { lintPortableZip } from "./lib/zip-lint.mjs";
 import { shouldPackagePath } from "./package-policy.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -58,7 +59,7 @@ const RUNTIME_ZIP_URL = `https://nodejs.org/dist/${NODE_VER}/node-${NODE_VER}-wi
 /** 便携 zip 顶层的文件夹名；exe 启动器释放时按它剥掉一层（scripts/exe-launcher.cs 的 TopDir）。 */
 export const PORTABLE_TOP_DIR = "CourseRaptor";
 
-export function buildPortable({ keep = false } = {}) {
+export async function buildPortable({ keep = false } = {}) {
   if (process.platform !== "win32") {
     throw new Error("本脚本只在 Windows 上构建（打包的是 Windows 便携运行时 + start.bat）。");
   }
@@ -200,8 +201,13 @@ export function buildPortable({ keep = false } = {}) {
     "Add-Type -AssemblyName System.IO.Compression.FileSystem",
     "if (Test-Path -LiteralPath $out) { Remove-Item -LiteralPath $out -Force }",
     "$zip = [System.IO.Compression.ZipFile]::Open($out, [System.IO.Compression.ZipArchiveMode]::Create)",
-    "$base = $src.TrimEnd('\\').Length + 1",
-    "$prefix = Split-Path -Leaf $src",
+    // 8.3 短路径免疫：$src 常以短名形式传入（TEMP 环境变量多为 DEV-CA~1 / RUNNER~1），
+    // 而 Get-ChildItem 子项的 FullName 是展开后的长名——按 $src 原串长度算偏移必然错位
+    //（本机差 1 字符 -> 全体条目双斜杠；CI runner 差 3 字符 -> 条目名被吃掉半截），
+    // 必须先让 PowerShell 把 $src 展开成与子项一致的 FullName 再取长度。
+    "$srcResolved = (Get-Item -LiteralPath $src).FullName.TrimEnd('\\')",
+    "$base = $srcResolved.Length + 1",
+    "$prefix = Split-Path -Leaf $srcResolved",
     "$n = 0",
     "Get-ChildItem -LiteralPath $src -Recurse -File | ForEach-Object {",
     "  $rel = $_.FullName.Substring($base).Replace('\\', '/')",
@@ -223,6 +229,15 @@ export function buildPortable({ keep = false } = {}) {
   // ── 7) 产物搬到临时根目录的固定文件名（供上传步骤使用），再清理工作区 ──
   const finalZip = path.join(tmpdir(), ARTIFACT);
   copyFileSync(outZip, finalZip);
+  // 条目校验：短路径偏移错位（双斜杠/半截名/关键文件缺失）在这里硬拦，
+  // 坏包绝不走到上传/嵌入 exe。CI Release 的自测失败正是这类包漏过了前缀检查。
+  const lint = await lintPortableZip(finalZip);
+  if (!lint.ok) {
+    throw new Error(
+      `便携 zip 条目校验未通过（前 5 条）：\n  ${lint.errors.slice(0, 5).join("\n  ")}`,
+    );
+  }
+  console.log(`zip 条目校验通过（${lint.count} 条，最长相对路径 ${lint.maxRel} 字符）`);
   const mb = (statSync(finalZip).size / 1024 / 1024).toFixed(1);
   if (!keep) rmSync(work, { recursive: true, force: true });
 
@@ -243,7 +258,7 @@ const invokedDirectly =
   process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
 if (invokedDirectly) {
   try {
-    buildPortable({ keep: process.argv.includes("--keep") });
+    await buildPortable({ keep: process.argv.includes("--keep") });
   } catch (e) {
     console.error(e instanceof Error ? e.message : e);
     process.exit(1);

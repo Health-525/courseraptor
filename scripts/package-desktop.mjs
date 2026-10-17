@@ -40,7 +40,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DESKTOP = path.join(ROOT, "desktop");
 const RESOURCES = path.join(DESKTOP, "build-resources");
 
-function run() {
+async function run() {
   if (process.platform !== "win32") {
     throw new Error("本脚本当前只在 Windows 上构建桌面安装包。");
   }
@@ -55,7 +55,7 @@ function run() {
   mkdirSync(outDir, { recursive: true });
 
   console.log("① 构建便携后端（app + 内置 Node 运行时）...");
-  const { portableDir, version, finalZip } = buildPortable({ keep: true });
+  const { portableDir, version, finalZip } = await buildPortable({ keep: true });
   if (!portableDir || !existsSync(portableDir)) {
     throw new Error("buildPortable 未回传 portableDir（检查 package-portable.mjs）。");
   }
@@ -100,7 +100,7 @@ function run() {
 }
 
 try {
-  run();
+  await run();
 } catch (e) {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
