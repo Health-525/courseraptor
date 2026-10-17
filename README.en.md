@@ -4,9 +4,11 @@
 
 # CourseRaptor
 
-### Less time hunting through portals. More time for student life.
+### Import your timetable once. Run the semester in one chat.
 
-**An open-source conversational campus agent** — timetables, todos, a knowledge base, documents, and memory, all in one chat. A local-first personal school assistant (Vercel AI SDK v7 · four entrances, one kernel): import your timetable once and start asking, with everything staying on your own machine.
+**A local-first campus agent** — timetable · todos · knowledge · memory, all in one chat.
+
+`local-first` `12 CN LLM providers` `terminal / web / QQ / Obsidian` `MIT open-source`
 
 [简体中文](README.md) · **English**
 
@@ -45,7 +47,7 @@ If you are building agents yourself, the repo doubles as a reference implementat
 | Where did I write down that formula? | A knowledge base that files notes by the courses on your timetable, with tags, search, and a 16-week heat strip |
 | Can it help me study? | Study-coach mode with methods loaded on demand, so they never occupy the standing context |
 
-The kernel ships **20 tools out of the box**, covering timetables, files and tables, document generation, sandboxed computation, memory, the knowledge base, todos, the study coach, the teaching-skill library, and settings. See [capabilities](docs/capabilities.md) for the full table.
+The kernel's out-of-the-box tools cover timetables, files and tables, document generation, sandboxed computation, memory, the knowledge base, todos, the study coach, the teaching-skill library, and settings. See [capabilities](docs/capabilities.md) for the full table.
 
 ## Try it without credentials
 
