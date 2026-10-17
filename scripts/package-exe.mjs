@@ -32,7 +32,8 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildPortable, PORTABLE_TOP_DIR } from "./package-portable.mjs";
+import { lintPortableZip } from "./lib/zip-lint.mjs";
+import { buildPortable } from "./package-portable.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const pkg = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8"));
@@ -70,33 +71,20 @@ mkdirSync(work, { recursive: true });
 console.log(`工作目录：${work}`);
 
 // ── 1) 便携 zip（内部含 doctor 冒烟测试，全过才继续）──
-const { finalZip } = buildPortable();
+const { finalZip } = await buildPortable();
 
-// ── 2) 校验 zip 顶层目录约定：启动器释放时按 PORTABLE_TOP_DIR 剥掉一层 ──
-const JSZip = (await import("jszip")).default;
-const zip = await JSZip.loadAsync(readFileSync(finalZip));
-const stray = Object.keys(zip.files).filter((name) => !name.startsWith(`${PORTABLE_TOP_DIR}/`));
-if (stray.length > 0) {
+// ── 2) 校验 zip 条目（与 package-portable 共用 lintPortableZip）：启动器释放时
+//    按 PORTABLE_TOP_DIR 剥掉一层，前缀必须恰好一层、无 //、关键文件齐全。
+//    2026-10 教训：仅凭 startsWith 前缀检查放过错位条目——CI runner 的 TEMP 是
+//    8.3 短名（RUNNER~1），zip 打包偏移差 3 字符，条目变成 CourseRaptor/ptor/...
+//    也能过前缀检查，最后挂在 selftest「安装不完整（缺 runtime\node.exe）」。──
+const lint = await lintPortableZip(finalZip);
+if (!lint.ok) {
   throw new Error(
-    `便携 zip 存在顶层目录之外的条目（示例：${stray.slice(0, 3).join("、")}），exe 释放会错位。`,
+    `便携 zip 条目校验未通过（前 5 条）：\n  ${lint.errors.slice(0, 5).join("\n  ")}`,
   );
 }
-// 启动器释放用普通路径（不用 \\?\ 前缀，.NET 路径校验会拒绝其中的 '?'），
-// 总长必须离 MAX_PATH=260 有余量：默认安装根 %LOCALAPPDATA%\CourseRaptor 约 40-60 字符。
-const MAX_REL = 150;
-let maxRel = 0;
-for (const name of Object.keys(zip.files)) {
-  const rel = name.length - PORTABLE_TOP_DIR.length - 1;
-  if (rel > maxRel) maxRel = rel;
-}
-if (maxRel > MAX_REL) {
-  throw new Error(
-    `zip 条目相对路径最长 ${maxRel} 字符，超过 ${MAX_REL} 护栏：exe 释放可能撞 MAX_PATH，需要改造启动器后再发版。`,
-  );
-}
-console.log(
-  `zip 顶层目录约定校验通过（${Object.keys(zip.files).length} 条，最长相对路径 ${maxRel} 字符）`,
-);
+console.log(`zip 顶层目录约定校验通过（${lint.count} 条，最长相对路径 ${lint.maxRel} 字符）`);
 
 // ── 3) 图标：docs/courseraptor-mascot.png 缩到 256，包成单图 PNG-in-ICO ──
 const iconIco = path.join(work, "app.ico");
