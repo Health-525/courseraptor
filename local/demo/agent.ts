@@ -19,6 +19,7 @@ import {
   demoGrades,
   demoKnowledge,
   demoNews,
+  demoSchedule,
   demoTodayBrief,
   demoTodos,
 } from "./data";
@@ -34,7 +35,7 @@ const DEMO_PROMPT = `你是「迅猛龙」课程助手的演示版，正在离�
 
 工作方式：
 - 凡涉及时间判断（今天几号周几、第几周、距截止还剩几天）必须先调 get_time，禁止凭训练数据猜「今天」。
-- 查课表用 get_schedule，成绩/通识学分用 get_grades，考试用 get_exams，教务通知用 get_news；待办与知识库的增删改查用 manage_todos / manage_knowledge。
+- 查课表用 get_schedule，成绩/通识学分用 get_grades，考试用 get_exams，教务通知用 get_news；待办与知识库的增删改查用 manage_todos / manage_knowledge。\n- 调课、换教室/教师、加课退课用 edit_schedule：先 list 拿时段 id，再 update / add / delete；用户想撤销全部修改用 revert，改完可调 get_schedule 复述新课表。
 - 主动做结合分析：比如把课表空档、考试倒计时和待办截止时间放在一起给建议——这正是产品的核心价值。
 
 表达：
@@ -67,6 +68,51 @@ function labelDue(dueAt: string, now: Date): string {
   if (diff === 1) return `明天 ${hm}`;
   if (diff === -1) return `昨天 ${hm}`;
   return `${d.getMonth() + 1}月${d.getDate()}日 ${hm}`;
+}
+
+/* ── 演示课表槽位定位：id 形如「3-1」＝周三第 2 个时段（weekday-下标）── */
+
+const WD_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+
+/** "1-2节" -> [1,2]；解析不了给空数组 */
+function parsePeriodStr(s: string): number[] {
+  const m = /(\d+)\s*[-~]\s*(\d+)/.exec(s) ?? /(\d+)/.exec(s);
+  if (!m) return [];
+  const a = parseInt(m[1] ?? m[3] ?? "", 10);
+  const b = m[2] ? parseInt(m[2], 10) : a;
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return [];
+  const out: number[] = [];
+  for (let p = Math.min(a, b); p <= Math.max(a, b); p++) out.push(p);
+  return out;
+}
+
+/** 节次数组 -> "1-2节" 式展示串 */
+function periodStrOf(periods: number[]): string {
+  const min = Math.min(...periods);
+  const max = Math.max(...periods);
+  return min === max ? `${min}节` : `${min}-${max}节`;
+}
+
+function slotLabel(weekday: number, periods: string): string {
+  return `${WD_NAMES[weekday - 1] ?? `周${weekday}`} ${periods}`;
+}
+
+/** 解析槽位 id；课表有增删移动后旧 id 会失效，返回 null 由调用方提示重新 list */
+function findSlot(raw: string): { weekday: number; index: number } | null {
+  const m = /^([1-7])-(\d+)$/.exec(raw);
+  if (!m) return null;
+  const weekday = Number(m[1] ?? 0);
+  const index = Number(m[2] ?? -1);
+  if (!Number.isInteger(weekday) || weekday < 1 || !Number.isInteger(index) || index < 0)
+    return null;
+  const day = demoSchedule.courses[weekday - 1];
+  if (!day || index >= day.length) return null;
+  return { weekday, index };
+}
+
+/** 演示课表是否相对初始种子有过修改（内存对比，无周次概念） */
+function demoScheduleModified(): boolean {
+  return JSON.stringify(demoSchedule.courses) !== JSON.stringify(demoSchedule.seed);
 }
 
 /** 演示课表里出现过的课程名：知识 add 时的归类参照 */
@@ -161,6 +207,197 @@ export function demoLiveTools() {
           ...(brief.week ? { week: brief.week } : {}),
           periodTimes: DEMO_PERIOD_TIMES,
           note: "虚构示例课表",
+        };
+      },
+    }),
+    /** 课表修改：内存态（与正式 edit_schedule 同形；改 demoSchedule，页面刷新即可见） */
+    edit_schedule: tool({
+      description:
+        "修改演示学生的课表（演示：仅保存在内存，重启即失）。调课、换教室/教师、加课退课时调用：先 list 拿各时段条目 id（一门课一周多时段就是多条，别拿错），update 按 id 改（weekday/periods/location/teacher/title 传哪个改哪个），add 新增（title/weekday/periods 必填），delete 按 ids 批量删，revert 撤销全部修改还原初始课表。目标时段与已有课冲突会报错并列出冲突课，用户明确确认「就调到那」再传 allowConflict 重试。改完可直接调 get_schedule 复述新课表。",
+      inputSchema: z.object({
+        action: z
+          .enum(["list", "update", "add", "delete", "revert"])
+          .describe(
+            "list=列出课表时段（拿 id），update=按 id 调课/改信息，add=新增一门课，delete=按 ids 批量删除，revert=还原初始课表",
+          ),
+        id: z.string().optional().describe("目标时段 id（update 必填，来自 list 结果，形如 3-1）"),
+        ids: z.array(z.string()).optional().describe("delete 必填：要删除的时段 id 列表"),
+        title: z.string().optional().describe("课程名（add 必填；update 改名）"),
+        weekday: z
+          .number()
+          .int()
+          .min(1)
+          .max(7)
+          .optional()
+          .describe("星期几（1=周一…7=周日；add 必填，update 调课目标日）"),
+        periods: z
+          .array(z.number().int().min(1).max(10))
+          .min(1)
+          .optional()
+          .describe("节次数组如 [3,4]（add 必填，update 调课目标节次）"),
+        location: z.string().optional().describe("上课地点（update 可传空串清空，add 省略为无）"),
+        teacher: z.string().optional().describe("教师（update 可传空串清空，add 省略为无）"),
+        allowConflict: z
+          .boolean()
+          .optional()
+          .describe("目标时段与已有课冲突时是否仍写入（默认否，须用户明确确认）"),
+      }),
+      execute: async ({
+        action,
+        id,
+        ids,
+        title,
+        weekday,
+        periods,
+        location,
+        teacher,
+        allowConflict,
+      }) => {
+        const modified = demoScheduleModified();
+        const entryOf = (weekday: number, index: number) => {
+          const slot = demoSchedule.courses[weekday - 1]?.[index];
+          return {
+            id: `${weekday}-${index}`,
+            title: slot?.title ?? "",
+            weekday,
+            weekdayLabel: WD_NAMES[weekday - 1] ?? "",
+            periods: slot?.periods ?? "",
+            ...(slot?.location ? { location: slot.location } : {}),
+            ...(slot?.teacher ? { teacher: slot.teacher } : {}),
+          };
+        };
+        if (action === "list") {
+          const entries: ReturnType<typeof entryOf>[] = [];
+          demoSchedule.courses.forEach((day, i) => {
+            day.forEach((_, j) => {
+              entries.push(entryOf(i + 1, j));
+            });
+          });
+          return {
+            summary: `${entries.length} 个课表时段${modified ? "（含修改，revert 可还原初始课表）" : ""}`,
+            entries,
+            note: modified ? "部分时段经过调课；revert 可整体还原" : undefined,
+          };
+        }
+        if (action === "revert") {
+          if (!modified) return { error: "课表没有本地修改，无需还原" };
+          demoSchedule.courses = structuredClone(demoSchedule.seed);
+          const total = demoSchedule.courses.reduce((n, d) => n + d.length, 0);
+          return { ok: true, summary: `已还原初始课表（${total} 个时段）` };
+        }
+        if (action === "delete") {
+          if (!ids?.length) return { error: "delete 需要 ids（来自 list 结果的时段 id 列表）" };
+          // 先全部校验再倒序删除：同天内先删大下标，避免删除改变后续下标
+          const targets: Array<{ weekday: number; index: number }> = [];
+          for (const raw of new Set(ids)) {
+            const r = findSlot(raw);
+            if (!r)
+              return { error: `条目 id 无效：${raw}。课表增删移动后旧 id 失效，请重新 list。` };
+            targets.push(r);
+          }
+          targets.sort((a, b) => b.weekday - a.weekday || b.index - a.index);
+          for (const r of targets) {
+            demoSchedule.courses[r.weekday - 1]?.splice(r.index, 1);
+          }
+          const total = demoSchedule.courses.reduce((n, d) => n + d.length, 0);
+          return {
+            ok: true,
+            summary: `已删除 ${new Set(ids).size} 个时段，剩余 ${total} 个`,
+            note: "id 是删除前的定位，现在已失效；再改先重新 list。",
+          };
+        }
+        if (action === "add") {
+          const name = title?.trim();
+          if (!name) return { error: "add 需要 title（课程名）" };
+          if (!weekday) return { error: "add 需要 weekday（1=周一…7=周日）" };
+          if (!periods?.length) return { error: "add 需要 periods（节次数组，如 [3,4]）" };
+          const slot = {
+            title: name.slice(0, 60),
+            periods: periodStrOf(periods),
+            ...(location?.trim() ? { location: location.trim() } : {}),
+            ...(teacher?.trim() ? { teacher: teacher.trim() } : {}),
+          };
+          const conflicts =
+            demoSchedule.courses[weekday - 1]
+              ?.filter((s) => parsePeriodStr(s.periods).some((p) => periods.includes(p)))
+              .map((s) => `「${s.title}」${slotLabel(weekday, s.periods)}`) ?? [];
+          if (conflicts.length && !allowConflict) {
+            return {
+              error: `目标时段与已有课冲突：${conflicts.join("、")}。换时段，或用户明确确认后传 allowConflict 重试。`,
+              conflicts,
+            };
+          }
+          (demoSchedule.courses[weekday - 1] ?? []).push(slot);
+          const index = (demoSchedule.courses[weekday - 1]?.length ?? 1) - 1;
+          return {
+            ok: true,
+            summary: `已加课：${slot.title} ${slotLabel(weekday, slot.periods)}`,
+            course: entryOf(weekday, index),
+            ...(conflicts.length
+              ? { warning: `与已有课冲突（用户已确认）：${conflicts.join("、")}` }
+              : {}),
+          };
+        }
+        // update：按 id 调课 / 改信息
+        const at = id ? findSlot(id) : null;
+        if (!at)
+          return {
+            error: `条目 id 无效：${id ?? "(未传)"}。id 来自 list 结果，课表有增删移动后请重新 list。`,
+          };
+        const day = demoSchedule.courses[at.weekday - 1];
+        const old = day?.[at.index];
+        if (!old) return { error: `条目 id 无效：${id}。请重新 list。` };
+        const next = {
+          title: title !== undefined ? title.trim().slice(0, 60) : old.title,
+          periods: periods?.length ? periodStrOf(periods) : old.periods,
+          ...(location !== undefined
+            ? location.trim()
+              ? { location: location.trim() }
+              : {}
+            : old.location
+              ? { location: old.location }
+              : {}),
+          ...(teacher !== undefined
+            ? teacher.trim()
+              ? { teacher: teacher.trim() }
+              : {}
+            : old.teacher
+              ? { teacher: old.teacher }
+              : {}),
+        };
+        if (!next.title) return { error: "title 不能改为空" };
+        const targetDay = weekday ?? at.weekday;
+        const moved = targetDay !== at.weekday;
+        // 冲突检测：目标天上的其他槽位——未移动时排除自身，移动时原槽位不在目标天、全算他人
+        const others = (demoSchedule.courses[targetDay - 1] ?? []).filter(
+          (_, j) => moved || j !== at.index,
+        );
+        const nextPeriods = parsePeriodStr(next.periods);
+        const conflicts = others
+          .filter((s) => parsePeriodStr(s.periods).some((p) => nextPeriods.includes(p)))
+          .map((s) => `「${s.title}」${slotLabel(targetDay, s.periods)}`);
+        if (conflicts.length && !allowConflict) {
+          return {
+            error: `调课后与已有课冲突：${conflicts.join("、")}。换时段，或用户明确确认后传 allowConflict 重试。`,
+            conflicts,
+          };
+        }
+        if (moved) {
+          day?.splice(at.index, 1);
+          (demoSchedule.courses[targetDay - 1] ?? []).push(next);
+          const newIndex = (demoSchedule.courses[targetDay - 1]?.length ?? 1) - 1;
+          return {
+            ok: true,
+            summary: `已调课：「${old.title}」 ${slotLabel(at.weekday, old.periods)} → ${slotLabel(targetDay, next.periods)}`,
+            course: entryOf(targetDay, newIndex),
+            note: "移动后的新 id 在返回里，后续修改用它。",
+          };
+        }
+        if (day) day[at.index] = next;
+        return {
+          ok: true,
+          summary: `已更新：「${next.title}」${slotLabel(targetDay, next.periods)}`,
+          course: entryOf(targetDay, at.index),
         };
       },
     }),

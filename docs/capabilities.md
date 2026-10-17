@@ -4,13 +4,14 @@
 
 ---
 
-## 🗓️ 课表与校历工具（2 个）
+## 🗓️ 课表与校历工具（3 个）
 
-> 课表**导入**不是 agent 工具，而是网页端的独立流程：`POST /api/schedule/import`（解析并返回逐行可编辑的预览）→ `POST /api/schedule/import/commit`（确认入库）。解析结果交给模型，拿不准的字段会先追问（最多 3 个关键问题）而不是瞎猜；提交时做时间冲突检测。课表缓存落在 `data/`，之后 `get_schedule` 只读本地缓存、不联网。
+> 课表**导入**不是 agent 工具，而是网页端的独立流程：`POST /api/schedule/import`（解析并返回逐行可编辑的预览）→ `POST /api/schedule/import/commit`（确认入库）。解析结果交给模型，拿不准的字段会先追问（最多 3 个关键问题）而不是瞎猜；提交时做时间冲突检测。课表缓存落在 `data/`，之后 `get_schedule` 只读本地缓存、不联网；教务通知调课、换教室换教师时，`edit_schedule` 可直接改这份缓存（首次修改前留有原始快照，`revert` 可整体还原；重新导入或在线刷新会以官方课表覆盖本地手改）。
 
 | 工具 | 说明 | 典型耗时 |
 |------|------|----------|
 | `get_schedule` | 课表查询：按教学周取当天 / 本周 / 指定周的课程，含节次时间段与当前周次；**带按周预分组索引**，问「第一周有什么课」直接查表不靠模型推算；也可指定学期如 `2026-2027-1`。只读本地导入的课表缓存 | <1s |
+| `edit_schedule` | 调课 / 换教室换教师 / 加课 / 退课，直写本地课表缓存（对 `get_schedule` 与今日页立即生效）。先 `list` 拿时段 id 再 `update` / `add` / `delete`；目标时段与已有课冲突会先报出来（单双周不算冲突），用户明确确认才可 `allowConflict` 覆盖；`revert` 整体还原最初导入的课表 | <1s |
 | `set_holidays` | 把**放假 / 调休安排**逐日落盘到 `data/term-holidays.json`（放假日标 `holiday`、调休补课日记「按周几上课」），之后 `get_schedule`、课表页与日历导出会自动叠加假期与补课 | ~1s |
 
 课表相关的两个网页入口不走模型、纯本地渲染：`/schedule` 页的「本周图片 / 整学期图片」按钮（`GET /api/schedule/image`，PNG 红头档案风或彩色课格，手机长按、电脑右键即可存图）与待办条目上的 `.ics` 导出链接（`GET /api/reminders/<id>.ics`）。
@@ -207,10 +208,10 @@ npm run qq
 
 ## 🧰 开箱工具分层
 
-- **内核**（`src/core/tools/`，与学校无关）：文件与数据四件套（`read_local_file` / `query_table` / `run_js` / `manage_attachments`）、文档写作与转换（`generate_document` / `convert_document`）、`export_schedule_image`、`save_memory`、`manage_todos`、`manage_knowledge`、`manage_pomodoro`、`read_skill`、`open_settings`、`open_panel`、`get_weather`、`get_time`
+- **内核**（`src/core/tools/`，与学校无关）：文件与数据四件套（`read_local_file` / `query_table` / `run_js` / `manage_attachments`）、文档写作与转换（`generate_document` / `convert_document`）、`export_schedule_image`、`edit_schedule`、`save_memory`、`manage_todos`、`manage_knowledge`、`manage_pomodoro`、`read_skill`、`open_settings`、`open_panel`、`get_weather`、`get_time`
 - **课表与校历**：`get_schedule`（只读本地导入的课表缓存）、`set_holidays`（放假 / 调休落盘）
 
-全部只读写本地数据：课表来自网页端导入缓存，其余走本机文件、沙箱计算与本地 JSON。PPT 工具源码保留、暂未挂入 agent。
+合计 19 个工具挂载进 agent（内核 17 + 课表与校历 2），全部只读写本地数据：课表来自网页端导入缓存（可经 `edit_schedule` 本地调课），其余走本机文件、沙箱计算与本地 JSON。PPT 工具源码保留、暂未挂入 agent（不计入上数）。
 
 ---
 

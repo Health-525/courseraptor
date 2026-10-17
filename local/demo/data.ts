@@ -26,6 +26,44 @@ export const DEMO_CLASS_TIMES: Record<string, string> = {
   "7-8节": "16:00-17:40",
 };
 
+/** 演示周课表的槽位形状（periods 为 "1-2节" 式字符串，与页面展示一致） */
+export interface DemoSlot {
+  title: string;
+  periods: string;
+  location?: string;
+  teacher?: string;
+}
+
+// 周内课程表（weekday-1 为下标）：每天都排一两门，任意日子打开演示页
+// 今日时间线都有内容；周六是调休补课，演示调休覆盖
+const SEED_WEEK_COURSES: DemoSlot[][] = [
+  [
+    { title: "示例高等数学", periods: "1-2节", location: "示例教学楼 101", teacher: "王老师" },
+    { title: "示例大学英语", periods: "3-4节", location: "示例教学楼 202", teacher: "李老师" },
+    { title: "示例通识选修", periods: "7-8节", location: "示例教学楼 303" },
+  ],
+  [{ title: "示例程序设计", periods: "3-4节", location: "示例机房", teacher: "陈老师" }],
+  [
+    { title: "示例高等数学", periods: "1-2节", location: "示例教学楼 101", teacher: "王老师" },
+    { title: "示例大学英语", periods: "3-4节", location: "示例教学楼 202", teacher: "李老师" },
+    { title: "示例程序设计", periods: "5-6节", location: "示例机房", teacher: "陈老师" },
+  ],
+  [{ title: "示例体育课", periods: "5-6节", location: "示例体育馆" }],
+  [{ title: "示例大学英语（口语）", periods: "1-2节", location: "示例语音室" }],
+  [{ title: "示例高等数学", periods: "1-2节", location: "示例教学楼 101", teacher: "王老师" }],
+  [],
+];
+
+/**
+ * 演示课表的可变内存态：demoTodayBrief（今日/课表页与 /api/today 的数据源）
+ * 与 live 工具 edit_schedule 共用同一份——模型调课后刷新页面即可见新课表。
+ * seed 留初始快照供 revert；进程内有效、不落盘，重启回初始状态。
+ */
+export const demoSchedule = {
+  courses: structuredClone(SEED_WEEK_COURSES),
+  seed: structuredClone(SEED_WEEK_COURSES),
+};
+
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** 演示知识库：覆盖「归入课程 / 自定义分类 / 未分类」三种形态，条目全为虚构。
@@ -259,27 +297,7 @@ export function demoTodayBrief(): TodayBrief {
     return (h ?? 0) * 60 + (m ?? 0);
   };
 
-  // 周内课程表（weekday-1 为下标）：每天都排一两门，任意日子打开演示页
-  // 今日时间线都有内容；周六是调休补课，演示调休覆盖
-  const weekCourses: Array<
-    Array<{ title: string; periods: string; location?: string; teacher?: string }>
-  > = [
-    [
-      { title: "示例高等数学", periods: "1-2节", location: "示例教学楼 101", teacher: "王老师" },
-      { title: "示例大学英语", periods: "3-4节", location: "示例教学楼 202", teacher: "李老师" },
-      { title: "示例通识选修", periods: "7-8节", location: "示例教学楼 303" },
-    ],
-    [{ title: "示例程序设计", periods: "3-4节", location: "示例机房", teacher: "陈老师" }],
-    [
-      { title: "示例高等数学", periods: "1-2节", location: "示例教学楼 101", teacher: "王老师" },
-      { title: "示例大学英语", periods: "3-4节", location: "示例教学楼 202", teacher: "李老师" },
-      { title: "示例程序设计", periods: "5-6节", location: "示例机房", teacher: "陈老师" },
-    ],
-    [{ title: "示例体育课", periods: "5-6节", location: "示例体育馆" }],
-    [{ title: "示例大学英语（口语）", periods: "1-2节", location: "示例语音室" }],
-    [{ title: "示例高等数学", periods: "1-2节", location: "示例教学楼 101", teacher: "王老师" }],
-    [],
-  ];
+  const weekCourses = demoSchedule.courses;
 
   const toBrief = (c: {
     title: string;
