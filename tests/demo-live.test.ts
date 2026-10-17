@@ -123,6 +123,78 @@ test("manage_knowledge：subject 归课程 / 自定义分类 / 未分类，关�
   assert.equal((hits.entries as Array<{ title: string }>)[0]!.title, "洛必达法则");
 });
 
+test("edit_schedule：list → 调课移动 → get_schedule 反映 → 冲突拦截 → revert 还原", async () => {
+  const tools = demoLiveTools();
+  const edit = asTool(tools.edit_schedule);
+  try {
+    const listed = await edit.execute({ action: "list" });
+    // 种子周课表：周一3 + 周二1 + 周三3 + 周四1 + 周五1 + 周六1 = 10 个时段
+    assert.equal((listed.entries as unknown[]).length, 10);
+
+    // 周三 1-2 节高数挪到周五 3-4 节：移动后返回新 id
+    const moved = await edit.execute({ action: "update", id: "3-0", weekday: 5, periods: [3, 4] });
+    assert.equal(moved.ok, true);
+    const newId = (moved.course as { id: string }).id;
+    assert.equal(newId, "5-1");
+
+    // get_schedule 与今日页共用同一份内存课表：周五现在 2 门
+    const after = await asTool(tools.get_schedule).execute({});
+    const days = (after.week as { days: Array<{ courses: unknown[] }> }).days;
+    assert.equal(days[4]!.courses.length, 2);
+    assert.equal(days[2]!.courses.length, 2);
+
+    // 换教室（用移动后的新 id）
+    const loc = await edit.execute({ action: "update", id: newId, location: "示例教学楼 404" });
+    assert.equal(loc.ok, true);
+    // 移动后 "3-0" 指向原周三下一门（英语）：旧 id 位置已被占用，模型必须重新 list
+    const relisted = await edit.execute({ action: "list" });
+    const entries = relisted.entries as Array<{ id: string; title: string }>;
+    assert.equal(entries.find((e) => e.id === newId)?.title, "示例高等数学");
+    assert.equal(entries.find((e) => e.id === "3-0")?.title, "示例大学英语");
+
+    // 冲突拦截：挪到周五 1-2 节撞口语课；allowConflict 确认后放行
+    const blocked = await edit.execute({
+      action: "update",
+      id: newId,
+      weekday: 5,
+      periods: [1, 2],
+    });
+    assert.match(String((blocked as { error?: string }).error), /口语/);
+    const forced = await edit.execute({
+      action: "update",
+      id: newId,
+      weekday: 5,
+      periods: [1, 2],
+      allowConflict: true,
+    });
+    assert.equal(forced.ok, true);
+
+    // add 周日 + delete
+    const added = await edit.execute({
+      action: "add",
+      title: "示例近代史",
+      weekday: 7,
+      periods: [9, 10],
+    });
+    assert.equal(added.ok, true);
+    const del = await edit.execute({ action: "delete", ids: ["7-0"] });
+    assert.equal(del.ok, true);
+
+    // revert 整体还原种子
+    const reverted = await edit.execute({ action: "revert" });
+    assert.equal(reverted.ok, true);
+    const restored = await asTool(tools.get_schedule).execute({});
+    const days2 = (restored.week as { days: Array<{ courses: unknown[] }> }).days;
+    assert.equal(days2[4]!.courses.length, 1);
+    assert.equal(days2[2]!.courses.length, 3);
+    const again = await edit.execute({ action: "revert" });
+    assert.match(String((again as { error?: string }).error), /无需/);
+  } finally {
+    // 进程级内存态：无论断言是否中途失败，都还原种子不污染后续用例
+    await edit.execute({ action: "revert" });
+  }
+});
+
 /* ── 结构化结果卡 ── */
 
 test("scheduleCard：每天每门课一行、今天与调休有标注、下一节进摘要", () => {

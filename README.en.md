@@ -45,7 +45,7 @@ If you are building agents yourself, the repo doubles as a reference implementat
 | Where did I write down that formula? | A knowledge base that files notes by the courses on your timetable, with tags, search, and a 16-week heat strip |
 | Can it help me study? | Study-coach mode with methods loaded on demand, so they never occupy the standing context |
 
-The kernel ships **20 tools out of the box**, covering timetables, files and tables, document generation, sandboxed computation, memory, the knowledge base, todos, the study coach, the teaching-skill library, and settings. See [capabilities](docs/capabilities.md) for the full table.
+The kernel ships **19 tools out of the box**, covering timetables, files and tables, document generation, sandboxed computation, memory, the knowledge base, todos, the study coach, the teaching-skill library, and settings. See [capabilities](docs/capabilities.md) for the full table.
 
 ## Try it without credentials
 
