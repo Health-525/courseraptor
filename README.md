@@ -37,8 +37,6 @@
 
 ## 界面预览
 
-> 截图均为虚构示例数据（演示模式）。
-
 **网页对话** —— 浏览器打开 `http://localhost:3210` 即聊，思考过程与工具调用全程可见：
 
 <p align="center"><img src="docs/screenshots/gui.png" width="800" alt="网页对话：思考卡片、工具调用与课表回复（虚构示例数据）"></p>
