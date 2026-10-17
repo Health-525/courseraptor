@@ -18,15 +18,27 @@ export interface CachedSchedule {
   /** 落盘时间戳（ms），仅调试用，不做过期判断 */
   savedAt: number;
   schedule: ScheduleResult;
+  /**
+   * 最初导入/在线拉取的课表快照：edit_schedule 首次修改前落下的
+   * 「官方原件」，revert 靠它整体还原。在线刷新与重新导入走
+   * saveScheduleCache 覆盖式写入、不保留 base——官方课表永远赢过本地手改。
+   */
+  base?: ScheduleResult;
   /** 落盘时的学校 id：真实学校之间切换后（如 hebau 切回 njtech）在线失败时，
    *  不得回退到别校导入的课表冒充「最后已知课表」。手动课表学校（custom）
    *  例外：读时放行别校标记的缓存（见 loadScheduleCache） */
   schoolId?: string;
 }
 
+function isScheduleResult(parsed: unknown): parsed is ScheduleResult {
+  const s = parsed as ScheduleResult;
+  return Boolean(s?.year) && Array.isArray(s.courses);
+}
+
 function isCachedSchedule(parsed: unknown): parsed is CachedSchedule {
   const c = parsed as CachedSchedule;
-  return Boolean(c?.schedule?.year) && Array.isArray(c.schedule.courses);
+  if (!isScheduleResult(c?.schedule)) return false;
+  return c.base === undefined || isScheduleResult(c.base);
 }
 
 /** 读缓存；没有、读坏了或不是当前学校的都返回 null，调用方自行回退到在线拉取 */
@@ -50,6 +62,24 @@ export function saveScheduleCache(schedule: ScheduleResult): void {
   writeJsonCache(
     "schedule-cache.json",
     { savedAt: Date.now(), schedule, ...(current ? { schoolId: current.info.id } : {}) },
+    "schedule-cache",
+  );
+}
+
+/**
+ * 本地编辑后的缓存整体落盘（保留 base 快照字段）。edit_schedule 专用；
+ * 在线拉取与网页导入走 saveScheduleCache 覆盖式写入、隐含清掉 base。
+ */
+export function saveScheduleEntry(entry: CachedSchedule): void {
+  const current = registeredSchool();
+  writeJsonCache(
+    "schedule-cache.json",
+    {
+      savedAt: Date.now(),
+      schedule: entry.schedule,
+      ...(entry.base ? { base: entry.base } : {}),
+      ...(current ? { schoolId: current.info.id } : {}),
+    },
     "schedule-cache",
   );
 }

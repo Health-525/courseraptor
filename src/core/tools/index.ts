@@ -13,6 +13,7 @@ import { memoryTools } from "./memory";
 import { panelTools } from "./panel";
 import { pomodoroTools } from "./pomodoro";
 import { reminderTools } from "./reminders";
+import { scheduleEditTools } from "./schedule-edit";
 import { scheduleImageTools } from "./schedule-image";
 import { settingsTools } from "./settings";
 import { skillTools } from "./skill-library";
@@ -28,6 +29,7 @@ export const coreTools = {
   ...pomodoroTools,
   ...skillTools,
   ...scheduleImageTools,
+  ...scheduleEditTools,
   ...settingsTools,
   ...panelTools,
   ...weatherTools,
