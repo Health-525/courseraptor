@@ -1,24 +1,17 @@
 /**
  * 知识库工具：manage_knowledge
  *
- * 把对话里值得沉淀的知识写进本地知识库（core/knowledge.ts 落盘
+ * 把对话里值得沉淀的知识写进本地知识库（src/knowledge.ts 落盘
  * data/knowledge.json），课表页 /today 的「知识」卡片与 /knowledge 页
- * 都能看到。用户明确要求记下本轮文件时，add 可带 filePath，原件抄进
- * knowledge-files。归属由 matchKnowledgeCategory 统一裁决：优先归入课表
- * 真实课程，subject 对不上课程时以其为自定义分类，没给 subject 且正文
+ * 都能看到。归属由 matchKnowledgeCategory 统一裁决：优先归入课表真实
+ * 课程，subject 对不上课程时以其为自定义分类，没给 subject 且正文
  * 对不上才落「未分类」。
  */
 
 import { tool } from "ai";
 import { z } from "zod";
 
-import {
-  addKnowledge,
-  deleteKnowledge,
-  listKnowledge,
-  presentKnowledge,
-  updateKnowledge,
-} from "../knowledge";
+import { addKnowledge, deleteKnowledge, listKnowledge, updateKnowledge } from "../knowledge";
 
 /** 结果摘要里的分类统计，如「高等数学 ×1、未分类 ×2」 */
 function categorySummary(entries: Array<{ category: string | null }>): string {
@@ -37,7 +30,7 @@ export const knowledgeTools = {
   /** 知识库维护 */
   manage_knowledge: tool({
     description:
-      "知识库维护（本地持久，课表页 /today 的「知识」卡片与 /knowledge 页都能看到）。用户说出值得长期保留的知识（课程概念、公式、解题方法、结论、经验总结——用户自己讲出的，或明确说「记住这个」）时主动调 add：title 一句话概括、content 写知识本身；**content 末尾必须附一行「来源：…」注明出处**（用户口述 / 某教材讲义或附件 / 某个工具返回 / 来源不明就写「来源：待核实」）——考前翻知识库时要能追溯这条是谁说的、依据什么。用户本轮发来文件，并且明确说要记住、记录、存进知识库或归到某门课时，同一条 add 再传 filePath：值用附件块里的「本机路径」原样填入，原件会归进该科目；content 用几句话说明这份资料是什么，来源写文件名。没说要记录的附件只用来回答，不要入库，也不要传别的路径。能看出归属就传 subject：优先用课表课程名如「高等数学」（俗称「高数」也能自动对应），对不上课表课程的 subject 会成为自定义分类（如「考研数学」「TypeScript」），传简短主题名即可；完全看不出归属才省略 subject 落「未分类」；问「我记过哪些知识」用 list；改内容/归属用 update；删用 delete。闲聊、提问、查询指令、待办安排不要记进知识库；拿不准要不要记时先问用户一句。",
+      "知识库维护（本地持久，课表页 /today 的「知识」卡片与 /knowledge 页都能看到）。用户说出值得长期保留的知识（课程概念、公式、解题方法、结论、经验总结——用户自己讲出的，或明确说「记住这个」）时主动调 add：title 一句话概括、content 写知识本身；**content 末尾必须附一行「来源：…」注明出处**（用户口述 / 某教材讲义或附件 / 某个工具返回 / 来源不明就写「来源：待核实」）——考前翻知识库时要能追溯这条是谁说的、依据什么；能看出归属就传 subject：优先用课表课程名如「高等数学」（俗称「高数」也能自动对应），对不上课表课程的 subject 会成为自定义分类（如「TypeScript」「编程技术」），传简短主题名即可；完全看不出归属才省略 subject 落「未分类」；问「我记过哪些知识」用 list；改内容/归属用 update；删用 delete。闲聊、提问、查询指令、待办安排不要记进知识库；拿不准要不要记时先问用户一句。",
     inputSchema: z.object({
       action: z
         .enum(["add", "list", "update", "delete"])
@@ -57,13 +50,7 @@ export const knowledgeTools = {
               .string()
               .optional()
               .describe(
-                "归属提示：优先用课表课程名（如「高等数学」）；对不上课表的简短主题（如「考研数学」「TypeScript」）会成为自定义分类；无归属就省略",
-              ),
-            filePath: z
-              .string()
-              .optional()
-              .describe(
-                "用户明确要求记下这份文件时才填：附件块里的「本机路径」原样传入。没说要记录就省略",
+                "归属提示：优先用课表课程名（如「高等数学」）；对不上课表的简短主题（如「TypeScript」）会成为自定义分类；无归属就省略",
               ),
           }),
         )
@@ -95,7 +82,6 @@ export const knowledgeTools = {
               id: result.entry.id,
               title: result.entry.title,
               category: result.entry.category,
-              ...(result.entry.file ? { file: result.entry.file.name } : {}),
             });
           } catch (error) {
             return { error: error instanceof Error ? error.message : `「${item.title}」记录失败` };
@@ -122,10 +108,7 @@ export const knowledgeTools = {
         if (keyword?.trim()) {
           const kw = keyword.trim().toLowerCase();
           entries = entries.filter(
-            (e) =>
-              e.title.toLowerCase().includes(kw) ||
-              e.content.toLowerCase().includes(kw) ||
-              (e.file?.name.toLowerCase().includes(kw) ?? false),
+            (e) => e.title.toLowerCase().includes(kw) || e.content.toLowerCase().includes(kw),
           );
         }
         const shown = entries.slice(0, 30);
@@ -138,7 +121,7 @@ export const knowledgeTools = {
           summary:
             `共 ${entries.length} 条知识` +
             (entries.length > shown.length ? `（仅示前 ${shown.length} 条，可加 keyword 筛）` : ""),
-          knowledge: shown.map(presentKnowledge),
+          knowledge: shown,
           categories: [...counts.entries()]
             .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
             .map(([name, n]) => ({ category: name, count: n })),
@@ -159,7 +142,7 @@ export const knowledgeTools = {
                 summary: updated.category
                   ? `知识已更新（归入「${updated.category}」）`
                   : "知识已更新（未分类）",
-                updated: presentKnowledge(updated),
+                updated,
               }
             : { error: `未找到知识 ${id}` };
         } catch (error) {

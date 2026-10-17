@@ -2680,7 +2680,7 @@ const HALL_CARDS = [
   { id: "grades", t: "成绩", d: "GPA、学分与最近学期成绩速览", group: "学习安排" },
   { id: "news", t: "教务通知", d: "教务处官网最新通知，标记需要行动的", group: "学习安排" },
   { id: "todos", t: "待办", d: "逾期置顶，按今天 / 明天分组", group: "效率工具" },
-  { id: "knowledge", t: "知识库", d: "按课程归类；说「记下这份」才存原件", group: "效率工具" },
+  { id: "knowledge", t: "知识库", d: "按课程归类，可搜可展开全文", group: "效率工具" },
   /* 大厅入口按需求下架（2026-09-22）：宫格不再展示番茄钟；对话里说「来一个番茄钟」
      照常可用——manage_pomodoro 工具、SSE 事件、对话内 .pomo 倒计时卡与
      buildPomodoro 面板逻辑全部保留，恢复展示只需去掉 hidden 标记 */
@@ -2831,16 +2831,6 @@ function hallKnowledgeItem(k) {
   renderText(false);
   if (k.source) text.title = `来源：${k.source}`;
   main.appendChild(text);
-  if (k.file?.name) {
-    const file = document.createElement("a");
-    file.className = "hm hall-know-file";
-    file.href = `/api/knowledge/${encodeURIComponent(k.id)}/file`;
-    file.target = "_blank";
-    file.rel = "noopener noreferrer";
-    file.textContent = `原件 · ${k.file.name}`;
-    file.addEventListener("click", (e) => e.stopPropagation());
-    main.appendChild(file);
-  }
   item.appendChild(main);
   if (!HALL_DEMO)
     item.appendChild(
@@ -3368,7 +3358,7 @@ function hallKnowEmpty() {
   return hallEmpty(
     "📚",
     "知识库还是空的",
-    "说「记住」会记下知识点。发来文件并说「记下这份」，原件会归进对应课程。",
+    "在对话框里分享知识点（或说「记住：……」），我会按课程归类记进来。",
     HALL_DEMO ? "" : "去记第一条",
     HALL_DEMO ? null : () => hallFocusChat("记住："),
   );
