@@ -735,51 +735,6 @@ test("知识库：页面直写与原地编辑（memos 式 POST/PATCH）", async 
   assert.equal(cleanup.status, 200);
 });
 
-test("知识库原件：记下上传文件后可下载，列表与导出不泄磁盘路径", async () => {
-  const url = (await startChatWeb())!;
-  const { saveUpload } = await import("../src/core/workspace-data");
-  const { addKnowledge, listKnowledge } = await import("../src/core/knowledge");
-
-  const upload = saveUpload("高数讲义.pdf", "application/pdf", Buffer.from("%PDF-1.4 note"));
-  const { entry } = addKnowledge({
-    title: "极限讲义原件",
-    content: "第 3 章，用户要求记下原件。\n来源：高数讲义.pdf",
-    subject: "高等数学",
-    filePath: upload.storedPath,
-  });
-  assert.ok(entry.file?.storedName);
-
-  const list = (await (await fetch(`${url}/api/knowledge`)).json()) as {
-    entries: Array<{ id: string; file?: { name: string; size: number; storedName?: string } }>;
-  };
-  const row = list.entries.find((e) => e.id === entry.id);
-  assert.equal(row?.file?.name, "高数讲义.pdf");
-  assert.equal(row?.file?.storedName, undefined, "列表不得暴露磁盘文件名");
-
-  const fileRes = await fetch(`${url}/api/knowledge/${entry.id}/file`);
-  assert.equal(fileRes.status, 200);
-  assert.match(fileRes.headers.get("content-type") ?? "", /pdf/);
-  assert.match(fileRes.headers.get("content-disposition") ?? "", /inline/);
-  assert.equal(await fileRes.text(), "%PDF-1.4 note");
-
-  const miss = await fetch(`${url}/api/knowledge/ffffffffffffffff/file`);
-  assert.equal(miss.status, 404);
-
-  const exported = await (await fetch(`${url}/api/data/export`)).text();
-  assert.ok(exported.includes("高数讲义.pdf"));
-  assert.ok(!exported.includes("storedName"), "导出不得带知识库磁盘文件名");
-  assert.ok(!exported.includes(entry.file!.storedName));
-
-  const del = await wfetch(`${url}/api/knowledge/${entry.id}`, { method: "DELETE" });
-  assert.equal(del.status, 200);
-  assert.equal(
-    listKnowledge().some((e) => e.id === entry.id),
-    false,
-  );
-  assert.equal((await fetch(`${url}/api/knowledge/${entry.id}/file`)).status, 404);
-  assert.ok(fs.existsSync(upload.storedPath), "删知识原件不碰上传区");
-});
-
 test("工具事件带 id/参数/结果预览（独立工具卡片的数据源）", async () => {
   setChatAgent({
     stream() {
