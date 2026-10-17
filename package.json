@@ -1,7 +1,7 @@
 {
   "name": "courseraptor",
   "version": "0.6.1",
-  "description": "CourseRaptor — local-first campus agent: timetable, todos, knowledge & memory in one chat. 12 CN LLM providers, MIT open-source",
+  "description": "大学校园对话式 Agent：导入课表即可开聊——课表 · 待办 · 知识库 · 记忆一句话问清，数据全留在本机",
   "scripts": {
     "dev": "tsx local/cli/index.ts",
     "start": "tsx local/cli/index.ts",
@@ -48,14 +48,11 @@
     "url": "https://github.com/Health-525/courseraptor/issues"
   },
   "keywords": [
-    "campus",
-    "timetable",
-    "local-first",
-    "ai-agent",
+    "njtech",
+    "agent",
+    "cli",
     "deepseek",
-    "vercel-ai-sdk",
-    "obsidian",
-    "qq-bot"
+    "教务"
   ],
   "author": "jiangshu",
   "license": "MIT",
