@@ -115,19 +115,6 @@ export function listUploads(): WebUpload[] {
   return readState().uploads.filter((u) => fs.existsSync(u.storedPath));
 }
 
-/** 按落盘路径找回用户上传：路径必须落在 web-uploads 内，且确实是这次索引里的文件。
- *  知识库只许收这份副本，不能拿任意本机路径入库。 */
-export function findUploadByStoredPath(storedPath: string): WebUpload | null {
-  const root = path.resolve(uploadsDir());
-  const resolved = path.resolve(storedPath);
-  if (!isInsideDir(root, resolved) || !fs.existsSync(resolved)) return null;
-  return (
-    readState().uploads.find(
-      (u) => path.resolve(u.storedPath) === resolved && fs.existsSync(u.storedPath),
-    ) ?? null
-  );
-}
-
 function safeUnlink(target: string): boolean {
   const root = path.resolve(uploadsDir());
   const resolved = path.resolve(target);

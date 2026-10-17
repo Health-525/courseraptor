@@ -28,7 +28,6 @@
  */
 
 import http from "node:http";
-import path from "node:path";
 import { clearAttachments } from "../../core/attachment-store";
 import { openLocalFile } from "../../core/attachments";
 import { loadLogoDataUri } from "../../core/brand";
@@ -47,8 +46,6 @@ import {
   clearKnowledge,
   deleteKnowledge,
   listKnowledge,
-  presentKnowledge,
-  readKnowledgeFile,
   updateKnowledge,
 } from "../../core/knowledge";
 import { localApiToken } from "../../core/local-api";
@@ -288,38 +285,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       return;
     }
     if (url === "/api/knowledge") {
-      json(res, { entries: listKnowledge().map(presentKnowledge) });
-      return;
-    }
-    const knowledgeFile = pagePath.match(/^\/api\/knowledge\/([a-f0-9]{16})\/file$/);
-    if (knowledgeFile) {
-      const opened = readKnowledgeFile(knowledgeFile[1] ?? "");
-      if (!opened) {
-        res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
-        res.end("not found");
-        return;
-      }
-      const ext = path.extname(opened.name).toLowerCase();
-      const mime: Record<string, string> = {
-        ".pdf": "application/pdf",
-        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        ".xls": "application/vnd.ms-excel",
-        ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        ".csv": "text/csv; charset=utf-8",
-        ".txt": "text/plain; charset=utf-8",
-        ".md": "text/markdown; charset=utf-8",
-      };
-      const type = mime[ext] ?? "application/octet-stream";
-      const ascii = opened.name.replace(/[^\x20-\x7E]/g, "_").replace(/"/g, "");
-      const disposition = ext === ".pdf" ? "inline" : "attachment";
-      res.writeHead(200, {
-        "content-type": type,
-        "content-length": opened.bytes.length,
-        "content-disposition": `${disposition}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(opened.name)}`,
-        "cache-control": "no-store",
-      });
-      res.end(opened.bytes);
+      json(res, { entries: listKnowledge() });
       return;
     }
     // 功能大厅「用量统计」面板：只读 token-usage 记账（快照前先冲刷 pending）
@@ -537,7 +503,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
             })),
           })),
           reminders: listReminders(),
-          knowledge: listKnowledge().map(presentKnowledge),
+          knowledge: listKnowledge(),
           summary: dataPayload(),
         },
         null,
@@ -788,11 +754,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
             : {}),
           source: "网页",
         });
-        json(
-          res,
-          { entry: presentKnowledge(result.entry), updatedExisting: result.updatedExisting },
-          201,
-        );
+        json(res, { entry: result.entry, updatedExisting: result.updatedExisting }, 201);
       } catch (error) {
         json(res, { error: error instanceof Error ? error.message : "保存知识失败" }, 400);
       }
@@ -916,11 +878,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
           ? { subject: typeof body.subject === "string" ? body.subject : "" }
           : {}),
       });
-      json(
-        res,
-        entry ? { entry: presentKnowledge(entry) } : { error: "知识条目不存在" },
-        entry ? 200 : 404,
-      );
+      json(res, entry ? { entry } : { error: "知识条目不存在" }, entry ? 200 : 404);
     } catch (error) {
       json(res, { error: error instanceof Error ? error.message : "更新知识失败" }, 400);
     }
