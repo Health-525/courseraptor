@@ -1,6 +1,6 @@
 {
   "name": "courseraptor",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "大学校园对话式 Agent：导入课表即可开聊——课表 · 待办 · 知识库 · 记忆一句话问清，数据全留在本机",
   "scripts": {
     "dev": "tsx local/cli/index.ts",
