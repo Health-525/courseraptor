@@ -27,3 +27,18 @@
 安装是否成功、首次查询在哪里失败、同学是否真正完成日历导入、反馈能否复现。GitHub Stars 是可见度信号，不能代替实际使用体验。
 
 每次重要功能更新，同时检查中英文 README、路线图、演示说明与相关截图。CI 徽章只反映它所链接的实际工作流状态。
+
+## 2026-10-18 首屏改版记录
+
+按「5 秒层 → 30 秒层 → 深读层」重排，并把三处会伤可信度的问题一起修掉：
+
+| 改动 | 依据 |
+|---|---|
+| 中文 / 英文 README 首屏改为 **横幅 + 一句定位 + 徽章 + 五端口径 + 一次克制的 Star 请求**，第一张真实界面图提前到第 20 行内 | 访客先判断「与我有关吗」，再决定读不读工具手册（[About READMEs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes)） |
+| **换掉旧主截图**：原 `screenshots/gui.png` 侧栏含 29 条真实感会话标题（「记住国庆期间我需要将我…」「https://abao.alipay.com/…」），与 README 自己「截图均为虚构示例数据」的声明冲突。改为离线演示模式下重新截取的 `web-chat.png` / `web-hall.png` + 既有 `screenshot-demo.jpg` | 截图是承诺的一部分：声称虚构就必须真的虚构。旧图与未使用的 `qq-history-sidebar.png` 已从仓库移除 |
+| **社交预览改真 JPEG**（1280×640 / 89 KB）。此前是 PNG 字节挂 `.jpg` 扩展名，GitHub 按内容识别能显示，但按 `Content-Type` 渲染的平台（X / 微信 / 即刻）会裂图 | [社交预览规范](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/customizing-your-repositorys-social-media-preview) |
+| **logo 1254² / 1.02 MB → 512² / 156 KB**，路径与文件名不变 | 首屏资源要跟着展示尺寸走：README 只显示 160px，favicon 上限 512px |
+| **口径统一**：slogan 收敛为「校园日常，一句话。」（落地页标题同步）、端入口统一为「一个内核，五个入口」、工具数统一 19、厂商数 12、依赖方向统一 `local → channels → core` | 同一件事在 README / 落地页 / About / 推广文案里有 3–4 种说法时，访客第一眼就会觉得「没打磨」 |
+| **About 描述重写**并补 6 个 Topics（campus / education / productivity / desktop-app / privacy / ai-assistant，共 16 个，上限 20） | 话题页与 Explore 是免费流量；描述前 60 字符决定搜索结果里的点击 |
+| README 安装区按「下载 exe（同学）→ 离线演示 → 源码（开发者）→ 技能包」重排，Node ≥ 24 作为**前置声明**提到命令之前 | 39 个 star 对应 10 次下载，说明卡点是「从看到到用上」，不是曝光不够 |
+| 许可证独立成末节，新增贡献与致谢 | 结构自检项 |
