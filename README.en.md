@@ -1,169 +1,119 @@
 <div align="center">
 
-<img src="docs/hero-banner.png" width="880" alt="CourseRaptor — an open-source conversational campus agent. Campus life, one sentence. Timetables, todos, a knowledge base, documents and memory; local-first, data never leaves your machine">
+<img src="docs/courseraptor-logo.png" width="160" alt="CourseRaptor logo: a flat three-color raptor with round glasses" />
 
 # CourseRaptor
 
-### Campus life, one sentence.
+### Less time hunting through portals. More time for student life.
 
-**An open-source conversational campus agent** — import your timetable once, then ask "what's my week", "what do I have to do today", "what should I revise" in one chat.<br>
-Local-first: credentials are encrypted on your own machine, nothing goes through a third party, no telemetry.
+**An open-source conversational campus agent** — timetables, todos, a knowledge base, documents, and memory, all in one chat. A local-first personal school assistant (Vercel AI SDK v7 · four entrances, one kernel): import your timetable once and start asking, with everything staying on your own machine.
+
+[简体中文](README.md) · **English**
 
 [![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Health-525/courseraptor?label=release&color=orange)](https://github.com/Health-525/courseraptor/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social&v=3)](https://github.com/Health-525/courseraptor)
+[![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social&v=2)](https://github.com/Health-525/courseraptor)
 
-[简体中文](README.md) · **English**
-
-[Screenshots](#screenshots) · [What it does](#what-it-does) · [Install](#install) · [Privacy](#privacy-and-security) · [Architecture](#architecture) · [Docs](#docs) · [FAQ](#faq)
-
-> ⚠️ **Independent, unofficial project.** The product interface and most documentation are in Chinese; this English overview is for developers who want to understand or contribute. The [Chinese README](README.md) is the authoritative, fully detailed version.
+[Try the demo](#try-it-without-credentials) · [Quick start](#use-your-own-model-api-key) · [Discuss](https://github.com/Health-525/courseraptor/discussions) · [Contribute](CONTRIBUTING.md)
 
 </div>
 
----
+CourseRaptor brings your timetable, todos, knowledge base, and document work into one conversational interface. Ask in the terminal, the browser, QQ, or an Obsidian sidebar — four entrances sharing one agent kernel and one memory store. Everything runs on your own machine: credentials are AES-256-GCM encrypted on disk, and it talks to your own model API key — DeepSeek by default, with 11 more built-in Chinese providers (Qwen, Zhipu GLM, Kimi, Doubao, Hunyuan, MiniMax, Step, ERNIE, Spark, SiliconFlow, China Mobile Cloud) plus custom OpenAI-compatible endpoints. Nothing is reported: the anonymous install-statistics server has been retired (legacy installers' once-every-24h pings go nowhere and are silently dropped; `RAPTOR_NO_TELEMETRY=1` disables them; running from source never reports).
 
-## Screenshots
+If you are building agents yourself, the repo doubles as a reference implementation: how a `ToolLoopAgent` loop organizes dozens of tools, how the kernel stays decoupled from concrete external systems behind ports (dependency direction is enforced in CI by `npm run verify:imports`), and how a multi-provider model layer is assembled from a plain-data registry. See [Build with us](#build-with-us) below.
 
-> Captured in offline demo mode (`npm run demo`) — all data is fictional, no real timetable, grades or conversations.
+> ⚠️ **This is an independent, unofficial project.** The product interface and most documentation are in Chinese; this English overview helps developers understand and contribute to the project. The [Chinese README](README.md) is the authoritative, fully detailed version.
 
-**Web chat** — ask once; the reasoning, every tool call and the conclusion stay visible:
+<p align="center">
+  <img src="docs/screenshots/gui.png" width="800" alt="Web chat: reasoning card, tool calls and timetable reply (fictional demo data)">
+</p>
 
-<p align="center"><img src="docs/screenshots/web-chat.png" width="860" alt="Web chat: asking for today's plan, showing the reasoning card and three tool calls (get_time / get_schedule / manage_todos) before a weekly timetable card (fictional demo data)"></p>
-
-**Feature hall** — ten panels (today, timetable, exams, grades, notices, todos, knowledge base, prompt templates, usage stats, settings) live in one drawer:
-
-<p align="center"><img src="docs/screenshots/web-hall.png" width="860" alt="Feature hall drawer listing today, timetable, exams, grades, notices, todos, knowledge base, prompt templates, usage stats and settings (fictional demo data)"></p>
-
-<details>
-<summary><b>Today view</b> (long screenshot: timetable grid, exams, todos and notes on one screen)</summary>
-
-<p align="center"><img src="docs/screenshot-demo.jpg" width="620" alt="Today view: weekly timetable grid, upcoming exams, grouped todos and the knowledge base (fictional demo data)"></p>
-
-</details>
+> Demo and screenshots use fictional sample data (demo mode), never real academic records.
 
 ## What it does
 
-| Student question | What happens |
+| Student question | Available capability |
 |---|---|
-| Where are my classes this week? What's on today? | Import your timetable once (paste text, or upload Excel/CSV/PDF/Word/TXT); query any teaching week including odd/even weeks and recorded schedule adjustments. The today view cross-references it with your todos |
-| Can I move Wednesday's class to Friday? | Conversational schedule editing: change time, room or teacher, add or drop a course — conflicts are reported first and every edit can be reverted to the original import |
-| What am I supposed to be revising? | Notes settle into a knowledge base as you chat, filed under the real courses on your timetable, flomo-style |
-| Can you work out my GPA? | Sandboxed JS (no network, no disk, time-boxed) — the model writes the code instead of doing arithmetic |
-| Can this become a Word document? | Word, Excel, PowerPoint and PDF generation with cross-format conversion and native CJK font embedding |
-| Will it remember things? | Two-tier memory: sessions resume across restarts, long-term facts are self-maintained — local JSON only, no database |
-| Can I see it on my phone? | Export a semester of `.ics` for any calendar app, or render the timetable as an image |
+| Where are my classes this week? | Import your timetable once (paste the text or upload Excel/CSV/PDF/Word/TXT), then query any teaching week, including odd/even weeks and recorded schedule adjustments |
+| What do I have to get done today? | A today view that cross-references your timetable with due todos, plus automatic desktop and QQ reminders |
+| What am I supposed to be revising? | A study-coach mode: intuition before formalism, hints before answers; exam prep follows a "template → variation → full paper" arc |
+| Can I use my phone calendar? | Local `.ics` export of a whole semester, import once into your calendar app |
+| Can I turn this material into a document? | Local document/table reading and Word, Excel, PowerPoint, and PDF generation with cross-format conversion |
+| Need actual math done? | Sandboxed JS (no network, no disk, time-boxed) — the model writes the code, the sandbox runs it |
+| Will it remember things? | Two-tier memory: sessions resume across restarts, long-term facts are self-maintained |
+| Where did I write down that formula? | A knowledge base that files notes by the courses on your timetable, with tags, search, and a 16-week heat strip |
+| Can it help me study? | Study-coach mode with methods loaded on demand, so they never occupy the standing context |
 
-## Capabilities
+The kernel ships **19 tools out of the box**, covering timetables, files and tables, document generation, sandboxed computation, memory, the knowledge base, todos, the study coach, the teaching-skill library, and settings. See [capabilities](docs/capabilities.md) for the full table.
 
-- **Timetable import** — any format in, structured schedule out; asks when unsure, shows a row-by-row preview before storing anything
-- **Conversational schedule editing** — move, swap rooms, add or drop courses; conflicts surface first, snapshots let you revert
-- **Files and tables** — reads local Word/PDF/Excel/Markdown with pagination and keyword lookup; large sheets are queried by row, not dumped into the model
-- **Document generation** — Word/Excel/PDF/PowerPoint, with a code-driven slide deck preview in the browser
-- **Knowledge base** — auto-filed by real course, browsable with tags, search and a 16-week heat strip
-- **Todos and reminders** — synced across entrances, desktop notifications plus QQ push on due dates, `.ics` export
-- **Two-tier memory** — cross-restart sessions and self-maintained long-term facts
-- **Study coach** — OpenMAIC learning skills (Feynman, exercise diagnosis, UbD, spaced review) loaded on demand, one at a time
-- **One kernel, five entrances** — terminal TUI, local web UI, desktop app (Electron shell, double-click), QQ official bot (allowlist), and an [Obsidian sidebar plugin](obsidian/README.md), all sharing one kernel and one memory store
-- **Bring your own model key** — 12 built-in Chinese providers (DeepSeek by default) plus any OpenAI-compatible endpoint; each key is encrypted separately and hot-swapped
-- **Zero-credential demo** — `npm run demo` runs on fictional data with scripted answers: no credentials, no model calls, nothing persisted
-- **19 tools out of the box** — timetables, files, documents, sandboxed computation, memory, knowledge base, todos, pomodoro and settings
+## Try it without credentials
 
-See [capabilities](docs/capabilities.md) for parameters, timings and environment variables.
-
-## Install
-
-> **Requirements**: Windows 10/11, macOS 12+ or Linux (glibc 2.28+). **Only running from source needs Node.js ≥ 24** — the installer bundles a Node runtime, so there is nothing else to install.
-
-### 1. Installer (recommended for students)
-
-Grab a package from [Releases](https://github.com/Health-525/courseraptor/releases/latest) (~100 MB download):
-
-- **`portable-win-x64.exe`** — double-click and go. It unpacks a `CourseRaptor` folder next to the exe (≈290 MB, runtime included), then opens instantly; deleting the folder uninstalls it. Upgrading means dropping the new exe into the same folder — accounts, memory and data are kept
-- **`desktop-win-x64-setup.exe`** — standard installer: tray, native notifications, in-app auto-update
-- **`portable-win-x64.zip`** — portable build; unzip and run `start.bat`
-
-The app opens straight into the interface. Add your model API key in **Feature hall → Settings** (DeepSeek by default; other providers can be switched under **Settings → AI models**). Keys are encrypted locally and remembered.
-
-### 2. Try it without credentials
+Install Node.js 24 or later, then:
 
 ```bash
 git clone https://github.com/Health-525/courseraptor.git
 cd courseraptor
-npm install
+npm ci
+npm run doctor
 npm run demo
 ```
 
-Open the URL printed in the terminal (normally `http://127.0.0.1:3211`). The demo uses **fictional data and scripted responses**: it does not read credentials, contact an AI provider, or persist conversations. Press `Ctrl+C` to stop.
+Open the URL printed in the terminal, normally `http://127.0.0.1:3211`.
 
-To see a real model analyse the same fictional data, run `npm run demo:live` instead (requires `DEEPSEEK_API_KEY` in the environment or the project `.env`; API usage may incur charges). Without a key it falls back to the scripted demo.
+The demo uses **fictional data and scripted responses**. It does not read personal credentials, contact an AI provider, or persist conversations to disk. It demonstrates the interface, not live AI performance. Press `Ctrl+C` to stop.
 
-### 3. From source (developers)
+To showcase real AI analysis with the same fictional data, run `npm run demo:live` instead. It answers with a real DeepSeek model (requires a `DEEPSEEK_API_KEY` in the environment or the project `.env`; API usage may incur charges) while every tool still returns fictional samples, so no account or personal data is involved. Without a key it falls back to the scripted offline demo.
 
-```bash
-git clone https://github.com/Health-525/courseraptor.git
-cd courseraptor
-npm install            # Node.js >= 24
+## Use your own model API key
 
-npm link               # registers the global command (once)
-raptor                 # or: npm run dev
-```
+Windows users can grab a self-contained installer (bundled Node runtime, ~100 MB download) from [Releases](https://github.com/Health-525/courseraptor/releases/latest) — no development environment needed. From source, run `npm start` (or double-click `start.bat` on Windows). Follow the prompts to configure your model API key (DeepSeek by default; other providers can be switched in the web Settings panel). Provider API usage may incur charges.
 
-Common scripts: `npm run doctor` (environment self-check) · `npm test` (node:test) · `npm run test:coverage` (with coverage floor) · `npm run typecheck && npm run lint` (types + Biome) · `npm run desktop:dev` (desktop development, see [`desktop/README.md`](desktop/README.md)).
+The browser UI usually runs at `http://localhost:3210`; follow the actual startup address if that port is busy. Keep the terminal running. To change your API key securely, enter `/key` without arguments in the terminal.
 
-### 4. Standalone skill packages
+## Architecture overview
 
-Two skill packages ship in the repo, independent of any school: copy them into `~/.claude/skills/`, `~/.zcode/skills/` or similar to reuse them with other agents.
+- **Agent runtime**: Vercel AI SDK v7 (`ToolLoopAgent` + `runAgentTUI` for terminal)
+- **LLM**: DeepSeek by default (`deepseek-flash` / V4.1-Flash), switchable to 11 more Chinese providers or a custom OpenAI-compatible endpoint — each provider's key stored and hot-swapped independently
+- **Web UI**: Single-page Node server (`src/channels/web/`) with push-panel layout, session history, and real-time tool result sync
+- **Layering**: dependencies point inward only (`local → channels → core`); the kernel never imports a concrete implementation, and cross-layer needs go through port injection — enforced by `npm run verify:imports` in CI
+- **Data storage**: Local JSON files only (`data/`, `session.json`, `memory.json`, `credentials.enc`); no database, no cloud sync
 
-- [`skills/export-schedule/`](skills/export-schedule/) — renders the cached timetable to an image for chat platforms
-- [`skills/feynman-learning/`](skills/feynman-learning/) and friends — OpenMAIC learning skills (MIT), loaded on demand via `read_skill`
-
-## Privacy and security
-
-- **Everything is local** — file parsing, document generation, memory and the knowledge base all run on your machine; `src/` is fully open so every request, file access and encryption step can be read
-- **Credentials** — API keys and the QQ bot secret are encrypted with AES-256-GCM into `credentials.enc`, bound to a machine fingerprint; a copied file will not decrypt elsewhere
-- **Network boundary** — the web server listens on `127.0.0.1` only, validates Host/Origin, requires a CSRF token for writes and only accepts `application/json`
-- **Execution boundary** — sandboxed JS has no network, no disk and a time limit; the anonymous install-statistics server is retired and running from source never reports (`RAPTOR_NO_TELEMETRY=1` disables legacy pings)
-- **Local hosting is not the same as offline** — prompts and relevant query results are sent to the model provider you configure; the optional cloud parser is used only for public web pages
-
-## Architecture
-
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/courseraptor-architecture.png">
-    <img src="docs/courseraptor-architecture-white.png" width="880" alt="CourseRaptor architecture: interaction entrances (terminal TUI, local web, desktop app, QQ bridge, Obsidian sidebar), the agent kernel, 19 tools and business capabilities, and local persistence — all on your machine; model APIs and weather are reached on demand">
-  </picture>
-</p>
-
-- **Agent runtime** — Vercel AI SDK v7 (`ToolLoopAgent`, plus `runAgentTUI` for the terminal)
-- **LLM** — DeepSeek by default (`deepseek-flash`, a.k.a. V4.1-Flash), switchable to 11 more Chinese providers or a custom OpenAI-compatible endpoint; keys stored and hot-swapped independently
-- **Layering** — dependencies point inward only (`local → channels → core`); the kernel never imports a concrete implementation, and cross-layer needs go through port injection, enforced by `npm run verify:imports` in CI
-- **Storage** — local JSON files only (`data/`, `session.json`, `memory.json`, `credentials.enc`); no database, no cloud sync
+## Project structure (key directories)
 
 ```
-├── bin/raptor.cjs      # Global CLI entry
-├── docs/               # Docs and brand assets
-├── skills/             # Standalone skill packages
-├── obsidian/           # Obsidian plugin (own npm project)
-├── desktop/            # Desktop app (Electron shell, own npm project)
-├── landing/            # Landing page (React + Vite, GitHub Pages)
+├── bin/raptor.cjs        # Global CLI entry (npm link)
+├── docs/                 # Assets & extended docs
+├── skills/               # Bundled skill packages: timetable image export
+│                         # learning skills + export-schedule
+├── obsidian/             # Obsidian plugin (fourth entrance: sidebar chat +
+│                         # today-schedule/todo insertion; own npm project)
 ├── src/
-│   ├── core/           # Kernel: agent, memory, calendar, documents, attachments, knowledge + tools
-│   └── channels/web/   # Web UI
-└── local/              # Entrypoints: cli (TUI), qq (bot bridge), demo
+│   ├── core/             # Kernel: agent, memory, calendar, documents,
+│   │                     # attachments, knowledge + generic tools
+│   └── channels/web/     # Web UI: chat, hall, /today, /todos, /knowledge
+└── local/                # Entrypoints: cli (TUI), qq (bot bridge), demo
 ```
 
-### Build with us
+## Boundaries that matter
+
+- Local hosting does **not** mean fully offline processing: prompts and relevant query results are sent to the configured model provider.
+- QQ users share the configured identity; the allowlist is not multi-student account isolation.
+- Timetable import is read-and-confirm: the agent parses, asks when unsure, and shows an editable preview before anything is stored.
+- Attachment parsing stays local; the optional cloud parser is used only for public web pages.
+
+Share the repository URL or an inspected clean installation package, never your used project directory. See [privacy and security](SECURITY.md).
+
+## Build with us
 
 Beyond the student tool, the repo is a working reference for local-first agents — every pattern below ships in daily use, backed by tests, free to lift under the MIT license (see [LICENSE](LICENSE)):
 
-- **Agent loop** — Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI` driving 19 tools across multi-turn loops — [`src/core/agent.ts`](src/core/agent.ts)
-- **Kernel isolation** — the kernel only talks to ports it defines itself; dependency direction is enforced in CI — [`src/core/school.ts`](src/core/school.ts)
-- **Multi-provider model layer** — a plain-data provider registry plus one model factory; 12 Chinese providers plus custom OpenAI-compatible endpoints — [`src/core/providers.ts`](src/core/providers.ts)
-- **Two-tier memory** — cross-restart sessions plus self-maintained long-term facts, local JSON only — [`src/core/memory/`](src/core/memory/)
-- **Local-first security** — AES-256-GCM credentials bound to a machine fingerprint, loopback-only web with Origin/CSRF checks, network-less sandboxed JS — [`src/core/credentials.ts`](src/core/credentials.ts)
-- **Engineering floor** — TypeScript `strict`, node:test with a coverage floor, Biome, dual-OS CI — [`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
+- **Agent loop**: Vercel AI SDK v7 `ToolLoopAgent` + `runAgentTUI` driving dozens of tools across multi-turn loops — [`src/core/agent.ts`](src/core/agent.ts)
+- **Kernel isolation**: the kernel (`src/core`) only talks to ports it defines itself and never imports a concrete implementation; dependency direction is enforced by `npm run verify:imports` — [`src/core/school.ts`](src/core/school.ts)
+- **Multi-provider model layer**: a plain-data provider registry plus one model factory; 12 Chinese providers + custom OpenAI-compatible endpoints, keys encrypted independently and hot-swapped — [`src/core/providers.ts`](src/core/providers.ts)
+- **Two-tier memory**: cross-restart session continuity plus self-maintained long-term facts, local JSON only — [`src/core/memory/`](src/core/memory/)
+- **Local-first security**: AES-256-GCM credentials bound to the machine fingerprint, loopback-only web with Origin/CSRF checks, network-less sandboxed JS — [`src/core/credentials.ts`](src/core/credentials.ts)
+- **Engineering floor**: TypeScript `strict`, node:test with a coverage floor, Biome, dual-OS CI — [`tsconfig.json`](tsconfig.json) · [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 
 ```bash
 npm run typecheck
@@ -171,59 +121,14 @@ npm run lint
 npm test
 ```
 
-## Docs
+[Contributing](CONTRIBUTING.md) · [Roadmap](docs/roadmap.md) · [Capabilities](docs/capabilities.md) · [Student guide](docs/student-guide.md)
 
-- [Student guide (中文)](docs/student-guide.md) — step-by-step setup with screenshots
-- [Capabilities](docs/capabilities.md) — tool parameters, timings, environment variables
-- [Configuration reference](docs/configuration.md) — environment variables, credentials, QQ bot
-- [Obsidian plugin](obsidian/README.md) — sidebar chat, schedule and todo insertion
-- [Roadmap](docs/roadmap.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Code of Conduct](CODE_OF_CONDUCT.md)
-
-## FAQ
-
-<details>
-<summary><b>The installer does nothing, or my antivirus blocks it</b></summary>
-
-The packages are unsigned (the exe is a self-extracting launcher; `runtime\node.exe` is the official Node runtime). Choose "More info → Run anyway" in SmartScreen, or add the install folder to your antivirus allowlist.
-</details>
-
-<details>
-<summary><b>No model API key yet — can I still try it?</b></summary>
-
-Yes: run the offline demo (`npm run demo`) for the full interface with zero credentials. Live chatting needs your own key — DeepSeek by default, or 11 other Chinese providers, or any OpenAI-compatible endpoint. You can change it later under **Feature hall → Settings → AI models**.
-</details>
-
-<details>
-<summary><b>The web page won't open, or the port is taken</b></summary>
-
-Use the address printed at startup (default `http://127.0.0.1:3210`; a busy port is skipped automatically). If the page misbehaves after an upgrade, hard-refresh with `Ctrl+F5`.
-</details>
-
-<details>
-<summary><b>Where is my data, and how do I remove it completely?</b></summary>
-
-All on your machine: `data/`, `credentials.enc`, `session.json`, `memory.json`. The installer build is uninstalled by deleting the `CourseRaptor` folder; from source, run `npm unlink` and delete the project directory. See "uninstall and cleanup" in the [capabilities doc](docs/capabilities.md).
-</details>
-
-## Contributing
-
-Bug reports, documentation fixes and concrete use cases all count. Start with [CONTRIBUTING.md](CONTRIBUTING.md); report security issues privately per [SECURITY.md](SECURITY.md). Questions and ideas are welcome in [Discussions](https://github.com/Health-525/courseraptor/discussions).
+Found it useful? A star, a reproducible issue, or a concrete student use case helps the project improve. Built something of your own on these patterns? Share it in [Discussions](https://github.com/Health-525/courseraptor/discussions).
 
 ## Disclaimer
 
-- Released under the [MIT License](LICENSE) and provided **"as is"**, without warranty of any kind, express or implied. This is an independent, unofficial project with no affiliation with or endorsement by any university.
-- Use it **for personal learning, research and technical exchange only** — not for any commercial purpose. Users assume all risks arising from use of this tool; follow your school's rules.
-- For decisions that matter (course enrolment, exam arrangements, graduation audits), always verify against your university's official channels.
-- This project does **not** solve or bypass CAPTCHAs; attachments protected by one fail with an explicit message asking you to download them manually.
+- CourseRaptor is released under the [MIT License](LICENSE) and provided **"as is"**, without warranty of any kind, express or implied. This is an independent, unofficial project with no affiliation with or endorsement by any university.
+- Use it **for personal learning, research, and technical exchange only** — not for any commercial purpose. Users assume all risks arising from use of this tool; follow your school's rules.
+- For decisions that matter (course enrollment, exam arrangements, graduation audits), always verify against your university's official channels.
 
-## License
-
-[MIT](LICENSE) © jiangshu
-
-<div align="center">
-
-**🦖 CourseRaptor** · campus life, one sentence
-
-[⬆ Back to top](#courseraptor) · [Chinese version](README.md)
-
-</div>
+Released under the [MIT License](LICENSE).
