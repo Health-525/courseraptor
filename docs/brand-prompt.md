@@ -10,7 +10,10 @@
   - 副标语：校园日常，一句话。
   - 能力清单：课表 · 待办 · 知识库 · 文档 · 记忆
   - 底部：本地优先 · 数据不出电脑 ｜ Web · TUI · QQ · Obsidian
-- `social-preview.jpg`：同一横幅的原字节另存为 `.jpg`（内容为 PNG，GitHub 社交预览按内容识别显示），1280×640，满足 GitHub 社交预览大小要求。
+- 用法：**README 首屏横幅**（`width="880"`，中文与英文 README 共用一张）。
+- `social-preview.jpg`：同一横幅重新编码为**真 JPEG**（1280×640，89 KB，`sharp` 质量 90 + 4:4:4 采样），供 X / 微信 / 即刻等按 `Content-Type` 渲染的平台使用；此前「PNG 字节挂 .jpg 扩展名」的写法在 GitHub 上能显示，在其他平台有裂图风险，已改掉。
+- 两份素材都满足 GitHub 社交预览要求（≥ 640×320、< 1 MB，推荐 1280×640 2:1）。上传入口：仓库 Settings → Social preview。
+
 
 ## README 架构图
 
