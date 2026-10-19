@@ -6,6 +6,7 @@
  * 这里只聚合通用模块。PPT 工具（ppt.ts）保留源码但不注册——产品侧暂下线。
  */
 
+import { aiNewsTools } from "./ai-news";
 import { documentTools } from "./document";
 import { filesTools } from "./files";
 import { knowledgeTools } from "./knowledge";
@@ -21,6 +22,7 @@ import { timeTools } from "./time";
 import { weatherTools } from "./weather";
 
 export const coreTools = {
+  ...aiNewsTools,
   ...filesTools,
   ...documentTools,
   ...memoryTools,

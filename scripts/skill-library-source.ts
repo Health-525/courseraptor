@@ -7,7 +7,7 @@
  *   1. 丢掉纯平台流程的章节；
  *   2. 把剩下的工具名换成中文动作描述。
  *
- * 本期 allowlist：学习类 6 篇 + export-schedule（课表卡片）。
+ * 本期 allowlist：学习类 6 篇 + export-schedule（课表卡片）+ ai-news。
  */
 
 export interface SkillSource {
@@ -55,6 +55,11 @@ export const SKILL_SOURCES: SkillSource[] = [
     id: "export-schedule",
     when: "导出课表图/课表卡片/本周或整学期课表图片",
     dropSections: ["仓库内调用", "打成独立技能包（供他人下载）"],
+  },
+  {
+    id: "ai-news",
+    when: "AI 新闻/模型动态/开源雷达/行业日报/突发简报/近期趋势",
+    dropSections: [],
   },
 ];
 

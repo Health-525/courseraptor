@@ -40,7 +40,7 @@ const file = `/**
  * tests/skill-library.test.ts 会逐篇比对生成物与清洗结果，防漂移。
  *
  * 原文平级存放于 skills/<id>/（OpenMAIC 学习类来自 THU-MAIC/OpenMAIC，MIT，
- * 见 skills/openmaic/LICENSE）。当前 allowlist：学习类 6 篇 + export-schedule。
+ * 见 skills/openmaic/LICENSE）。收录范围以 scripts/skill-library-source.ts 为准。
  * 入库前清洗：丢掉纯平台/外部 CLI 章节、替换 OpenMAIC 工具名为中文动作描述。
  */
 

@@ -15,6 +15,7 @@
 | `RAPTOR_BURST` | 限速令牌桶突发容量，1-64 的整数（默认 8，启动时校验） |
 | `FIRECRAWL_API_KEY` | 可选，公开网页附件的云解析兜底；本地解析无需此项 |
 | `RAPTOR_CJK_FONT` | 可选，中文 PDF 使用的本机字体绝对路径 |
+| `RAPTOR_AI_NEWS_PYTHON` | 可选，AI 新闻技能使用的 Python 3.11+ 解释器完整路径；默认自动探测。新闻引擎仅使用标准库，缺少 Python 时仅此功能不可用 |
 | `QQBOT_APP_ID` / `QQBOT_APP_SECRET` / `QQBOT_PASSCODE` | 可选，QQ 官方机器人凭证与准入暗号 |
 | `QQBOT_PUSH_OPENIDS` | 可选，QQ 主动推送目标 openid（逗号分隔）：待办到期提醒只发给这些人；不配置则不发推送，白名单里的其他授权用户收不到你的提醒 |
 | `GITHUB_TOKEN` / `GITEE_TOKEN` | 可选，将课表日历发布到公开仓库；分享范围需本人确认 |
@@ -44,6 +45,14 @@ npm run demo:live   # 等价于 npm run demo -- --live
 - Key 来源：先看 shell 环境的 `DEEPSEEK_API_KEY`，没有再从项目根 `.env` 取同名键（仅取 `DEEPSEEK_API_KEY` / `DEEPSEEK_BASE_URL` / `RAPTOR_MODEL` 三个键）；模型默认 `deepseek-flash`，可用 `RAPTOR_MODEL` 覆盖。演示不读取 `credentials.enc`。
 - 找不到 Key 时自动回退离线剧本并在终端提示，页面照常可用。
 - 适合录制演示视频或现场展示 AI 分析能力；正式使用请运行 `npm start` 配置自己的 Key。
+
+## AI 新闻技能
+
+在对话中说「看看今天的 AI 新闻」「查看 AI 突发简报」或「总结最近七天 AI 趋势」即可。日报由当前配置的模型撰写，采集、事件排序和校验由本地 Python 引擎完成，无需 OpenClaw 或飞书。首次采集需要访问配置好的公开新闻源；当天来源冻结后重复读取复用快照。历史日期只查询已有记录，不能补造过去的新闻。
+
+首次使用需要 Python 3.11+。解释器不在 PATH 时设置 `RAPTOR_AI_NEWS_PYTHON`，之后重启应用。可用 `python scripts/ai-news/news.py doctor` 检查版本和公开来源配置；该命令只读，不访问远端。便携安装包会携带新闻脚本与公开来源配置，Python 解释器仍需本机提供，或由分发者放在应用的 `runtime/python/` 下。
+
+来源快照、摘要草稿、冻结 Markdown 日报及 SQLite 缓存保存在 `data/ai-news/`（随 `RAPTOR_DATA_DIR` 变化）。工具仅返回分页记录，日报全量校验通过后才冻结；突发与趋势仅基于实际采集数据。不会发送群消息、发布到外部平台、下载媒体或获取字幕。
 
 ## 凭证优先级
 

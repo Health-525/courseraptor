@@ -1,0 +1,498 @@
+[
+  {
+    "name": "OpenAI",
+    "kind": "rss",
+    "url": "https://openai.com/news/rss.xml",
+    "allowed_hosts": ["openai.com"]
+  },
+  {
+    "name": "Google DeepMind",
+    "kind": "rss",
+    "url": "https://deepmind.google/blog/rss.xml",
+    "allowed_hosts": ["deepmind.google"]
+  },
+  {
+    "name": "Google AI",
+    "kind": "rss",
+    "url": "https://blog.google/technology/ai/rss/",
+    "allowed_hosts": ["blog.google"]
+  },
+  {
+    "name": "Google Gemini Enterprise Agent Platform",
+    "kind": "rss",
+    "url": "https://cloud.google.com/feeds/gemini-enterprise-agent-platform-release-notes.xml",
+    "allowed_hosts": ["cloud.google.com", "docs.cloud.google.com"],
+    "preserve_feed_entries": true
+  },
+  {
+    "name": "Anthropic",
+    "kind": "html_index",
+    "index_url": "https://www.anthropic.com/news",
+    "article_path_prefix": "/news/",
+    "allowed_hosts": ["anthropic.com"],
+    "max_candidates": 12
+  },
+  {
+    "name": "Meta AI",
+    "kind": "html_index",
+    "index_url": "https://ai.meta.com/blog/",
+    "article_path_prefix": "/blog/",
+    "allowed_hosts": ["ai.meta.com"],
+    "max_candidates": 8
+  },
+  {
+    "name": "xAI",
+    "kind": "html_index",
+    "index_url": "https://x.ai/news",
+    "article_path_prefix": "/news/",
+    "allowed_hosts": ["x.ai"],
+    "max_candidates": 16
+  },
+  {
+    "name": "Mistral AI",
+    "kind": "html_index",
+    "index_url": "https://mistral.ai/news/",
+    "article_path_prefix": "/news/",
+    "allowed_hosts": ["mistral.ai"],
+    "max_candidates": 12
+  },
+  {
+    "name": "Cohere",
+    "kind": "html_index",
+    "index_url": "https://cohere.com/blog",
+    "article_path_prefix": "/blog/",
+    "excluded_path_prefixes": ["/blog/tag/", "/blog/authors/"],
+    "allowed_hosts": ["cohere.com"],
+    "max_candidates": 8
+  },
+  {
+    "name": "OpenAI API",
+    "kind": "html_changelog",
+    "url": "https://developers.openai.com/api/docs/changelog",
+    "allowed_hosts": ["developers.openai.com"]
+  },
+  {
+    "name": "Anthropic Platform",
+    "kind": "html_changelog",
+    "url": "https://platform.claude.com/docs/en/release-notes/overview",
+    "allowed_hosts": ["platform.claude.com"]
+  },
+  {
+    "name": "Gemini API",
+    "kind": "html_changelog",
+    "url": "https://ai.google.dev/gemini-api/docs/changelog",
+    "allowed_hosts": ["ai.google.dev"]
+  },
+  {
+    "name": "Mistral API",
+    "kind": "html_changelog",
+    "url": "https://docs.mistral.ai/resources/changelogs",
+    "allowed_hosts": ["docs.mistral.ai"]
+  },
+  {
+    "name": "Cohere API",
+    "kind": "html_changelog",
+    "url": "https://docs.cohere.com/v2/changelog",
+    "allowed_hosts": ["docs.cohere.com"]
+  },
+  {
+    "name": "DeepSeek API",
+    "kind": "html_changelog",
+    "url": "https://api-docs.deepseek.com/updates/",
+    "allowed_hosts": ["api-docs.deepseek.com"]
+  },
+  {
+    "name": "DeepSeek 官方新闻",
+    "kind": "html_index",
+    "index_url": "https://api-docs.deepseek.com/news/news260424/",
+    "article_path_prefix": "/news/",
+    "allowed_hosts": ["api-docs.deepseek.com"],
+    "max_candidates": 20
+  },
+  {
+    "name": "Qwen",
+    "kind": "qwen_api",
+    "url": "https://qwen.ai/api/v2/article/retrieval?type=qwen_ai&language=zh-CN",
+    "article_url_template": "https://qwen.ai/blog?id={slug}",
+    "allowed_hosts": ["qwen.ai"]
+  },
+  {
+    "name": "ByteDance Seed",
+    "kind": "seed_router",
+    "url": "https://seed.bytedance.com/blog",
+    "article_url_template": "https://seed.bytedance.com/zh/blog/{slug}",
+    "allowed_categories": ["Models"],
+    "allowed_hosts": ["seed.bytedance.com"]
+  },
+  {
+    "name": "火山引擎",
+    "kind": "volcengine_router",
+    "url": "https://www.volcengine.com/news",
+    "article_url_template": "https://www.volcengine.com/news/detail/{id}",
+    "allowed_categories": ["machinelearning", "机器学习"],
+    "allowed_hosts": ["volcengine.com"]
+  },
+  {
+    "name": "百度千帆",
+    "kind": "html_changelog",
+    "url": "https://cloud.baidu.com/doc/qianfan/s/Mmh8l4qwj",
+    "allowed_hosts": ["cloud.baidu.com"]
+  },
+  {
+    "name": "腾讯混元",
+    "kind": "html_changelog",
+    "url": "https://cloud.tencent.com/document/product/1729/97765",
+    "allowed_hosts": ["cloud.tencent.com"]
+  },
+  {
+    "name": "阿里云百炼",
+    "kind": "html_changelog",
+    "url": "https://help.aliyun.com/zh/model-studio/model-release-notes",
+    "allowed_hosts": ["help.aliyun.com"]
+  },
+  {
+    "name": "智谱 GLM",
+    "kind": "rss",
+    "url": "https://docs.bigmodel.cn/cn/update/new-releases/rss.xml",
+    "allowed_hosts": ["docs.bigmodel.cn"]
+  },
+  {
+    "name": "华为 AI",
+    "kind": "rss",
+    "url": "https://www.huawei.com/en/rss-feeds/huawei-updates/rss",
+    "allowed_hosts": ["huawei.com"],
+    "title_include_terms": [
+      "Pangu",
+      "openPangu",
+      "Ascend",
+      "CloudMatrix",
+      "SuperPoD",
+      "AI Cloud",
+      "AI computing",
+      "large model",
+      "LLM"
+    ]
+  },
+  {
+    "name": "硅基流动 SiliconFlow",
+    "kind": "html_changelog",
+    "url": "https://docs.siliconflow.com/cn/release-notes/overview",
+    "allowed_hosts": ["docs.siliconflow.com"]
+  },
+  {
+    "name": "商汤 SenseNova",
+    "kind": "html_index",
+    "index_url": "https://www.sensetime.com/hk/research/",
+    "article_path_prefix": "/hk/research/",
+    "allowed_hosts": ["sensetime.com"],
+    "max_candidates": 20
+  },
+  {
+    "name": "Microsoft AI",
+    "kind": "rss",
+    "url": "https://news.microsoft.com/source/topics/ai/feed/",
+    "allowed_hosts": ["news.microsoft.com"],
+    "title_include_terms": ["model", "Azure AI", "Copilot", "agent", "Phi", "foundation"]
+  },
+  {
+    "name": "AWS AI",
+    "kind": "rss",
+    "url": "https://aws.amazon.com/blogs/machine-learning/feed/",
+    "allowed_hosts": ["aws.amazon.com"],
+    "title_include_terms": [
+      "introducing",
+      "announcing",
+      "available",
+      "availability",
+      "launch",
+      "model",
+      "Bedrock",
+      "Nova",
+      "Claude",
+      "Gemini",
+      "GPT",
+      "Grok",
+      "Mistral",
+      "Llama",
+      "AgentCore",
+      "Strands",
+      "SageMaker",
+      "Amazon Quick",
+      "AWS Transform"
+    ],
+    "title_exclude_terms": [
+      "build ",
+      "building ",
+      "best practices",
+      "how to ",
+      "customer",
+      "recommendation",
+      "blueprint",
+      "evaluating "
+    ]
+  },
+  {
+    "name": "AWS What's New · AI",
+    "kind": "rss",
+    "url": "https://aws.amazon.com/about-aws/whats-new/recent/feed/",
+    "allowed_hosts": ["aws.amazon.com"],
+    "title_include_terms": [
+      "Amazon Bedrock",
+      "SageMaker AI",
+      "Amazon Nova",
+      "Amazon Q",
+      "Amazon Quick",
+      "Kiro",
+      "Amazon Bedrock AgentCore",
+      "Strands Agents",
+      "AWS Transform",
+      "AWS Neuron",
+      "Trainium",
+      "Inferentia",
+      "Amazon Lex",
+      "Amazon Polly",
+      "Amazon Rekognition",
+      "Amazon Textract",
+      "Amazon Transcribe",
+      "Amazon Translate",
+      "Amazon Comprehend",
+      "Amazon Personalize",
+      "Amazon Kendra",
+      "AI agent",
+      "generative AI",
+      "foundation model",
+      "Model Context Protocol",
+      "MCP"
+    ]
+  },
+  {
+    "name": "Amazon Bedrock Release Notes",
+    "kind": "rss",
+    "url": "https://docs.aws.amazon.com/bedrock/latest/userguide/bedrock-ug.rss",
+    "allowed_hosts": ["docs.aws.amazon.com"],
+    "preserve_feed_entries": true
+  },
+  {
+    "name": "Amazon Bedrock AgentCore Release Notes",
+    "kind": "rss",
+    "url": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/bedrock-agentcore-dg.rss",
+    "allowed_hosts": ["docs.aws.amazon.com"],
+    "preserve_feed_entries": true
+  },
+  {
+    "name": "Amazon SageMaker AI Release Notes",
+    "kind": "rss",
+    "url": "https://docs.aws.amazon.com/sagemaker/latest/dg/amazon-sagemaker-release-notes.rss",
+    "allowed_hosts": ["docs.aws.amazon.com"],
+    "title_exclude_terms": ["managed policy updates"],
+    "preserve_feed_entries": true
+  },
+  {
+    "name": "Cloudflare AI Changelog",
+    "kind": "rss",
+    "url": "https://developers.cloudflare.com/changelog/rss/index.xml",
+    "allowed_hosts": ["developers.cloudflare.com"],
+    "title_include_terms": [
+      "Workers AI -",
+      "AI Gateway -",
+      "Agents -",
+      "AI Search -",
+      "Vectorize -"
+    ],
+    "preserve_feed_entries": true
+  },
+  {
+    "name": "Databricks AI",
+    "kind": "rss",
+    "url": "https://learn.microsoft.com/en-us/azure/databricks/feed.xml",
+    "allowed_hosts": ["learn.microsoft.com"],
+    "title_include_terms": [
+      "Mosaic AI",
+      "Agent Bricks",
+      "AI/BI",
+      "Genie",
+      "Foundation Model",
+      "Model Serving",
+      "MLflow",
+      "Vector Search",
+      "serverless GPU",
+      "machine learning",
+      "OpenAI connector",
+      "Anthropic connector"
+    ],
+    "preserve_feed_entries": true
+  },
+  {
+    "name": "Stability AI",
+    "kind": "rss",
+    "url": "https://stability.ai/news-updates?format=rss",
+    "allowed_hosts": ["stability.ai"]
+  },
+  {
+    "name": "Ai2",
+    "kind": "html_index",
+    "index_url": "https://allenai.org/news",
+    "article_path_prefix": "/blog/",
+    "allowed_hosts": ["allenai.org"],
+    "max_candidates": 12
+  },
+  {
+    "name": "Runway",
+    "kind": "html_index",
+    "index_url": "https://runway.com/research",
+    "article_path_prefix": "/research/",
+    "excluded_path_prefixes": ["/research/publications"],
+    "allowed_hosts": ["runway.com"],
+    "title_include_terms": [
+      "introducing",
+      "announcing",
+      "model",
+      "agent",
+      "research",
+      "world",
+      "Aleph",
+      "Gen-",
+      "Runway Dev"
+    ],
+    "title_exclude_terms": ["office", "partnership", "customer"],
+    "max_candidates": 20
+  },
+  {
+    "name": "MiniMax",
+    "kind": "html_index",
+    "index_url": "https://www.minimax.io/news",
+    "article_path_prefix": "/news/",
+    "allowed_hosts": ["minimax.io"],
+    "allow_json_date": false,
+    "max_candidates": 12
+  },
+  {
+    "name": "Kimi",
+    "kind": "html_index",
+    "index_url": "https://www.kimi.com/blog/",
+    "article_path_prefix": "/blog/",
+    "allowed_hosts": ["kimi.com"],
+    "max_candidates": 12
+  },
+  {
+    "name": "GitHub Changelog · AI",
+    "kind": "rss",
+    "url": "https://github.blog/changelog/feed/",
+    "allowed_hosts": ["github.blog"],
+    "title_include_terms": [
+      "Copilot",
+      "GitHub Models",
+      "AI agent",
+      "agentic",
+      "MCP",
+      "Codex",
+      "Claude",
+      "Gemini",
+      "GPT",
+      "Grok",
+      "Kimi"
+    ]
+  },
+  {
+    "name": "NVIDIA",
+    "kind": "rss",
+    "url": "https://blogs.nvidia.com/feed/",
+    "allowed_hosts": ["blogs.nvidia.com"],
+    "title_include_terms": [
+      "NVIDIA AI",
+      "AI agent",
+      "AI model",
+      "AI factory",
+      "AI infrastructure",
+      "AI safety",
+      "AI security",
+      "agentic AI",
+      "generative AI",
+      "physical AI",
+      "build AI",
+      "inference",
+      "robotics",
+      "Jetson",
+      "DGX",
+      "Blackwell",
+      "NeMo",
+      "NIM"
+    ],
+    "title_exclude_terms": ["GeForce NOW", "gaming", "esports"]
+  },
+  {
+    "name": "NIST AI",
+    "kind": "rss",
+    "url": "https://www.nist.gov/news-events/news/rss.xml",
+    "allowed_hosts": ["nist.gov"],
+    "title_include_terms": [
+      "artificial intelligence",
+      "AI model",
+      "AI system",
+      "AI risk",
+      "AI safety",
+      "AI standard",
+      "machine learning"
+    ],
+    "max_items": 4
+  },
+  {
+    "name": "UK AI Security Institute",
+    "kind": "rss",
+    "url": "https://www.gov.uk/government/organisations/ai-security-institute.atom",
+    "allowed_hosts": ["gov.uk"],
+    "max_items": 6
+  },
+  {
+    "name": "European Commission AI",
+    "kind": "html_index",
+    "index_url": "https://digital-strategy.ec.europa.eu/en/related-content?topic=119",
+    "article_path_prefix": "/en/news/",
+    "allowed_hosts": ["digital-strategy.ec.europa.eu"],
+    "max_candidates": 12,
+    "title_include_terms": ["AI", "artificial intelligence", "general-purpose AI", "GPAI"],
+    "max_items": 4
+  },
+  {
+    "name": "OpenAI Codex Releases",
+    "kind": "rss",
+    "url": "https://github.com/openai/codex/releases.atom",
+    "allowed_hosts": ["github.com"],
+    "stable_releases_only": true
+  },
+  {
+    "name": "Anthropic Claude Code Releases",
+    "kind": "rss",
+    "url": "https://github.com/anthropics/claude-code/releases.atom",
+    "allowed_hosts": ["github.com"],
+    "stable_releases_only": true
+  },
+  {
+    "name": "Google Gemini CLI Releases",
+    "kind": "rss",
+    "url": "https://github.com/google-gemini/gemini-cli/releases.atom",
+    "allowed_hosts": ["github.com"],
+    "stable_releases_only": true
+  },
+  {
+    "name": "LangChain Releases",
+    "kind": "rss",
+    "url": "https://github.com/langchain-ai/langchain/releases.atom",
+    "allowed_hosts": ["github.com"],
+    "stable_releases_only": true
+  },
+  {
+    "name": "LiteLLM Releases",
+    "kind": "rss",
+    "url": "https://github.com/BerriAI/litellm/releases.atom",
+    "allowed_hosts": ["github.com"],
+    "stable_releases_only": true
+  },
+  {
+    "name": "vLLM Releases",
+    "kind": "rss",
+    "url": "https://github.com/vllm-project/vllm/releases.atom",
+    "allowed_hosts": ["github.com"],
+    "stable_releases_only": true
+  }
+]

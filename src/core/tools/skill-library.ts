@@ -12,7 +12,7 @@ import { SKILL_LIBRARY, skillLibraryMenu } from "../skill-library";
 
 export const skillTools = {
   read_skill: tool({
-    description: `学习与课表图技能库（${SKILL_LIBRARY.length} 篇，按需一篇）。学习类请求先读对应篇目再答：${skillLibraryMenu()}。一次只取当前需要的一篇，读完按它的流程与边界执行；教务查询与闲聊不要套用。课表图产出请调 export_schedule_image，不必为导出再读 export-schedule（除非要核对行为细节）。`,
+    description: `学习、课表图与 AI 新闻技能库（${SKILL_LIBRARY.length} 篇，按需一篇）。学习类或 AI 新闻请求先读对应篇目再答：${skillLibraryMenu()}。一次只取当前需要的一篇，读完按它的流程与边界执行；教务查询与闲聊不要套用。课表图产出请调 export_schedule_image，不必为导出再读 export-schedule（除非要核对行为细节）。`,
     inputSchema: z.object({
       skill: z
         .enum(SKILL_LIBRARY.map((s) => s.id) as [string, ...string[]])
