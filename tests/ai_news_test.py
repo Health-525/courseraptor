@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -172,6 +172,23 @@ class NewsTest(unittest.TestCase):
                     self.fail("锁不能重入")
         with news.daily_lock(file):
             pass
+
+    def test_shanghai_cache_day_boundary(self):
+        from radar import github_radar
+        from radar.timezones import REPORT_TIMEZONE
+
+        now = datetime(2026, 10, 18, 16, 1, tzinfo=timezone.utc)
+        self.assertEqual(now.astimezone(REPORT_TIMEZONE).utcoffset(), timedelta(hours=8))
+        self.assertEqual(now.astimezone(REPORT_TIMEZONE).date().isoformat(), "2026-10-19")
+
+        class FixedDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return now.astimezone(tz)
+
+        with patch.object(github_radar, "datetime", FixedDateTime):
+            self.assertFalse(github_radar._same_shanghai_day({"fetched_at": "2026-10-18T15:59:00+00:00"}))
+            self.assertTrue(github_radar._same_shanghai_day({"fetched_at": "2026-10-18T16:00:00+00:00"}))
 
     def test_cli_is_json_and_has_no_publish_route(self):
         result = subprocess.run([sys.executable, "-B", str(ENGINE / "news.py"), "query"], input='{"date":"../../secret"}',
