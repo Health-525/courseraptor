@@ -320,6 +320,7 @@ h1 {
 }
 .tape-inner {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
@@ -578,13 +579,13 @@ h2 { font-size: clamp(32px, 3.4vw, 48px); line-height: 1.32; font-weight: 800; l
 
 .start-section { background: var(--paper); border-block: 1.5px dashed rgba(74, 68, 58, 0.2); padding-block: 68px }
 
-.start-grid { display: grid; grid-template-columns: 0.95fr 1.05fr; gap: 88px }
+.start-grid { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); gap: 88px }
 .start-grid > div > p:not(.eyebrow) { color: var(--ink-soft) }
 .start-grid .actions { justify-content: flex-start; margin: 18px 0 16px }
 .start-grid .eyebrow { justify-content: flex-start; margin-inline: 0 }
 
 .setup ol { padding: 0; margin: 0; list-style: none }
-.setup li { display: grid; grid-template-columns: 36px 1fr; gap: 20px; padding-bottom: 26px; position: relative }
+.setup li { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 20px; padding-bottom: 26px; position: relative }
 .setup li > span {
   position: relative;
   border-radius: 50%;
