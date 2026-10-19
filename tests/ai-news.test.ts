@@ -96,12 +96,17 @@ test("新闻工具限定操作与结构，不暴露任意命令参数", () => {
   assert.equal(save.safeParse({ source_set_sha256: "invalid", entries: [] }).success, false);
 });
 
-test("Python 新闻回归：分页到冻结日报、证据校验、趋势和锁", { skip: !interpreter }, () => {
-  const result = spawnSync(interpreter!, ["-B", path.join(root, "tests", "ai_news_test.py")], {
-    encoding: "utf8",
-    windowsHide: true,
-    timeout: 30_000,
-    env: { ...process.env, PYTHONUTF8: "1", PYTHONDONTWRITEBYTECODE: "1" },
-  });
+test("Python 新闻回归：无外部依赖和时区数据库时仍可运行", { skip: !interpreter }, () => {
+  const result = spawnSync(
+    interpreter!,
+    ["-S", "-B", path.join(root, "tests", "ai_news_test.py")],
+    {
+      encoding: "utf8",
+      windowsHide: true,
+      timeout: 30_000,
+      // -S 禁用第三方 site-packages，空时区路径模拟 Windows 原生 Python。
+      env: { ...process.env, PYTHONUTF8: "1", PYTHONDONTWRITEBYTECODE: "1", PYTHONTZPATH: "" },
+    },
+  );
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });

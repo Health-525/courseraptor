@@ -13,10 +13,10 @@ from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Callable, TypedDict
-from zoneinfo import ZoneInfo
 
 from .models import ContentItem, SourceCheck, SourceHealth
 from .storage import Storage
+from .timezones import REPORT_TIMEZONE
 
 GITHUB_TRENDING_URL = "https://github.com/trending?since=daily"
 GITHUB_REPOSITORY_API = "https://api.github.com/repos/{repository}"
@@ -25,7 +25,6 @@ FETCH_TIMEOUT_SECONDS = 20
 LOCAL_CACHE_REUSE_MINUTES = 30
 TRENDING_CACHE_FALLBACK_HOURS = 12
 REPOSITORY_CACHE_FALLBACK_HOURS = 36
-SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 
 class GitHubRateLimitError(RuntimeError):
@@ -126,7 +125,7 @@ def _same_shanghai_day(cache: dict[str, object]) -> bool:
         return False
     if fetched_at.tzinfo is None:
         fetched_at = fetched_at.replace(tzinfo=timezone.utc)
-    return fetched_at.astimezone(SHANGHAI).date() == datetime.now(SHANGHAI).date()
+    return fetched_at.astimezone(REPORT_TIMEZONE).date() == datetime.now(REPORT_TIMEZONE).date()
 
 
 def _request_headers(*, html: bool) -> dict[str, str]:
