@@ -31,6 +31,11 @@ const DOC_FILES = new Set([
   "brand-prompt.md",
   "github-best-practices.md",
   "launch-post.md",
+  "screenshots/demo-overview.png",
+  "screenshots/demo-schedule.png",
+  "screenshots/demo-today.png",
+  "screenshots/demo-knowledge.png",
+  "screenshots/demo-todos.png",
 ]);
 
 export function shouldPackagePath(relativePath) {
@@ -39,7 +44,10 @@ export function shouldPackagePath(relativePath) {
   const parts = rel.split("/");
   if (parts.some((part) => !part || part === "." || part === "..")) return false;
   if (parts.length === 1) return ROOT_FILES.has(rel) || CODE_DIRS.has(rel) || rel === "docs";
-  if (parts[0] === "docs") return parts.length === 2 && DOC_FILES.has(parts[1]);
+  if (parts[0] === "docs") {
+    const docPath = parts.slice(1).join("/");
+    return docPath === "screenshots" || DOC_FILES.has(docPath);
+  }
   if (!CODE_DIRS.has(parts[0])) return false;
   // 落地页（landing/）与技能包（skills/）不属于学生端安装包，白名单里自然排除。
   // 即使误放在代码目录，也不带出日志、密钥、编辑器备份或环境文件。

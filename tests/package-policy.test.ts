@@ -25,6 +25,8 @@ test("安装包过滤在真实目录复制时不带出会话、文件、凭证�
     "downloads/private.xlsx",
     "qq-bridge.log",
     "docs/screenshot-web.png",
+    "docs/screenshots/private-session.png",
+    "docs/screenshots/gui.png",
     "src/debug.log",
     "unknown-personal-file.txt",
   ];
@@ -34,6 +36,11 @@ test("安装包过滤在真实目录复制时不带出会话、文件、凭证�
     "scripts/doctor.mjs",
     "docs/student-guide.md",
     "docs/courseraptor-logo.png",
+    "docs/screenshots/demo-overview.png",
+    "docs/screenshots/demo-schedule.png",
+    "docs/screenshots/demo-today.png",
+    "docs/screenshots/demo-knowledge.png",
+    "docs/screenshots/demo-todos.png",
     "package-lock.json",
     ".env.example",
   ];
