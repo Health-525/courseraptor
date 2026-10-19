@@ -7,7 +7,7 @@
  */
 
 import { type LanguageModelMiddleware, ToolLoopAgent, wrapLanguageModel } from "ai";
-
+import { newsWorkflowStop } from "./ai-news";
 import { config } from "./config";
 import { buildLanguageModel } from "./llm";
 import { toolTimeoutConfig } from "./loop-timeout";
@@ -117,6 +117,7 @@ export async function createRaptorAgent(channel?: "qq", options?: { carryOver?: 
 
   return new ToolLoopAgent({
     model: buildWrappedModel(),
+    stopWhen: newsWorkflowStop,
     instructions,
     // 循环看门狗：单次工具执行硬预算（含文档三件套的更长覆盖）。
     // 经 AbortSignal 下发——信号感知的工具超时抛错，SDK 转成错误

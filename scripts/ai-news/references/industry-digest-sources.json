@@ -1,0 +1,88 @@
+[
+  {
+    "name": "DeepLearning.AI · The Batch",
+    "kind": "rss",
+    "url": "https://charonhub.deeplearning.ai/tag/the-batch/rss/",
+    "allowed_hosts": ["charonhub.deeplearning.ai"],
+    "allow_content_fallback": false,
+    "max_items": 2
+  },
+  {
+    "name": "TechCrunch AI",
+    "kind": "rss",
+    "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
+    "allowed_hosts": ["techcrunch.com"],
+    "allow_content_fallback": false,
+    "title_exclude_terms": ["sponsored", "partner content"],
+    "max_items": 4
+  },
+  {
+    "name": "InfoQ AI/ML",
+    "kind": "rss",
+    "url": "https://feed.infoq.com/ai-ml-data-eng/",
+    "allowed_hosts": ["feed.infoq.com", "infoq.com"],
+    "allow_content_fallback": false,
+    "title_exclude_terms": ["sponsored", "partner content"],
+    "max_items": 4
+  },
+  {
+    "name": "Interconnects",
+    "kind": "rss",
+    "url": "https://www.interconnects.ai/feed",
+    "allowed_hosts": ["interconnects.ai"],
+    "allow_content_fallback": false,
+    "max_items": 2
+  },
+  {
+    "name": "MIT Technology Review AI",
+    "kind": "rss",
+    "url": "https://www.technologyreview.com/topic/artificial-intelligence/feed/",
+    "allowed_hosts": ["technologyreview.com"],
+    "allow_content_fallback": false,
+    "title_exclude_terms": ["sponsored", "partner content"],
+    "max_items": 3
+  },
+  {
+    "name": "The Register AI+ML",
+    "kind": "rss",
+    "url": "https://api.theregister.com/api/v1/article?limit=25&orderBy=published&query=tag%3A%22ai+and+ml%22&remapper=rss&site_id=2",
+    "allowed_hosts": ["api.theregister.com", "theregister.com"],
+    "allow_content_fallback": false,
+    "title_exclude_terms": ["sponsored", "partner content", "vendor voice"],
+    "max_items": 4
+  },
+  {
+    "name": "InfoQ 中文站 · AI",
+    "kind": "rss",
+    "url": "https://www.infoq.cn/feed",
+    "allowed_hosts": ["infoq.cn"],
+    "allow_content_fallback": false,
+    "title_include_terms": [
+      "AI",
+      "人工智能",
+      "大模型",
+      "智能体",
+      "Agent",
+      "LLM",
+      "MCP",
+      "RAG",
+      "OpenAI",
+      "Claude",
+      "Gemini",
+      "DeepSeek",
+      "Qwen",
+      "通义",
+      "混元",
+      "豆包",
+      "Kimi",
+      "智谱",
+      "MiniMax",
+      "推理",
+      "训练",
+      "算力",
+      "GPU"
+    ],
+    "title_exclude_terms": ["课程", "训练营", "大会报名", "招聘", "广告"],
+    "max_items": 3
+  }
+]

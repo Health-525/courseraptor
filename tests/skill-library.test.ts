@@ -1,7 +1,7 @@
 /**
  * 技能库测试（read_skill）
  *
- * 钉住：allowlist 7 篇、防漂移、无 OpenMAIC 幽灵工具名、工具接线、提示词路由。
+ * 钉住：allowlist、防漂移、无 OpenMAIC 幽灵工具名、工具接线、提示词路由。
  */
 
 import assert from "node:assert/strict";
@@ -27,10 +27,11 @@ const EXPECTED_IDS = [
   "spiral-curriculum",
   "curriculum-planner",
   "export-schedule",
+  "ai-news",
 ];
 
-test("技能库：allowlist 7 篇，id 唯一、原文平级在 skills/<id>/", () => {
-  assert.equal(SKILL_LIBRARY.length, 7);
+test("技能库：allowlist 8 篇，id 唯一、原文平级在 skills/<id>/", () => {
+  assert.equal(SKILL_LIBRARY.length, 8);
   assert.equal(SKILL_SOURCES.length, SKILL_LIBRARY.length);
   const ids = SKILL_LIBRARY.map((s) => s.id);
   assert.deepEqual([...ids].sort(), [...EXPECTED_IDS].sort());

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "severities": ["high", "critical"],
+  "max_items": 12,
+  "packages": [
+    { "ecosystem": "pip", "name": "anthropic" },
+    { "ecosystem": "pip", "name": "gradio" },
+    { "ecosystem": "pip", "name": "langchain" },
+    { "ecosystem": "pip", "name": "langgraph" },
+    { "ecosystem": "pip", "name": "litellm" },
+    { "ecosystem": "pip", "name": "llama-index" },
+    { "ecosystem": "pip", "name": "mlflow" },
+    { "ecosystem": "pip", "name": "open-webui" },
+    { "ecosystem": "pip", "name": "openai" },
+    { "ecosystem": "pip", "name": "ray" },
+    { "ecosystem": "pip", "name": "streamlit" },
+    { "ecosystem": "pip", "name": "tensorflow" },
+    { "ecosystem": "pip", "name": "torch" },
+    { "ecosystem": "pip", "name": "transformers" },
+    { "ecosystem": "pip", "name": "vllm" },
+    { "ecosystem": "npm", "name": "@anthropic-ai/sdk" },
+    { "ecosystem": "npm", "name": "@modelcontextprotocol/sdk" },
+    { "ecosystem": "npm", "name": "langchain" },
+    { "ecosystem": "npm", "name": "openai" }
+  ]
+}
