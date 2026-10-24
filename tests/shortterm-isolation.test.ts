@@ -57,9 +57,24 @@ test("carryOver 默认开：TUI/QQ 仍能恢复上次会话", async () => {
   assert.match(await loadLastSessionTranscript(), new RegExp(HEAD), "转写本身应可读");
 });
 
+test("TUI 实例（channel 留空）不套 QQ 或网页的渠道专属排版规则", async () => {
+  const seen = instructionsOf(await createRaptorAgent());
+  assert.doesNotMatch(seen, /输出格式（QQ 渠道/, "TUI 不是 QQ，不该套 QQ 固定模板");
+  assert.doesNotMatch(
+    seen,
+    /输出格式（网页渠道/,
+    "TUI 是纯文本终端，不该套网页的 Markdown 表格规则",
+  );
+});
+
+test("网页实例显式传 web：套用网页渠道的 Markdown 表格排版规则", async () => {
+  const seen = instructionsOf(await createRaptorAgent("web", { carryOver: false }));
+  assert.match(seen, /输出格式（网页渠道/, "网页实例应带 Markdown 表格排版规则");
+});
+
 test("carryOver=false：网页实例的提示词不含上次会话记录", async () => {
   seedLastSession();
-  const seen = instructionsOf(await createRaptorAgent(undefined, { carryOver: false }));
+  const seen = instructionsOf(await createRaptorAgent("web", { carryOver: false }));
   assert.notEqual(seen, "", "应能读到 agent 的系统提示词，否则本测试是空跑");
   assert.doesNotMatch(seen, new RegExp(HEAD), "网页不应注入上次会话记录");
   assert.doesNotMatch(seen, /选课已经结束了/, "别的会话内容不得出现在提示词里");
@@ -70,7 +85,7 @@ test("carryOver=false：网页实例的提示词不含上次会话记录", async
 
 test("长期记忆不受影响：关掉注入后角色设定仍在", async () => {
   seedLastSession();
-  const seen = instructionsOf(await createRaptorAgent(undefined, { carryOver: false }));
+  const seen = instructionsOf(await createRaptorAgent("web", { carryOver: false }));
   assert.match(seen, /你是/, "网页实例仍要有角色设定，只摘掉短期记忆尾巴");
 });
 
@@ -82,12 +97,12 @@ test("装配点：网页注册的是 carryOver=false 实例，TUI 保持默认�
   );
   assert.match(
     src,
-    /setChatAgent\(await createRaptorAgent\(undefined, \{ carryOver: false \}\)\)/,
+    /setChatAgent\(await createRaptorAgent\("web", \{ carryOver: false \}\)\)/,
     "网页注册的实例应关掉注入",
   );
   assert.match(
     src,
-    /setChatAgentRefresher\(async \(\) => \{\s*setChatAgent\(await createRaptorAgent\(undefined, \{ carryOver: false \}\)\)/,
+    /setChatAgentRefresher\(async \(\) => \{\s*setChatAgent\(await createRaptorAgent\("web", \{ carryOver: false \}\)\)/,
     "换模型后重建的网页实例同样要关掉注入",
   );
   assert.match(src, /const agent = await createRaptorAgent\(\);/, "TUI 仍用默认（注入）实例");

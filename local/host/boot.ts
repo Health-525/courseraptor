@@ -84,10 +84,10 @@ export async function bootstrapHost(): Promise<BootResult> {
   const { setChatAgent, setChatAgentRefresher, setQQBridgeLauncher, startChatWeb } = await import(
     "../../src/channels/web/chat-web"
   );
-  setChatAgent(await createRaptorAgent(undefined, { carryOver: false }));
+  setChatAgent(await createRaptorAgent("web", { carryOver: false }));
   // 换模型即重建 agent 给网页用；终端 TUI 持有的是上面这个实例，重启后才用新模型
   setChatAgentRefresher(async () => {
-    setChatAgent(await createRaptorAgent(undefined, { carryOver: false }));
+    setChatAgent(await createRaptorAgent("web", { carryOver: false }));
   });
   // 桥热启动是宿主职责（web 不 import local/）：设置页存 QQ 凭证后懒加载拉起
   setQQBridgeLauncher(() =>
