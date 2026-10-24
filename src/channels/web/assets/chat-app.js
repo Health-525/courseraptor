@@ -3063,7 +3063,7 @@ function buildExams(b) {
       hallEmpty(
         "📝",
         "近 14 天没有考试",
-        "当前是手动课表模式：考试安排要接入教务系统才支持，直接问我也一样。",
+        "当前是手动课表模式：在对话框里说一声就能补录考试，如「记一下 6 月 28 日 14:00 高数考试，教 A-101」。",
       ),
     );
     return wrap;
@@ -3552,7 +3552,7 @@ function gradesRender(g, wrap) {
         hallEmpty(
           "📊",
           "还没有成绩",
-          "当前是手动课表模式：成绩要接入教务系统才支持，在对话框里说「我的成绩」试试。",
+          "当前是手动课表模式：在对话框里报成绩（如「高数考了 92，4 学分」）就能记录到这里。",
         ),
       );
       return wrap;
@@ -3566,7 +3566,7 @@ function gradesRender(g, wrap) {
   wrap.appendChild(
     hallItem(
       `GPA ${g.gpa}${g.gpaBasis ? `（${g.gpaBasis}）` : ""}`,
-      `必修学分 ${g.requiredCredits} · 共 ${g.courseCount} 门课`,
+      `${String(g.gpaBasis || "").startsWith("手动记录") ? "已记学分" : "必修学分"} ${g.requiredCredits} · 共 ${g.courseCount} 门课`,
       true,
     ),
   );
@@ -3582,7 +3582,7 @@ function gradesRender(g, wrap) {
     hallNote(
       "缓存于 " +
         new Date(g.savedAt).toLocaleString("zh-CN", { hour12: false }) +
-        "；在对话框里再问一次成绩即刷新。",
+        (schoolManual() ? "；要改记录直接在对话里说。" : "；在对话框里再问一次成绩即刷新。"),
     ),
   );
   return wrap;
@@ -4416,6 +4416,11 @@ const TOOL_PANEL = {
   manage_todos: "todos",
   manage_knowledge: "knowledge",
   manage_pomodoro: "pomodoro",
+  /* 对话里改课表/考试/成绩/提示词：面板开着立即重画，没开着作废缓存 */
+  edit_schedule: "schedule",
+  edit_exams: "exams",
+  edit_grades: "grades",
+  manage_prompts: "prompts",
   get_grades: "grades",
   get_news: "news",
   read_notice: "news",
@@ -4882,6 +4887,14 @@ function showPrompts() {
     .catch(() => {
       if (hallPanel === "prompts") quickError("读取清单失败，检查本地服务后重进。");
     });
+}
+/* 对话工具 manage_prompts 改完清单后，把服务端的生效清单同步到 chips 与面板基线 */
+function syncQuickFromServer() {
+  if (document.body.dataset.demo === "true") return;
+  fetch("/api/settings")
+    .then((r) => r.json())
+    .then((d) => applyQuickQuestions(d.quickQuestions))
+    .catch(() => {});
 }
 renderQuickList();
 quickIdleMsg();
@@ -6408,9 +6421,16 @@ async function send(text) {
             const panel = TOOL_PANEL[ev.name];
             if (panel && panel !== "settings") {
               hallBrief = null;
-              if (hallPanel === panel && document.body.classList.contains("hall-open"))
+              /* 今日日程由课表/考试/待办共同派生：这些面板的数据变了，今日页也要重画 */
+              const derivesToday = panel === "schedule" || panel === "exams" || panel === "todos";
+              if (
+                (hallPanel === panel || (hallPanel === "today" && derivesToday)) &&
+                document.body.classList.contains("hall-open")
+              )
                 renderHall();
             }
+            /* 对话里改了提示词清单：不管面板开没开，输入框上方的 chips 都要同步 */
+            if (ev.name === "manage_prompts") syncQuickFromServer();
             /* 服务端点名要推出的面板：open_panel（用户显式说「打开××」）与
                凭证未配置要点名的设置。自动推出（本轮手动关过则不打扰） */
             if (ev.panel && !hallAutoMuted) openHall(ev.panel, { focus: false });

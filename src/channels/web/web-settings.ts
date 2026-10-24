@@ -31,10 +31,10 @@ import {
   providerOptionList,
   resolveProviderId,
 } from "../../core/providers";
+import { effectiveQuickQuestions, normalizeQuickQuestions } from "../../core/quick-questions";
 import { loadScheduleCache } from "../../core/schedule-cache";
 import { listSchoolOptions, school, selectSchool } from "../../core/school";
 import { workspaceStats } from "../../core/workspace-data";
-import { effectiveQuickQuestions, normalizeQuickQuestions } from "./quick-questions";
 import { oneLine } from "./web-tool-events";
 
 // ── 设置：教务账号 + DeepSeek Key（复用 /key 的「校验→热生效→加密落盘」）──

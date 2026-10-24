@@ -8,11 +8,14 @@
 
 import { aiNewsTools } from "./ai-news";
 import { documentTools } from "./document";
+import { examEditTools } from "./exams";
 import { filesTools } from "./files";
+import { gradeEditTools } from "./grades";
 import { knowledgeTools } from "./knowledge";
 import { memoryTools } from "./memory";
 import { panelTools } from "./panel";
 import { pomodoroTools } from "./pomodoro";
+import { promptTools } from "./prompts";
 import { reminderTools } from "./reminders";
 import { scheduleEditTools } from "./schedule-edit";
 import { scheduleImageTools } from "./schedule-image";
@@ -25,10 +28,13 @@ export const coreTools = {
   ...aiNewsTools,
   ...filesTools,
   ...documentTools,
+  ...examEditTools,
+  ...gradeEditTools,
   ...memoryTools,
   ...reminderTools,
   ...knowledgeTools,
   ...pomodoroTools,
+  ...promptTools,
   ...skillTools,
   ...scheduleImageTools,
   ...scheduleEditTools,
