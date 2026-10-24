@@ -59,6 +59,21 @@ test("写操作成功即记，并带上分类前缀", () => {
   assert.ok(know?.startsWith("【知识库】"), `知识库台账行应带前缀，实际 ${know}`);
 });
 
+test("对话改课表/考试/成绩/提示词：写动作记账带前缀，list 与失败不记", () => {
+  const cases: Array<[string, string]> = [
+    ["edit_schedule", "【课表】"],
+    ["edit_exams", "【考试】"],
+    ["edit_grades", "【成绩】"],
+    ["manage_prompts", "【提示词】"],
+  ];
+  for (const [tool, prefix] of cases) {
+    const line = ledgerLine(tool, { action: "update" }, { ok: true, summary: "已改一条" });
+    assert.ok(line?.startsWith(prefix), `${tool} 台账行应带前缀 ${prefix}，实际 ${line}`);
+    assert.equal(ledgerLine(tool, { action: "list" }, { ok: true, summary: "x" }), null);
+    assert.equal(ledgerLine(tool, { action: "update" }, { error: "id 无效" }), null);
+  }
+});
+
 test("失败不记：工具以 {error} 形态返回失败（不抛异常）时不进台账", () => {
   assert.equal(
     ledgerLine("manage_todos", { action: "add" }, { error: "add 需要 items（至少一条待办）" }),
@@ -214,6 +229,10 @@ test("闭集登记的工具名都是真实装配给 agent 的工具（重命名�
     "save_memory",
     "set_holidays",
     "manage_pomodoro",
+    "edit_schedule",
+    "edit_exams",
+    "edit_grades",
+    "manage_prompts",
     "generate_document",
     "convert_document",
     "export_schedule_image",

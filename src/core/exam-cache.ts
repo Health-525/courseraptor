@@ -18,11 +18,24 @@ export interface CachedExams {
    *  手动课表学校（custom）例外：读时放行别校标记的缓存（与 schedule-cache 同约定） */
   schoolId?: string;
   exams: ExamResult;
+  /**
+   * 最后一次官方查到（或手动模式最初建立）的考试安排快照：edit_exams
+   * 首次修改前落下，revert 靠它整体还原。在线刷新走 saveExamCache
+   * 覆盖式写入、不保留 base——官方安排永远赢过本地手改（与
+   * schedule-cache 的 base 同一套约定）。
+   */
+  base?: ExamResult;
+}
+
+function isExamResult(parsed: unknown): parsed is ExamResult {
+  const e = parsed as ExamResult;
+  return Boolean(e?.year) && Array.isArray(e.exams);
 }
 
 function isCachedExams(parsed: unknown): parsed is CachedExams {
   const c = parsed as CachedExams;
-  return Boolean(c?.exams?.year) && Array.isArray(c.exams.exams);
+  if (!isExamResult(c?.exams)) return false;
+  return c.base === undefined || isExamResult(c.base);
 }
 
 /** 读缓存；没有、读坏了或不是当前学校的都返回 null，调用方自行回退到在线拉取 */
@@ -44,6 +57,24 @@ export function saveExamCache(exams: ExamResult): void {
   writeJsonCache(
     "exam-cache.json",
     { savedAt: Date.now(), exams, ...(current ? { schoolId: current.info.id } : {}) },
+    "exam-cache",
+  );
+}
+
+/**
+ * 本地编辑后的缓存整体落盘（保留 base 快照字段）。edit_exams 专用；
+ * 在线拉取走 saveExamCache 覆盖式写入、隐含清掉 base。
+ */
+export function saveExamEntry(entry: CachedExams): void {
+  const current = registeredSchool();
+  writeJsonCache(
+    "exam-cache.json",
+    {
+      savedAt: Date.now(),
+      exams: entry.exams,
+      ...(entry.base ? { base: entry.base } : {}),
+      ...(current ? { schoolId: current.info.id } : {}),
+    },
     "exam-cache",
   );
 }

@@ -170,6 +170,7 @@ npm run qq
 - **番茄钟**：对话里说「开始 25 分钟番茄钟」即可；对话时间线出现倒计时卡片（时间到翻朱砂底 + 提示音 + 桌面通知 + 标题提醒），刷新页面后进行中的计时会恢复成时间线顶部的实时卡片；时间到可一键「再来一轮 / 休息 5 分钟」接龙，取消等服务端确认后才置灰（宫格入口已隐藏，计时全部在对话里完成）
 - **知识库面板**：按课程归类、关键词搜索、展开全文，条目可直接删除
 - **提示词模板面板**：输入框上方「提示词」清单的自定义管理
+- **对话即可增删改**：课表、考试、待办、知识库、提示词模板（以及手动课表模式下的成绩）都能在对话里创建、修改、删除（`edit_schedule` / `edit_exams` / `manage_todos` / `manage_knowledge` / `manage_prompts` / `edit_grades`），改完已打开的面板自动刷新；教务已适配学校的成绩以官方查询为准、本地不可改；教务通知、用量统计、设置里的凭证保持只读/手动填写
 - **用量统计面板**：一年 53 周 GitHub 式热力图（非零日按分位升档着色，默认滚到今天）+ 今日 / 近 7 天 / 近 30 天 / 近一年四格摘要 + 各模型用量分布与占比条，数据来自 `data/token-usage.json`（按天/按模型聚合，保留 371 天）
 - **设置面板**：三栏（AI 模型 / QQ 机器人 / 本地数据），栏头状态点一眼看出配没配（未配朱砂实心）；课表导入入口在「本地数据」栏；危险操作走两步确认。agent 也能应你一句「打开设置」自己调 `open_settings` 推出面板
 - **会话互相独立**：每个会话只带自己的历史（新开一页/新会话不会被上一次聊过什么带跑），多标签页互不干扰；要接上之前的对话，从侧栏切回那个会话即可
@@ -208,7 +209,7 @@ npm run qq
 
 ## 🧰 开箱工具分层
 
-- **内核**（`src/core/tools/`，与学校无关）：文件与数据四件套（`read_local_file` / `query_table` / `run_js` / `manage_attachments`）、文档写作与转换（`generate_document` / `convert_document`）、`export_schedule_image`、`edit_schedule`、`save_memory`、`manage_todos`、`manage_knowledge`、`manage_pomodoro`、`read_skill`、`open_settings`、`open_panel`、`get_weather`、`get_time`
+- **内核**（`src/core/tools/`，与学校无关）：文件与数据四件套（`read_local_file` / `query_table` / `run_js` / `manage_attachments`）、文档写作与转换（`generate_document` / `convert_document`）、`export_schedule_image`、`edit_schedule`、`edit_exams`、`edit_grades`（仅手动课表模式）、`manage_prompts`、`save_memory`、`manage_todos`、`manage_knowledge`、`manage_pomodoro`、`read_skill`、`open_settings`、`open_panel`、`get_weather`、`get_time`
 - **课表与校历**：`get_schedule`（只读本地导入的课表缓存）、`set_holidays`（放假 / 调休落盘）
 
 合计 19 个工具挂载进 agent（内核 17 + 课表与校历 2），全部只读写本地数据：课表来自网页端导入缓存（可经 `edit_schedule` 本地调课），其余走本机文件、沙箱计算与本地 JSON。PPT 工具源码保留、暂未挂入 agent（不计入上数）。
