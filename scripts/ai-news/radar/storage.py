@@ -6,7 +6,7 @@ import hashlib
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import TracebackType
 from typing import Literal
@@ -135,6 +135,14 @@ class Storage:
                 """,
                 (url, etag, last_modified, body, datetime.now(timezone.utc).isoformat()),
             )
+
+    def prune_http_cache(self, max_age_days: int = 7) -> int:
+        """Drop cached responses far older than any fallback window (72h at most)."""
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=max_age_days)).isoformat()
+        with self._connect() as connection:
+            return connection.execute(
+                "DELETE FROM http_cache WHERE fetched_at < ?", (cutoff,)
+            ).rowcount
 
     def previous_github_snapshot(
         self, repository: str, before_date: str

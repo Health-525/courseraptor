@@ -746,6 +746,88 @@ def build_breaking_report(
     return report, "\n".join(markdown).rstrip() + "\n"
 
 
+DIGEST_DEFAULT_LIMIT = 40
+DIGEST_MIN_LIMIT = 5
+DIGEST_MAX_LIMIT = 100
+DIGEST_MIN_SCORE = 60.0
+DIGEST_MAX_PER_SOURCE = 3
+DIGEST_TYPE_SHARE = 0.4
+DIGEST_URGENT_ALERTS = frozenset({"high", "breaking", "critical"})
+
+
+def select_digest_records(
+    records: list[dict[str, object]], limit: int = DIGEST_DEFAULT_LIMIT
+) -> tuple[list[dict[str, object]], dict[str, object]]:
+    """Pick the high-quality subset that goes into the frozen daily digest.
+
+    Collection stays complete (SQLite history, trends); only the snapshot a model
+    must read and summarise is curated. ``records`` must already be rank-ordered.
+    Rules, in the order they are attributed in ``selection["dropped"]``:
+    one record per event, no low-evidence items unless urgent, recovered (older than
+    the primary window) items only when urgent, unreadable items only when they are
+    urgent first-party releases, a minimum rank score, a per-source cap and a
+    per-source-type cap. Recommended highlights bypass the score and cap rules.
+    """
+    if not DIGEST_MIN_LIMIT <= limit <= DIGEST_MAX_LIMIT:
+        raise ValueError(
+            f"digest limit must be {DIGEST_MIN_LIMIT} through {DIGEST_MAX_LIMIT}"
+        )
+    type_cap = max(3, math.ceil(limit * DIGEST_TYPE_SHARE))
+    selected: list[dict[str, object]] = []
+    dropped: Counter[str] = Counter()
+    seen_events: set[str] = set()
+    per_source: Counter[str] = Counter()
+    per_type: Counter[str] = Counter()
+
+    def drop_reason(record: dict[str, object]) -> str | None:
+        urgent = str(record.get("alert_level")) in DIGEST_URGENT_ALERTS
+        if str(record.get("event_id")) in seen_events:
+            return "duplicate_event"
+        if bool(record.get("recommended_highlight")):
+            return None
+        if record.get("verification_status") == "low_evidence" and not urgent:
+            return "low_evidence"
+        if record.get("recency_status") == "recovered" and not urgent:
+            return "stale"
+        if record.get("source_text_status") != "available" and not (
+            urgent and record.get("verification_status") == "first_party"
+        ):
+            return "unavailable"
+        if float(record.get("rank_score", 0)) < DIGEST_MIN_SCORE and not urgent:
+            return "below_score"
+        if per_source[str(record.get("source"))] >= DIGEST_MAX_PER_SOURCE:
+            return "source_cap"
+        if per_type[str(record.get("source_type"))] >= type_cap:
+            return "type_cap"
+        return None
+
+    for record in records:
+        reason = drop_reason(record)
+        if reason is None and len(selected) >= limit:
+            reason = "over_limit"
+        if reason is not None:
+            dropped[reason] += 1
+            continue
+        selected.append(record)
+        seen_events.add(str(record.get("event_id")))
+        per_source[str(record.get("source"))] += 1
+        per_type[str(record.get("source_type"))] += 1
+    return selected, {
+        "policy": {
+            "limit": limit,
+            "min_rank_score": DIGEST_MIN_SCORE,
+            "max_per_source": DIGEST_MAX_PER_SOURCE,
+            "max_per_source_type": type_cap,
+            "recovered_requires_urgent_alert": True,
+            "low_evidence_requires_urgent_alert": True,
+        },
+        "collected": len(records),
+        "selected": len(selected),
+        "dropped": dict(sorted(dropped.items())),
+        "by_type": dict(sorted(per_type.items())),
+    }
+
+
 def newsroom_summary(records: list[dict[str, object]]) -> dict[str, object]:
     events = {str(record.get("event_id")) for record in records}
     verification = Counter(str(record.get("verification_status")) for record in records)
