@@ -12,9 +12,11 @@ from .github_radar import load_github_radar_config
 from .huggingface_radar import load_huggingface_radar_config
 from .intelligence import classify_item, verify_source_payload
 from .newsroom import (
+    DIGEST_DEFAULT_LIMIT,
     build_breaking_report,
     enrich_and_rank_records,
     newsroom_summary,
+    select_digest_records,
 )
 from .official_news import COLLECTION_LOOKBACK_HOURS, load_official_sources
 from .security_advisories import load_security_advisory_config
@@ -37,7 +39,23 @@ def skill_root() -> Path:
 
 def state_dir() -> Path:
     configured = os.environ.get("AI_NEWS_STATE_DIR", "").strip()
-    return Path(configured).expanduser() if configured else Path.home() / ".courseraptor" / "ai-news"
+    if configured:
+        return Path(configured).expanduser()
+    # 独立技能包（打包时写入 STANDALONE 标记）把数据放在技能目录 data/ 下。
+    if (skill_root() / "STANDALONE").is_file():
+        return skill_root().parent / "data"
+    return Path.home() / ".courseraptor" / "ai-news"
+
+
+def digest_limit() -> int:
+    """Daily digest size; override with AI_NEWS_DIGEST_LIMIT."""
+    configured = os.environ.get("AI_NEWS_DIGEST_LIMIT", "").strip()
+    if not configured:
+        return DIGEST_DEFAULT_LIMIT
+    try:
+        return int(configured)
+    except ValueError as error:
+        raise ValueError("AI_NEWS_DIGEST_LIMIT must be an integer") from error
 
 
 def channels_file() -> Path:
@@ -258,6 +276,12 @@ def prepare(date_str: str) -> tuple[int, dict[str, object]]:
                 records.append(record)
             feedback_profile = {"samples": 0}
             records = enrich_and_rank_records(records, now, feedback_profile)
+            # 采集与历史（SQLite、趋势）保持全量；只有冻结给模型逐条写摘要的快照被精选。
+            collected_available = sum(
+                record["source_text_status"] == "available" for record in records
+            )
+            collected_total = len(records)
+            records, selection = select_digest_records(records, digest_limit())
             for record in records:
                 record["source_text_sha256"] = hashlib.sha256(
                     str(record["source_text"]).encode("utf-8")
@@ -285,6 +309,7 @@ def prepare(date_str: str) -> tuple[int, dict[str, object]]:
                 },
                 "source_health": [entry.to_dict() for entry in health],
                 "quality_gate": quality_gate,
+                "selection": selection,
                 "newsroom": newsroom,
                 "provenance": {
                     "source_set_sha256": source_set_sha256,
@@ -294,9 +319,6 @@ def prepare(date_str: str) -> tuple[int, dict[str, object]]:
                 "items": records,
             }
             atomic_write_json(paths["source"], payload)
-            available_count = sum(
-                record["source_text_status"] == "available" for record in records
-            )
             storage.record_collection_run(
                 date_str,
                 "prepared_with_warnings"
@@ -304,9 +326,10 @@ def prepare(date_str: str) -> tuple[int, dict[str, object]]:
                 else "prepared",
                 quality_gate,
                 [entry.to_dict() for entry in health],
-                len(records),
-                available_count,
+                collected_total,
+                collected_available,
             )
+            storage.prune_http_cache()
     except (OSError, RuntimeError, ValueError) as error:
         return 1, {"status": "failed", "stage": "prepare", "error": str(error)}
 
@@ -330,6 +353,8 @@ def prepare(date_str: str) -> tuple[int, dict[str, object]]:
         "status": result_status,
         "date": date_str,
         "total": len(records),
+        "collected": collected_total,
+        "selection": selection,
         "official_news": official_news,
         "youtube": youtube,
         "aihot": aihot,

@@ -15,7 +15,7 @@ const limit = z.number().int().min(1).max(20).default(8);
 export const aiNewsTools = {
   prepare_ai_news: tool({
     description:
-      "采集并冻结今日 AI 新闻来源，或分页读取已冻结来源。先 read_skill(ai-news)。不会生成摘要或发送消息；重复调用复用当天快照。按 next_offset 继续读取，不能只读第一页就声称覆盖全天。",
+      "采集 AI 新闻并冻结精选后的高质量来源，或分页读取已冻结来源。先 read_skill(ai-news)。不会生成摘要或发送消息；重复调用复用当天快照。total 是精选数、collected 是采集总数，按 next_offset 读完全部精选记录再写摘要，汇报时如实说明「从 collected 条中精选 total 条」。",
     inputSchema: z.object({ date, offset, limit }),
     execute: async (input, { abortSignal }) => runAiNews("prepare", input, abortSignal),
   }),

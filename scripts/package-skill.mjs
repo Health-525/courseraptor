@@ -3,6 +3,8 @@
  *
  * 支持的技能（skills/<名>/ 为源码，package/ 为独立包门面）：
  * - export-schedule  课表图片导出（读本地缓存渲染 PNG/SVG；不带参数时的默认目标）
+ * - ai-news          AI 新闻精选日报（Python 3.11+ 标准库引擎整拷进包，不走 esbuild；
+ *                    门面在 skills/ai-news/package/，状态落技能自身 data/）
  *
  * 产物（默认在 dist/ 下）：
  * - dist/skill/<名>/    可整目录拷进各 agent 工具技能目录的技能
@@ -202,7 +204,25 @@ const SKILL_DEFS = {
     resvg: { packages: ["@resvg/resvg-js", "@resvg/resvg-js-win32-x64-msvc"] },
     selfCheck: { args: ["--help"], expect: [/--mode/] },
   },
+  // Python 引擎形态：不走 esbuild，整拷 scripts/ai-news/（标准库实现）到包内 scripts/，
+  // 写入 STANDALONE 标记让状态目录落在技能自身 data/ 下；门面在 skills/ai-news/package/。
+  "ai-news": {
+    python: { engine: ["scripts", "ai-news"] },
+    selfCheck: { args: ["scripts/news.py", "doctor"], expect: [/"status": "ok"/] },
+  },
 };
+
+/** 整拷 Python 引擎，跳过字节码缓存与本地运行数据。 */
+function copyPythonEngine(from, to) {
+  fs.mkdirSync(to, { recursive: true });
+  for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
+    if (entry.name === "__pycache__" || entry.name === "STANDALONE") continue;
+    if (/\.(?:pyc|db|lock|log)$/.test(entry.name)) continue;
+    const source = path.join(from, entry.name);
+    if (entry.isDirectory()) copyPythonEngine(source, path.join(to, entry.name));
+    else fs.copyFileSync(source, path.join(to, entry.name));
+  }
+}
 
 /** npm 安装到 prefix（不落 package.json）。优先 node 自带的 npm-cli.js 直跑，
  *  避免 Windows 下 spawn .cmd 的 shell 注入面；标准布局缺失时退化 shell。 */
@@ -276,9 +296,19 @@ export async function buildSkillPackage({
     fs.mkdirSync(path.join(skillDir, "scripts"), { recursive: true });
   }
 
-  // 1) 单文件 bundle（纯提示词技能无脚本，跳过）
+  // 1a) Python 引擎：整拷源码 + STANDALONE 标记（状态目录落到技能自身 data/）
+  if (def.python) {
+    const scriptsDir = path.join(skillDir, "scripts");
+    copyPythonEngine(path.join(root, ...def.python.engine), scriptsDir);
+    fs.writeFileSync(
+      path.join(scriptsDir, "STANDALONE"),
+      "独立技能包标记：存在时，新闻状态（SQLite、来源快照、日报）保存在技能目录 data/ 下。\n",
+    );
+  }
+
+  // 1) 单文件 bundle（纯提示词与 Python 技能无 JS bundle，跳过）
   let bundlePath = null;
-  if (!def.promptOnly) {
+  if (!def.promptOnly && !def.python) {
     const esbuild = loadEsbuild();
     await esbuild.build({
       entryPoints: [path.join(skillSrc, def.entry)],
@@ -302,10 +332,12 @@ export async function buildSkillPackage({
   } else {
     fs.copyFileSync(path.join(skillSrc, "package", "SKILL.md"), path.join(skillDir, "SKILL.md"));
     fs.copyFileSync(path.join(skillSrc, "package", "README.md"), path.join(skillDir, "README.md"));
-    fs.copyFileSync(
-      path.join(skillSrc, "package", ".env.example"),
-      path.join(skillDir, ".env.example"),
-    );
+    if (!def.python) {
+      fs.copyFileSync(
+        path.join(skillSrc, "package", ".env.example"),
+        path.join(skillDir, ".env.example"),
+      );
+    }
   }
   if (def.references) {
     fs.mkdirSync(path.join(skillDir, "references"), { recursive: true });
@@ -375,17 +407,21 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
         continue;
       }
       console.log("   自检：");
-      const script = path.join(r.skillDir, "scripts", path.basename(SKILL_DEFS[skill].bundleName));
-      const run = spawnSync(process.execPath, [script, ...r.selfCheck.args], {
+      const def = SKILL_DEFS[skill];
+      const python = def.python ? process.env.RAPTOR_AI_NEWS_PYTHON || "python" : null;
+      const command = python ?? process.execPath;
+      const args = python
+        ? r.selfCheck.args
+        : [path.join(r.skillDir, "scripts", path.basename(def.bundleName)), ...r.selfCheck.args];
+      const run = spawnSync(command, args, {
         encoding: "utf8",
         cwd: r.skillDir,
+        env: { ...process.env, PYTHONUTF8: "1", PYTHONDONTWRITEBYTECODE: "1" },
       });
       if (run.status !== 0 || !r.selfCheck.expect.every((re) => re.test(String(run.stdout)))) {
         throw new Error(`自检失败：exit=${run.status}\n${run.stderr}`);
       }
-      console.log(
-        `   node scripts/${path.basename(script)} ${r.selfCheck.args.join(" ")} → 正常 ✓`,
-      );
+      console.log(`   ${path.basename(command)} ${r.selfCheck.args.join(" ")} → 正常 ✓`);
     }
   })().catch((error) => {
     console.error(`❌ 打包失败：${error.message}`);

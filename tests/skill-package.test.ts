@@ -23,6 +23,62 @@ function childEnv() {
   return env;
 }
 
+test("技能打包：ai-news Python 独立包结构 + 解压后可自检、状态落包内 data/", async (t) => {
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-skill-news-"));
+  t.after(() => fs.rmSync(outDir, { recursive: true, force: true }));
+
+  const built = await buildSkillPackage({ outDir, skill: "ai-news", includeBinaries: false });
+  assert.equal(built.bundleBytes, 0, "Python 技能没有 JS bundle");
+
+  for (const rel of [
+    "SKILL.md",
+    "README.md",
+    "scripts/news.py",
+    "scripts/NOTICE.md",
+    "scripts/LICENSE",
+    "scripts/STANDALONE",
+    "scripts/radar/workflow.py",
+    "scripts/radar/newsroom.py",
+    "scripts/references/official-news-sources.json",
+  ]) {
+    assert.ok(fs.existsSync(path.join(built.skillDir, rel)), `产物应包含 ${rel}`);
+  }
+  assert.ok(
+    !built.files.some((f) => /__pycache__|\.pyc$|\.db$|\.env/.test(f)),
+    "不带缓存与本地数据",
+  );
+  assert.match(
+    fs.readFileSync(path.join(built.skillDir, "SKILL.md"), "utf8"),
+    /^---\nname: ai-news\n/,
+    "门面 SKILL.md 来自 package/，frontmatter 名为 ai-news",
+  );
+
+  const zip = fs.readFileSync(built.zipPath).toString("latin1");
+  assert.ok(zip.includes("ai-news/SKILL.md") && zip.includes("ai-news/scripts/news.py"));
+
+  const python = ["python", "python3"].find(
+    (c) =>
+      spawnSync(c, ["-c", "import sys; raise SystemExit(sys.version_info < (3, 11))"]).status === 0,
+  );
+  if (!python) return; // 无 Python 3.11+ 的机器只校验结构
+  const env: NodeJS.ProcessEnv = { ...process.env, PYTHONUTF8: "1", PYTHONDONTWRITEBYTECODE: "1" };
+  delete env.AI_NEWS_STATE_DIR;
+  const run = (args: string[]) =>
+    spawnSync(python, [path.join(built.skillDir, "scripts", "news.py"), ...args], {
+      encoding: "utf8",
+      cwd: os.tmpdir(), // 任意 cwd 都能跑
+      env,
+    });
+  const doctor = run(["doctor"]);
+  assert.equal(doctor.status, 0, doctor.stderr);
+  assert.equal(JSON.parse(doctor.stdout).status, "ok");
+  // 历史日期无冻结来源 → 明确报错，且不在用户家目录乱写
+  const history = run(["prepare", "--date", "2020-01-01"]);
+  assert.equal(history.status, 1);
+  assert.match(JSON.parse(history.stdout).error, /历史日期/);
+  assert.ok(!fs.existsSync(path.join(built.skillDir, "data", "state.db")), "历史日期不应建库");
+});
+
 test("技能打包：export-schedule 独立包结构 + 自包含可运行", async (t) => {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-skill-exp-"));
   t.after(() => fs.rmSync(outDir, { recursive: true, force: true }));
