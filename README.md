@@ -1,25 +1,36 @@
 <div align="center">
 
-# 🦖 CourseRaptor
+<img src="docs/courseraptor-logo.png" width="80" height="80" alt="CourseRaptor 小恐龙标识" />
 
-<img src="docs/courseraptor-logo.png" width="104" alt="CourseRaptor 小恐龙标识" />
+<h3>🦖 CourseRaptor</h3>
 
-[![CI](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
-[![下载最新版](https://img.shields.io/github/v/release/Health-525/courseraptor?label=release&color=orange)](https://github.com/Health-525/courseraptor/releases/latest)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social&v=2)](https://github.com/Health-525/courseraptor)
+**把课表、待办和学习资料，交给同一个 AI 助手。**
 
-**面向大学生的本地优先智能学习工作台：以 AI 为核心，统一连接课表、待办、课程资料与知识沉淀，让每一天的学习安排都清晰可控。**
+面向大学生的本地优先学习工作台
 
-[下载 Windows 版](https://github.com/Health-525/courseraptor/releases/latest) · [第一次使用](#第一次使用) · [源码与演示](#源码与离线演示) · [English](README.en.md)
+[![CI](https://img.shields.io/github/actions/workflow/status/Health-525/courseraptor/ci.yml?branch=main&style=flat&label=CI)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
+[![下载最新版](https://img.shields.io/github/v/release/Health-525/courseraptor?style=flat&label=release&color=2f8177)](https://github.com/Health-525/courseraptor/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-64748b?style=flat)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=flat&label=stars&color=64748b)](https://github.com/Health-525/courseraptor)
+
+**[下载 Windows 版](https://github.com/Health-525/courseraptor/releases/latest)** · [快速上手](#第一次使用) · [离线演示](#源码与离线演示) · [English](README.en.md)
 
 </div>
 
-课表在教务系统里，截止日期散在聊天和备忘录里。CourseRaptor 把你导入的课表、说过的待办和保存的知识放到同一个助手中，让你查询时少翻几个地方。
+<p align="center"><img src="docs/screenshots/demo-overview.png" width="960" alt="CourseRaptor 主界面：左侧会话列表、中间 AI 对话、右侧功能大厅" /></p>
 
-你可以问「这周周三在哪上课」，也可以说「记一下，周五下午三点前交实验报告」。课表、待办和生成的文件保存在本机，模型由你选择。**正式 AI 对话需要自己的模型 API Key，相关内容会发送到该模型服务，可能产生调用费用。**
+<p align="center"><sub>会话、对话与功能大厅，一屏连接学习日常。截图使用隔离的虚构数据，未调用 AI。</sub></p>
 
-[能帮你做什么](#能帮你做什么) · [界面一览](#界面一览) · [下载与运行要求](#下载与运行要求) · [第一次使用](#第一次使用) · [常见问题](#常见问题) · [数据与使用边界](#数据与使用边界) · [给开发者](#给开发者) · [参与贡献](#参与贡献)
+问一句「这周周三在哪上课」，记一句「周五下午三点前交实验报告」。CourseRaptor 把导入的课表、记录的待办和保存的知识放在一起，让你少翻几个地方。
+
+> **使用前了解：**学习记录和生成的文件保存在本机；正式 AI 对话需要自己的模型 API Key，相关内容会发送到所选模型服务，并可能产生调用费用。
+
+<details>
+<summary>文档导航</summary>
+
+[功能介绍](#能帮你做什么) · [更多界面](#界面一览) · [运行要求](#下载与运行要求) · [第一次使用](#第一次使用) · [常见问题](#常见问题) · [数据与使用边界](#数据与使用边界) · [开发与贡献](#给开发者)
+
+</details>
 
 ## 能帮你做什么
 
@@ -43,13 +54,7 @@
 
 ## 界面一览
 
-主界面从左到右依次是会话列表、对话区和功能大厅：
-
-<p align="center"><img src="docs/screenshots/demo-overview.png" width="960" alt="CourseRaptor 当前主界面：左侧会话列表、中间对话区和右侧功能大厅" /></p>
-
-<p align="center"><sub>当前源码实际界面，使用隔离的虚构示例数据。功能大厅及各功能面板均在右侧栏内打开；截图未调用 AI。</sub></p>
-
-功能大厅里的常用面板（同样为虚构示例数据，点击标题可查看原图）：
+主界面见页首预览。课表、今日安排、待办和知识库等面板均在右侧功能大厅内打开；以下截图同样使用虚构示例数据，点击标题可查看原图。
 
 <details>
 <summary>展开查看：课表、今日安排、待办与知识库</summary>
