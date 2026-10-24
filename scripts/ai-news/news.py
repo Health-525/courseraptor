@@ -155,13 +155,17 @@ def prepare_news(request: dict) -> dict:
     return {"status": "prepared" if records else "empty", "date": date, "cached": cached,
             "generated_at": payload.get("generated_at"), "source_set_sha256": source_hash(payload),
             "quality_gate": payload.get("quality_gate"), "source_health": health,
+            "selection": payload.get("selection"),
             "digest_exists": artifact_paths(date)["digest"].is_file(),
             "saved": len(saved), "saved_urls": [item["url"] for item in page["items"] if item["url"] in saved],
             **page}
 
 
-def markdown_for(date: str, records: list, entries: dict) -> str:
-    lines = [f"# AI 前哨｜{date}", "", "摘要仅依据各条来源文本；发布方主张保留来源归属。", ""]
+def markdown_for(date: str, records: list, entries: dict, selection: dict | None = None) -> str:
+    lines = [f"# AI 前哨｜{date}", "", "摘要仅依据各条来源文本；发布方主张保留来源归属。"]
+    if selection and "collected" in selection:
+        lines.append(f"本期从 {selection['collected']} 条采集记录中精选 {selection['selected']} 条。")
+    lines.append("")
     for index, record in enumerate(records, 1):
         entry = entries[record["url"]]
         # 不允许来源或模型输出通过换行伪造下一条记录。
@@ -227,7 +231,7 @@ def save_digest(request: dict) -> dict:
         if not finalize:
             return {"status": "draft", "date": date, "saved": len(entries), "total": len(records),
                     "remaining": len(missing), "highlighted": sum(e["highlight"] for e in entries.values())}
-        markdown = markdown_for(date, records, entries)
+        markdown = markdown_for(date, records, entries, payload.get("selection"))
         validate_frozen_digest(payload, markdown)
         atomic_write_text(paths["digest"], markdown)
         return {"status": "saved", "date": date, "total": len(records), "digest_file": str(paths["digest"]),
@@ -272,14 +276,30 @@ def query_news(request: dict) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("doctor", "prepare", "save", "query"))
+    parser.add_argument("--request-file", help="从 UTF-8 JSON 文件读取请求，代替标准输入（便于在各 shell 中写入中文摘要）")
+    parser.add_argument("--date", help="YYYY-MM-DD，缺省为上海今天")
+    parser.add_argument("--offset", type=int, help="分页起点")
+    parser.add_argument("--limit", type=int, help="每页条数 1–20")
+    parser.add_argument("--kind", choices=("daily", "breaking", "trend"), help="query 类型")
+    parser.add_argument("--days", type=int, help="trend 天数 2–31")
     args = parser.parse_args()
+    # Windows 控制台默认代码页不是 UTF-8，中文 JSON 输出会乱码或抛错。
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     try:
-        raw = sys.stdin.buffer.read(512_001)
+        if args.request_file:
+            raw = Path(args.request_file).read_bytes()[:512_001]
+        else:
+            raw = sys.stdin.buffer.read(512_001) if not sys.stdin.isatty() else b""
         if len(raw) > 512_000:
             raise ValueError("请求超过大小限制")
-        request = json.loads(raw.decode("utf-8") or "{}")
+        request = json.loads(raw.decode("utf-8-sig") or "{}")
         if not isinstance(request, dict):
             raise ValueError("请求必须是 JSON 对象")
+        for key in ("date", "offset", "limit", "kind", "days"):
+            if getattr(args, key) is not None:
+                request[key] = getattr(args, key)
         handlers = {"prepare": prepare_news, "save": save_digest, "query": query_news}
         result = doctor() if args.command == "doctor" else handlers[args.command](request)
         print(json.dumps(result, ensure_ascii=False))

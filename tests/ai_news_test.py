@@ -200,5 +200,179 @@ class NewsTest(unittest.TestCase):
         self.assertNotIn("publish", help_result.stdout)
 
 
+def candidate(index, **changes):
+    record = {
+        "id": f"c{index}", "event_id": f"e{index}", "source": f"Source {index}",
+        "source_type": "official_news", "rank_score": 80.0 - index * 0.1,
+        "alert_level": "watch", "verification_status": "single_source",
+        "recency_status": "current", "source_text_status": "available",
+        "recommended_highlight": False,
+    }
+    record.update(changes)
+    return record
+
+
+class DigestSelectionTest(unittest.TestCase):
+    def pick(self, records, limit=40):
+        from radar.newsroom import select_digest_records
+        return select_digest_records(records, limit)
+
+    def test_keeps_rank_order_and_reports_what_was_dropped(self):
+        records = [candidate(i) for i in range(6)] + [
+            candidate(10, recency_status="recovered"),
+            candidate(11, verification_status="low_evidence"),
+            candidate(12, source_text_status="unavailable"),
+            candidate(13, rank_score=50.0),
+            candidate(14, event_id="e0"),
+        ]
+        chosen, info = self.pick(records, 40)
+        self.assertEqual([r["id"] for r in chosen], [f"c{i}" for i in range(6)])
+        self.assertEqual(info["collected"], 11)
+        self.assertEqual(info["selected"], 6)
+        self.assertEqual(info["dropped"], {"below_score": 1, "duplicate_event": 1, "low_evidence": 1,
+                                           "stale": 1, "unavailable": 1})
+
+    def test_urgent_items_survive_staleness_and_score_floor(self):
+        urgent = candidate(1, recency_status="recovered", alert_level="high", verification_status="first_party",
+                           rank_score=55.0)
+        unreadable = candidate(2, source_text_status="unavailable", alert_level="high",
+                               verification_status="first_party")
+        weak = candidate(3, source_text_status="unavailable", alert_level="high")
+        chosen, _ = self.pick([urgent, unreadable, weak, candidate(4), candidate(5), candidate(6)], 40)
+        ids = [r["id"] for r in chosen]
+        self.assertIn("c1", ids)
+        self.assertIn("c2", ids)
+        self.assertNotIn("c3", ids, "只有一方来源的不可读记录不能靠告警等级入选")
+
+    def test_caps_per_source_and_per_type(self):
+        same_source = [candidate(i, source="One Feed") for i in range(6)]
+        chosen, info = self.pick(same_source, 40)
+        self.assertEqual(len(chosen), 3)
+        self.assertEqual(info["dropped"], {"source_cap": 3})
+        same_type = [candidate(i, source_type="youtube") for i in range(30)]
+        chosen, info = self.pick(same_type, 10)
+        self.assertEqual(len(chosen), 4, "单一来源类型最多占 40%")
+        self.assertEqual(info["dropped"], {"type_cap": 26})
+
+    def test_recommended_highlight_bypasses_caps_but_not_duplicate_events(self):
+        records = [candidate(i, source="One Feed", rank_score=50.0, recommended_highlight=True) for i in range(5)]
+        records.append(candidate(9, event_id="e0", recommended_highlight=True))
+        chosen, info = self.pick(records, 40)
+        self.assertEqual(len(chosen), 5)
+        self.assertEqual(info["dropped"], {"duplicate_event": 1})
+
+    def test_limit_is_enforced_and_validated(self):
+        records = [candidate(i, source_type=f"type{i % 7}", source=f"S{i}") for i in range(30)]
+        chosen, info = self.pick(records, 8)
+        self.assertEqual(len(chosen), 8)
+        self.assertEqual(info["dropped"]["over_limit"], 22)
+        for bad in (4, 101):
+            with self.assertRaisesRegex(ValueError, "limit"):
+                self.pick(records, bad)
+
+    def test_environment_limit(self):
+        from radar.workflow import digest_limit
+        with patch.dict(os.environ, {"AI_NEWS_DIGEST_LIMIT": "25"}):
+            self.assertEqual(digest_limit(), 25)
+        with patch.dict(os.environ, {"AI_NEWS_DIGEST_LIMIT": "many"}):
+            with self.assertRaisesRegex(ValueError, "AI_NEWS_DIGEST_LIMIT"):
+                digest_limit()
+        with patch.dict(os.environ, {"AI_NEWS_DIGEST_LIMIT": ""}):
+            self.assertEqual(digest_limit(), 40)
+
+
+class CuratedPrepareTest(unittest.TestCase):
+    """prepare() 端到端：采集全量进 SQLite，冻结快照只含精选。"""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="raptor-news-prep-")
+        self.addCleanup(self.temporary.cleanup)
+        environment = patch.dict(os.environ, {"AI_NEWS_STATE_DIR": self.temporary.name})
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    def collected(self, count):
+        now = datetime.now(timezone.utc)
+        return [ContentItem(
+            item_id=f"id-{i}", source_type="official_news", source=f"官方发布 · Vendor {i % 12}",
+            title=f"Vendor {i % 12} ships model {i} with agent API {i}", published_at=now - timedelta(hours=i % 20),
+            url=f"https://vendor{i % 12}.example.com/news/{i}",
+            raw_source_text="The vendor released a model and an API for agent workflows today. " * 3,
+        ) for i in range(count)]
+
+    def run_prepare(self, items):
+        from radar import workflow
+        from radar.models import SourceHealth
+        health = [SourceHealth("official_news", "ok", 10, 0, 0)]
+        with patch.object(workflow, "collect_sources", return_value=(items, health)):
+            return workflow.prepare(news.report_date())
+
+    def test_snapshot_is_curated_but_history_and_counts_are_complete(self):
+        code, result = self.run_prepare(self.collected(80))
+        self.assertEqual(code, 0, result)
+        self.assertEqual(result["collected"], 80)
+        self.assertLessEqual(result["total"], 40)
+        self.assertEqual(result["selection"]["collected"], 80)
+        self.assertEqual(result["selection"]["selected"], result["total"])
+        payload = json.loads(Path(result["source_file"]).read_text(encoding="utf-8"))
+        self.assertEqual(len(payload["items"]), result["total"])
+        self.assertTrue(all(r["recency_status"] in {"current", "recovered"} for r in payload["items"]))
+        self.assertEqual(payload["selection"], result["selection"])
+        from radar.intelligence import verify_source_payload
+        verify_source_payload(payload)
+        db = Storage(Path(self.temporary.name))
+        db.initialize()
+        self.assertEqual(len(db.items_for_digest(news.report_date())), 80, "历史与趋势仍保留全量采集")
+
+    def test_prepare_reader_exposes_selection_and_digest_header_states_it(self):
+        code, result = self.run_prepare(self.collected(60))
+        self.assertEqual(code, 0, result)
+        with patch.object(news, "prepare", side_effect=AssertionError("不得重新采集")):
+            page = news.prepare_news({"limit": 20})
+        self.assertTrue(page["cached"])
+        self.assertEqual(page["selection"], result["selection"])
+        self.assertEqual(page["total"], result["total"])
+        self.assertLess(page["total"], 60)
+        header = news.markdown_for("2026-10-24", [], {}, result["selection"])
+        self.assertIn(f"从 {result['collected']} 条采集记录中精选 {result['selection']['selected']} 条", header)
+        self.assertNotIn("精选", news.markdown_for("2026-10-24", [], {}, None))
+
+    def test_cache_pruning_removes_only_stale_responses(self):
+        db = Storage(Path(self.temporary.name))
+        db.initialize()
+        db.put_http_cache("https://fresh.example.com/feed", b"fresh")
+        db.put_http_cache("https://old.example.com/feed", b"old")
+        with db._connect() as connection:
+            connection.execute("UPDATE http_cache SET fetched_at = ? WHERE url = ?",
+                               ((datetime.now(timezone.utc) - timedelta(days=9)).isoformat(),
+                                "https://old.example.com/feed"))
+        self.assertEqual(db.prune_http_cache(), 1)
+        self.assertIsNotNone(db.get_http_cache("https://fresh.example.com/feed"))
+        self.assertIsNone(db.get_http_cache("https://old.example.com/feed"))
+
+
+class CommandLineTest(unittest.TestCase):
+    def test_flags_utf8_request_file_and_standalone_state_dir(self):
+        with tempfile.TemporaryDirectory(prefix="raptor-news-cli-") as directory:
+            request = Path(directory) / "request.json"
+            request.write_text('{"date": "../../x"}', encoding="utf-8-sig")
+            env = {**os.environ, "AI_NEWS_STATE_DIR": directory, "PYTHONUTF8": "1"}
+            run = subprocess.run([sys.executable, "-B", str(ENGINE / "news.py"), "query", "--request-file", str(request)],
+                                 capture_output=True, env=env, stdin=subprocess.DEVNULL)
+            self.assertEqual(run.returncode, 1)
+            self.assertEqual(json.loads(run.stdout.decode("utf-8"))["status"], "failed")
+            flagged = subprocess.run([sys.executable, "-B", str(ENGINE / "news.py"), "query", "--date", "2020-01-01"],
+                                     capture_output=True, env=env, stdin=subprocess.DEVNULL)
+            self.assertIn("冻结来源", json.loads(flagged.stdout.decode("utf-8"))["error"])
+
+    def test_standalone_marker_moves_state_next_to_the_skill(self):
+        from radar import workflow
+        marker = workflow.skill_root() / "STANDALONE"
+        self.assertFalse(marker.exists(), "仓库源码里不应带独立包标记")
+        with patch.dict(os.environ, {"AI_NEWS_STATE_DIR": ""}), \
+                patch.object(Path, "is_file", lambda self: self.name == "STANDALONE"):
+            self.assertEqual(workflow.state_dir(), workflow.skill_root().parent / "data")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
