@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/courseraptor-logo.png" width="88" height="88" alt="CourseRaptor 小恐龙标识" />
+<img src="docs/courseraptor-logo.png" width="240" height="240" alt="CourseRaptor 小恐龙标识" />
 
 <h1>CourseRaptor</h1>
 
@@ -15,21 +15,23 @@
 
 [**下载 Windows 版**](https://github.com/Health-525/courseraptor/releases/latest) · [快速上手](#快速上手) · [功能介绍](#功能介绍) · [使用文档](#文档与贡献) · [English](README.en.md)
 
-<br />
-
-<img src="docs/screenshots/demo-overview.png" width="960" alt="CourseRaptor 主界面：左侧会话列表、中间 AI 对话、右侧功能大厅" />
-
-<sub>会话、对话与功能大厅，一屏连接学习日常。截图使用虚构数据，未调用 AI。</sub>
-
 </div>
-
-<br />
 
 「这周周三在哪上课？」「记一下，周五下午三点前交实验报告。」
 
 CourseRaptor 将你导入的课表、记录的待办和保存的知识放在一起。可以直接对话，也可以在功能大厅查看课表、今日安排、待办和知识库。
 
 > **使用前了解：**学习记录与生成文件保存在本机；正式 AI 对话需要自己的模型 API Key，相关内容会发送到所选模型服务，并可能产生调用费用。
+
+## 界面预览
+
+左侧管理会话，中间与 AI 对话，右侧功能大厅集中查看课表、待办和学习资料。
+
+<p align="center">
+  <img src="docs/screenshots/demo-overview.png" width="840" alt="CourseRaptor 主界面：左侧会话列表、中间 AI 对话、右侧功能大厅" />
+  <br />
+  <sub>离线演示界面 · 使用虚构数据 · 未调用 AI</sub>
+</p>
 
 ## 功能介绍
 
