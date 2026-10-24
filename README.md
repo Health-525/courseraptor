@@ -9,7 +9,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=social&v=2)](https://github.com/Health-525/courseraptor)
 
-**大学生的开源 AI 课表与待办助手。导入课表，用一句话查课、记待办、整理本周安排。**
+**面向大学生的本地优先智能学习工作台：以 AI 为核心，统一连接课表、待办、课程资料与知识沉淀，让每一天的学习安排都清晰可控。**
 
 [下载 Windows 版](https://github.com/Health-525/courseraptor/releases/latest) · [第一次使用](#第一次使用) · [源码与演示](#源码与离线演示) · [English](README.en.md)
 
@@ -27,16 +27,16 @@
 
 ## 能帮你做什么
 
-先从课表和待办开始，再按需要使用其他能力。
+先从课表和待办开始，再按需要使用其他能力。以下每一条都对应当前源码中实际注册的 Agent 工具，而不是规划中的功能。
 
-- **查课与调课**：按教学周查看课程、时间和地点；通过对话修改本地课表，导出课表图片或 `.ics` 日历。
-- **记截止待办**：说出事项和截止时间，保存后可查询、完成或修改；程序运行时按提醒规则发出到期提醒。
-- **整理今日安排**：结合已有课表和待办回答「今天有什么安排」，在功能大厅查看具体记录。
-- **留下学习记录**：按课程整理知识点，用费曼法、习题诊断或螺旋复习等技能辅助学习。
-- **处理课程材料**：读取本地 PDF、Word 和表格，筛选数据，生成 Word、Excel 或 PDF 文件。
-- **在常用入口继续用**：网页、终端及可选的 QQ、Obsidian 入口复用同一台电脑上的助手；QQ 与插件需要另行配置。
+- **查课与调课**：按教学周查看课程、时间和地点；通过对话修改本地课表，导出课表图片（SVG / PNG）或 `.ics` 日历文件。
+- **记截止待办**：说出事项和截止时间即可保存；主程序运行时每小时检查一次，临近截止每天提醒一次，支持 Windows 桌面通知，配置 QQ 后可同时推送到 QQ。
+- **整理今日安排**：结合课表和待办回答「今天有什么安排」；功能大厅提供今日安排、课表、待办、知识库等独立面板，不开对话也能查。
+- **留下学习记录**：按课程整理知识点，借助费曼学习法、螺旋复习等内置学习技能辅助消化；重要偏好和结论可存入长期记忆，跨会话自动生效。
+- **处理课程材料**：上传、粘贴或拖入本地 PDF、Word、表格等附件（单个文件不超过 25 MB），让 AI 阅读、筛选和计算，生成 Word、Excel、PDF 文件或转换成 PPT，产物保存在本机。
+- **在常用入口继续用**：网页（默认 `127.0.0.1:3210`）、终端 TUI，以及可选的 QQ 机器人、Obsidian 插件入口，复用同一台电脑上的助手状态；QQ 与插件需要另行配置。
 
-不需要先适配学校教务系统才能开始：可以直接导入自己的课表。成绩、考试、教务通知等在线查询取决于已安装的学校适配器，不是所有学校都有。
+不需要先适配学校教务系统才能开始：公开仓库默认内置「手动导入课表」模式，任何学校都能直接使用。在线成绩、考试、教务通知查询依赖学校适配器，公开仓库当前不随附任何学校的在线适配器。
 
 <details>
 <summary>展开查看：课表、今日安排、待办与知识库</summary>
@@ -54,7 +54,7 @@
 <details>
 <summary>也关注 AI 行业动态？</summary>
 
-源码 `main` 已接入 [AI 新闻 Skill](skills/ai-news/SKILL.md)：支持有来源的中文日报、突发简报和本地历史趋势，额外需要 Python 3.11+。首次采集访问配置好的公开来源，之后复用当天快照；不包含飞书投递。现有安装包是否包含此能力，以对应发布说明为准。见[配置说明](docs/configuration.md#ai-新闻技能)。
+源码 `main` 已接入 [AI 新闻技能](skills/ai-news/SKILL.md)：可以生成带来源的中文日报和突发简报，并查询本地留存的采集历史，额外需要 Python 3.11+。它是按需触发的工作流，不会在后台定时自动推送；首次采集访问配置好的公开来源，之后当天复用快照。现有安装包是否包含此能力，以对应发布说明为准。见[配置说明](docs/configuration.md#ai-新闻技能)。
 
 </details>
 
@@ -66,7 +66,7 @@
 | Windows x64 便携版 | 已内置 Node.js；正式对话需要模型 Key | 同一发布页中选择 `portable-win-x64.exe` 或 `.zip` 结尾的文件 |
 | Windows / macOS / Linux 源码版 | Node.js 24+、Git；首次安装依赖需要联网 | [源码与离线演示](#源码与离线演示) |
 
-当前预编译安装包面向 Windows x64；macOS 和 Linux 请使用源码版。不要把发布页底部的 **Source code** 包当作 Windows 安装器。附加功能有各自依赖，中文 PDF 需要可用的中文字体，AI 新闻需要 Python。
+当前预编译安装包面向 Windows x64；macOS 和 Linux 请使用源码版。不要把发布页底部的 **Source code** 包当作 Windows 安装器。附加功能有各自依赖：中文 PDF 需要可用的中文字体，AI 新闻需要 Python。
 
 ## 第一次使用
 
@@ -128,6 +128,20 @@ npm start
 </details>
 
 <details>
+<summary>我的数据保存在哪里？</summary>
+
+源码版默认保存在仓库的 `data/` 目录，可用环境变量 `RAPTOR_DATA_DIR` 指到别处；Windows 桌面版保存在 `%APPDATA%\CourseRaptor\data`。会话、课表、待办、知识库和加密后的模型凭证都在其中，备份数据就是备份这个目录；不要把使用过的整个目录原样转发给他人。
+
+</details>
+
+<details>
+<summary>怎么升级到新版本？</summary>
+
+Windows 桌面安装版内置自动更新，也可以直接下载新版安装包覆盖安装；个人数据与程序本体分开存放，升级不受影响。便携版重新运行新版文件即可。源码版在仓库目录执行 `git pull` 后重启；终端斜杠命令 `/update` 的自更新需要额外配置更新服务端，个人使用不必开启。
+
+</details>
+
+<details>
 <summary>启动、模型连接或导入遇到问题怎么办？</summary>
 
 先看[同学指南](docs/student-guide.md#常见问题)和[配置参考](docs/configuration.md)。源码版可运行 `npm run doctor` 检查本地前提；它不会替你检查模型账户余额。安装包未做代码签名，Windows 可能提示未知发布者；请核对下载来源并自行决定是否运行。可复现问题请提交 [Issue](https://github.com/Health-525/courseraptor/issues/new/choose)，不要附带密码、Key 或完整个人日志。
@@ -136,16 +150,17 @@ npm start
 
 ## 数据与使用边界
 
-- **本地保存，模型按需联网。** 会话、课表、待办和知识库存放在本机；AI 对话所需的提示词、相关查询结果和材料内容会发送到你配置的模型服务商。本地优先不等于所有内容永远不离开电脑。
-- **凭证独立保存。** 模型 Key 等凭证加密保存在本机；分享项目时发仓库链接或干净安装包，不要转发已经使用过的整个目录。
-- **每个人使用自己的数据。** 多入口复用同一台电脑上的状态，QQ 白名单不代表多用户数据隔离。需要多人独立使用时，请各自安装和配置。
+- **本地保存，模型按需联网。** 会话、课表、待办和知识库存放在本机；AI 对话所需的提示词、相关查询结果和附件内容会发送到你配置的模型服务商。此外，天气查询、版本更新检查等少量功能会访问对应公共服务，可选的新闻采集与网页抓取只在启用时联网。本地优先不等于所有内容永远不离开电脑。
+- **凭证加密保存。** 模型 Key 等凭证使用 AES-256-GCM 加密后单独保存在本机，与代码和会话记录分开存放；分享项目时发仓库链接或干净安装包，不要转发已经使用过的整个目录。
+- **使用统计可关闭。** 源码直接运行时使用统计为空实现、不发送任何数据；正式安装包可能内置匿名使用统计，可用环境变量 `RAPTOR_NO_TELEMETRY=1` 关闭。
+- **每个人使用自己的数据。** 多入口复用同一台电脑上的状态；QQ 白名单只限制谁能对话，不提供多用户数据隔离。需要多人独立使用时，请各自安装和配置。
 - **结果需要核对。** 本项目为非官方个人工具。课程变更、考试和其他重要安排以学校正式渠道为准；生成内容与解析结果应由使用者确认。
 
 网络、附件解析和凭证处理的细节见 [SECURITY.md](SECURITY.md)。
 
 ## 给开发者
 
-学生用途之外，CourseRaptor 也是一个可运行的本地 Agent 参考项目。技术说明集中在这里，便于按需要拆解和复用。
+学生用途之外，CourseRaptor 也是一个完整可运行的本地 Agent 参考项目：TypeScript 与 Vercel AI SDK 组成的多轮工具调用循环（`ToolLoopAgent`，当前注册二十余个核心工具），源码由 tsx 直接解释执行、无编译产物，模型接入覆盖 DeepSeek 官方 API、十余家 OpenAI 兼容厂商与自定义端点。
 
 | 想研究什么 | 从哪里开始 |
 |---|---|
@@ -157,14 +172,16 @@ npm start
 | 对话内按需加载 Skill | [`skills/`](skills/) 与 [`src/core/tools/skill-library.ts`](src/core/tools/skill-library.ts) |
 | 桌面和 Obsidian 入口 | [`desktop/`](desktop/) · [`obsidian/`](obsidian/) |
 
-核心采用 TypeScript 与 Vercel AI SDK，网页使用 Node HTTP 服务。依赖方向为 `local → channels → core`，分层检查由 CI 执行。主要个人状态使用本地 JSON；AI 新闻引擎另使用本地 SQLite 保存采集历史和缓存，无需部署数据库服务。
+依赖方向为 `local → channels → core`，由 CI 的分层检查强制；个人状态使用本地 JSON 文件，AI 新闻引擎另用本地 SQLite 保存采集历史，无需部署任何数据库服务。
 
 ```bash
-npm run check          # 类型、代码规范、分层检查
-npm run test:coverage  # 全量测试与覆盖率门禁
+npm run doctor          # 本地环境体检
+npm run check           # 类型、代码规范、分层检查
+npm run test:coverage   # 全量测试与覆盖率门禁（行覆盖 80%）
+npm run package:skill   # 将技能打包为可分发 zip
 ```
 
-课表图也可[打包为独立技能](skills/export-schedule/package/README.md)，学习技能的来源与许可见 [`skills/openmaic/`](skills/openmaic/)。AI 新闻的移植来源见[引擎说明](scripts/ai-news/NOTICE.md)。
+CI 在 Ubuntu 与 Windows 双系统执行安装体检、类型检查、代码规范、重复度、分层、覆盖率与生产依赖审计。课表图可[打包为独立技能](skills/export-schedule/package/README.md)，学习技能的来源与许可见 [`skills/openmaic/`](skills/openmaic/)，AI 新闻的移植来源见[引擎说明](scripts/ai-news/NOTICE.md)。
 
 ## 文档与参与贡献
 
@@ -172,10 +189,10 @@ npm run test:coverage  # 全量测试与覆盖率门禁
 
 [同学指南](docs/student-guide.md) · [配置参考](docs/configuration.md) · [能力文档](docs/capabilities.md) · [Obsidian 插件](obsidian/README.md) · [路线图](docs/roadmap.md)
 
-欢迎告诉我们你最常重复处理的校园小事，以及安装、模型配置或课表导入卡在哪一步。问题请用 [Issue 表单](https://github.com/Health-525/courseraptor/issues/new/choose)，使用想法可到 [Discussions](https://github.com/Health-525/courseraptor/discussions) 交流；代码与文档贡献见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+欢迎告诉我们你最常重复处理的校园小事，以及安装、模型配置或课表导入卡在哪一步。Issue 区提供「使用问题」「学生功能建议」「请求适配我的学校」三类表单，使用想法可到 [Discussions](https://github.com/Health-525/courseraptor/discussions) 交流；代码与文档贡献见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
 如果它帮到了你，欢迎 Star 或分享项目链接，让有同样需求的同学找到它。
 
 ## 许可证
 
-[MIT](LICENSE)。本项目用于个人学习、研究与技术交流，请勿用于商业用途或牟利场景；按「现状」提供，不作任何明示或默示担保。
+[MIT](LICENSE)。本项目为非官方的个人学习工具，按「现状」提供，不作任何明示或默示担保。
