@@ -5140,6 +5140,7 @@ let providerCurrent = "deepseek";
 let providerSaved = "deepseek";
 let providerOptions = [];
 let providerHosted = false;
+let providerKeySaved = {}; // 各供应商是否已存过 Key（后端只给布尔）
 let siteProviders = ["deepseek"]; // quota 探测成功后更新；PR 过渡期默认仅 DeepSeek
 let quotaUiMode = ""; // quota 探测得到的 Key 来源选择（与 dsUiMode 同推导）
 function providerLabelOf(id) {
@@ -5159,10 +5160,11 @@ function applyProviderUi() {
   const modelRow = document.getElementById("customModelRow");
   if (modelRow) modelRow.hidden = !isCustom;
   const kk = document.getElementById("sKey");
+  /* 每家供应商一把 Key：该厂商存过就提示「已保存」，保存设置时后端自动载入，不必重填 */
   if (kk)
     kk.placeholder =
-      keyConfigured && providerCurrent === providerSaved
-        ? "已保存；留空不修改"
+      providerKeySaved[providerCurrent] || (keyConfigured && providerCurrent === providerSaved)
+        ? "已保存，无需重新填写；留空不修改"
         : providerKeyHintOf(providerCurrent);
   const note = document.getElementById("dsOwnNote");
   if (note)
@@ -5175,6 +5177,7 @@ function fillProviders(d) {
     ? p.options.filter((x) => x && typeof x.id === "string")
     : [];
   providerHosted = !!p.hosted;
+  providerKeySaved = p.keySaved && typeof p.keySaved === "object" ? p.keySaved : {};
   providerSaved = p.current || "deepseek";
   providerCurrent = p.current || "deepseek";
   const url = document.getElementById("customBaseUrl");
@@ -5232,7 +5235,21 @@ function pickProvider(id) {
   if (mid) mid.value = "";
   pickModel("");
   previewProviderModels(id);
+  /* 自动保存：选好厂商即落盘并载入它自己已存的 Key，不必再点「保存设置」。
+     自定义端点还缺服务地址，留给用户填完后手动保存 */
+  if (id !== "custom") autoSaveSettings();
 }
+/* 复用「保存设置」的提交与回填；保存中按钮是 disabled，重复触发自然无效 */
+function autoSaveSettings() {
+  if (document.body.dataset.demo === "true") return;
+  const btn = document.getElementById("saveSettings");
+  if (btn && !btn.disabled) btn.click();
+}
+/* Key 填完（失焦/回车确认）自动保存；先于「保存设置」按钮的 click 触发，
+   此时按钮已 disabled，不会重复提交 */
+sKey.addEventListener("change", () => {
+  if (sKey.value.trim()) autoSaveSettings();
+});
 const providerSelectBtn = document.getElementById("providerSelect");
 if (providerSelectBtn) {
   bindDdBtn(providerSelectBtn);

@@ -1534,6 +1534,45 @@ test("POST /api/settings 切换供应商：型号随供应商记忆、custom 需
   await call({ providerId: "deepseek" });
 });
 
+test("每个供应商各存一把 Key：切换自动载入各自的 Key，没存过的不沿用上一家", async () => {
+  const url = (await startChatWeb())!;
+  const { config } = await import("../src/core/config");
+  const call = (body: unknown) =>
+    wfetch(`${url}/api/settings`, { method: "POST", body: JSON.stringify(body) });
+  const read = async () =>
+    (await (await fetch(`${url}/api/settings`)).json()) as {
+      provider: { current: string; keySaved: Record<string, boolean> };
+    };
+  const glmKey = "glm-test-key-0123456789abcdef";
+  const savedEnvKey = process.env.RAPTOR_PROVIDER_KEY;
+
+  try {
+    // 在智谱下保存 Key
+    assert.equal((await call({ providerId: "glm", apiKey: glmKey })).status, 200);
+    assert.equal(config.deepseekApiKey, glmKey);
+    assert.equal(process.env.RAPTOR_PROVIDER_KEY, glmKey);
+
+    // 切到通义千问（从没存过 Key）：不能带着智谱的 Key 去请求别家端点
+    assert.equal((await call({ providerId: "qwen" })).status, 200);
+    assert.equal(config.deepseekApiKey, "", "未保存过 Key 的供应商不沿用上一家的 Key");
+    assert.equal(process.env.RAPTOR_PROVIDER_KEY, undefined);
+    const onQwen = await read();
+    assert.equal(onQwen.provider.keySaved.glm, true, "已存过 Key 的供应商要告知前端");
+    assert.equal(onQwen.provider.keySaved.qwen, undefined);
+
+    // 切回智谱：自动载入它自己的 Key，无需再填
+    const back = await call({ providerId: "glm" });
+    assert.equal(back.status, 200);
+    assert.equal(config.deepseekApiKey, glmKey, "切回来自动载入该供应商保存的 Key");
+    assert.equal(process.env.RAPTOR_PROVIDER_KEY, glmKey);
+    assert.equal(JSON.stringify(await read()).includes(glmKey), false, "状态接口不回显 Key 明文");
+  } finally {
+    await call({ providerId: "deepseek" });
+    if (savedEnvKey === undefined) delete process.env.RAPTOR_PROVIDER_KEY;
+    else process.env.RAPTOR_PROVIDER_KEY = savedEnvKey;
+  }
+});
+
 test("托管环境（RAPTOR_HOSTED=1）：供应商与 custom 地址提交一律被拒", async () => {
   const url = (await startChatWeb())!;
   const { config } = await import("../src/core/config");
