@@ -1,30 +1,31 @@
 <div align="center">
 
-<img src="docs/courseraptor-logo.png" width="160" height="160" alt="CourseRaptor 小恐龙标识" />
+<a href="https://github.com/Health-525/courseraptor/releases/latest">
+  <img src="docs/courseraptor-logo.png" width="150" height="150" alt="CourseRaptor 小恐龙标识" />
+</a>
 
 <h1>CourseRaptor</h1>
 
-**面向大学生的本地优先 AI 学习工作台**
+<p>
+  <strong>面向大学生的本地优先 AI 学习工作台</strong><br />
+  课表、待办、课程资料与知识库，一处整理，随时对话。
+</p>
 
-把课表、待办和学习资料，交给同一个助手。
+[![Release](https://img.shields.io/github/v/release/Health-525/courseraptor?logo=github&label=release&color=2f8177)](https://github.com/Health-525/courseraptor/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/Health-525/courseraptor/ci.yml?branch=main&logo=githubactions&label=CI)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-[![CI](https://img.shields.io/github/actions/workflow/status/Health-525/courseraptor/ci.yml?branch=main&style=for-the-badge&label=CI&labelColor=334155&color=2f8177)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Health-525/courseraptor?style=for-the-badge&label=&labelColor=334155&color=2f8177)](https://github.com/Health-525/courseraptor/releases/latest)
-[![License: MIT](https://img.shields.io/badge/license-MIT-2f8177?style=for-the-badge&labelColor=334155)](LICENSE)
-
-[**下载 Windows 版**](https://github.com/Health-525/courseraptor/releases/latest) · [快速上手](#快速上手) · [功能介绍](#功能介绍) · [使用文档](#文档与贡献) · [English](README.en.md)
+[**下载 Windows 版**](https://github.com/Health-525/courseraptor/releases/latest) · [**快速上手**](#快速上手) · [使用文档](docs/student-guide.md) · [English](README.en.md)
 
 </div>
 
-「这周周三在哪上课？」「记一下，周五下午三点前交实验报告。」
+CourseRaptor 把课表查询、截止提醒和课程资料整理放进同一个学习工作台。你可以问「这周周三在哪上课？」，也可以说「记一下，周五下午三点前交实验报告」，或直接在功能大厅查看和管理。
 
-CourseRaptor 将你导入的课表、记录的待办和保存的知识放在一起。可以直接对话，也可以在功能大厅查看课表、今日安排、待办和知识库。
-
-> **使用前了解：**学习记录与生成文件保存在本机；正式 AI 对话需要自己的模型 API Key，相关内容会发送到所选模型服务，并可能产生调用费用。
+学习记录保存在本机；正式 AI 对话需要自己的模型 API Key，相关内容会发送到所选模型服务，并可能产生调用费用。没有 Key 也可以先体验[离线演示](#源码与离线演示)。
 
 ## 界面预览
 
-左侧管理会话，中间与 AI 对话，右侧功能大厅集中查看课表、待办和学习资料。
+**对话与功能大厅。** 左侧管理会话，中间与 AI 对话，右侧查看课表、待办和学习资料。
 
 <p align="center">
   <img src="docs/screenshots/demo-overview.png" width="840" alt="CourseRaptor 主界面：左侧会话列表、中间 AI 对话、右侧功能大厅" />
@@ -36,14 +37,12 @@ CourseRaptor 将你导入的课表、记录的待办和保存的知识放在一�
 
 <a id="能帮你做什么"></a>
 
-| 能力 | 你可以做什么 |
-| :--- | :--- |
-| **课表与日历** | 按教学周查询课程、时间和地点，调整本地课表，导出 SVG / PNG 图片或 `.ics` 日历。 |
-| **待办与提醒** | 用一句话记录截止事项，查询、修改或完成待办；程序运行时支持到期提醒。 |
-| **今日安排** | 结合课表和待办整理当天计划，也可直接打开功能大厅查看。 |
-| **知识与复习** | 按课程保存知识点，使用费曼学习法、螺旋复习等学习技能，跨会话保留重要记忆。 |
-| **课程材料** | 阅读 PDF、Word、表格等附件，筛选和计算数据，生成 Word、Excel、PDF 或转换成 PPT。 |
-| **多种入口** | 通过网页、终端 TUI 使用；另行配置后，可接入 QQ 机器人和 Obsidian 插件。 |
+- **课表与日历** — 按教学周查询课程、时间和地点，调整课表，导出 SVG / PNG 或 `.ics` 日历。
+- **待办与提醒** — 用一句话记录截止事项，查询、修改或完成待办；程序运行时支持到期提醒。
+- **今日安排** — 结合课表和待办整理当天计划，在功能大厅直接查看。
+- **知识与复习** — 按课程保存知识点，使用费曼学习法、螺旋复习等学习技能，跨会话保留重要记忆。
+- **课程材料** — 阅读 PDF、Word 和表格，筛选与计算数据，生成 Word、Excel、PDF 或转换成 PPT。
+- **多种入口** — 支持网页与终端 TUI；另行配置后，可接入 QQ 机器人和 Obsidian 插件。
 
 **不需要先适配学校，就能导入课表开始使用。** 公开仓库默认提供手动导入模式；在线成绩、考试和教务通知查询需要对应的学校适配器，当前公开仓库不随附在线适配器。
 
@@ -217,6 +216,6 @@ CI 在 Ubuntu 与 Windows 上执行检查。技能分发和来源说明见[课�
 
 欢迎通过 [Issue](https://github.com/Health-525/courseraptor/issues/new/choose) 反馈使用问题或建议，在 [Discussions](https://github.com/Health-525/courseraptor/discussions) 分享校园使用场景。如果它帮到了你，也欢迎 Star 或分享给需要的同学。
 
----
+## 许可证
 
 基于 [MIT](LICENSE) 许可证开源。非官方个人学习工具，按「现状」提供，不作任何明示或默示担保。
