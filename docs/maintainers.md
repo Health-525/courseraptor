@@ -37,7 +37,7 @@ npm run demo
 | `src/core/fetch-result.ts` | 统一抓取结果类型（数据接入层与 weather 共用） |
 | `src/core/workspace-data.ts` | 待办 / 上传文件的跨层共享存储 |
 
-状态文件（session.json、memory.json、qq-allowlist.json、qq-bridge.log）统一放 `data/` 下；旧版本散在项目根的文件会在首次运行时自动搬过去。`credentials.enc` 仍留在项目根（安全考量，支持 `RAPTOR_CREDENTIALS_FILE` 重定向）。
+状态文件（session.json、memory.json、qq-allowlist.json、qq-bridge.log）统一放 `data/` 下；旧版本散在项目根的文件会在首次运行时自动搬过去。`credentials.enc` 同样放 `data/` 下（跟 `RAPTOR_DATA_DIR` 走，支持 `RAPTOR_CREDENTIALS_FILE` 单独重定向）；旧版本在项目根的凭证首次运行时自动搬入。命令行、网页、桌面端共用同一个数据目录：桌面端默认用 `%APPDATA%\courseraptor-desktop\data`，在其 userData 目录放一个 `data-dir.txt`（第一行写绝对路径）即可改指向仓库的 `data/`。
 
 ## 安装包内容
 
