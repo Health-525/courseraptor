@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/courseraptor-logo.png" width="240" height="240" alt="CourseRaptor 小恐龙标识" />
+<img src="docs/courseraptor-logo.png" width="160" height="160" alt="CourseRaptor 小恐龙标识" />
 
 <h1>CourseRaptor</h1>
 
@@ -8,10 +8,9 @@
 
 把课表、待办和学习资料，交给同一个助手。
 
-[![CI](https://img.shields.io/github/actions/workflow/status/Health-525/courseraptor/ci.yml?branch=main&style=flat&label=CI)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Health-525/courseraptor?style=flat&label=release&color=2f8177)](https://github.com/Health-525/courseraptor/releases/latest)
-[![License: MIT](https://img.shields.io/badge/license-MIT-64748b?style=flat)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/Health-525/courseraptor?style=flat&label=stars&color=64748b)](https://github.com/Health-525/courseraptor/stargazers)
+[![CI](https://img.shields.io/github/actions/workflow/status/Health-525/courseraptor/ci.yml?branch=main&style=for-the-badge&label=CI&labelColor=334155&color=2f8177)](https://github.com/Health-525/courseraptor/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Health-525/courseraptor?style=for-the-badge&label=&labelColor=334155&color=2f8177)](https://github.com/Health-525/courseraptor/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2f8177?style=for-the-badge&labelColor=334155)](LICENSE)
 
 [**下载 Windows 版**](https://github.com/Health-525/courseraptor/releases/latest) · [快速上手](#快速上手) · [功能介绍](#功能介绍) · [使用文档](#文档与贡献) · [English](README.en.md)
 
