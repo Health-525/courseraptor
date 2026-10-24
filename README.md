@@ -4,7 +4,7 @@
   <img src="docs/courseraptor-logo.png" width="150" height="150" alt="CourseRaptor 小恐龙标识" />
 </a>
 
-<h1>CourseRaptor</h1>
+<h1>🦖 CourseRaptor</h1>
 
 <p>
   <strong>面向大学生的本地优先 AI 学习工作台</strong><br />
