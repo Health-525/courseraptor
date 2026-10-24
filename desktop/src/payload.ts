@@ -28,6 +28,30 @@ export interface ResolvedBackend {
   nodeBin: string;
 }
 
+/**
+ * 旧版本把 credentials.enc 放在后端目录里（backend/<版本>/CourseRaptor/app/），
+ * 升级清理旧版本目录时会一并丢掉。凭证改放 dataDir 后，这里在清理前把旧版凭证
+ * 搬过去：数据目录里已有则不覆盖；多个旧版本取最新修改的那份。
+ */
+export function rescueLegacyCredentials(dataDir: string): void {
+  const target = path.join(dataDir, "credentials.enc");
+  const base = path.join(app.getPath("userData"), "backend");
+  try {
+    if (fs.existsSync(target) || !fs.existsSync(base)) return;
+    const found = fs
+      .readdirSync(base)
+      .map((v) => path.join(base, v, "CourseRaptor", "app", "credentials.enc"))
+      .filter((f) => fs.existsSync(f))
+      .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+    const newest = found[0];
+    if (!newest) return;
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.copyFileSync(newest, target);
+  } catch {
+    /* 抢救失败不挡启动：用户重新配置一次即可 */
+  }
+}
+
 export async function ensureBackendExtracted(payloadZip: string): Promise<ResolvedBackend> {
   const version = app.getVersion();
   const base = path.join(app.getPath("userData"), "backend");

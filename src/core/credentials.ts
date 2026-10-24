@@ -6,7 +6,7 @@
  * 凭证文件被拷贝到其他机器无法解密，防住云同步/误分享等明文泄露路径。
  * 边界：对同机同用户的恶意程序无防护作用（本机派生密钥本机可解）。
  *
- * 优先级：.env 的 JWGL_* > credentials.enc > 首次运行引导录入
+ * 优先级：.env 的 JWGL_* > credentials.enc（data/ 下）> 首次运行引导录入
  */
 
 import crypto from "node:crypto";
@@ -14,11 +14,34 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { quarantineCorruptFileSync, writeFileAtomicSync } from "./atomic-write";
-import { PROJECT_ROOT } from "./paths";
+import { dataDir, PROJECT_ROOT } from "./paths";
 import { registeredSchool } from "./school";
 
-// RAPTOR_CREDENTIALS_FILE 可把凭证文件指到别处（测试隔离用），默认项目根
-const CRED_FILE = process.env.RAPTOR_CREDENTIALS_FILE || path.join(PROJECT_ROOT, "credentials.enc");
+/**
+ * 凭证文件位置：RAPTOR_CREDENTIALS_FILE 显式指定优先（托管多用户 / 测试隔离），
+ * 否则与其它状态一起放在 dataDir() 下——命令行、网页、桌面端指向同一个数据目录，
+ * 凭证随之共用，桌面端升级（替换后端目录）也不会丢。
+ *
+ * 旧版本把它放在项目根：本地版（未设 RAPTOR_DATA_DIR）首次访问时搬进 data/，
+ * 搬失败（被占用等）就继续用旧位置，不挡启动。测试 / 桌面端设了 RAPTOR_DATA_DIR
+ * 时不做迁移（桌面端的旧版凭证由 desktop/src/payload.ts 在清理旧后端前抢救）。
+ */
+function credFile(): string {
+  const explicit = process.env.RAPTOR_CREDENTIALS_FILE;
+  if (explicit) return explicit;
+  const target = path.join(dataDir(), "credentials.enc");
+  if (process.env.RAPTOR_DATA_DIR) return target;
+  const legacy = path.join(PROJECT_ROOT, "credentials.enc");
+  try {
+    if (fs.existsSync(legacy) && !fs.existsSync(target)) {
+      fs.mkdirSync(dataDir(), { recursive: true });
+      fs.renameSync(legacy, target);
+    }
+  } catch {
+    return fs.existsSync(legacy) && !fs.existsSync(target) ? legacy : target;
+  }
+  return target;
+}
 
 export interface StoredCredentials {
   username: string;
@@ -92,7 +115,7 @@ export interface CredentialsStore {
 /** 读取并解密本地凭证；文件不存在或跨机器无法解密时返回 null */
 export function loadCredentialsStore(): CredentialsStore | null {
   try {
-    const raw = JSON.parse(fs.readFileSync(CRED_FILE, "utf8")) as {
+    const raw = JSON.parse(fs.readFileSync(credFile(), "utf8")) as {
       salt: string;
       iv: string;
       tag: string;
@@ -121,7 +144,7 @@ export function saveCredentialsStore(patch: Partial<CredentialsStore>): void {
   // 写出等于用 patch 覆盖掉里面所有其它字段（比如已存的 DeepSeek Key）。
   // 先隔离留档再写，并且说一声——静默丢凭证比报错糟得多。
   if (!existing && hasStoredCredentials()) {
-    quarantineCorruptFileSync(CRED_FILE);
+    quarantineCorruptFileSync(credFile());
     console.warn(
       "⚠️ 本机凭证文件无法解密（换过机器或文件已损坏），已另存备份后重建；教务账号可能需要重新配置。",
     );
@@ -136,7 +159,7 @@ export function saveCredentialsStore(patch: Partial<CredentialsStore>): void {
   const cipher = crypto.createCipheriv("aes-256-gcm", machineKey(salt), iv);
   const data = Buffer.concat([cipher.update(JSON.stringify(payload), "utf8"), cipher.final()]);
   writeFileAtomicSync(
-    CRED_FILE,
+    credFile(),
     JSON.stringify(
       {
         v: 1,
@@ -170,12 +193,12 @@ export function saveStoredCredentials(username: string, password: string): void 
 
 export function clearStoredCredentials(): void {
   try {
-    fs.unlinkSync(CRED_FILE);
+    fs.unlinkSync(credFile());
   } catch {
     /* 不存在 */
   }
 }
 
 export function hasStoredCredentials(): boolean {
-  return fs.existsSync(CRED_FILE);
+  return fs.existsSync(credFile());
 }
