@@ -12,10 +12,12 @@
   --cream: #FFFBF0;
   --paper: #FFFDF6;
   --green: #7FB069;
-  --green-deep: #5E8F4A;
+  --green-btn: #42742F;
+  --green-btn-deep: #2F5522;
+  --green-deep: #487536;
   --highlight: #FFE066;
   --ink: #4A443A;
-  --ink-soft: #8A8272;
+  --ink-soft: #6B6455;
   --ink-faint: #B3AB99;
   --note-yellow: #FFF3B8;
   --note-green: #E4F0D9;
@@ -24,7 +26,7 @@
   --line: rgba(74, 68, 58, 0.14);
   --line-strong: rgba(74, 68, 58, 0.3);
   --shadow-card: 3px 5px 12px rgba(74, 68, 58, 0.13);
-  --shadow-pin: 0 4px 0 var(--green-deep);
+  --shadow-pin: 0 4px 0 var(--green-btn-deep);
   --radius: 14px;
   --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
   --font-round: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
@@ -69,7 +71,7 @@ img { display: block; max-width: 100%; height: auto }
 
 .wrap { width: min(1160px, calc(100% - 88px)); margin-inline: auto }
 
-.skip { position: fixed; left: 20px; top: -80px; z-index: 100; padding: 12px 20px; background: var(--green); color: #fff }
+.skip { position: fixed; left: 20px; top: -80px; z-index: 100; padding: 12px 20px; background: var(--green-btn); color: #fff }
 .skip:focus { top: 12px }
 
 code { font-family: var(--font-mono); font-size: 0.92em; background: rgba(127,176,105,0.16); padding: 1px 6px; border-radius: 5px }
@@ -113,6 +115,9 @@ code { font-family: var(--font-mono); font-size: 0.92em; background: rgba(127,17
 .header nav a:hover, .header nav a.active, .text-link:hover { color: var(--green-deep) }
 .github-link { padding: 8px 16px; border: 1.5px solid rgba(74, 68, 58, 0.24); border-radius: 999px; color: var(--ink) !important; transition: border-color 0.2s, background 0.2s, transform 0.2s var(--ease-out) }
 .github-link:hover { border-color: var(--green); background: rgba(127, 176, 105, 0.1); transform: translateY(-1px) }
+.header nav a.nav-download { padding: 8px 18px; border-radius: 999px; background: var(--green-btn); color: #fff; font-weight: 800; box-shadow: 0 3px 0 var(--green-btn-deep); transition: transform 0.16s var(--ease-out), box-shadow 0.16s }
+.header nav a.nav-download:hover { color: #fff; transform: translateY(-1px) }
+.header nav a.nav-download:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--green-btn-deep) }
 
 /* ---------- 首屏：画面即界面（产品实样 + 新功能便签） ---------- */
 
@@ -187,6 +192,10 @@ h1 {
 .hero-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; margin-bottom: 30px }
 .hero-desc { font-size: 16.5px; line-height: 1.9; color: var(--ink-soft); margin: 0; max-width: 30em; text-wrap: pretty }
 .hero .actions { margin: 0; flex-shrink: 0 }
+.hero-cta { display: flex; flex-direction: column; align-items: flex-end; gap: 14px; flex-shrink: 0 }
+.hero-facts { display: flex; gap: 6px 18px; flex-wrap: wrap; justify-content: flex-end; margin: 0; padding: 0; list-style: none; font-size: 13px; font-weight: 700; color: var(--ink-soft) }
+.hero-facts li { display: inline-flex; align-items: center; gap: 7px }
+.hero-facts li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green) }
 
 /* ---------- 主视觉：贴在板上的产品实拍 + 功能便签 ---------- */
 
@@ -280,9 +289,9 @@ h1 {
   cursor: pointer;
   transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.16s, background 0.2s, border-color 0.2s;
 }
-.primary { background: var(--green); color: #fff; box-shadow: var(--shadow-pin) }
+.primary { background: var(--green-btn); color: #fff; box-shadow: var(--shadow-pin) }
 .primary:hover { transform: translateY(-2px) }
-.primary:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--green-deep); transition-duration: 0.08s }
+.primary:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--green-btn-deep); transition-duration: 0.08s }
 .ghost { background: transparent; color: var(--ink); border: 2px solid rgba(74, 68, 58, 0.3) }
 .ghost:hover { background: rgba(127, 176, 105, 0.1); border-color: var(--green-deep); transform: translateY(-2px) }
 .ghost:active { transform: translateY(0) scale(0.98); transition-duration: 0.08s }
@@ -335,8 +344,8 @@ h1 {
 
 .section { padding-block: 60px }
 
-.screen { min-height: 100vh; display: flex; flex-direction: column; justify-content: center }
-@supports (min-height: 100svh) { .screen { min-height: 100svh } }
+.screen { min-height: min(78vh, 760px); display: flex; flex-direction: column; justify-content: center }
+@supports (min-height: 100svh) { .screen { min-height: min(78svh, 760px) } }
 
 section { scroll-margin-top: 0 }
 
@@ -465,7 +474,7 @@ h2 { font-size: clamp(32px, 3.4vw, 48px); line-height: 1.32; font-weight: 800; l
   transition: border-color 0.2s, background 0.2s, transform 0.18s var(--ease-out), box-shadow 0.18s;
 }
 .question-list button:hover { border-color: var(--green); transform: rotate(-0.5deg) translateY(-2px) }
-.question-list button[aria-pressed="true"] { background: var(--green); border-color: var(--green); color: #fff; box-shadow: 2px 3px 0 var(--green-deep) }
+.question-list button[aria-pressed="true"] { background: var(--green-btn); border-color: var(--green-btn); color: #fff; box-shadow: 2px 3px 0 var(--green-btn-deep) }
 
 /* 对话窗：一张大号白便签 */
 .conversation {
@@ -479,7 +488,7 @@ h2 { font-size: clamp(32px, 3.4vw, 48px); line-height: 1.32; font-weight: 800; l
 .conversation-top > span:first-child { font-weight: 800; color: var(--ink); font-size: 14px }
 .conversation-top .status-dot { background: var(--green); margin-right: 5px }
 
-.question { margin: 22px 24px 22px auto; max-width: 80%; width: fit-content; background: var(--green); color: white; padding: 10px 17px; border-radius: 14px 14px 3px 14px; font-size: 14.5px }
+.question { margin: 22px 24px 22px auto; max-width: 80%; width: fit-content; background: var(--green-btn); color: white; padding: 10px 17px; border-radius: 14px 14px 3px 14px; font-size: 14.5px }
 
 .answer { padding: 0 24px 22px; min-height: 360px }
 .answer-label { font-size: 13px; color: var(--ink-soft); margin-bottom: 13px }
@@ -536,7 +545,8 @@ h2 { font-size: clamp(32px, 3.4vw, 48px); line-height: 1.32; font-weight: 800; l
 
 .product { padding-block: 68px }
 
-.figure-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; align-items: start }
+.figure-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; align-items: start }
+.figure-note { text-align: center; margin: 28px 0 0 }
 
 .photo {
   margin: 0;
@@ -551,6 +561,7 @@ h2 { font-size: clamp(32px, 3.4vw, 48px); line-height: 1.32; font-weight: 800; l
 .photo-a { transform: rotate(-1.5deg) }
 .photo-b { transform: rotate(1.1deg) }
 .photo-c { transform: rotate(-0.8deg) }
+.photo-d { transform: rotate(1.3deg) }
 .photo .photo-pin { top: -8px; left: 50%; transform: translateX(-50%) }
 
 .window-bar {
@@ -570,10 +581,11 @@ h2 { font-size: clamp(32px, 3.4vw, 48px); line-height: 1.32; font-weight: 800; l
 .lights i:nth-child(1) { background: #E0806A }
 .lights i:nth-child(2) { background: #EFBE55 }
 .lights i:nth-child(3) { background: #9BCF7F }
+.window-bar { justify-content: flex-start }
 .window-bar > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .product figure > img { width: 100%; height: auto; transition: transform 0.5s var(--ease-out) }
 .product figure:hover > img { transform: scale(1.015) }
-.product figcaption { font-size: 12px; padding: 12px 12px 2px; color: var(--ink-soft) }
+.product figcaption { font-size: 13px; padding: 12px 8px 2px; color: var(--ink-soft) }
 
 /* ---------- 开始使用 ---------- */
 
@@ -596,8 +608,8 @@ h2 { font-size: clamp(32px, 3.4vw, 48px); line-height: 1.32; font-weight: 800; l
   line-height: 34px;
   font-size: 15px;
   font-weight: 800;
-  background: var(--green);
-  box-shadow: 0 3px 0 var(--green-deep);
+  background: var(--green-btn);
+  box-shadow: 0 3px 0 var(--green-btn-deep);
   font-variant-numeric: tabular-nums;
 }
 /* 步骤间的连线：一截和纸胶带 */
@@ -717,7 +729,7 @@ details[open] summary::after { transform: rotate(45deg) }
 @media (max-width: 1350px) and (min-width: 1051px) {
   .hero { padding-block: 48px 26px }
   .section, .product, .try-section, .start-section { padding-block: 48px }
-  .screen { min-height: 100vh }
+  .screen { min-height: 0 }
   .section-head { margin-bottom: 26px }
   .section-head h2 { font-size: 36px }
   .wall { gap: 18px }
@@ -737,7 +749,6 @@ details[open] summary::after { transform: rotate(45deg) }
   .header nav { gap: 18px }
   .wall { grid-template-columns: 1fr 1fr }
   .figure-grid { grid-template-columns: 1fr 1fr }
-  .figure-grid .photo-c { grid-column: span 2 }
   .try-grid, .start-grid, .faq { gap: 40px }
   .hero { padding-block: 48px 26px }
 }
@@ -745,6 +756,8 @@ details[open] summary::after { transform: rotate(45deg) }
 @media (max-width: 900px) {
   /* 首屏：标题与按钮纵向堆叠；功能便签改为拍立得白边上的横排标签，信息不丢 */
   .hero-head { flex-direction: column; align-items: flex-start; gap: 20px }
+  .hero-cta { align-items: flex-start }
+  .hero-facts { justify-content: flex-start }
   .hero .actions { justify-content: flex-start }
   .hero-shot { width: 100%; padding-bottom: 20px }
   .shot-tag { position: static; display: inline-block; max-width: none; margin: 12px 7px 0; padding: 9px 14px; vertical-align: top }
@@ -767,6 +780,7 @@ details[open] summary::after { transform: rotate(45deg) }
   .brand { font-size: 20px }
   .header nav { width: 100%; justify-content: space-between; gap: 10px; font-size: 13px }
   .github-link { padding: 5px 11px }
+  .header nav a.nav-download { display: none }
   html { scroll-padding-top: calc(var(--header-h) + 42px) }
   .hero { padding-block: 40px 22px }
   h1 { font-size: clamp(46px, 11.4vw, 58px) }
@@ -782,8 +796,7 @@ details[open] summary::after { transform: rotate(45deg) }
   .sticky { min-height: 0 }
   .sticky p { font-size: 13px }
   .try-grid, .start-grid, .faq { grid-template-columns: 1fr; gap: 34px }
-  .figure-grid { grid-template-columns: 1fr }
-  .figure-grid .photo-c { grid-column: auto }
+  .figure-grid { grid-template-columns: 1fr 1fr; gap: 14px }
   .try-section, .start-section { padding-block: 52px }
   .answer { min-height: 340px }
   .eyebrow { font-size: 11px; margin-bottom: 18px; letter-spacing: 1.1px }
@@ -805,6 +818,8 @@ details[open] summary::after { transform: rotate(45deg) }
 
 /* 窄屏首屏 CTA 纵向堆叠，避免长文案按钮互相挤压截断 */
 @media (max-width: 480px) {
+  .figure-grid { grid-template-columns: 1fr }
+  .hero-cta { align-self: stretch }
   .hero .actions { flex-direction: column; align-items: stretch }
   .hero .button { width: 100% }
 }
