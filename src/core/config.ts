@@ -177,6 +177,33 @@ function env(key: string): string | undefined {
   return v?.trim() ? v.trim() : undefined;
 }
 
+// 启动时 .env / shell 里的 DeepSeek Key（loadConfig 之前捕获，之后保存 Key 会改写 env）
+const BOOT_DEEPSEEK_ENV_KEY = env("DEEPSEEK_API_KEY");
+
+/**
+ * 切换供应商后装载「该供应商自己」的 Key：热更新 config 与进程环境。
+ * 每家一把 Key，已保存过的切回来直接用，不让用户重填；没存过的清空，
+ * 绝不把上一家的 Key 带到新厂商的端点上（既是泄露也必然 401）。
+ * 仅本地版切换路径调用（托管版供应商由网关管理，不会走到这里）。
+ */
+export function activateProviderKey(providerId: string): void {
+  const { keys, overrides } = effectiveProviderKeys(loadCredentialsStore());
+  const resolved = resolveProviderApiKey({
+    environmentKey: providerId === "deepseek" ? BOOT_DEEPSEEK_ENV_KEY : undefined,
+    storedKey: keys[providerId],
+    storedOverride: overrides[providerId] === true,
+    disableOverride: env("RAPTOR_DISABLE_DS_OVERRIDE") === "1",
+  });
+  config.deepseekApiKey = resolved.key;
+  config.deepseekApiKeySource = resolved.source;
+  if (resolved.key) {
+    process.env.RAPTOR_PROVIDER_KEY = resolved.key;
+    if (providerId === "deepseek") process.env.DEEPSEEK_API_KEY = resolved.key;
+  } else {
+    delete process.env.RAPTOR_PROVIDER_KEY;
+  }
+}
+
 // ── 数值型环境变量：zod 校验，坏值启动即报错（不再是 NaN 悄悄进限速桶）────
 
 /** @internal 导出仅供测试钉住校验规则 */
