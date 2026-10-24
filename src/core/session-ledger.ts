@@ -74,6 +74,10 @@ const PREFIX = {
   memory: "长期记忆",
   calendar: "校历",
   pomodoro: "番茄钟",
+  schedule: "课表",
+  exams: "考试",
+  grades: "成绩",
+  prompts: "提示词",
   artifact: "文件",
 } as const;
 
@@ -100,6 +104,14 @@ function ledgerCategory(
     case "manage_pomodoro":
       // status/list 是查询；start/cancel 改变了当前计时状态
       return action === "status" || action === "list" ? undefined : PREFIX.pomodoro;
+    case "edit_schedule":
+      return action === "list" ? undefined : PREFIX.schedule;
+    case "edit_exams":
+      return action === "list" ? undefined : PREFIX.exams;
+    case "edit_grades":
+      return action === "list" ? undefined : PREFIX.grades;
+    case "manage_prompts":
+      return action === "list" ? undefined : PREFIX.prompts;
     case "generate_document":
     case "convert_document":
     case "ppt_save":

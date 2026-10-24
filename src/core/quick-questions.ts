@@ -1,8 +1,9 @@
 /**
  * 网页「提示词」模板：默认清单 + 保存时的归一化。
  *
- * 用户可在设置面板自行增删（存于 credentialsStore.webQuickQuestions），
- * 这里是正式服务与演示服务共用的唯一事实源；空列表视为恢复默认。
+ * 用户可在提示词模板面板自行增删（存于 credentialsStore.webQuickQuestions），
+ * 也可在对话里让模型代改（core/tools/prompts.ts）。归一化规则放 core 层
+ * （网页服务、演示服务与对话工具共用同一份）；空列表视为恢复默认。
  */
 
 /** 单条问题长度上限（字符） */
