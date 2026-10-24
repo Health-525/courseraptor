@@ -15,15 +15,11 @@
 
 </div>
 
-<p align="center"><img src="docs/screenshots/demo-overview.png" width="960" alt="CourseRaptor 当前主界面：左侧会话列表、中间对话区和右侧功能大厅" /></p>
-
-<p align="center"><sub>当前源码实际界面，使用隔离的虚构示例数据。功能大厅及各功能面板均在右侧栏内打开；截图未调用 AI。</sub></p>
-
 课表在教务系统里，截止日期散在聊天和备忘录里。CourseRaptor 把你导入的课表、说过的待办和保存的知识放到同一个助手中，让你查询时少翻几个地方。
 
 你可以问「这周周三在哪上课」，也可以说「记一下，周五下午三点前交实验报告」。课表、待办和生成的文件保存在本机，模型由你选择。**正式 AI 对话需要自己的模型 API Key，相关内容会发送到该模型服务，可能产生调用费用。**
 
-[能帮你做什么](#能帮你做什么) · [下载与运行要求](#下载与运行要求) · [第一次使用](#第一次使用) · [常见问题](#常见问题) · [数据与使用边界](#数据与使用边界) · [给开发者](#给开发者) · [参与贡献](#参与贡献)
+[能帮你做什么](#能帮你做什么) · [界面一览](#界面一览) · [下载与运行要求](#下载与运行要求) · [第一次使用](#第一次使用) · [常见问题](#常见问题) · [数据与使用边界](#数据与使用边界) · [给开发者](#给开发者) · [参与贡献](#参与贡献)
 
 ## 能帮你做什么
 
@@ -39,22 +35,30 @@
 不需要先适配学校教务系统才能开始：公开仓库默认内置「手动导入课表」模式，任何学校都能直接使用。在线成绩、考试、教务通知查询依赖学校适配器，公开仓库当前不随附任何学校的在线适配器。
 
 <details>
-<summary>展开查看：课表、今日安排、待办与知识库</summary>
+<summary>也关注 AI 行业动态？</summary>
 
-以下均从当前源码主界面的功能大厅侧栏截取，课程、待办与知识记录为虚构示例。点击标题可查看原图。
+源码 `main` 已接入 [AI 新闻技能](skills/ai-news/SKILL.md)：可以生成带来源的中文日报和突发简报，并查询本地留存的采集历史，额外需要 Python 3.11+。它是按需触发的工作流，不会在后台定时自动推送；首次采集访问配置好的公开来源，之后当天复用快照。现有安装包是否包含此能力，以对应发布说明为准。见[配置说明](docs/configuration.md#ai-新闻技能)。
+
+</details>
+
+## 界面一览
+
+主界面从左到右依次是会话列表、对话区和功能大厅：
+
+<p align="center"><img src="docs/screenshots/demo-overview.png" width="960" alt="CourseRaptor 当前主界面：左侧会话列表、中间对话区和右侧功能大厅" /></p>
+
+<p align="center"><sub>当前源码实际界面，使用隔离的虚构示例数据。功能大厅及各功能面板均在右侧栏内打开；截图未调用 AI。</sub></p>
+
+功能大厅里的常用面板（同样为虚构示例数据，点击标题可查看原图）：
+
+<details>
+<summary>展开查看：课表、今日安排、待办与知识库</summary>
 
 | [周课表](docs/screenshots/demo-schedule.png) | [今日安排](docs/screenshots/demo-today.png) |
 |---|---|
 | <img src="docs/screenshots/demo-schedule.png" width="440" alt="功能大厅课表侧栏，按星期列出示例课程、时间和地点" /> | <img src="docs/screenshots/demo-today.png" width="440" alt="功能大厅今日日程侧栏，展示示例课程时间与上课状态" /> |
 | [截止待办](docs/screenshots/demo-todos.png) | [课程知识库](docs/screenshots/demo-knowledge.png) |
 | <img src="docs/screenshots/demo-todos.png" width="440" alt="功能大厅待办侧栏，按截止时间分组并展示完成状态" /> | <img src="docs/screenshots/demo-knowledge.png" width="440" alt="功能大厅知识库侧栏，按课程筛选和搜索示例知识点" /> |
-
-</details>
-
-<details>
-<summary>也关注 AI 行业动态？</summary>
-
-源码 `main` 已接入 [AI 新闻技能](skills/ai-news/SKILL.md)：可以生成带来源的中文日报和突发简报，并查询本地留存的采集历史，额外需要 Python 3.11+。它是按需触发的工作流，不会在后台定时自动推送；首次采集访问配置好的公开来源，之后当天复用快照。现有安装包是否包含此能力，以对应发布说明为准。见[配置说明](docs/configuration.md#ai-新闻技能)。
 
 </details>
 
