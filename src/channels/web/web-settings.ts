@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { attachmentStats } from "../../core/attachment-store";
 import { listSessions } from "../../core/chat-sessions";
-import { config, effectiveProviderKeys } from "../../core/config";
+import { activateProviderKey, config, effectiveProviderKeys } from "../../core/config";
 import { loadCredentialsStore, saveCredentialsStore } from "../../core/credentials";
 import { generatedDir } from "../../core/document/save";
 import { knowledgeStats } from "../../core/knowledge";
@@ -58,6 +58,16 @@ export function schoolOptionNote(capabilities: readonly string[]): string {
   return have.length ? `教务系统已适配：${have.join(" / ")}` : "教务系统已适配";
 }
 
+/** 每家供应商「是否有可用 Key」：当前供应商看生效值，其余看加密存储 */
+function savedKeyFlags(creds: ReturnType<typeof loadCredentialsStore>): Record<string, boolean> {
+  const flags: Record<string, boolean> = {};
+  for (const [id, key] of Object.entries(effectiveProviderKeys(creds).keys)) {
+    if (key) flags[id] = true;
+  }
+  if (config.deepseekApiKey) flags[config.providerId] = true;
+  return flags;
+}
+
 /** 给设置弹窗的状态：只有脱敏摘要，永远不回显密码与完整 Key */
 export function settingsPayload() {
   const ds = getDeepSeekKeyStatus();
@@ -79,6 +89,8 @@ export function settingsPayload() {
       label: config.providerLabel,
       options: providerOptionList(),
       customBaseUrl: config.customBaseUrl,
+      /** 各供应商是否已存过 Key（只有布尔，不含 Key 本身）：切换时免重填的依据 */
+      keySaved: savedKeyFlags(creds),
       /** 托管版禁自定义端点（防实例探测内网），前端据此隐藏 custom 选项 */
       hosted: config.hosted,
     },
@@ -366,12 +378,17 @@ export function applySettings(body: Record<string, unknown>): {
           model: nextModel,
           modelOverride: true,
         });
+        // 装载新供应商自己的 Key（每家一把，切回来不用重填；没存过则清空）
+        activateProviderKey(def.id);
         invalidateModelCache();
         providerChanged = true;
+        const keyNote = config.deepseekApiKey
+          ? "，已自动载入该供应商保存的 Key"
+          : "，该供应商还没有保存 Key，请在下方填写一次";
         results.push({
           field: "provider",
           ok: true,
-          message: `供应商已切换为「${def.label}」：型号与 Key 请按新供应商确认`,
+          message: `供应商已切换为「${def.label}」${keyNote}`,
         });
       }
     } else if (body.customBaseUrl !== undefined && urlCheck?.ok) {
