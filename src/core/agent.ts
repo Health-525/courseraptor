@@ -13,7 +13,7 @@ import { buildLanguageModel } from "./llm";
 import { toolTimeoutConfig } from "./loop-timeout";
 import { formatMemoryForPrompt } from "./memory/longterm";
 import { captureSessionPrompt, loadLastSessionTranscript } from "./memory/shortterm";
-import { basePrompt, QQ_CHANNEL_PROMPT } from "./prompt";
+import { basePrompt, QQ_CHANNEL_PROMPT, WEB_CHANNEL_PROMPT } from "./prompt";
 import { school } from "./school";
 import { recordTokenUsage } from "./token-usage";
 import { coreTools } from "./tools";
@@ -100,18 +100,18 @@ export function raptorModelMiddleware(): LanguageModelMiddleware {
  * 提示词等于让 A 会话的尾巴出现在 B 会话里——多会话/多标签下还会互相
  * 覆盖。新会话要延续上文，切回历史会话即可，不必靠提示词注入。
  */
-export async function createRaptorAgent(channel?: "qq", options?: { carryOver?: boolean }) {
+export async function createRaptorAgent(channel?: "qq" | "web", options?: { carryOver?: boolean }) {
   const carryOver = options?.carryOver ?? true;
   const [memorySection, lastSession] = await Promise.all([
     formatMemoryForPrompt(),
     carryOver ? loadLastSessionTranscript() : Promise.resolve(""),
   ]);
-  const instructions = [
-    basePrompt(),
-    memorySection,
-    lastSession,
-    channel === "qq" ? QQ_CHANNEL_PROMPT : undefined,
-  ]
+  // TUI（channel 留空）是纯文本终端，没有 Markdown 渲染：既不适用 QQ 的固定模板
+  // （那是为手机窄屏设计的），也不能套网页的表格/产物收尾规则（会打印出原始
+  // `| 列 | 列 |` 语法）——只给它 basePrompt 的朴素指引，跟过去行为一致。
+  const channelPrompt =
+    channel === "qq" ? QQ_CHANNEL_PROMPT : channel === "web" ? WEB_CHANNEL_PROMPT : undefined;
+  const instructions = [basePrompt(), memorySection, lastSession, channelPrompt]
     .filter(Boolean)
     .join("\n\n");
 
