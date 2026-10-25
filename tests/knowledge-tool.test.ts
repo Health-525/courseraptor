@@ -147,6 +147,23 @@ test("list：默认全量、category/keyword 可筛、带分类统计", async ()
   assert.match(String(miss.note), /空/);
 });
 
+test("list 多关键词：空格/顿号分隔，任一命中即返回（答前检索的召回）", async () => {
+  // 「不存在的词」不命中，「洛必达」命中标题——OR 语义保证不被无关词拖空
+  const or = await manage.execute({ action: "list", keyword: "不存在的词 洛必达" });
+  const orItems = or.knowledge as Array<{ title: string }>;
+  assert.equal(orItems.length, 1);
+  assert.equal(orItems[0]!.title, "洛必达法则");
+
+  // 顿号分隔；「番茄」命中被覆盖更新过的标题「番茄 工作法」，「过去分词」命中正文
+  const body = await manage.execute({ action: "list", keyword: "番茄、过去分词" });
+  const bodyTitles = (body.knowledge as Array<{ title: string }>).map((e) => e.title);
+  assert.deepEqual(bodyTitles.sort(), ["现在完成时", "番茄 工作法"]);
+
+  // 全部不命中仍走空态提示
+  const none = await manage.execute({ action: "list", keyword: "没有的词、也没有的词" });
+  assert.match(String(none.note), /空/);
+});
+
 test("update 改内容与归属、delete 按 id 删除、错误路径", async () => {
   const listed = await manage.execute({ action: "list" });
   const items = listed.knowledge as Array<{ id: string; title: string }>;
@@ -241,6 +258,7 @@ test("入库纪律：content 要求附来源行，无法确定时写「来源：
   );
   assert.match(desc, /末尾必须附一行「来源：/, "知识入库要带来源行");
   assert.match(desc, /来源：待核实/, "依据不明时如实标待核实");
+  assert.match(desc, /先调 list 传 keyword 检索知识库/, "工具说明要教答前检索");
   type ContentField = { meta?: () => { description?: string } };
   type ItemsField = { element: { shape: { content: ContentField } } };
   const schema = knowledgeTools.manage_knowledge.inputSchema as unknown as {
