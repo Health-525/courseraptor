@@ -96,3 +96,13 @@ test("知识库段：入库要附来源行，依据不明写待核实", () => {
   assert.match(s, /末尾附一行「来源：/, "知识入库要带来源行");
   assert.match(s, /来源：待核实/, "依据不明时标待核实");
 });
+
+test("知识库段：答知识类问题先检索知识库，命中以其为依据", () => {
+  const s = basePrompt();
+  assert.match(s, /答知识类问题先查知识库/, "应确立答前检索规则");
+  assert.match(s, /回答前先调 list 传 keyword 检索/, "检索走 manage_knowledge list");
+  assert.match(s, /来自你记过的知识/, "命中要标明来自用户记录");
+  assert.match(s, /用户记过的口径优先于你自己的讲法/, "记录口径优先");
+  assert.match(s, /才按常规方式回答/, "知识库没有才走常规回答路径");
+  assert.match(s, /教务查询、闲聊不用查/, "划定不检索的范围");
+});
