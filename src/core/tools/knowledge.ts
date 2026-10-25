@@ -1,11 +1,12 @@
 /**
  * 知识库工具：manage_knowledge
  *
- * 把对话里值得沉淀的知识写进本地知识库（src/knowledge.ts 落盘
- * data/knowledge.json），课表页 /today 的「知识」卡片与 /knowledge 页
- * 都能看到。归属由 matchKnowledgeCategory 统一裁决：优先归入课表真实
- * 课程，subject 对不上课程时以其为自定义分类，没给 subject 且正文
- * 对不上才落「未分类」。
+ * 两个职责：答前检索——用户问知识类问题时先 list 传 keyword 查本地
+ * 知识库，命中以其为依据回答；沉淀维护——把对话里值得保留的知识写进
+ * 本地知识库（src/knowledge.ts 落盘 data/knowledge.json），课表页
+ * /today 的「知识」卡片与 /knowledge 页都能看到。归属由
+ * matchKnowledgeCategory 统一裁决：优先归入课表真实课程，subject
+ * 对不上课程时以其为自定义分类，没给 subject 且正文对不上才落「未分类」。
  */
 
 import { tool } from "ai";
@@ -30,7 +31,7 @@ export const knowledgeTools = {
   /** 知识库维护 */
   manage_knowledge: tool({
     description:
-      "知识库维护（本地持久，课表页 /today 的「知识」卡片与 /knowledge 页都能看到）。用户说出值得长期保留的知识（课程概念、公式、解题方法、结论、经验总结——用户自己讲出的，或明确说「记住这个」）时主动调 add：title 一句话概括、content 写知识本身；**content 末尾必须附一行「来源：…」注明出处**（用户口述 / 某教材讲义或附件 / 某个工具返回 / 来源不明就写「来源：待核实」）——考前翻知识库时要能追溯这条是谁说的、依据什么；能看出归属就传 subject：优先用课表课程名如「高等数学」（俗称「高数」也能自动对应），对不上课表课程的 subject 会成为自定义分类（如「TypeScript」「编程技术」），传简短主题名即可；完全看不出归属才省略 subject 落「未分类」；问「我记过哪些知识」用 list；改内容/归属用 update；删用 delete。闲聊、提问、查询指令、待办安排不要记进知识库；拿不准要不要记时先问用户一句。",
+      "知识库维护与答前检索（本地持久，课表页 /today 的「知识」卡片与 /knowledge 页都能看到）。**用户问知识类问题（概念/公式/解题方法/课程内容，或让你讲解、复习、出题）时，先调 list 传 keyword 检索知识库**——命中相关条目就以其为依据回答，标明来自用户记过的知识并转述其「来源」行（用户记过的口径优先于你自己的讲法）；一次没命中可换关键词再试一次。用户说出值得长期保留的知识（课程概念、公式、解题方法、结论、经验总结——用户自己讲出的，或明确说「记住这个」）时主动调 add：title 一句话概括、content 写知识本身；**content 末尾必须附一行「来源：…」注明出处**（用户口述 / 某教材讲义或附件 / 某个工具返回 / 来源不明就写「来源：待核实」）——考前翻知识库时要能追溯这条是谁说的、依据什么；能看出归属就传 subject：优先用课表课程名如「高等数学」（俗称「高数」也能自动对应），对不上课表课程的 subject 会成为自定义分类（如「TypeScript」「编程技术」），传简短主题名即可；完全看不出归属才省略 subject 落「未分类」；问「我记过哪些知识」用 list；改内容/归属用 update；删用 delete。闲聊、提问、查询指令、待办安排不要记进知识库；拿不准要不要记时先问用户一句。",
     inputSchema: z.object({
       action: z
         .enum(["add", "list", "update", "delete"])
@@ -57,7 +58,10 @@ export const knowledgeTools = {
         .optional()
         .describe("add 必填：一批知识条目（至多 10 条）"),
       category: z.string().optional().describe("list 时按课程分类筛选；传空字符串表示只看未分类"),
-      keyword: z.string().optional().describe("list 时按关键词检索标题与内容"),
+      keyword: z
+        .string()
+        .optional()
+        .describe("list 时按关键词检索标题与内容（多个关键词空格/顿号分隔，任一命中即返回）"),
       id: z.string().optional().describe("目标条目 id（update/delete 必填，来自 list 结果）"),
       title: z.string().optional().describe("update 时的新标题"),
       content: z.string().optional().describe("update 时的新内容"),
@@ -106,10 +110,17 @@ export const knowledgeTools = {
             : entries.filter((e) => !e.category);
         }
         if (keyword?.trim()) {
-          const kw = keyword.trim().toLowerCase();
-          entries = entries.filter(
-            (e) => e.title.toLowerCase().includes(kw) || e.content.toLowerCase().includes(kw),
-          );
+          // 多关键词任一命中即返回（答前检索要的是召回，由模型判断相关性）
+          const kws = keyword
+            .trim()
+            .toLowerCase()
+            .split(/[\s,，、]+/)
+            .filter(Boolean);
+          entries = entries.filter((e) => {
+            const title = e.title.toLowerCase();
+            const content = e.content.toLowerCase();
+            return kws.some((kw) => title.includes(kw) || content.includes(kw));
+          });
         }
         const shown = entries.slice(0, 30);
         const counts = new Map<string, number>();
