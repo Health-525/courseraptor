@@ -71,8 +71,22 @@ function readState(): WorkspaceState {
   }
 }
 
+/** 工作区数据（含待办）写入回调：todo-reminders 注册，据此立即重算定点唤醒点 */
+const changeListeners = new Set<() => void>();
+
+export function onWorkspaceChanged(fn: () => void): void {
+  changeListeners.add(fn);
+}
+
 function writeState(state: WorkspaceState): void {
   writeFileAtomicSync(statePath(), JSON.stringify(state, null, 2));
+  for (const fn of changeListeners) {
+    try {
+      fn();
+    } catch {
+      // 监听者异常不许影响写入方
+    }
+  }
 }
 
 const ALLOWED_EXT = new Set([".pdf", ".docx", ".xlsx", ".xls", ".csv", ".txt", ".md", ".pptx"]);

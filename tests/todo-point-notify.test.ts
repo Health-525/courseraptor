@@ -14,9 +14,17 @@ import { test } from "node:test";
 const tmpData = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-point-"));
 process.env.RAPTOR_DATA_DIR = tmpData;
 
-const { dueWithinWindow, runPointNotifyCheck } = await import("../src/core/todo-reminders");
-const { addReminder, deleteReminder, listReminders, normalizeNotifyAt, updateReminder } =
-  await import("../src/core/workspace-data");
+const { dueWithinWindow, nextPointNotifyAt, runPointNotifyCheck } = await import(
+  "../src/core/todo-reminders"
+);
+const {
+  addReminder,
+  deleteReminder,
+  listReminders,
+  normalizeNotifyAt,
+  onWorkspaceChanged,
+  updateReminder,
+} = await import("../src/core/workspace-data");
 const { coreTools } = await import("../src/core/tools");
 
 const manage = coreTools.manage_todos as unknown as {
@@ -86,6 +94,8 @@ test("定点通知：到点触发一次，复查不重弹", () => {
     runPointNotifyCheck({ now: new Date("2026-12-18T09:05"), notify: rec.notify }),
     [],
   );
+  // 已通知过的时刻不再算「待通知」（事件驱动唤醒点据此排除）
+  assert.equal(nextPointNotifyAt(), null);
   assert.deepEqual(rec.sent, ["交材料"]);
   cleanup(r.id);
 });
@@ -166,6 +176,23 @@ test("弥散提醒不受影响：设了 notifyAt 的待办仍进 7 天窗口", (
   cleanup(r.id);
 });
 
+test("nextPointNotifyAt：只看未完成且带通知时刻的待办，取最早的", () => {
+  const later = addReminder({
+    title: "下一个",
+    dueAt: "2026-12-20T15:00",
+    notifyAt: "2026-12-19T09:00",
+  });
+  const earlierDone = addReminder({
+    title: "完成了的更早一条",
+    dueAt: "2026-12-20T15:00",
+    notifyAt: "2026-12-19T08:00",
+  });
+  updateReminder(earlierDone.id, { done: true });
+  assert.equal(nextPointNotifyAt(), new Date("2026-12-19T09:00:00").getTime());
+  cleanup(later.id, earlierDone.id);
+  assert.equal(nextPointNotifyAt(), null);
+});
+
 test("manage_todos 工具：add 带 notifyAt 落库、update 改/清通知时刻", async () => {
   const r = await manage.execute({
     action: "add",
@@ -194,4 +221,17 @@ test("manage_todos 工具：add 带 notifyAt 落库、update 改/清通知时刻
   assert.equal(listReminders().find((x) => x.id === added[0]!.id)?.notifyAt, undefined);
 
   cleanup(added[0]!.id);
+});
+
+test("onWorkspaceChanged：待办写入即回调（调度器据此重算唤醒点，不做高频轮询）", () => {
+  let pings = 0;
+  onWorkspaceChanged(() => {
+    pings++;
+  });
+  const r = addReminder({ title: "钩子验证", dueAt: "2026-12-20", notifyAt: "2026-12-20T10:00" });
+  assert.ok(pings >= 1, "新增待办应触发回调");
+  updateReminder(r.id, { done: true });
+  assert.ok(pings >= 2, "修改待办应触发回调");
+  cleanup(r.id);
+  assert.ok(pings >= 3, "删除待办应触发回调");
 });
