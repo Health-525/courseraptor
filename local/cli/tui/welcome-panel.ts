@@ -12,7 +12,8 @@
  * （U+1F300–U+1F5xx），⭐✅ 之类歧义宽度的符号不用。
  */
 
-import { BOLD, BRIGHT_CYAN, DIM, dim, RED, RESET, YELLOW } from "./color";
+import { stripVTControlCharacters } from "node:util";
+import { BOLD, BRIGHT_CYAN, DIM, dim, MINT, RED, RESET, YELLOW } from "./color";
 
 export interface ScheduleRow {
   /** 形如 10:00-11:40；查不到节次时间时为空串 */
@@ -158,25 +159,56 @@ function todoLines(sec: SectionRows<TodoRow>, width: number): string[] {
 /** 卡片最大内容宽度：更宽的终端整体居中，而不是把徽标列越拉越远、右半屏留白 */
 const CARD_MAX = 76;
 
+/** 从戴圆眼镜的小恐龙原型提取的字符轮廓；13 行可放进常见 24 行终端。 */
+const RAPTOR_MASCOT = [
+  "   ⣀⡤⠤⠖⠃ ⠘⠲⠤⠤⢤⡀",
+  " ⢠⠞⠁ ⡠⠖⠒⠲⢄  ⢀⡴⣛⡖⠢⡄",
+  "⡴⡟⠲⠤⣾ ⣴⣯⣕⠈⡷⠒⠺⠈⠶⢻ ⡽",
+  " ⡇  ⢘⣦⢜⣋⣡⠜⠁    ⡈⠉⠳⡄",
+  " ⠹⣄⢰⡋⢯⣙⣦⡀      ⠁ ⢠⠇",
+  "  ⠘⢦⠹⡄  ⠙⢒⣦⣤⣤⣀⡴⠒⠚⠉",
+  "   ⠈⡇⡇  ⡴⠋⢸⡀⠁        ⣀⣀⡀",
+  "   ⣰⢳⠃ ⣠⠇  ⠙⢦⣀    ⢀⡴⠋⠁⣠⠟",
+  " ⢠⠞⠁⢺⢀⡞⠁     ⠈⠳⣄⣠⠖⠋  ⡼⠁",
+  " ⠘⠦⢤⡸⣼⣄⣀⣠           ⡼⠁",
+  "    ⡇⠘⠦⣄⣈⣇       ⣀⡤⠞⠁",
+  "   ⣀⡇  ⢰⡋⠉⠉⢳   ⢸⡉⠁",
+  "  ⠘⠧⠤⠤⠤⠖⠃ ⠰⣯⢤ ⡤⣤⠟",
+];
+const MASCOT_WIDTH = Math.max(...RAPTOR_MASCOT.map(textWidth));
+const MASCOT_GAP = 3;
+
 /**
  * 渲染整块面板。宽终端（>CARD_MAX+4 列正文区）时卡片按 CARD_MAX 定宽居中，
  * 两侧对称留白；行预算：外框正文区高度 = 终端行数 - 5（24 行终端即 19 行），
- * 固定装饰 9 行 + 每栏目最多 4 条 + 1 行「还有 N」，条目数在 welcome.ts 截断。
+ * 常规宽度在信息右侧展示字符小恐龙，窄终端隐藏；页脚与 URL 始终独占整行。
+ * 每栏目最多 4 条 + 1 行「还有 N」，条目数在 welcome.ts 截断。
  */
 export function buildWelcomeLines(s: WelcomeState, contentWidth: number): string[] {
   const frame = Math.max(36, contentWidth);
   const width = Math.min(CARD_MAX, frame);
   const margin = " ".repeat(Math.floor((frame - width) / 2));
+  const showMascot = width >= CARD_MAX;
+  const infoWidth = showMascot ? width - MASCOT_WIDTH - MASCOT_GAP : width;
   const meta = `· ${s.dateLabel}${s.week ? ` · 第${s.week}周` : ""}`;
-  const lines: string[] = [
+  let lines: string[] = [
     `👋 ${BOLD}${greeting(s.now)}${RESET} ${dim(meta)}`,
     "",
     sectionLabel("📅", "今日课表"),
   ];
-  if (!s.blank) lines.push(...scheduleLines(s.schedule, width));
+  if (!s.blank) lines.push(...scheduleLines(s.schedule, infoWidth));
   lines.push("", sectionLabel("📋", "一周内待办"));
-  if (!s.blank) lines.push(...todoLines(s.todos, width));
+  if (!s.blank) lines.push(...todoLines(s.todos, infoWidth));
   lines.push("");
+  if (showMascot) {
+    while (lines.length < RAPTOR_MASCOT.length) lines.push("");
+    lines = lines.map((line, index) => {
+      const visible = textWidth(stripVTControlCharacters(line));
+      const padding = " ".repeat(Math.max(0, infoWidth - visible) + MASCOT_GAP);
+      const mascot = (RAPTOR_MASCOT[index] ?? "").padEnd(MASCOT_WIDTH);
+      return `${line}${padding}${MINT}${mascot}${RESET}`;
+    });
+  }
   // 说明后缀放得下才带：URL 本身不可折行，窄终端优先保地址完整
   if (s.webUrl) {
     const base = `💬 网页对话  ${s.webUrl}`;
