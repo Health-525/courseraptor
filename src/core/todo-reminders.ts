@@ -1,10 +1,17 @@
 /**
- * 待办到期提醒：定时扫描本地待办（web-workspace.json），进入「距到期 ≤ 7 天」
- * 窗口的未完成待办每天提醒一次——Windows 桌面通知 + QQ 主动推送（桥在线时）。
+ * 待办提醒，两种节奏共存于同一状态文件 data/todo-reminder-state.json：
  *
- * 去重状态落在 data/todo-reminder-state.json（todoId -> 已提醒的本地日期），
- * 同一天只提醒一次；每天 8 点前不弹，避免半夜打扰。逾期未完成的不弹
- * （课表页 /today 已有红色 ⚠ 展示），窗口外、已完成的都不提醒。
+ * 1. 弥散提醒：定时扫描本地待办（web-workspace.json），进入「距到期 ≤ 7 天」
+ *    窗口的未完成待办每天提醒一次——Windows 桌面通知 + QQ 主动推送（桥在线时）。
+ *    去重状态记 reminded（todoId -> 已提醒的本地日期）；每天 8 点前不弹，避免
+ *    半夜打扰；逾期未完成的不弹（课表页 /today 已有红色 ⚠ 展示）。
+ *
+ * 2. 定点通知：待办带 notifyAt（「是否需要通知」——对话里「到点提醒我」「提前
+ *    一小时叫我」设定）时，到该时刻单独通知一次。去重记 pointNotified
+ *    （todoId -> 已通知的 notifyAt 值），改时刻自然重新武装；错过超过 15 分钟
+ *    补发窗口的静默跳过（标记已处理，不轰炸）；完成的待办不触发。
+ *
+ * 两路互不排斥：设了 notifyAt 的待办仍参与弥散提醒（一个防忘、一个到点叫）。
  */
 
 import { execFile } from "node:child_process";
@@ -14,17 +21,24 @@ import { writeFileAtomicSync } from "./atomic-write";
 import { PROJECT_ROOT } from "./config";
 // QQ 推送 / 桌面通知走 core 内的渠道端口（实现由宿主注册），core 不 import local/
 import { sendDesktopNotification, sendQQPush } from "./notify";
-import { listReminders, type Reminder } from "./workspace-data";
+import { listReminders, onWorkspaceChanged, type Reminder } from "./workspace-data";
 
 const DAY_MS = 86_400_000;
 /** 提前提醒窗口：距到期 ≤ 7 天 */
 const WINDOW_MS = 7 * DAY_MS;
-/** 复查间隔：每小时一次（去重按天，多查不重弹） */
+/** 弥散复查间隔：每小时一次（去重按天，多查不重弹）——与历史节奏一致 */
 const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 /** 当天这个点之前不提醒（本地时区），避免半夜弹通知 */
 const REMIND_AFTER_HOUR = 8;
 /** 单轮最多提醒条数，防止一口气刷屏 */
 const MAX_NOTIFY_PER_CHECK = 5;
+/** 定点通知补发窗口：错过不超过 15 分钟仍补发（睡眠唤醒 / 刚开程序） */
+const POINT_CATCH_UP_MS = 15 * 60_000;
+/**
+ * 定点慢心跳：没有任何待通知时刻时，至多 1 小时看一眼——兜住绕过
+ * writeState 的外部改动（手改文件等）；正常路径都靠事件驱动精确唤醒
+ */
+const POINT_HEARTBEAT_MS = 60 * 60 * 1000;
 
 function statePath(): string {
   return path.join(
@@ -33,9 +47,10 @@ function statePath(): string {
   );
 }
 
-/** todoId -> 已提醒过的本地日期（YYYY-MM-DD） */
+/** todoId -> 已提醒过的本地日期（YYYY-MM-DD）；pointNotified: todoId -> 已定点通知的 notifyAt 值 */
 interface ReminderState {
   reminded: Record<string, string>;
+  pointNotified: Record<string, string>;
 }
 
 function readState(): ReminderState {
@@ -43,9 +58,11 @@ function readState(): ReminderState {
     const value = JSON.parse(fs.readFileSync(statePath(), "utf8")) as Partial<ReminderState>;
     return {
       reminded: value.reminded && typeof value.reminded === "object" ? value.reminded : {},
+      pointNotified:
+        value.pointNotified && typeof value.pointNotified === "object" ? value.pointNotified : {},
     };
   } catch {
-    return { reminded: {} };
+    return { reminded: {}, pointNotified: {} };
   }
 }
 
@@ -170,20 +187,124 @@ export function runReminderCheck(deps: ReminderCheckDeps = {}): Reminder[] {
   return fresh;
 }
 
+/** 定点通知默认出口：与弥散提醒同一套端口（桌面宿主原生通知 / toast / QQ） */
+async function defaultPointNotify(items: Reminder[], now: Date): Promise<void> {
+  for (const r of items) {
+    const title = "CourseRaptor 到点提醒";
+    const body = `「${r.title}」— ${dueText(r, now)}`;
+    if (!sendDesktopNotification(title, body)) windowsToast(title, body);
+  }
+  const lines = items.map((r) => `• ${r.title} — ${dueText(r, now)}`).join("\n");
+  await sendQQPush(`⏰ 到点提醒\n${lines}`).catch(() => {});
+}
+
+export interface PointNotifyDeps {
+  /** 测试注入时钟 */
+  now?: Date;
+  /** 测试注入通知出口；默认桌面通知 + QQ 推送 */
+  notify?: (items: Reminder[], now: Date) => void | Promise<void>;
+}
+
 /**
- * 定时任务入口：启动即查 + 每小时复查。
- * RAPTOR_NO_TODO_REMINDERS=1 整体关闭；interval unref，不拖住进程退出。
+ * 定点通知核对一轮：返回本轮真正通知出去的待办。
+ * 同步返回、通知异步发；先把去重标记落盘再发，发送失败也不重复轰炸。
+ * 错过超过补发窗口的静默标记跳过（补一条几小时前的通知只会困惑）。
+ */
+export function runPointNotifyCheck(deps: PointNotifyDeps = {}): Reminder[] {
+  const now = deps.now ?? new Date();
+  const all = listReminders();
+  const state = readState();
+  let dirty = false;
+  // 完成、删除或清掉通知时刻的待办：定点记录一并清理（重新武装可再触发）
+  const armed = new Set(all.filter((r) => !r.done && r.notifyAt).map((r) => r.id));
+  for (const id of Object.keys(state.pointNotified)) {
+    if (!armed.has(id)) {
+      delete state.pointNotified[id];
+      dirty = true;
+    }
+  }
+  const fresh: Reminder[] = [];
+  for (const r of all) {
+    if (r.done || !r.notifyAt) continue;
+    if (state.pointNotified[r.id] === r.notifyAt) continue; // 该时刻已通知过
+    const at = Date.parse(r.notifyAt);
+    if (!Number.isFinite(at) || now.getTime() < at) continue; // 未到点
+    state.pointNotified[r.id] = r.notifyAt;
+    dirty = true;
+    if (now.getTime() - at <= POINT_CATCH_UP_MS) fresh.push(r);
+  }
+  if (fresh.length) {
+    const notify = deps.notify ?? defaultPointNotify;
+    Promise.resolve(notify(fresh, now)).catch(() => {});
+  }
+  if (dirty) {
+    try {
+      writeFileAtomicSync(statePath(), JSON.stringify(state, null, 2));
+    } catch {
+      // 状态写不进去只影响去重，下一轮会重试
+    }
+  }
+  return fresh;
+}
+
+/**
+ * 下一个待通知的定点时刻（ms 时间戳）：已完成、已通知过当前值的不算；
+ * 一个都没有返回 null。唤醒点据此精确调度。
+ */
+export function nextPointNotifyAt(): number | null {
+  const state = readState();
+  let next: number | null = null;
+  for (const r of listReminders()) {
+    if (r.done || !r.notifyAt) continue;
+    if (state.pointNotified[r.id] === r.notifyAt) continue; // 该时刻已通知过
+    const at = Date.parse(r.notifyAt);
+    if (Number.isFinite(at) && (next === null || at < next)) next = at;
+  }
+  return next;
+}
+
+let pointTimer: NodeJS.Timeout | null = null;
+
+/** 重算定点唤醒点：有下一个通知时刻就精确到点唤醒（+250ms 余量防提前醒），没有挂 1 小时心跳 */
+function schedulePointWake(): void {
+  if (pointTimer) clearTimeout(pointTimer);
+  const next = nextPointNotifyAt();
+  const wait =
+    next === null
+      ? POINT_HEARTBEAT_MS
+      : Math.min(Math.max(next - Date.now() + 250, 250), POINT_HEARTBEAT_MS);
+  pointTimer = setTimeout(pointTick, wait);
+  pointTimer.unref?.();
+}
+
+function pointTick(): void {
+  try {
+    runPointNotifyCheck();
+  } catch {
+    // 提醒是附加能力，任何异常都不许影响主流程
+  }
+  schedulePointWake();
+}
+
+/**
+ * 定时任务入口：弥散提醒每小时一轮（与历史节奏一致）；定点通知**事件驱动**——
+ * 写待办（新增/修改/完成）即重算唤醒点，其余时间只挂「到点精确唤醒 + 至多
+ * 1 小时心跳」，不做高频轮询。睡眠唤醒后定时器迟到：15 分钟补发窗口内照常
+ * 触发，超窗的静默跳过（runPointNotifyCheck 的既有语义）。
+ * RAPTOR_NO_TODO_REMINDERS=1 整体关闭；定时器 unref，不拖住进程退出。
  */
 export function startTodoReminderScheduler(): void {
   if (process.env.RAPTOR_NO_TODO_REMINDERS === "1") return;
-  const check = () => {
+  const diffuse = () => {
     try {
       runReminderCheck();
     } catch {
       // 提醒是附加能力，任何异常都不许影响主流程
     }
   };
-  check();
-  const timer = setInterval(check, CHECK_INTERVAL_MS);
-  timer.unref?.();
+  diffuse();
+  setInterval(diffuse, CHECK_INTERVAL_MS).unref?.();
+
+  onWorkspaceChanged(schedulePointWake);
+  pointTick();
 }
