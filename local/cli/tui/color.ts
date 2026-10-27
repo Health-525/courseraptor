@@ -20,7 +20,9 @@ const supportsColor =
 
 export const RESET = supportsColor ? "\x1b[0m" : "";
 export const CYAN = supportsColor ? "\x1b[36m" : "";
+export const BRIGHT_CYAN = supportsColor ? "\x1b[96m" : "";
 export const DIM = supportsColor ? "\x1b[2m" : "";
+export const BOLD = supportsColor ? "\x1b[1m" : "";
 export const GREEN = supportsColor ? "\x1b[32m" : "";
 export const YELLOW = supportsColor ? "\x1b[33m" : "";
 export const RED = supportsColor ? "\x1b[31m" : "";
