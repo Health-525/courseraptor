@@ -10,10 +10,13 @@
  *    让给菜单，保证总行数恒等于终端高度（帧 diff 与清屏重绘都不出格）。
  *    选中项变化不经过库的按键管线，应用侧 emit stdout 的 resize 触发库全帧
  *    重绘（库的重绘只挂在这个事件上）。
+ *
+ * 3. Windows 稳定重绘：整帧使用绝对行定位，绘制时关闭自动换行，结束后恢复。
  */
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { patchTerminalFrames } from "./tui-frame-patch.mjs";
 
 const require = createRequire(import.meta.url);
 // 包主入口就是 dist/index.js
@@ -105,6 +108,12 @@ if (!source.includes("globalThis.__raptorSlashMenu")) {
   if (!menuApplied) {
     console.error("[patch-tui] 菜单锚点未匹配，@ai-sdk/tui 可能已升级，跳过该项");
   }
+}
+
+const stableFrames = patchTerminalFrames(patched);
+if (stableFrames !== patched) {
+  patched = stableFrames;
+  applied.push("Windows 稳定重绘");
 }
 
 if (patched === source) {

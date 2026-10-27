@@ -55,6 +55,7 @@ test("textWidth：中文与常用 emoji 按 2 列，ASCII 按 1 列", () => {
   assert.equal(textWidth("操作系统"), 8);
   assert.equal(textWidth("📅📋"), 4);
   assert.equal(textWidth("10:00-11:40"), 11);
+  assert.equal(textWidth("⣀⠤⠖"), 3);
 });
 
 test("truncateTo：超长中文标题截断后仍不超预算且以 ... 结尾", () => {
@@ -105,14 +106,9 @@ test("hint 栏目渲染单行提示，more 条数落在「还有 N」行", () =>
   const hint: SectionRows<ScheduleRow> = { kind: "hint", text: "今天没有课" };
   const todos: SectionRows<TodoRow> = { kind: "hint", text: "暂无一周内到期待办" };
   const lines = buildWelcomeLines(state({ schedule: hint, todos }), 96).map(strip);
-  assert.ok(
-    lines.some((l) => l.trimStart() === "今天没有课"),
-    JSON.stringify(lines),
-  );
-  assert.ok(
-    lines.some((l) => l.trimStart() === "暂无一周内到期待办"),
-    JSON.stringify(lines),
-  );
+  const content = lines.map((line) => line.replace(/[\u2800-\u28ff].*/u, "").trim());
+  assert.ok(content.includes("今天没有课"), JSON.stringify(lines));
+  assert.ok(content.includes("暂无一周内到期待办"), JSON.stringify(lines));
   const rows = buildWelcomeLines(state(), 96).map(strip);
   assert.ok(rows.some((l) => l.includes("...还有 2 条，问我看全部")));
 });
@@ -176,4 +172,21 @@ test("宽终端：卡片定宽 76 列整体居中，两侧对称留白", () => {
     "80 列内应贴左渲染",
   );
   assert.ok(!snug.some((l) => l.startsWith("      👋")), "76 列内不该有居中前缀");
+});
+
+test("字符小恐龙：宽终端并排显示、窄终端隐藏，URL 完整且待办徽标仍对齐", () => {
+  const hasMascot = (line: string) => /[\u2800-\u28ff]/u.test(line);
+  const wide = buildWelcomeLines(state(), 76).map(strip);
+  assert.equal(wide.filter(hasMascot).length, 13);
+  assert.ok(wide.some((line) => line.includes("http://127.0.0.1:8787")));
+  assert.ok(!wide.find((line) => line.includes("网页对话"))?.match(/[\u2800-\u28ff]/u));
+  const badgeEnds = wide.flatMap((line) => {
+    const match = line.match(/^.*?(?:还有 \d+ 天|已逾期|今天|明天)/u);
+    return match ? [textWidth(match[0])] : [];
+  });
+  assert.equal(new Set(badgeEnds).size, 1);
+  const narrow = buildWelcomeLines(state(), 56).map(strip);
+  assert.ok(!narrow.some(hasMascot));
+  const blank = buildWelcomeLines(state({ blank: true, week: undefined }), 76).map(strip);
+  assert.ok(blank.length <= 19, "未选学校时仍应放进 24 行终端正文区");
 });

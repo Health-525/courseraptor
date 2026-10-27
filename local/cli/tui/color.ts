@@ -24,6 +24,8 @@ export const BRIGHT_CYAN = supportsColor ? "\x1b[96m" : "";
 export const DIM = supportsColor ? "\x1b[2m" : "";
 export const BOLD = supportsColor ? "\x1b[1m" : "";
 export const GREEN = supportsColor ? "\x1b[32m" : "";
+/** 吉祥物使用固定薄荷绿，避免终端主题把普通绿色映射成过亮的荧光绿。 */
+export const MINT = supportsColor ? "\x1b[38;2;155;212;171m" : "";
 export const YELLOW = supportsColor ? "\x1b[33m" : "";
 export const RED = supportsColor ? "\x1b[31m" : "";
 export const INVERT = supportsColor ? "\x1b[7m" : "";
