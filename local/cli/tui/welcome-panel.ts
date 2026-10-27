@@ -155,12 +155,18 @@ function todoLines(sec: SectionRows<TodoRow>, width: number): string[] {
   return lines;
 }
 
+/** 卡片最大内容宽度：更宽的终端整体居中，而不是把徽标列越拉越远、右半屏留白 */
+const CARD_MAX = 76;
+
 /**
- * 渲染整块面板。行预算：外框正文区高度 = 终端行数 - 5（24 行终端即 19 行），
+ * 渲染整块面板。宽终端（>CARD_MAX+4 列正文区）时卡片按 CARD_MAX 定宽居中，
+ * 两侧对称留白；行预算：外框正文区高度 = 终端行数 - 5（24 行终端即 19 行），
  * 固定装饰 9 行 + 每栏目最多 4 条 + 1 行「还有 N」，条目数在 welcome.ts 截断。
  */
 export function buildWelcomeLines(s: WelcomeState, contentWidth: number): string[] {
-  const width = Math.max(36, contentWidth);
+  const frame = Math.max(36, contentWidth);
+  const width = Math.min(CARD_MAX, frame);
+  const margin = " ".repeat(Math.floor((frame - width) / 2));
   const meta = `· ${s.dateLabel}${s.week ? ` · 第${s.week}周` : ""}`;
   const lines: string[] = [
     `👋 ${BOLD}${greeting(s.now)}${RESET} ${dim(meta)}`,
@@ -176,8 +182,8 @@ export function buildWelcomeLines(s: WelcomeState, contentWidth: number): string
     const base = `💬 网页对话  ${s.webUrl}`;
     lines.push(textWidth(base) + 16 <= width ? `${base} ${dim("· 浏览器打开即聊")}` : base);
   }
-  // 分隔线不满宽：跟随终端拉伸的长线在 resize 重排前会残留旧长度
-  lines.push(dim("─".repeat(Math.min(44, width - 2))));
+  // 分隔线铺满卡片内宽，居中后即成卡片底缘，不随终端拉伸
+  lines.push(dim("─".repeat(width - 4)));
   // 页脚按宽度二选一：放不下就换短文案，宁可措辞紧凑也不让库把行截断——
   // Star 行被截会切掉 URL 本体，链接就废了
   const shortcuts = `${INDENT}滚轮/↑↓ 滚动 · ESC 打断回复 · 输入 / 唤出命令菜单 · Ctrl+C 退出`;
@@ -192,5 +198,6 @@ export function buildWelcomeLines(s: WelcomeState, contentWidth: number): string
       ? `${DIM}${star}${RESET}${starUrl}`
       : `${DIM}${starShort}${RESET}${starUrl}`,
   );
-  return lines;
+  // 空行不加前导空格：视觉等价，diff/选中复制时更干净
+  return lines.map((l) => (l ? margin + l : l));
 }

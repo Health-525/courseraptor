@@ -105,8 +105,14 @@ test("hint 栏目渲染单行提示，more 条数落在「还有 N」行", () =>
   const hint: SectionRows<ScheduleRow> = { kind: "hint", text: "今天没有课" };
   const todos: SectionRows<TodoRow> = { kind: "hint", text: "暂无一周内到期待办" };
   const lines = buildWelcomeLines(state({ schedule: hint, todos }), 96).map(strip);
-  assert.ok(lines.includes("  今天没有课"));
-  assert.ok(lines.includes("  暂无一周内到期待办"));
+  assert.ok(
+    lines.some((l) => l.trimStart() === "今天没有课"),
+    JSON.stringify(lines),
+  );
+  assert.ok(
+    lines.some((l) => l.trimStart() === "暂无一周内到期待办"),
+    JSON.stringify(lines),
+  );
   const rows = buildWelcomeLines(state(), 96).map(strip);
   assert.ok(rows.some((l) => l.includes("...还有 2 条，问我看全部")));
 });
@@ -134,9 +140,40 @@ test("课表行时间列定宽，无时间的课也保持对齐", () => {
   };
   const lines = buildWelcomeLines(state({ schedule }), 96)
     .map(strip)
-    .filter((l) => l.startsWith("  ") && (l.includes("操作系统") || l.includes("无时间课")));
-  // 时间列固定 13 列（11 时间 + 2 间隔）：课名一律从第 15 列起，空时间用占位空格
+    .filter((l) => l.includes("操作系统") || l.includes("无时间课"));
+  // 时间列固定 13 列（11 时间 + 2 间隔）：课名从「卡片左边距 + 缩进 2 + 时间列 13」列起
+  const margin = Math.floor((96 - Math.min(76, 96)) / 2);
+  const titleCol = margin + 2 + 13;
   assert.equal(lines.length, 2, JSON.stringify(lines));
-  assert.ok(lines[0]?.slice(15).startsWith("操作系统"), `课名未对齐：${JSON.stringify(lines)}`);
-  assert.ok(lines[1]?.slice(15).startsWith("无时间课"), `空时间未占位：${JSON.stringify(lines)}`);
+  assert.ok(
+    lines[0]?.slice(titleCol).startsWith("操作系统"),
+    `课名未对齐：${JSON.stringify(lines)}`,
+  );
+  assert.ok(
+    lines[1]?.slice(titleCol).startsWith("无时间课"),
+    `空时间未占位：${JSON.stringify(lines)}`,
+  );
+});
+
+test("宽终端：卡片定宽 76 列整体居中，两侧对称留白", () => {
+  // 117 列终端（正文区 113）：margin = (113-76)/2 = 18，徽标右缘 ≤ 卡片内缘
+  const lines = buildWelcomeLines(state(), 113).map(strip);
+  const margin = Math.floor((113 - 76) / 2);
+  for (const l of lines) {
+    if (!l) continue;
+    assert.ok(l.startsWith(" ".repeat(margin)), `未居中：${JSON.stringify(l)}`);
+    assert.ok(textWidth(l) <= 113, `超宽：${l}`);
+  }
+  // 卡片内容不越过卡片右缘（margin + 76），徽标不再漂向半屏
+  for (const l of lines) {
+    if (!l) continue;
+    assert.ok(textWidth(l) <= margin + 76, `内容超出卡片宽：${l}`);
+  }
+  // 80 列终端（正文区 76）：卡片占满正文区，不居中，抬头贴左
+  const snug = buildWelcomeLines(state(), 76).map(strip);
+  assert.ok(
+    snug.some((l) => l.startsWith("👋")),
+    "80 列内应贴左渲染",
+  );
+  assert.ok(!snug.some((l) => l.startsWith("      👋")), "76 列内不该有居中前缀");
 });
