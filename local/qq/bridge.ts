@@ -449,4 +449,7 @@ if (isEntry) {
   // 独立跑桥时待办提醒照常工作（主入口 index.ts 里另有启动）
   const { startTodoReminderScheduler } = await import("../../src/core/todo-reminders");
   startTodoReminderScheduler();
+  // 定时提醒同款：独立跑桥时到点照样弹（boot.ts 里另有启动，内部有单例护栏）
+  const { startAlarmScheduler } = await import("../../src/core/alarms");
+  startAlarmScheduler();
 }

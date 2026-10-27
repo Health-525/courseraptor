@@ -28,7 +28,7 @@ Start with questions such as “Where are my classes on Wednesday?” or “Reme
 ## Features
 
 - **Classes and schedule changes:** query teaching weeks, times and rooms; edit the local timetable and export an image or `.ics` calendar.
-- **Deadline todos:** record a task and due time, then list, update or complete it. Due reminders follow the app’s rules while the main process is running.
+- **Deadline todos:** record a task and due time, then list, update or complete it. Due reminders follow the app’s rules while the main process is running, and one-off / daily / weekly alarms can be set for exact times.
 - **Today’s plan:** combine your existing timetable and todos in a conversation, with the underlying records available in the feature hall.
 - **Study records:** organize knowledge by course and use on-demand learning skills such as Feynman explanations, exercise diagnosis and spiral review.
 - **Course materials:** read local PDF, Word and spreadsheet files, filter data, and generate Word, Excel or PDF documents.

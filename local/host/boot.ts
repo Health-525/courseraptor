@@ -101,5 +101,9 @@ export async function bootstrapHost(): Promise<BootResult> {
     startTodoReminderScheduler(),
   );
 
+  // 定时提醒（定点闹钟）：每 30 秒核对一次，到点桌面通知 + QQ 推送；
+  // 与待办提醒同一存活语义（桌面托盘常驻即持续生效）。
+  void import("../../src/core/alarms").then(({ startAlarmScheduler }) => startAlarmScheduler());
+
   return { agent, updateInfo, webUrl };
 }

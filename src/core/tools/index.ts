@@ -7,6 +7,7 @@
  */
 
 import { aiNewsTools } from "./ai-news";
+import { alarmTools } from "./alarms";
 import { documentTools } from "./document";
 import { examEditTools } from "./exams";
 import { filesTools } from "./files";
@@ -26,6 +27,7 @@ import { weatherTools } from "./weather";
 
 export const coreTools = {
   ...aiNewsTools,
+  ...alarmTools,
   ...filesTools,
   ...documentTools,
   ...examEditTools,
