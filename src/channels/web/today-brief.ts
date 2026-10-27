@@ -85,6 +85,10 @@ export interface BriefTodo {
   dueAt: string;
   /** "今天 23:59" / "明天 14:00" / "9月20日 周日 14:00" */
   dueLabel: string;
+  /** 定点通知时刻（ISO）；未设为空（普通待办） */
+  notifyAt?: string;
+  /** "今天 14:00 通知"；未设定点通知为空 */
+  notifyLabel?: string;
   overdue: boolean;
   isToday: boolean;
   notes?: string;
@@ -367,6 +371,12 @@ function buildTodos(now: Date): TodayBrief["todos"] {
         title: r.title,
         dueAt: r.dueAt,
         dueLabel: dueLabelOf(due, today),
+        ...(r.notifyAt
+          ? {
+              notifyAt: r.notifyAt,
+              notifyLabel: `${dueLabelOf(new Date(r.notifyAt), today)} 通知`,
+            }
+          : {}),
         overdue: due.getTime() < now.getTime(),
         isToday: dayDiff === 0,
         ...(r.notes ? { notes: r.notes } : {}),

@@ -3142,12 +3142,15 @@ function todoHallItem(t) {
   main.appendChild(ht);
   const metaText =
     t.dueLabel +
+    (t.notifyLabel ? ` · ⏰ ${t.notifyLabel}` : "") +
     (t.overdue ? " · 已逾期" : t.isToday ? " · 今天到期" : "") +
     (t.source ? ` · 来自${t.source}` : "");
   const hm = el2("hm", metaText);
   if (t.overdue) {
     hm.innerHTML = "";
-    hm.appendChild(document.createTextNode(`${t.dueLabel} · `));
+    hm.appendChild(
+      document.createTextNode(`${t.dueLabel}${t.notifyLabel ? ` · ⏰ ${t.notifyLabel}` : ""} · `),
+    );
     const tag = document.createElement("span");
     tag.className = "overdue-tag";
     tag.textContent = "⚠ 已逾期";

@@ -32,6 +32,8 @@ export interface Reminder {
   id: string;
   title: string;
   dueAt: string;
+  /** 定点通知时刻（可选）：到点单独桌面通知 + QQ 推送一次；不设只走弥散提醒 */
+  notifyAt?: string;
   source?: string;
   sourceUrl?: string;
   notes?: string;
@@ -75,6 +77,17 @@ function writeState(state: WorkspaceState): void {
 
 const ALLOWED_EXT = new Set([".pdf", ".docx", ".xlsx", ".xls", ".csv", ".txt", ".md", ".pptx"]);
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+/**
+ * 定点通知时刻规范化：必须有具体钟点（纯日期不算——23:59 弹通知没有意义），
+ * 「2026-11-06 09:00」空格写法也收；无效返回 null。
+ */
+export function normalizeNotifyAt(raw: string): string | null {
+  const value = raw.trim().replace(" ", "T");
+  if (!value || /^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
 
 export function saveUpload(name: string, type: string, buf: Buffer): WebUpload {
   const safeName = path
@@ -161,11 +174,18 @@ export function addReminder(input: Record<string, unknown>): Reminder {
   const dueAt = cleanText(input.dueAt, 40);
   if (!title) throw new Error("请填写待办内容");
   if (!dueAt || Number.isNaN(Date.parse(dueAt))) throw new Error("请选择有效的截止时间");
+  let notifyAt: string | undefined;
+  const notifyRaw = cleanText(input.notifyAt, 40);
+  if (notifyRaw) {
+    notifyAt = normalizeNotifyAt(notifyRaw) ?? undefined;
+    if (!notifyAt) throw new Error("通知时刻需带具体钟点，如 2026-11-06T09:00:00");
+  }
   const now = Date.now();
   const reminder: Reminder = {
     id: crypto.randomBytes(8).toString("hex"),
     title,
     dueAt: new Date(dueAt).toISOString(),
+    ...(notifyAt ? { notifyAt } : {}),
     source: cleanText(input.source, 160) || undefined,
     sourceUrl: cleanText(input.sourceUrl, 500) || undefined,
     notes: cleanText(input.notes, 500) || undefined,
@@ -194,6 +214,17 @@ export function updateReminder(id: string, patch: Record<string, unknown>): Remi
   // 备注显式传入即可改（含清空）；不传不动，避免误抹 agent 记录的备注
   if (typeof patch.notes === "string") {
     reminder.notes = cleanText(patch.notes, 500) || undefined;
+  }
+  // 定点通知：传新时刻即改（改后按新时刻重新武装）；传空串清除，回到普通待办
+  if (typeof patch.notifyAt === "string") {
+    const value = patch.notifyAt.trim();
+    if (!value) {
+      delete reminder.notifyAt;
+    } else {
+      const normalized = normalizeNotifyAt(value);
+      if (!normalized) throw new Error("通知时刻需带具体钟点，如 2026-11-06T09:00:00");
+      reminder.notifyAt = normalized;
+    }
   }
   reminder.updatedAt = Date.now();
   writeState(state);

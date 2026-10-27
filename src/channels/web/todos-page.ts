@@ -280,7 +280,13 @@ function todoItem(t) {
   const title = el("span", "todo-title", t.title);
   if (t.notes) title.title = t.notes;
   row.appendChild(title);
-  row.appendChild(el("span", "todo-due", (t.overdue ? "⚠ " : "") + t.dueLabel));
+  row.appendChild(
+    el(
+      "span",
+      "todo-due",
+      (t.overdue ? "⚠ " : "") + t.dueLabel + (t.notifyLabel ? " · ⏰ " + t.notifyLabel : ""),
+    ),
+  );
   if (!DEMO_DATA && t.id) {
     const ics = el("a", "todo-ics", ".ics");
     ics.href = "/api/reminders/" + encodeURIComponent(t.id) + ".ics";

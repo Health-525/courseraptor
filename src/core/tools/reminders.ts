@@ -3,6 +3,8 @@
  *
  * 读写网页侧同一份 web-workspace.json 待办（课表页 /today 与对话页
  * 设置里的「截止日期待办」共享），让用户在对话里随口说的安排落进待办。
+ * 条目可带 notifyAt（定点通知时刻）：「到点提醒我」「提前一小时叫我」
+ * 这类要到点被叫的需求由 todo-reminders 的定点通知到点单独弹一次。
  */
 
 import { tool } from "ai";
@@ -21,7 +23,7 @@ export const reminderTools = {
   /** 待办维护 */
   manage_todos: tool({
     description:
-      "待办维护（本地持久，课表页 /today 与对话页「设置 → 截止日期待办」都能看到）。用户说出自己的待办（「我这周要交高数作业」「记一下周五交实验报告」）时主动调 add，一次说几件事就一批记全；问「我有哪些待办」用 list；办完了用 update 置 done；不要了用 delete。截止时间必须是绝对时间——相对日期（明天/下周五）先调 get_time 换算再传入；只给日期（如 2026-09-16）按当天 23:59 截止；用户没提截止时间就先问一句再记。",
+      "待办维护（本地持久，课表页 /today 与对话页「设置 → 截止日期待办」都能看到）。用户说出自己的待办（「我这周要交高数作业」「记一下周五交实验报告」）时主动调 add，一次说几件事就一批记全；问「我有哪些待办」用 list；办完了用 update 置 done；不要了用 delete。截止时间必须是绝对时间——相对日期（明天/下周五）先调 get_time 换算再传入；只给日期（如 2026-09-16）按当天 23:59 截止；用户没提截止时间就先问一句再记。用户要到点被叫（「周五下午三点提醒我交」「交之前一小时叫我」）时给该条带 notifyAt——定点通知时刻，必须含具体钟点（同样先换算成绝对时间），一般等于或早于截止时间；只说截止、没要到点通知的不用带。",
     inputSchema: z.object({
       action: z
         .enum(["add", "list", "update", "delete"])
@@ -37,6 +39,12 @@ export const reminderTools = {
               .describe(
                 "截止时间（绝对时间，如 2026-09-16T23:59:00；相对日期须先用 get_time 换算）",
               ),
+            notifyAt: z
+              .string()
+              .optional()
+              .describe(
+                "定点通知时刻（可选）：到点单独桌面通知 + QQ 推送一次；须含具体钟点，如 2026-09-16T14:00:00，一般等于或早于截止时间",
+              ),
             notes: z.string().optional().describe("补充说明（≤500 字）"),
           }),
         )
@@ -46,10 +54,14 @@ export const reminderTools = {
       id: z.string().optional().describe("目标待办 id（update/delete 必填，来自 list 结果）"),
       title: z.string().optional().describe("update 时的标题"),
       dueAt: z.string().optional().describe("update 时的新截止时间"),
+      notifyAt: z
+        .string()
+        .optional()
+        .describe("update 时的新定点通知时刻（须含具体钟点）；传空字符串清除通知"),
       notes: z.string().optional().describe("update 时的新备注"),
       done: z.boolean().optional().describe("update 时的完成状态（true=已完成）"),
     }),
-    execute: async ({ action, items, includeDone, id, title, dueAt, notes, done }) => {
+    execute: async ({ action, items, includeDone, id, title, dueAt, notifyAt, notes, done }) => {
       if (action === "add") {
         if (!items?.length) return { error: "add 需要 items（至少一条待办）" };
         if (items.length > 20) return { error: "一次最多记录 20 条待办" };
@@ -58,14 +70,19 @@ export const reminderTools = {
           if (!item.title.trim()) return { error: "每条待办都需要 title" };
           const normalized = normalizeDueAt(item.dueAt);
           if (!normalized) return { error: `「${item.title}」的截止时间无效：${item.dueAt}` };
-          created.push(
-            addReminder({
-              title: item.title,
-              dueAt: normalized,
-              ...(item.notes ? { notes: item.notes } : {}),
-              source: "对话",
-            }),
-          );
+          try {
+            created.push(
+              addReminder({
+                title: item.title,
+                dueAt: normalized,
+                ...(item.notifyAt?.trim() ? { notifyAt: item.notifyAt } : {}),
+                ...(item.notes ? { notes: item.notes } : {}),
+                source: "对话",
+              }),
+            );
+          } catch (e) {
+            return { error: `「${item.title}」：${(e as Error).message}` };
+          }
         }
         const open = listReminders().filter((r) => !r.done).length;
         return {
@@ -93,8 +110,14 @@ export const reminderTools = {
           if (!normalized) return { error: `新的截止时间无效：${dueAt}` };
           patch.dueAt = normalized;
         }
+        if (notifyAt !== undefined) patch.notifyAt = notifyAt; // 空串=清除，updateReminder 里处理
         if (notes !== undefined) patch.notes = notes;
-        const updated = updateReminder(id, patch);
+        let updated: ReturnType<typeof updateReminder>;
+        try {
+          updated = updateReminder(id, patch);
+        } catch (e) {
+          return { error: (e as Error).message };
+        }
         return updated
           ? { ok: true, summary: "待办已更新", updated }
           : { error: `未找到待办 ${id}` };
