@@ -9,16 +9,36 @@
  * 页面只通过 preload 暴露的极小 API 与本进程通信。
  */
 
+import fs from "node:fs";
 import path from "node:path";
 import { BrowserWindow, Notification, app, dialog, ipcMain, shell, type Tray } from "electron";
 import { type BackendHandle, startBackend } from "./backend";
-import { ensureBackendExtracted } from "./payload";
-import { createTray } from "./tray";
+import { ensureBackendExtracted, rescueLegacyCredentials } from "./payload";
 import { initPet } from "./pet";
+import { createTray } from "./tray";
 
 const isDev = !app.isPackaged;
-/** 数据落到用户目录：升级（替换安装目录）不丢数据（方案 §3.2） */
-const dataDir = path.join(app.getPath("userData"), "data");
+/**
+ * 数据目录解析，优先级：
+ *   1) 环境变量 RAPTOR_DATA_DIR（显式指定）
+ *   2) userData/data-dir.txt 第一行（绝对路径）——让桌面端与命令行共用同一个 data/
+ *      （命令行默认就是仓库根的 data/，写入该路径即三端数据统一）
+ *   3) userData/data（默认）：升级（替换安装目录）不丢数据（方案 §3.2）
+ * 凭证 credentials.enc 跟着 dataDir 走，同样共用。
+ */
+function resolveDataDir(): string {
+  const fromEnv = process.env.RAPTOR_DATA_DIR?.trim();
+  if (fromEnv) return path.resolve(fromEnv);
+  try {
+    const text = fs.readFileSync(path.join(app.getPath("userData"), "data-dir.txt"), "utf8");
+    const line = (text.split(/\r?\n/)[0] ?? "").trim();
+    if (line && path.isAbsolute(line)) return path.resolve(line);
+  } catch {
+    /* 没配置：走默认 */
+  }
+  return path.join(app.getPath("userData"), "data");
+}
+const dataDir = resolveDataDir();
 process.env.RAPTOR_DATA_DIR = dataDir;
 
 let win: BrowserWindow | null = null;
@@ -60,6 +80,8 @@ async function resolveBackend(): Promise<{ appPath: string; nodeBin: string }> {
       nodeBin: process.platform === "win32" ? "node.exe" : "node",
     };
   }
+  // 清理旧版本后端目录之前，先把旧版留在其中的 credentials.enc 抢救进数据目录
+  rescueLegacyCredentials(dataDir);
   return ensureBackendExtracted(path.join(process.resourcesPath, "payload.zip"));
 }
 
