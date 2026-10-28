@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>CourseRaptor 桌面宠物</title>
+<!--
+  桌面宠物页面：戴眼镜的小恐龙，跑在透明无边框的 BrowserWindow 里。
+  动画逻辑移植自 C# 原型（DinosaurPet.cs）：4×4 精灵图逐格取主体连通区，
+  按状态叠加抬升/旋转/缩放，底部状态胶囊 + 顶部气泡 + 睡觉的 z Z。
+  窗口级操作（移动、走动边界、右键菜单、退出）通过 window.pet 桥交给主进程。
+  本页面自包含，无任何网络请求。
+-->
+<style>
+  html, body {
+    margin: 0; width: 100%; height: 100%; overflow: hidden;
+    background: transparent; user-select: none; cursor: default;
+    font-family: "Microsoft YaHei UI", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  canvas { display: block; width: 100vw; height: 100vh; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<script>
+"use strict";
+
+// ── 常量：与 C# 原型逐一对齐 ──
+const INK = "#123049";
+const PAPER = "#FFFBEB";
+const PILL_BG = "rgba(255, 251, 235, 0.9)";
+const BUBBLE_BORDER = "#DFE3D6";
+const FRAME_BOX = 256;        // 每帧绘制到 256×256 的舞台盒
+const BODY_BOTTOM = 246;      // 角色脚底在盒内的基线
+const FIT_H = 230, FIT_W = 238;
+const ALPHA_THRESHOLD = 72;   // 主体连通区的透明度门槛
+const MIN_BODY_PIXELS = 500;
+const WALK_SPEED = 38;        // 像素/秒，与原型一致
+const CLICK_WINDOW_MS = 400;
+
+const LABELS = ["待机", "向左走", "向右走", "打招呼", "推眼镜", "开心", "被提起", "睡觉"];
+
+// ── 状态机 ──
+const state = {
+  action: "idle",          // idle | walkLeft | walkRight | wave | glasses | happy | drag | sleep
+  started: 0,
+  until: Infinity,
+  nextAuto: 6,
+  speech: "",
+  speechUntil: 0,
+  autoWalk: true,
+  lastClick: -1e4,
+};
+
+function now() { return performance.now() / 1000; }
+
+function label() { return LABELS[["idle", "walkLeft", "walkRight", "wave", "glasses", "happy", "drag", "sleep"].indexOf(state.action)] ?? state.action; }
+
+function setAction(action, seconds, message) {
+  const t = now();
+  state.action = action;
+  state.started = t;
+  state.until = seconds > 0 ? t + seconds : Infinity;
+  state.nextAuto = t + (seconds > 0 && Number.isFinite(seconds) ? seconds : 0) + 6 + Math.random() * 6;
+  if (message) { state.speech = message; state.speechUntil = t + 4; }
+}
+
+// ── 精灵图处理：4×4 网格逐格取最大连通区，对齐脚底后渲染进 256×256 帧盒 ──
+const frames = [];
+
+function extractLargestBody(data, w, h) {
+  // 4 邻接 flood fill 找最大不透明连通区（与原型 ExtractCharacter 等价）
+  const labels = new Int32Array(w * h);
+  const queue = new Int32Array(w * h);
+  let label = 0, bestLabel = 0, bestCount = 0;
+  for (let start = 0; start < labels.length; start++) {
+    if (labels[start] !== 0 || data[start * 4 + 3] < ALPHA_THRESHOLD) continue;
+    label++;
+    let read = 0, write = 1;
+    queue[0] = start;
+    labels[start] = label;
+    while (read < write) {
+      const p = queue[read++];
+      const px = p % w, py = (p / w) | 0;
+      const neighbours = [px > 0 ? p - 1 : -1, px < w - 1 ? p + 1 : -1, py > 0 ? p - w : -1, py < h - 1 ? p + w : -1];
+      for (const n of neighbours) {
+        if (n < 0 || labels[n] !== 0 || data[n * 4 + 3] < ALPHA_THRESHOLD) continue;
+        labels[n] = label;
+        queue[write++] = n;
+      }
+    }
+    if (write > bestCount) { bestCount = write; bestLabel = label; }
+  }
+  if (bestCount < MIN_BODY_PIXELS) throw new Error("动画帧缺少有效角色");
+  let left = w, top = h, right = 0, bottom = 0;
+  for (let p = 0; p < labels.length; p++) {
+    if (labels[p] !== bestLabel) continue;
+    const x = p % w, y = (p / w) | 0;
+    if (x < left) left = x;
+    if (x > right) right = x;
+    if (y < top) top = y;
+    if (y > bottom) bottom = y;
+  }
+  const cw = right - left + 1, ch = bottom - top + 1;
+  const out = new ImageData(cw, ch);
+  for (let y = 0; y < ch; y++) {
+    for (let x = 0; x < cw; x++) {
+      const from = ((top + y) * w + (left + x)) * 4;
+      const to = (y * cw + x) * 4;
+      if (labels[(top + y) * w + left + x] !== bestLabel) continue;
+      out.data[to] = data[from];
+      out.data[to + 1] = data[from + 1];
+      out.data[to + 2] = data[from + 2];
+      out.data[to + 3] = data[from + 3];
+    }
+  }
+  return out;
+}
+
+async function buildFrames() {
+  const image = new Image();
+  image.src = "dino-sprites.png";
+  await image.decode();
+  const sheet = document.createElement("canvas");
+  sheet.width = image.naturalWidth;
+  sheet.height = image.naturalHeight;
+  const sctx = sheet.getContext("2d", { willReadFrequently: true });
+  sctx.drawImage(image, 0, 0);
+  const sw = sheet.width, sh = sheet.height;
+  const crops = [];
+  let largestW = 1, largestH = 1;
+  for (let index = 0; index < 16; index++) {
+    const col = index % 4, row = (index / 4) | 0;
+    const x0 = Math.floor(col * sw / 4), x1 = Math.floor((col + 1) * sw / 4);
+    const y0 = Math.floor(row * sh / 4), y1 = Math.floor((row + 1) * sh / 4);
+    const pixels = sctx.getImageData(x0, y0, x1 - x0, y1 - y0);
+    const body = extractLargestBody(pixels.data, pixels.width, pixels.height);
+    crops.push(body);
+    if (body.width > largestW) largestW = body.width;
+    if (body.height > largestH) largestH = body.height;
+  }
+  const scale = Math.min(FIT_H / largestH, FIT_W / largestW);
+  for (const body of crops) {
+    // drawImage 不收 ImageData：先落到同尺寸的临时画布
+    const bodyCanvas = document.createElement("canvas");
+    bodyCanvas.width = body.width;
+    bodyCanvas.height = body.height;
+    bodyCanvas.getContext("2d").putImageData(body, 0, 0);
+    const frame = document.createElement("canvas");
+    frame.width = FRAME_BOX;
+    frame.height = FRAME_BOX;
+    const fctx = frame.getContext("2d");
+    const w = body.width * scale, h = body.height * scale;
+    fctx.imageSmoothingQuality = "high";
+    fctx.drawImage(bodyCanvas, (FRAME_BOX - w) / 2, BODY_BOTTOM - h, w, h);
+    frames.push(frame);
+  }
+}
+
+// ── 绘制：与原型 PetArtwork.Draw 同一套位移/旋转/缩放 ──
+function wrapText(ctx, text, maxWidth) {
+  // 气泡文本按字符换行（中文无空格，逐字测宽即可）
+  const lines = [];
+  let line = "";
+  for (const ch of text) {
+    if (ctx.measureText(line + ch).width > maxWidth && line) {
+      lines.push(line);
+      line = ch;
+    } else {
+      line += ch;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+function drawStatusPill(ctx, w, h) {
+  const text = `${label()} · 右键菜单`;
+  ctx.font = "11px 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
+  const tw = ctx.measureText(text).width;
+  const pillW = tw + 22, pillH = 21, pillX = (w - pillW) / 2, pillY = h - 24;
+  ctx.fillStyle = PILL_BG;
+  roundRect(ctx, pillX, pillY, pillW, pillH, 10);
+  ctx.fill();
+  ctx.fillStyle = INK;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText(text, pillX + 11, pillY + 2);
+}
+
+function drawSpeech(ctx, w) {
+  if (!state.speech || now() >= state.speechUntil) return;
+  ctx.font = "12px 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
+  const maxTextWidth = Math.max(120, w - 40);
+  const lines = wrapText(ctx, state.speech, maxTextWidth);
+  const widest = Math.max(...lines.map((l) => ctx.measureText(l).width));
+  const bubbleW = Math.min(w - 14, Math.max(160, widest + 24));
+  const lineH = 16;
+  const bubbleH = lines.length * lineH + 16;
+  const bubbleX = (w - bubbleW) / 2, bubbleY = 5;
+  ctx.fillStyle = PAPER;
+  ctx.strokeStyle = BUBBLE_BORDER;
+  ctx.lineWidth = 1;
+  roundRect(ctx, bubbleX, bubbleY, bubbleW, bubbleH, 12);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = INK;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  lines.forEach((line, i) => {
+    ctx.fillText(line, w / 2, bubbleY + 8 + i * lineH);
+  });
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function render(ctx, w, h, t) {
+  const clock = t;
+  const at = t - state.started;
+  ctx.clearRect(0, 0, w, h);
+
+  let frame = 0, angle = 0, lift = 0, sx = 1, sy = 1;
+  const bodySize = Math.min(w - 26, h - 80);
+  switch (state.action) {
+    case "idle":
+      frame = clock % 5.2 > 5.04 ? 2 : 0;
+      sy = 1 + Math.sin(clock * 2.2) * 0.012;
+      sx = 1 - Math.sin(clock * 2.2) * 0.004;
+      break;
+    case "walkLeft":
+    case "walkRight":
+      frame = 4 + (Math.trunc(at * 6) % 4);
+      lift = Math.abs(Math.sin(at * Math.PI * 6)) * 2;
+      break;
+    case "wave": {
+      const wave = [8, 9, 11, 9];
+      frame = wave[Math.trunc(at * 3.5) % wave.length];
+      angle = Math.sin(at * 5) * 1.2;
+      break;
+    }
+    case "glasses": {
+      const glasses = [0, 8, 10, 8];
+      frame = glasses[Math.trunc(at * 2.2) % glasses.length];
+      angle = Math.sin(at * 3) * 3;
+      break;
+    }
+    case "happy":
+      frame = 9;
+      lift = Math.abs(Math.sin(at * Math.PI * 2.2)) * bodySize * 0.12;
+      angle = Math.sin(at * 7) * 4;
+      break;
+    case "drag":
+      frame = 0;
+      angle = Math.sin(at * 6) * 7;
+      lift = 6;
+      sy = 1.025;
+      sx = 0.98;
+      break;
+    case "sleep":
+      frame = 12;
+      sy = 1 + Math.sin(clock * 1.6) * 0.016;
+      break;
+  }
+
+  // 与 WPF 的 Rotate/Scale(centerX, centerY) 等价：平移到 pivot → 旋转缩放 → 平移回
+  const pivotX = w / 2;
+  const pivotY = h - 25 - bodySize * 0.04;
+  ctx.save();
+  ctx.translate(0, -lift);
+  ctx.translate(pivotX, pivotY);
+  ctx.rotate((angle * Math.PI) / 180);
+  ctx.scale(state.action === "walkLeft" ? -sx : sx, sy);
+  ctx.translate(-pivotX, -pivotY);
+  if (frames[frame]) {
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(frames[frame], (w - bodySize) / 2, h - 25 - bodySize, bodySize, bodySize);
+  }
+  ctx.restore();
+
+  if (state.action === "sleep") {
+    ctx.fillStyle = INK;
+    ctx.font = "19px 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText("z Z", w * 0.68, h * 0.35 - Math.sin(clock * 1.7) * 4);
+  }
+  drawStatusPill(ctx, w, h);
+  drawSpeech(ctx, w);
+}
+
+// ── 主进程桥（pet-preload.js 暴露；缺桥时动画照跑，只是不能移动/退场）──
+const bridge = window.pet ?? null;
+
+function scheduleAuto() {
+  const t = now();
+  // 到点收尾：上一动作过期就转待机（待机的 until 是 ∞，这条不会反复触发）
+  if (t >= state.until) setAction("idle", 0, "");
+  if (state.autoWalk && state.action === "idle" && t >= state.nextAuto) {
+    const choice = Math.trunc(Math.random() * 10);
+    const action = choice < 7
+      ? (Math.random() < 0.5 ? "walkLeft" : "walkRight")
+      : choice === 7 ? "glasses" : choice === 8 ? "wave" : "happy";
+    setAction(action, 3 + Math.random() * 2, "");
+  }
+}
+
+// 走动：主进程负责钳制到工作区；撞边掉头由返回值判断
+setInterval(() => {
+  if (!bridge) return;
+  if (state.action !== "walkLeft" && state.action !== "walkRight") return;
+  const dx = (state.action === "walkRight" ? 1 : -1) * WALK_SPEED * 0.1;
+  bridge.step(dx).then((r) => {
+    if (state.action !== "walkLeft" && state.action !== "walkRight") return;
+    const width = window.innerWidth;
+    if (r.x <= r.left + 0.5) state.action = "walkRight";
+    else if (r.x + width >= r.right - 0.5) state.action = "walkLeft";
+  }).catch(() => {});
+}, 100);
+
+// ── 交互：单击/双击打招呼，拖动换「被提起」，右键菜单，Esc/空格 ──
+let pressed = false, moved = false, lastX = 0, lastY = 0;
+
+document.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0) return;
+  pressed = true;
+  moved = false;
+  lastX = e.clientX;
+  lastY = e.clientY;
+  e.currentTarget.setPointerCapture?.(e.pointerId);
+});
+
+document.addEventListener("pointermove", (e) => {
+  if (!pressed) return;
+  const dx = e.clientX - lastX;
+  const dy = e.clientY - lastY;
+  lastX = e.clientX;
+  lastY = e.clientY;
+  if (Math.abs(dx) + Math.abs(dy) === 0) return;
+  if (!moved && Math.hypot(dx, dy) < 5) return;
+  if (!moved) {
+    moved = true;
+    setAction("drag", Infinity, "轻一点呀～");
+  }
+  bridge?.moveBy(dx, dy)?.catch?.(() => {});
+});
+
+document.addEventListener("pointerup", () => {
+  if (!pressed) return;
+  pressed = false;
+  if (moved) {
+    setAction("happy", 1.4, "站稳啦！");
+    return;
+  }
+  const ms = performance.now();
+  const doubleClick = ms - state.lastClick < CLICK_WINDOW_MS;
+  state.lastClick = ms;
+  setAction(doubleClick ? "happy" : "wave", 2.7, doubleClick ? "好开心呀！" : "你好呀！");
+});
+
+document.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  if (!bridge) return;
+  bridge.menu({ autoWalk: state.autoWalk, size: window.innerWidth }).then((r) => {
+    if (!r) return;
+    if (r.action === "sleep") {
+      const wake = state.action === "sleep";
+      setAction(wake ? "idle" : "sleep", Infinity, wake ? "睡醒啦！" : "我先打个盹……");
+    } else if (r.action === "idle") {
+      setAction("idle", 0, "我在这里陪你。");
+    } else if (r.action === "walkLeft" || r.action === "walkRight") {
+      setAction(r.action, 4, "");
+    } else if (r.action === "wave") {
+      setAction("wave", 3, "你好呀！");
+    } else if (r.action === "glasses") {
+      setAction("glasses", 3, "让我想一想……");
+    } else if (r.action === "happy") {
+      setAction("happy", 3, "好开心呀！");
+    }
+    if (typeof r.autoWalk === "boolean") {
+      state.autoWalk = r.autoWalk;
+      bridge.persist({ autoWalk: r.autoWalk });
+      if (!r.autoWalk && (state.action === "walkLeft" || state.action === "walkRight")) setAction("idle", 0, "");
+    }
+  }).catch(() => {});
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") { bridge?.close()?.catch?.(() => {}); }
+  if (e.key === " ") { setAction("happy", 3, "好开心呀！"); e.preventDefault(); }
+});
+
+// ── 画布尺寸与渲染循环 ──
+const canvas = document.getElementById("stage");
+const ctx = canvas.getContext("2d");
+
+function resizeCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.max(1, Math.round(window.innerWidth * dpr));
+  canvas.height = Math.max(1, Math.round(window.innerHeight * dpr));
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+function tick() {
+  if (!pressed) scheduleAuto();
+  render(ctx, window.innerWidth, window.innerHeight, now());
+  requestAnimationFrame(tick);
+}
+
+buildFrames()
+  .then(() => {
+    setAction("wave", 2.6, "你好！单击互动，右键选动作");
+    state.nextAuto = now() + 6;
+    requestAnimationFrame(tick);
+  })
+  .catch((err) => {
+    document.body.textContent = `桌宠素材加载失败：${err?.message ?? err}`;
+    document.body.style.cssText += ";color:#123049;padding:16px;font-size:12px;";
+  });
+</script>
+</body>
+</html>

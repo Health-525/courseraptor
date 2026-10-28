@@ -10,4 +10,12 @@ contextBridge.exposeInMainWorld("raptor", {
   openDataDir: (): Promise<string> => ipcRenderer.invoke("raptor:open-data-dir"),
   /** 应用版本号 */
   appVersion: (): Promise<string> => ipcRenderer.invoke("raptor:app-version"),
+  /** 桌面宠物设置；设置弹窗「桌面」栏目用 */
+  petState: (): Promise<{ enabled: boolean; size: number; autoWalk: boolean; topmost: boolean }> =>
+    ipcRenderer.invoke("raptor:pet-state"),
+  /** 开关桌面宠物，返回开关后的最新设置 */
+  setPetEnabled: (
+    enabled: boolean,
+  ): Promise<{ enabled: boolean; size: number; autoWalk: boolean; topmost: boolean }> =>
+    ipcRenderer.invoke("raptor:pet-set-enabled", enabled),
 });

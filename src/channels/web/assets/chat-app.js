@@ -5622,6 +5622,49 @@ document
 document.getElementById("clearFiles").title =
   "清理已读附件副本、网页上传和生成文件；聊天记录与待办保留";
 document.getElementById("clearAllData").title = "清空全部本地会话、附件、生成文件和待办；不可恢复";
+/* ── 桌面栏目：仅桌面壳（页面被注入 window.raptor 桥）显示。开关即点即生效，
+   状态以主进程持久化（pet.json）为准；纯网页/演示环境整栏保持隐藏 ── */
+const petSwitch = document.getElementById("petSwitch");
+if (petSwitch && window.raptor?.petState && window.raptor?.setPetEnabled) {
+  document.getElementById("setTabDesktop").hidden = false;
+  const petStateText = document.getElementById("petStateText");
+  const curPet = document.getElementById("curPet");
+  let petOn = false;
+  const paintPet = () => {
+    petSwitch.setAttribute("aria-checked", petOn ? "true" : "false");
+    petSwitch.hidden = false;
+    if (petStateText) {
+      petStateText.textContent = petOn ? "已开启：小恐龙正在桌面右下角" : "已关闭";
+    }
+    if (curPet) {
+      curPet.textContent = petOn
+        ? "右键小恐龙可以换动作、关自动散步、调整大小，或让它退场"
+        : "开启后小恐龙常驻桌面右下角，不影响任何课程数据";
+    }
+  };
+  window.raptor
+    .petState()
+    .then((s) => {
+      petOn = !!s?.enabled;
+      paintPet();
+    })
+    .catch(() => {});
+  petSwitch.addEventListener("click", async () => {
+    petSwitch.disabled = true;
+    try {
+      const s = await window.raptor.setPetEnabled(!petOn);
+      petOn = !!s?.enabled;
+      paintPet();
+      setMsg.className = "setmsg good";
+      setMsg.textContent = petOn ? "桌面宠物已开启，它已在屏幕右下角跟你打招呼" : "桌面宠物已关闭";
+    } catch {
+      setMsg.className = "setmsg";
+      setMsg.textContent = "桌面宠物开关失败，请再试一次。";
+    } finally {
+      petSwitch.disabled = false;
+    }
+  });
+}
 document.getElementById("saveSettings").addEventListener("click", () => {
   const body = {};
   /* 学校栏：下拉选成别的学校＝保存时提交切换（服务端运行期换适配器，
