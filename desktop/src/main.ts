@@ -14,6 +14,7 @@ import { BrowserWindow, Notification, app, dialog, ipcMain, shell, type Tray } f
 import { type BackendHandle, startBackend } from "./backend";
 import { ensureBackendExtracted } from "./payload";
 import { createTray } from "./tray";
+import { initPet } from "./pet";
 
 const isDev = !app.isPackaged;
 /** 数据落到用户目录：升级（替换安装目录）不丢数据（方案 §3.2） */
@@ -80,6 +81,8 @@ function onReady(): void {
     onQuit: quitApp,
   });
   setupAutoUpdate();
+  // 桌面宠物：注册开关 IPC；上次开着的话在这里就地恢复（见 pet.ts）
+  initPet();
 
   ipcMain.handle("raptor:open-data-dir", () => shell.openPath(dataDir));
   ipcMain.handle("raptor:app-version", () => app.getVersion());

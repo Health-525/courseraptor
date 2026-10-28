@@ -892,6 +892,26 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   .set-main { flex: 1; min-width: 0; min-height: 0; overflow-y: auto; padding-right: 6px; }
   .set-pane { display: none; }
   .set-pane.on { display: block; }
+  /* 「桌面」栏目：桌宠开关行。开关即点即生效（桌面壳专属栏目，网页版整栏隐藏），
+     滑轨用纸底墨线、开启换朱砂，与全站按钮同语言 */
+  .pet-row { display: flex; align-items: center; justify-content: space-between;
+             gap: 14px; margin: 4px 0 8px; padding: 10px 12px;
+             border: 1px solid var(--rule-2); border-radius: 3px; background: var(--card); }
+  .pet-row .pet-desc b { display: block; font-size: 14px; font-weight: 600; color: var(--ink); }
+  .pet-row .pet-desc span { display: block; margin-top: 3px; font-size: 12px;
+                            line-height: 1.55; color: var(--ink-3); }
+  .pet-switch { flex: none; position: relative; width: 44px; height: 24px;
+                border: 1px solid var(--rule-2); border-radius: 12px;
+                background: var(--paper-deep); cursor: pointer; padding: 0;
+                transition: background .15s ease, border-color .15s ease; }
+  .pet-switch i { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+                  border-radius: 50%; background: var(--card);
+                  box-shadow: 0 1px 3px rgba(50, 42, 31, .3);
+                  transition: left .15s ease; }
+  .pet-switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+  .pet-switch[aria-checked="true"] i { left: 22px; background: #fff; }
+  .pet-switch:disabled { cursor: default; opacity: .6; }
+  .pet-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   /* 栏目内动作行：替代原 panel 头行右侧挂动作的做法 */
 
   /* 字段：标签在上、输入在下，全宽对齐；不再用 72px 边栏配 82px 缩进魔数 */
@@ -1629,6 +1649,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
           <button class="set-tab" type="button" role="tab" id="setTabSchool" aria-controls="setPaneSchool" aria-selected="false" data-pane="school" hidden><i class="sdot" aria-hidden="true"></i>学校</button>
           <button class="set-tab on" type="button" role="tab" id="setTabModel" aria-controls="setPaneModel" aria-selected="true" data-pane="model"><i class="sdot" aria-hidden="true"></i>AI 模型</button>
           <button class="set-tab" type="button" role="tab" id="setTabQQ" aria-controls="setPaneQQ" aria-selected="false" data-pane="qq"><i class="sdot" aria-hidden="true"></i>QQ 机器人</button>
+          <button class="set-tab" type="button" role="tab" id="setTabDesktop" aria-controls="setPaneDesktop" aria-selected="false" data-pane="desktop" hidden>桌面</button>
           <button class="set-tab" type="button" role="tab" id="setTabData" aria-selected="false" data-pane="data">本地数据</button>
         </nav>
         <div class="set-main">
@@ -1673,6 +1694,14 @@ export function chatPage(options: { demo?: boolean } = {}): string {
             <label class="fld"><span>AppSecret</span><span class="fld-row"><input id="sQQSecret" type="password" autocomplete="new-password" ${demo ? "disabled" : ""}><button class="fld-eye" type="button" id="eyeQQSecret" aria-pressed="false" ${demo ? "disabled" : ""}>显示</button></span></label>
             <label class="fld"><span>激活暗号</span><input id="sQQPass" type="text" autocomplete="off" placeholder="首次激活用的暗号（自定）" ${demo ? "disabled" : ""}></label>
             <div class="cur" id="curQQ">未配置；到 q.qq.com 创建机器人后填入，保存后即可在 QQ 里使用</div>
+          </section>
+          <section class="set-pane" id="setPaneDesktop" role="tabpanel" aria-labelledby="setTabDesktop" data-pane="desktop">
+            <p class="dlg-intro">桌面宠物是一只戴眼镜的小恐龙：平时在屏幕右下角待机、偶尔散个步，可以拖动，右键它还能选动作、关自动散步、调整大小。开关即时生效，重启应用后保持上次选择。仅桌面版提供。</p>
+            <div class="pet-row">
+              <span class="pet-desc"><b>桌面宠物</b><span id="petStateText">仅桌面版可用</span></span>
+              <button type="button" class="pet-switch" id="petSwitch" role="switch" aria-checked="false" aria-label="开关桌面宠物" hidden><i aria-hidden="true"></i></button>
+            </div>
+            <div class="cur" id="curPet"></div>
           </section>
           <section class="set-pane" id="setPaneData" role="tabpanel" aria-labelledby="setTabData" data-pane="data">
             <p class="dlg-intro">会话、附件、生成文件、待办与课表都保存在本机，可导入、导出或按需清理。此栏目的操作即时生效，无需点「保存设置」。</p>

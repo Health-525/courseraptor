@@ -1,5 +1,7 @@
 import builtinModules from "builtin-modules";
 import esbuild from "esbuild";
+import fs from "node:fs";
+import path from "node:path";
 
 /**
  * 打包 Electron 主进程与预加载脚本为 CJS（Electron main 不能直接跑 TS）。
@@ -21,7 +23,7 @@ const external = [
 ];
 
 const context = await esbuild.context({
-  entryPoints: ["src/main.ts", "src/preload.ts"],
+  entryPoints: ["src/main.ts", "src/preload.ts", "src/pet-preload.ts"],
   bundle: true,
   platform: "node",
   format: "cjs",
@@ -32,6 +34,12 @@ const context = await esbuild.context({
   sourcemap: prod ? false : "inline",
   minify: prod,
 });
+
+// 桌宠静态资源原样拷进 dist（electron-builder 的 files 已含 dist/**/*）
+fs.mkdirSync("dist", { recursive: true });
+for (const name of ["pet.html", "dino-sprites.png"]) {
+  fs.copyFileSync(path.join("assets", name), path.join("dist", name));
+}
 
 if (prod) {
   await context.rebuild();
