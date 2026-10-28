@@ -41,9 +41,11 @@ for (const file of [
 checks.push({
   id: "credentials",
   status: "info",
-  message: existsSync(path.join(root, "credentials.enc"))
-    ? "检测到加密凭证文件；未读取或验证内容。"
-    : "未发现加密凭证；npm start 可引导配置，npm run demo 无需账号。",
+  message:
+    existsSync(path.join(root, "data", "credentials.enc")) ||
+    existsSync(path.join(root, "credentials.enc"))
+      ? "检测到加密凭证文件；未读取或验证内容。"
+      : "未发现加密凭证；npm start 可引导配置，npm run demo 无需账号。",
 });
 checks.push({
   id: "scope",
