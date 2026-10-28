@@ -1,7 +1,7 @@
 {
   "name": "courseraptor",
-  "version": "0.6.2",
-  "description": "大学生的开源 AI 课表与待办助手：导入课表，用一句话查课、记待办、整理本周安排。",
+  "version": "0.6.4",
+  "description": "面向大学生的本地优先智能学习工作台：以 AI 为核心，统一连接课表、待办、课程资料与知识沉淀，让每一天的学习安排都清晰可控。",
   "scripts": {
     "dev": "tsx local/cli/index.ts",
     "start": "tsx local/cli/index.ts",

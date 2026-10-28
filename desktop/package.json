@@ -1,6 +1,6 @@
 {
   "name": "courseraptor-desktop",
-  "version": "0.6.2",
+  "version": "0.6.4",
   "private": true,
   "description": "CourseRaptor 桌面版（Electron 薄壳）：复用现成 Web UI + Node 后端，加窗口/托盘/通知/自动更新",
   "author": "jiangshu",
