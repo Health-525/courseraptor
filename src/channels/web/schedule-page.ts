@@ -12,6 +12,7 @@
  * 演示模式：demo=true 时内嵌虚构数据（demoData），不发任何请求。
  */
 
+import { MOBILE_NAV_CSS, mobileNav } from "./mobile-nav";
 import type { TodayBrief } from "./today-brief";
 
 export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } = {}): string {
@@ -171,6 +172,7 @@ export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } 
                 font-size: 15px; writing-mode: vertical-rl; letter-spacing: .12em; }
   .week-unscheduled { margin: 12px 0 0; padding-top: 10px; border-top: 1px dashed var(--rule);
                       font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+  .schedule-view-switch, .mobile-day-card { display: none; }
 
   /* ── 手机：日列保住可读的最小宽度，整周横向滚动查看。
      旧版把 7 天硬压进屏宽（每列仅 ~39px），课名被劈成一字一行的竖条，
@@ -178,37 +180,78 @@ export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } 
      上课时间直接进课格（.tt-course-meta[data-time]），滚到周中时不用
      回头查节次列。 ── */
   @media (max-width: 720px) {
-    .pagehead { flex-wrap: wrap; padding: 14px 16px; gap: 10px 12px; }
-    .pagehead .seal { width: 38px; height: 38px; }
-    .pagehead .seal img { top: 4px; left: 4px; width: 30px; height: 30px; }
+    .pagehead { flex-wrap: nowrap; padding: 12px 16px; gap: 10px; }
+    .pagehead .seal { width: 34px; height: 34px; }
+    .pagehead .seal img { top: 4px; left: 4px; width: 26px; height: 26px; }
     .ph-title h1 { font-size: 20px; }
-    /* 时钟独占一行、按钮换行排第二行且不折字（与 today 页同一修法） */
-    .ph-right { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
-    .ph-clock { flex: 1 1 100%; }
-    .ph-right .tbtn { flex: none; white-space: nowrap; }
-    main { display: block; padding: 22px 14px 56px; }
-    .schedule-rail { position: static; padding: 0 0 18px; }
-    .rail-meta { margin-top: 10px; padding-top: 10px; }
-    .col { gap: 20px; }
-    .week-timetable { min-width: 0; grid-template-columns: 32px repeat(7, minmax(60px, 1fr));
-                      grid-template-rows: 42px repeat(var(--period-count), minmax(46px, auto)); }
+    .ph-title .ph-stamp, .ph-clock, .ph-right a[href="/today"], .ph-right a[href="/"] { display: none; }
+    .ph-right { width: auto; flex: none; gap: 6px; margin-left: auto; }
+    .ph-right .tbtn { min-height: 34px; padding: 4px 8px; font-size: 12px; white-space: nowrap; }
+    main { display: block; padding: 14px 14px 28px; }
+    .schedule-rail { position: static; padding: 0 2px 12px; }
+    .rail-kicker { display: none; }
+    .rail-title { font-size: 22px; }
+    .week-nav { margin-top: 10px; gap: 8px; }
+    .week-nav .tbtn, .week-sel { min-height: 40px; }
+    .rail-meta { margin-top: 10px; padding-top: 8px; font-size: 12px; }
+    .col { gap: 0; }
+    .schedule-view-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 3px;
+                            margin-bottom: 12px; padding: 3px; border-radius: 10px;
+                            background: var(--shade); }
+    .schedule-view-switch button { min-height: 40px; border: 0; border-radius: 8px;
+                                   background: transparent; color: var(--ink-2);
+                                   font-family: inherit; font-size: 14px; cursor: pointer; }
+    .schedule-view-switch button[aria-pressed="true"] { background: var(--card); color: var(--accent-deep);
+                                   font-weight: 600; box-shadow: 0 1px 4px rgba(50, 42, 31, .08); }
+    .mobile-day-card { display: block; border-radius: 12px; }
+    body.schedule-week .mobile-day-card { display: none; }
+    #weekCard { display: none; border-radius: 12px; }
+    body.schedule-week #weekCard { display: block; }
+    .day-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 10px;
+                scroll-snap-type: x proximity; }
+    .day-tab { flex: none; min-width: 58px; min-height: 52px; padding: 5px 8px;
+               border: 1px solid var(--rule); border-radius: 8px; background: var(--paper);
+               color: var(--ink-2); font-family: inherit; cursor: pointer;
+               scroll-snap-align: start; }
+    .day-tab b, .day-tab span { display: block; }
+    .day-tab b { font-size: 14px; font-weight: 600; }
+    .day-tab span { margin-top: 1px; font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+    .day-tab.today { border-color: var(--accent); }
+    .day-tab[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft);
+                                    color: var(--accent-deep); }
+    .day-summary { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+                   margin: 4px 2px 10px; color: var(--ink-2); }
+    .day-summary strong { font-family: var(--kai); font-size: 20px; font-weight: 600; }
+    .day-summary span { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+    .day-course { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 12px;
+                  padding: 13px 4px; border-top: 1px solid var(--rule); }
+    .day-course-time { font-family: var(--mono); font-size: 12.5px; line-height: 1.55;
+                       color: var(--accent-deep); font-variant-numeric: tabular-nums; }
+    .day-course-time span { display: block; color: var(--ink-3); font-size: 11.5px; }
+    .day-course-name { font-size: 16px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+    .day-course-meta { margin-top: 4px; font-size: 13px; line-height: 1.6; color: var(--ink-2); }
+    .day-course.now { margin: 0 -8px; padding-left: 12px; padding-right: 12px;
+                      border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0;
+                      background: var(--accent-soft); }
+    .day-empty { margin: 8px 0 4px; padding: 24px 12px; border: 1px dashed var(--rule-2);
+                 border-radius: 8px; text-align: center; color: var(--ink-3); font-size: 14px; }
+    .week-timetable { min-width: 0; grid-template-columns: 34px repeat(7, minmax(72px, 1fr));
+                      grid-template-rows: 42px repeat(var(--period-count), minmax(48px, auto)); }
     #weekCard .cbody { padding: 10px 8px 12px; }
     .tt-range { display: none; }
     .tt-period { font-size: 12px; }
-    /* 表头竖排堆叠并允许换行：60px 出头的日列放不下「周六 补课」横排 */
     .tt-day { flex-direction: column; align-items: flex-start; justify-content: center;
-              gap: 1px; padding: 3px 3px; }
+              gap: 1px; padding: 3px; }
     .tt-day-name { font-size: 13px; line-height: 1.3; white-space: normal; }
-    .tt-day-date { font-size: 10.5px; line-height: 1.3; white-space: normal; }
-    .tt-day-tag { margin-left: 2px; font-size: 9.5px; padding: 0 2px; }
-    .tt-course { margin: 2px; padding: 4px 5px; border-left-width: 2px; }
-    .tt-course-name { font-size: 12px; }
-    .tt-course-meta { font-size: 10.5px; }
+    .tt-day-date { font-size: 11px; line-height: 1.3; white-space: normal; }
+    .tt-day-tag { margin-left: 2px; font-size: 10px; padding: 0 2px; }
+    .tt-course { margin: 2px; padding: 5px; border-left-width: 2px; }
+    .tt-course-name { font-size: 12.5px; }
+    .tt-course-meta { font-size: 11px; }
     .tt-course-meta[data-time]::before { content: attr(data-time); display: block; }
     .tt-holiday { font-size: 13px; }
-    /* 横滚提示：只有真放不下时才由 JS 挂上 */
     .week-hint { margin: 8px 0 0; text-align: center; font-family: var(--mono);
-                 font-size: 11px; color: var(--ink-3); letter-spacing: .04em; }
+                 font-size: 12px; color: var(--ink-3); letter-spacing: .02em; }
   }
   /* 触屏：周次直达下拉提到 16px 防 iOS 聚焦缩放 */
   @media (hover: none) {
@@ -232,6 +275,7 @@ export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } 
     @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
   }
+${MOBILE_NAV_CSS}
 </style>
 </head>
 <body data-demo="${demo}">
@@ -265,17 +309,27 @@ export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } 
     <div class="rail-meta" id="scheduleMeta"></div>
   </aside>
   <div class="col">
+    <div class="schedule-view-switch" role="group" aria-label="课表视图">
+      <button type="button" id="dayView" aria-pressed="true">按天</button>
+      <button type="button" id="weekView" aria-pressed="false">整周</button>
+    </div>
+    <section class="card mobile-day-card" id="dayCard" aria-label="每日课程">
+      <h2>每日课程<span class="cnote" id="dayNote"></span></h2>
+      <div class="cbody"><p class="skel">…</p></div>
+    </section>
     <section class="card" id="weekCard" aria-label="周课表">
       <h2>周课表<span class="cnote" id="weekNote"></span></h2>
       <div class="cbody"><p class="skel">…</p></div>
     </section>
   </div>
 </main>
+${mobileNav("schedule")}
 <script>
 ${demo && demoData ? `const DEMO_DATA = ${JSON.stringify(demoData)};` : "const DEMO_DATA = null;"}
 const $ = (id) => document.getElementById(id);
 let selectedWeek = null;
 let displayedWeek = null;
+let selectedDayIndex = null;
 
 function el(tag, cls, text) {
   const n = document.createElement(tag);
@@ -419,6 +473,73 @@ function renderWeek(b) {
   }
 }
 
+/* 手机默认按天阅读：星期横向选择，课程以时间轴展开；整周网格仍可随时切回。 */
+function renderDay(b) {
+  const body = $("dayCard").querySelector(".cbody");
+  body.textContent = "";
+  $("dayNote").textContent = b.term.weekLabel || "";
+  if (!b.schedule.available) {
+    body.appendChild(el("p", "daynote", "暂无课表数据。在对话页问一次课表，缓存后这里就有数据了。"));
+    return;
+  }
+  if (!b.week) {
+    body.appendChild(el("p", "daynote", "当前不在教学周内，好好享受假期。"));
+    return;
+  }
+  const days = b.week.days;
+  if (!Number.isInteger(selectedDayIndex) || selectedDayIndex < 0 || selectedDayIndex >= days.length) {
+    selectedDayIndex = Math.max(0, days.findIndex((d) => d.isToday));
+  }
+  const tabs = el("div", "day-tabs");
+  tabs.setAttribute("aria-label", "选择星期");
+  for (let i = 0; i < days.length; i++) {
+    const d = days[i];
+    const tab = el("button", "day-tab" + (d.isToday ? " today" : ""));
+    tab.type = "button";
+    tab.setAttribute("aria-pressed", String(i === selectedDayIndex));
+    tab.setAttribute("aria-label", d.label + " " + d.dateShort + (d.isToday ? "，今天" : ""));
+    tab.appendChild(el("b", null, d.label));
+    tab.appendChild(el("span", null, d.isToday ? "今天" : d.dateShort));
+    tab.addEventListener("click", () => { selectedDayIndex = i; renderDay(b); });
+    tabs.appendChild(tab);
+  }
+  body.appendChild(tabs);
+  const activeTab = tabs.children[selectedDayIndex];
+  if (activeTab) tabs.scrollLeft = Math.max(0, activeTab.offsetLeft - (tabs.clientWidth - activeTab.offsetWidth) / 2);
+
+  const day = days[selectedDayIndex];
+  const summary = el("div", "day-summary");
+  summary.appendChild(el("strong", null, day.label + " · " + day.dateShort));
+  summary.appendChild(el("span", null, day.holiday ? day.holiday : day.courses.length + " 门课"));
+  body.appendChild(summary);
+  if (day.holiday) {
+    body.appendChild(el("p", "day-empty", day.holiday + "放假，没有排课。"));
+    return;
+  }
+  if (!day.courses.length) {
+    body.appendChild(el("p", "day-empty", "这一天没有课，留点时间给自己。"));
+    return;
+  }
+  const periodTimes = b.periodTimes || {};
+  const nowDate = new Date(b.now);
+  const nowMin = nowDate.getHours() * 60 + nowDate.getMinutes();
+  for (const c of day.courses) {
+    const start = c.pStart != null ? periodRange(periodTimes, c.pStart) : null;
+    const end = c.pEnd != null ? periodRange(periodTimes, c.pEnd) : null;
+    const isNow = day.isToday && start && end && nowMin >= start[0] && nowMin <= end[1];
+    const row = el("article", isNow ? "day-course now" : "day-course");
+    const time = el("div", "day-course-time", c.time || "时间待定");
+    const periods = c.pStart != null ? "第 " + c.pStart + (c.pEnd === c.pStart ? "" : "–" + c.pEnd) + " 节" : "节次待定";
+    time.appendChild(el("span", null, periods + (isNow ? " · 现在" : "")));
+    row.appendChild(time);
+    const content = el("div");
+    content.appendChild(el("div", "day-course-name", c.title));
+    content.appendChild(el("div", "day-course-meta", [c.location, c.teacher, c.weeks].filter(Boolean).join(" · ") || "地点与教师待定"));
+    row.appendChild(content);
+    body.appendChild(row);
+  }
+}
+
 function renderSrc(b) {
   const n = $("scheduleMeta");
   n.textContent = "";
@@ -464,6 +585,7 @@ function render(b) {
   if (b.term.weekSource === "estimated") {
     week.appendChild(el("span", "warn", "（周次为估算）"));
   }
+  renderDay(b);
   renderWeek(b);
   renderSrc(b);
   /* 图片导出按钮：演示模式没有真实缓存、没有缓存时点开是裸 JSON 错误页、
@@ -500,6 +622,9 @@ function load() {
       const body = $("weekCard").querySelector(".cbody");
       body.textContent = "";
       body.appendChild(el("p", "daynote", "课表暂时取不出来，请稍候刷新。"));
+      const dayBody = $("dayCard").querySelector(".cbody");
+      dayBody.textContent = "";
+      dayBody.appendChild(el("p", "daynote", "课表暂时取不出来，请稍候刷新。"));
     });
 }
 
@@ -508,6 +633,20 @@ function load() {
   const w = Number(new URLSearchParams(location.search).get("week"));
   if (Number.isInteger(w) && w >= 1) selectedWeek = w;
 })();
+function setScheduleView(week) {
+  document.body.classList.toggle("schedule-week", week);
+  $("dayView").setAttribute("aria-pressed", String(!week));
+  $("weekView").setAttribute("aria-pressed", String(week));
+  if (week) requestAnimationFrame(() => {
+    const wrap = $("weekCard").querySelector(".weekwrap");
+    const today = $("weekCard").querySelector(".tt-day.today");
+    if (wrap && today && wrap.scrollLeft === 0) {
+      wrap.scrollLeft = Math.max(0, today.offsetLeft + today.offsetWidth / 2 - wrap.clientWidth / 2);
+    }
+  });
+}
+$("dayView").addEventListener("click", () => setScheduleView(false));
+$("weekView").addEventListener("click", () => setScheduleView(true));
 $("prevWeek").addEventListener("click", () => {
   if (displayedWeek && displayedWeek > 1) { selectedWeek = displayedWeek - 1; load(); }
 });
