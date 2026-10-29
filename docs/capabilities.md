@@ -67,6 +67,21 @@
 
 ---
 
+## 🌐 联网搜索（2 个）
+
+DeepSeek 官方 **Search / Fetch API**（自研搜索引擎）做时效性问答：新闻、政策、版本、赛程这类「训练数据之后」的事实，agent 先搜再答并附来源链接；需要某页全文时再读成 Markdown。
+
+| 工具 | 说明 | 典型耗时 |
+|------|------|----------|
+| `web_search` | 联网搜索（1-128 字查询，支持 `site:` / `"短语"` / `-排除` / `lang:` / `after:` 运算符），返回标题 / 链接 / 摘要 / 日期与站点权威度（authority 0-4，≥3 高可信）+ 相关度分；默认 8 条、最多 20 条 | ~1-3s |
+| `web_fetch` | 把网页 URL 正文读成 Markdown（超长截断约 2 万字），供总结或溯源 | ~1-5s |
+
+- **Key**：复用 DeepSeek API Key——对话供应商就是 DeepSeek 时直接用当前 Key；切到其他供应商时自动找保存过的 DeepSeek Key。没配 Key 时工具如实报错并引导到设置面板，不影响其他功能
+- **计费**：DeepSeek 侧按**成功请求**计费（$0.75 / 千次；HTTP 200 且非空才算，失败与空结果不计）。提示词已约束模型「一次一个聚焦查询、换关键词重搜至多一次」，不为同一问题反复刷
+- **边界**：教务处通知仍走 `get_news` / `read_notice`，AI 行业新闻走 ai-news 工作流——`web_search` 是通用时效信息通道，不替代专用工具；提示词同时约定「搜不到就说搜不到」，不许拿训练数据印象充当最新事实
+
+---
+
 ## 🧠 两层记忆
 
 | 层 | 存储 | 机制 |
@@ -210,10 +225,10 @@ npm run qq
 
 ## 🧰 开箱工具分层
 
-- **内核**（`src/core/tools/`，与学校无关）：文件与数据四件套（`read_local_file` / `query_table` / `run_js` / `manage_attachments`）、文档写作与转换（`generate_document` / `convert_document`）、`export_schedule_image`、`edit_schedule`、`edit_exams`、`edit_grades`（仅手动课表模式）、`manage_prompts`、`save_memory`、`manage_todos`、`manage_knowledge`、`manage_pomodoro`、`read_skill`、`open_settings`、`open_panel`、`get_weather`、`get_time`
+- **内核**（`src/core/tools/`，与学校无关）：文件与数据四件套（`read_local_file` / `query_table` / `run_js` / `manage_attachments`）、文档写作与转换（`generate_document` / `convert_document`）、`export_schedule_image`、`edit_schedule`、`edit_exams`、`edit_grades`（仅手动课表模式）、`manage_prompts`、`save_memory`、`manage_todos`、`manage_knowledge`、`manage_pomodoro`、`read_skill`、`open_settings`、`open_panel`、`get_weather`、`get_time`、联网搜索（`web_search` / `web_fetch`）
 - **课表与校历**：`get_schedule`（只读本地导入的课表缓存）、`set_holidays`（放假 / 调休落盘）
 
-合计 19 个工具挂载进 agent（内核 17 + 课表与校历 2），全部只读写本地数据：课表来自网页端导入缓存（可经 `edit_schedule` 本地调课），其余走本机文件、沙箱计算与本地 JSON。PPT 工具源码保留、暂未挂入 agent（不计入上数）。
+合计 21 个工具挂载进 agent（内核 19 + 课表与校历 2），全部只读写本地数据：课表来自网页端导入缓存（可经 `edit_schedule` 本地调课），其余走本机文件、沙箱计算与本地 JSON；联网搜索（`web_search` / `web_fetch`）是唯一出网查询的例外，只查用户问到的时效信息。PPT 工具源码保留、暂未挂入 agent（不计入上数）。
 
 ---
 

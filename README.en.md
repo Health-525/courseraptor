@@ -31,6 +31,7 @@ Start with questions such as “Where are my classes on Wednesday?” or “Reme
 - **Deadline todos:** record a task and due time, then list, update or complete it. Due reminders follow the app’s rules while the main process is running, and individual todos can request an exact-time notification.
 - **Today’s plan:** combine your existing timetable and todos in a conversation, with the underlying records available in the feature hall.
 - **Study records:** organize knowledge by course and use on-demand learning skills such as Feynman explanations, exercise diagnosis and spiral review.
+- **Web search:** time-sensitive questions are answered via DeepSeek web search with source links instead of stale guesses; a given URL can also be read and summarized.
 - **Course materials:** read local PDF, Word and spreadsheet files, filter data, and generate Word, Excel or PDF documents.
 - **Optional entry points:** web and terminal share the same local assistant, with QQ and Obsidian integrations available through additional setup.
 

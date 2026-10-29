@@ -23,6 +23,7 @@ import { settingsTools } from "./settings";
 import { skillTools } from "./skill-library";
 import { timeTools } from "./time";
 import { weatherTools } from "./weather";
+import { webSearchTools } from "./web-search";
 
 export const coreTools = {
   ...aiNewsTools,
@@ -41,5 +42,6 @@ export const coreTools = {
   ...settingsTools,
   ...panelTools,
   ...weatherTools,
+  ...webSearchTools,
   ...timeTools,
 };
