@@ -69,17 +69,29 @@ test("行为准则：今日简报规则要求日程与待办结合分析", () =>
   assert.match(s, /不要分两张清单各念各的/, "应要求交叉分析而非两张清单");
 });
 
-test("事实纪律段：先筛后查、时效事实标待核实、不覆盖用户给定事实、报告三组格式", () => {
+test("事实纪律段：先筛后查、时效事实先联网核实、不覆盖用户给定事实、报告三组格式", () => {
   const s = basePrompt();
   assert.match(s, /## 事实纪律/, "应有独立的事实纪律段");
   assert.match(s, /先筛后查，不要逐句自查/, "高信号风险优先，不逐句自查");
-  assert.match(s, /时效性事实默认「待核实」/, "时效性断言无工具支撑时要标待核实");
+  assert.match(s, /时效性事实先联网核实/, "时效性断言应先走 web_search 搜证");
+  assert.match(s, /不许拿训练数据里的印象充当事实/, "搜不到也要标待核实，不许编");
   assert.match(s, /不打断主流程/, "生成类任务的核查是收尾步，不索要批准");
   assert.match(s, /不改用户给定的事实/, "用户材料/口述是既定输入，不擅自替换");
   assert.match(s, /A\. 明确错误/, "核查报告要有 A/B/C 分组");
   assert.match(s, /B\. 表述不严谨/);
   assert.match(s, /C\. 需核实/);
   assert.match(s, /不写分数、置信度百分比/, "报告不写分数与置信度");
+});
+
+test("联网搜索段：时效问题先搜再答、按次计费约束、专用工具优先", () => {
+  const s = basePrompt();
+  assert.match(s, /web_search/, "应有联网搜索能力段");
+  assert.match(s, /先搜再答/, "时效性问题先搜再答");
+  assert.match(s, /搜索按次计费/, "要有计费节制约束（不为同一问题反复搜）");
+  assert.match(s, /换关键词重搜至多一次/, "重搜次数有上限");
+  assert.match(s, /web_fetch/, "应有网页读取工具");
+  assert.match(s, /教务通知走 get_news/, "教务通知不绕去联网搜索");
+  assert.doesNotMatch(s, /你没有联网检索工具/, "旧「无联网」表述应随功能移除");
 });
 
 test("学习辅导段：按需 read_skill，多步计划先签核", () => {
