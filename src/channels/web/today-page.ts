@@ -11,6 +11,7 @@
  * 演示模式：demo=true 时内嵌虚构数据（demoData），不发任何请求。
  */
 
+import { MOBILE_NAV_CSS, mobileNav } from "./mobile-nav";
 import type { TodayBrief } from "./today-brief";
 
 export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {}): string {
@@ -157,24 +158,42 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
                color: var(--ink-3); overflow-wrap: anywhere; }
   .exam-list { display: grid; gap: 8px; }
 
-  /* ── 手机：左栏信息落为页首一截 ── */
+  /* ── 手机：页头一行，下一节课成为首屏主角 ── */
+  @keyframes mobileEnter { from { opacity: 0; transform: translateY(6px); }
+                           to { opacity: 1; transform: none; } }
   @media (max-width: 720px) {
-    .pagehead { flex-wrap: wrap; padding: 14px 16px; gap: 10px 12px; }
-    .pagehead .seal { width: 38px; height: 38px; }
-    .pagehead .seal img { top: 4px; left: 4px; width: 30px; height: 30px; }
+    .pagehead { flex-wrap: nowrap; padding: 12px 16px; gap: 10px; }
+    .pagehead .seal { width: 34px; height: 34px; }
+    .pagehead .seal img { top: 4px; left: 4px; width: 26px; height: 26px; }
     .ph-title h1 { font-size: 20px; }
-    /* 时钟独占一行、按钮换行排第二行且不折字：窄屏塞不下时整行换行，
-       而不是把按钮文字竖着劈成两半 */
-    .ph-right { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
-    .ph-clock { flex: 1 1 100%; }
-    .ph-right .tbtn { flex: none; white-space: nowrap; }
-    main { display: block; padding: 22px 14px 56px; }
-    .schedule-rail { position: static; padding: 0 0 18px; }
-    .rail-meta { margin-top: 10px; padding-top: 10px; }
-    .rail-nav { display: flex; flex-wrap: wrap; }
-    .col { gap: 20px; }
-    .lead { padding: 14px 16px 15px; }
-    .lead-title { font-size: 20px; }
+    .ph-title .ph-stamp, .ph-week, .ph-right .tbtn { display: none; }
+    .ph-right { width: auto; flex: none; margin-left: auto; }
+    .ph-clock { flex: none; }
+    .ph-date { font-size: 12px; }
+    main { display: block; padding: 16px 14px 28px; }
+    .schedule-rail { position: static; display: grid; grid-template-columns: auto minmax(0, 1fr);
+                     align-items: start; gap: 12px; padding: 0 2px 12px; }
+    .rail-kicker, .rail-nav { display: none; }
+    .rail-title { font-size: 22px; }
+    .rail-meta { margin: 0; padding: 0; border-top: 0; text-align: right; font-size: 12px; }
+    .rail-meta .tbtn { min-height: 34px; margin-top: 6px; }
+    .col { gap: 16px; }
+    .lead { padding: 16px; border: 1px solid var(--rule-2); border-top: 2px solid var(--accent);
+            border-radius: 12px; animation: mobileEnter .28s ease-out; }
+    .lead-kicker { font-size: 12px; letter-spacing: .08em; }
+    .lead-title { font-size: 22px; }
+    .lead-count { font-size: 21px; }
+    .today-strip { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 3px;
+                   scroll-snap-type: x proximity; }
+    .tchip { flex: none; scroll-snap-align: start; }
+    .tchip.done { opacity: 1; background: var(--shade); }
+    .tchip.done .tchip-name { color: var(--ink-3); text-decoration: line-through; }
+    .card { border-radius: 12px; animation: mobileEnter .28s .05s ease-out both; }
+    .card > h2 { padding: 12px 16px 10px; }
+    .cbody { padding: 12px; }
+    .exam-item { padding: 10px; }
+    .exam-dday { font-size: 12px; }
+    .exam-meta { font-size: 12.5px; }
   }
 
   /* ── 打印：隐去导航与操作，只留头条与考试 ── */
@@ -188,8 +207,9 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
     @media (prefers-reduced-motion: reduce) {
-    * { transition: none !important; }
+    * { animation: none !important; transition: none !important; }
   }
+${MOBILE_NAV_CSS}
 </style>
 </head>
 <body data-demo="${demo}">
@@ -229,6 +249,7 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
     </section>
   </div>
 </main>
+${mobileNav("today")}
 <script>
 ${demo && demoData ? `const DEMO_DATA = ${JSON.stringify(demoData)};` : "const DEMO_DATA = null;"}
 const $ = (id) => document.getElementById(id);

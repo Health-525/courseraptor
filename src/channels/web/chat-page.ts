@@ -3,6 +3,8 @@
  * 前端应用代码在 assets/chat-app.js（独立 JS 资产：编辑器与工具可直接解析，
  * 语法自检也有测试兜底），经 /app.js 端点伺服（app-asset.ts）。演示模式由
  * body[data-demo] 传给前端，代码本体不分叉。 */
+import { MOBILE_NAV_CSS, mobileNav } from "./mobile-nav";
+
 export function chatPage(options: { demo?: boolean } = {}): string {
   const demo = options.demo === true;
   return `<!doctype html>
@@ -1579,11 +1581,52 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .tool summary:active, .think summary:active { background: var(--paper-deep); }
     /* 键盘弹出（输入条内聚焦）时收起提示词行：打字期间把屏幕让给消息区，
        失焦即回来；仅触屏生效，桌面聚焦不打扰点提示词 */
-    form:focus-within .quickbar { display: none; }
+    form:has(textarea:focus) .quickbar { display: none; }
   }
+  /* ── 手机工作台：压缩欢迎区，输入与核心导航落在拇指热区 ── */
+  @keyframes mobileHeroIn { from { opacity: 0; transform: translateY(6px); }
+                            to { opacity: 1; transform: none; } }
+  @media (max-width: 720px) {
+    .topbar { min-height: 56px; background: var(--paper); border-bottom-color: transparent; }
+    #log { padding: 24px 18px 20px; }
+    .hero { justify-content: flex-start; padding: 38px 6px 32px; }
+    .hero .seal { width: 76px; height: 76px; margin-bottom: 18px;
+                  animation: mobileHeroIn .3s ease-out; }
+    .hero .seal img { top: 9px; left: 9px; width: 58px; height: 58px; }
+    .hero .hero-kicker { margin-bottom: 9px; letter-spacing: .12em;
+                         animation: mobileHeroIn .3s .05s ease-out both; }
+    .hero h2 { font-size: 28px; letter-spacing: .5px;
+               animation: mobileHeroIn .3s .1s ease-out both; }
+    .hero p { max-width: 330px; line-height: 1.75;
+              animation: mobileHeroIn .3s .15s ease-out both; }
+    .hero .mobile-block { display: block; }
+    .hero .hint { display: block; margin-top: 8px; font-family: var(--sans);
+                  font-size: 13px; line-height: 1.6; letter-spacing: 0; }
+    .turn { margin-bottom: 30px; }
+    .turn.user .msg { padding: 11px 14px; border-radius: 0 8px 8px 0; }
+    form { border-top: 0; padding: 8px max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left)); }
+    .quickbar { width: 100%; margin-bottom: 8px; }
+    .qlabel { display: none; }
+    .qchips { width: 100%; }
+    .chip { min-height: 36px; background: var(--paper); }
+    .cwrap { gap: 6px; padding: 6px; border-radius: 12px;
+             box-shadow: 0 5px 18px rgba(50, 42, 31, .07); }
+    .attach-btn { border-color: transparent; background: transparent; }
+    #b { padding: 8px 16px; border-radius: 9px; }
+    .jump { bottom: calc(var(--jump-bottom, 96px) + var(--vkb, 0px) + 66px); }
+    .hall-head { padding-left: max(16px, env(safe-area-inset-left));
+                 padding-right: max(16px, env(safe-area-inset-right)); }
+    .hall-rule { margin: 0 16px; }
+    .hall-body { padding: 16px 16px max(24px, env(safe-area-inset-bottom)); }
+    .hall-card { min-height: 68px; padding: 13px 8px 13px 16px; }
+    .hall-ico { width: 34px; height: 34px; }
+    .tool summary, .think summary { min-height: 44px; }
+    .acts .tbtn, .frow a.tbtn { min-height: 42px; }
+  }
+${MOBILE_NAV_CSS}
 </style>
 </head>
-<body data-demo="${demo}">
+<body class="chat-shell" data-demo="${demo}">
 <aside>
   <div class="mast">
     <h1 class="wordmark"><span class="course">Course</span><span class="raptor">Raptor</span></h1>
@@ -1608,7 +1651,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
       <div class="seal" aria-hidden="true"><img src="/logo.png" alt="" width="80" height="80"></div>
       <p class="hero-kicker" id="heroKicker">TODAY</p>
       <h2 id="heroGreet">同学，你好。</h2>
-      <p>课表、成绩、考试、通知——直接用一句话问。${
+      <p>课表、成绩、考试、通知——<span class="mobile-block">直接用一句话问。</span>${
         demo
           ? `<br>
       <span class="hint">点击下方提示词体验示例；演示会话在服务重启后清空。</span>`
@@ -1764,6 +1807,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
   </div>
 </aside>
 <div class="drawer-backdrop" id="drawerBackdrop"></div>
+${mobileNav("chat")}
 <script src="/app.js"></script>
 </body>
 </html>`;

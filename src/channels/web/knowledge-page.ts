@@ -22,6 +22,7 @@
  */
 
 import type { KnowledgeEntry } from "../../core/knowledge";
+import { MOBILE_NAV_CSS, mobileNav } from "./mobile-nav";
 
 /** 长文默认折叠的字符数（标题+正文合计），展开收起由用户决定 */
 const CLAMP_LEN = 160;
@@ -294,26 +295,37 @@ export function knowledgePage(
 
   @media (max-width: 720px) {
     :root { --heat-s: 10px; }
-    .pagehead { flex-wrap: wrap; padding: 14px 16px; gap: 10px 12px; }
-    .pagehead .seal { width: 38px; height: 38px; }
-    .pagehead .seal img { top: 4px; left: 4px; width: 30px; height: 30px; }
+    .pagehead { flex-wrap: nowrap; padding: 12px 16px; gap: 10px; }
+    .pagehead .seal { width: 34px; height: 34px; }
+    .pagehead .seal img { top: 4px; left: 4px; width: 26px; height: 26px; }
     .ph-title h1 { font-size: 20px; }
-    .ph-title .ph-stamp { display: none; }
-    .ph-right { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
-    .ph-right .tbtn { flex: none; white-space: nowrap; }
-    main { display: block; padding: 22px 14px 56px; }
-    .kn-rail { position: static; border-bottom: 1px solid var(--rule); padding: 0 0 16px; }
-    .cat-nav { flex-direction: row; flex-wrap: wrap; gap: 4px; margin: 6px 0 4px; }
-    .cat-btn { border: 1px solid var(--rule-2); background: var(--paper); padding: 4px 10px;
-               width: auto; }
+    .ph-title .ph-stamp, .ph-right { display: none; }
+    main { display: block; padding: 14px 14px 28px; }
+    .kn-rail { position: static; margin-bottom: 14px; padding: 0; border-bottom: 0; }
+    .kw-box { min-height: 44px; border-radius: 10px; background: var(--card); }
+    .kw-hint, .rail-sec, .rail-meta { display: none; }
+    .cat-nav { flex-direction: row; flex-wrap: nowrap; gap: 6px; margin: 8px 0 0;
+               overflow-x: auto; padding-bottom: 3px; }
+    .cat-btn { flex: none; width: auto; min-height: 36px; border: 1px solid var(--rule);
+               background: var(--paper); padding: 5px 10px; border-radius: 8px; }
     .cat-btn.active::before { display: none; }
     .cat-label { max-width: 9em; }
-    .rail-meta { margin-top: 10px; padding-top: 10px; }
-    .kn-hero { flex-direction: column; align-items: stretch; gap: 14px; padding: 14px 16px; }
-    .hero-stats { flex-wrap: wrap; gap: 8px 0; }
-    .hs-cell { padding: 0 16px; }
-    .hs-cell .n { font-size: 26px; }
+    .kn-hero { flex-direction: column; align-items: stretch; gap: 12px; margin-bottom: 14px;
+               padding: 14px; border-radius: 12px; }
+    .hero-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
+    .hs-cell { flex-direction: column; gap: 3px; padding: 0 12px; }
+    .hs-cell .n { font-size: 25px; }
     .hero-heat { min-width: 0; align-items: flex-start; }
+    .composer { margin-bottom: 16px; padding: 6px 12px 12px 16px; border-radius: 10px; }
+    .cp-text, .cp-subject { font-size: 16px; }
+    .cp-send { min-height: 44px; padding: 8px 16px; }
+    .cp-note { line-height: 1.55; }
+    .day-head { margin-top: 20px; }
+    .k-entry { padding: 13px 14px 12px 16px; border-radius: 10px; }
+    .k-title { font-size: 16px; }
+    .k-text { font-size: 14.5px; }
+    .k-foot { flex-wrap: wrap; gap: 8px; }
+    .k-tag { max-width: 60%; }
   }
   /* 触屏：搜索框提到 16px 防 iOS 聚焦缩放；小字按钮放大到能点的尺寸；
      操作按钮触屏没有 hover，常显 */
@@ -340,6 +352,7 @@ export function knowledgePage(
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
   }
+${MOBILE_NAV_CSS}
 </style>
 </head>
 <body data-demo="${demo}">
@@ -383,6 +396,7 @@ ${
     <div class="kn-flow" id="listBody"><p class="skel">…</p></div>
   </section>
 </main>
+${mobileNav("knowledge")}
 <script>
 const CLAMP_LEN = ${CLAMP_LEN};
 const BATCH = ${BATCH};

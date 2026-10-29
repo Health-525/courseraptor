@@ -11,6 +11,7 @@
  * 演示模式：demo=true 时内嵌虚构数据（demoData），不发任何请求。
  */
 
+import { MOBILE_NAV_CSS, mobileNav } from "./mobile-nav";
 import type { TodayBrief } from "./today-brief";
 
 export function todosPage(options: { demo?: boolean; demoData?: TodayBrief } = {}): string {
@@ -172,20 +173,32 @@ export function todosPage(options: { demo?: boolean; demoData?: TodayBrief } = {
                 border-radius: 4px; text-align: center;
                 color: var(--ink-3); font-size: 14px; }
 
-  /* ── 手机：左栏统计落为横向一排 ── */
+  /* ── 手机：清单优先，标题、时间与删除操作分区放置 ── */
   @media (max-width: 720px) {
-    .pagehead { flex-wrap: wrap; padding: 14px 16px; gap: 10px 12px; }
-    .pagehead .seal { width: 38px; height: 38px; }
-    .pagehead .seal img { top: 4px; left: 4px; width: 30px; height: 30px; }
+    .pagehead { flex-wrap: nowrap; padding: 12px 16px; gap: 10px; }
+    .pagehead .seal { width: 34px; height: 34px; }
+    .pagehead .seal img { top: 4px; left: 4px; width: 26px; height: 26px; }
     .ph-title h1 { font-size: 20px; }
-    /* 时钟独占一行、按钮换行排第二行且不折字（与 today 页同一修法） */
-    .ph-right { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
-    .ph-clock { flex: 1 1 100%; }
-    .ph-right .tbtn { flex: none; white-space: nowrap; }
-    main { display: block; padding: 22px 14px 56px; }
-    .todos-rail { position: static; padding: 0 0 18px; }
-    .rail-meta { margin-top: 10px; padding-top: 10px; }
-    .todo-item { grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 8px; }
+    .ph-title .ph-stamp, .ph-right { display: none; }
+    main { display: block; padding: 16px 14px 28px; }
+    .todos-rail { position: static; padding: 0 2px 12px; }
+    .rail-kicker { display: none; }
+    .rail-title { font-size: 22px; }
+    .rail-meta { margin-top: 8px; padding-top: 8px; font-size: 12px; }
+    .card { border-radius: 12px; }
+    .card > h2 { padding: 12px 16px 10px; }
+    .cbody { padding: 12px; }
+    .todo-group { min-height: 32px; font-size: 12px; }
+    .todo-item { grid-template-columns: auto minmax(0, 1fr) auto; gap: 5px 10px;
+                 align-items: start; padding: 11px 10px; border-radius: 8px; }
+    .todo-chk { grid-column: 1; grid-row: 1 / span 2; width: 22px; height: 22px; margin-top: 2px; }
+    .todo-chk::before { content: ""; position: absolute; inset: -11px; }
+    .todo-chk:checked::after { left: 7px; top: 2px; }
+    .todo-title { grid-column: 2; grid-row: 1; font-size: 15px; line-height: 1.55; }
+    .todo-due { grid-column: 2; grid-row: 2; justify-self: start; margin-top: 2px;
+                font-size: 12px; line-height: 1.5; white-space: normal; }
+    .todo-del { grid-column: 3; grid-row: 1 / span 2; align-self: center;
+                min-width: 44px; min-height: 44px; padding: 6px; }
     .todo-ics { display: none; }
   }
   /* 触屏没有悬停：行内小字按钮放大到能点的尺寸 */
@@ -206,6 +219,7 @@ export function todosPage(options: { demo?: boolean; demoData?: TodayBrief } = {
     @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; }
   }
+${MOBILE_NAV_CSS}
 </style>
 </head>
 <body data-demo="${demo}">
@@ -231,6 +245,7 @@ export function todosPage(options: { demo?: boolean; demoData?: TodayBrief } = {
     <div class="cbody"><p class="skel">…</p></div>
   </section>
 </main>
+${mobileNav("todos")}
 <script>
 ${demo && demoData ? `const DEMO_DATA = ${JSON.stringify(demoData)};` : "const DEMO_DATA = null;"}
 const $ = (id) => document.getElementById(id);
