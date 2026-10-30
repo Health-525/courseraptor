@@ -148,6 +148,18 @@ export function textToBlocks(text: string): NonNullable<DocumentSpec["blocks"]> 
       const hashes = head.match(/^#+/);
       const level = (hashes?.[0].length ?? 1) as 1 | 2 | 3;
       blocks.push({ type: "heading", text: head.replace(/^#+\s+/, ""), level });
+    } else if (head) {
+      // pptx 附件的逐页标记（attachments.extractPptxText）：转 Word/PDF 时还原成小节标题
+      const pageMark = head.match(/^【第 (\d+) 页(?:·([^】]+))?】$/);
+      if (pageMark) {
+        blocks.push({
+          type: "heading",
+          text: `第 ${pageMark[1]} 页${pageMark[2] ? ` · ${pageMark[2]}` : ""}`,
+          level: 2,
+        });
+      } else {
+        blocks.push({ type: "paragraph", text: chunk.trim() });
+      }
     } else {
       blocks.push({ type: "paragraph", text: chunk.trim() });
     }

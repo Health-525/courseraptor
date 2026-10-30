@@ -52,6 +52,11 @@ export const SKILL_SOURCES: SkillSource[] = [
     dropSections: ["`ask_user` ends the run", "The execution loop", "When something fails"],
   },
   {
+    id: "course-notes",
+    when: "上传课件/讲义要整理成学习笔记/复习提纲/知识汇总",
+    dropSections: [],
+  },
+  {
     id: "export-schedule",
     when: "导出课表图/课表卡片/本周或整学期课表图片",
     dropSections: ["仓库内调用", "打成独立技能包（供他人下载）"],

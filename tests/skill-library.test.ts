@@ -26,12 +26,13 @@ const EXPECTED_IDS = [
   "understanding-by-design",
   "spiral-curriculum",
   "curriculum-planner",
+  "course-notes",
   "export-schedule",
   "ai-news",
 ];
 
-test("技能库：allowlist 8 篇，id 唯一、原文平级在 skills/<id>/", () => {
-  assert.equal(SKILL_LIBRARY.length, 8);
+test("技能库：allowlist 9 篇，id 唯一、原文平级在 skills/<id>/", () => {
+  assert.equal(SKILL_LIBRARY.length, 9);
   assert.equal(SKILL_SOURCES.length, SKILL_LIBRARY.length);
   const ids = SKILL_LIBRARY.map((s) => s.id);
   assert.deepEqual([...ids].sort(), [...EXPECTED_IDS].sort());
