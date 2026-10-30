@@ -115,9 +115,66 @@ function unescapeXml(s: string): string {
     .replace(/&amp;/g, "&");
 }
 
+/** XML 片段按 <a:p> 段落抽文本：段内 <a:t> 直接拼接，段落间由调用方处理 */
+function paragraphTexts(xml: string): string[] {
+  return xml
+    .split(/<\/a:p>/)
+    .map((p) =>
+      [...p.matchAll(/<a:t(?:\s[^>]*)?>([^<]*)<\/a:t>/g)]
+        .map((m) => unescapeXml(m[1] ?? ""))
+        .join(""),
+    )
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+/** 截取 `<p:sp>` / `<p:graphicFrame>` 单个形状的 XML（OOXML 里形状不嵌套同类） */
+function shapeChunks(xml: string, tag: "p:sp" | "p:graphicFrame"): string[] {
+  return xml
+    .split(`<${tag}>`)
+    .slice(1)
+    .map((chunk) => {
+      const end = chunk.indexOf(`</${tag}>`);
+      return end >= 0 ? chunk.slice(0, end) : chunk;
+    });
+}
+
+/** 单页正文：标题占位符（title/ctrTitle）作页标题，其余形状按段落；表格按「单元格 | 单元格」成行 */
+function slideText(xml: string): { title: string; body: string[] } {
+  let title = "";
+  const body: string[] = [];
+  for (const sp of shapeChunks(xml, "p:sp")) {
+    const paras = paragraphTexts(sp);
+    if (!paras.length) continue;
+    if (/<p:ph[^>]*type="(title|ctrTitle)"/.test(sp) && !title) {
+      title = paras.join(" ");
+    } else {
+      body.push(...paras);
+    }
+  }
+  for (const gf of shapeChunks(xml, "p:graphicFrame")) {
+    if (!gf.includes("<a:tbl>")) continue;
+    for (const row of gf.split(/<\/a:tr>/)) {
+      const cells = row
+        .split(/<\/a:tc>/)
+        .map((cell) => paragraphTexts(cell).join(" "))
+        .filter(Boolean);
+      if (cells.length) body.push(cells.join(" | "));
+    }
+  }
+  // 没有标题占位符的页面，首段通常就是本页主题
+  if (!title && body.length) title = body.shift() ?? "";
+  return { title, body };
+}
+
 /**
- * pptx 抽正文：pptx = zip，幻灯片正文是 ppt/slides/slideN.xml 里的 <a:t> 文本段。
- * pptxgenjs 生成、Office 另存的都吃这个结构；按自然页序拼段。
+ * pptx 抽正文（按页结构化，供整理笔记/转档引用页码）：pptx = zip，
+ * 正文在 ppt/slides/slideN.xml，演讲者备注在 ppt/notesSlides/notesSlideN.xml。
+ * pptxgenjs 生成、Office 另存的都吃这个结构。每页输出：
+ *   【第 N 页·标题】正文段落……
+ *   【备注】演讲者备注……
+ * 空页跳过；页码与标题保留，模型整理笔记时可写「课件第 N 页」溯源。
+ * 备注文件优先按 slide 的 .rels 关系对应（比同编号假设稳），缺 rels 才回退同编号。
  */
 export async function extractPptxText(buf: Buffer): Promise<string> {
   const JSZip = require("jszip") as typeof import("jszip");
@@ -128,20 +185,26 @@ export async function extractPptxText(buf: Buffer): Promise<string> {
     .sort((a, b) => slideNo(a) - slideNo(b));
   const slides: string[] = [];
   for (const name of names) {
+    const page = slideNo(name);
     const xml = await zip.file(name)?.async("string");
     if (!xml) continue;
-    // 一个 <a:p> 是一个段落：段内文本段直接拼接，段落间换行。
-    // <a:t> 可能带 xml:space 等属性，正则不锁死尖括号内的写法
-    const text = xml
-      .split(/<\/a:p>/)
-      .map((p) =>
-        [...p.matchAll(/<a:t(?:\s[^>]*)?>([^<]*)<\/a:t>/g)]
-          .map((m) => unescapeXml(m[1] ?? ""))
-          .join(""),
-      )
-      .filter((t) => t.trim())
-      .join("\n");
-    if (text) slides.push(text);
+    const { title, body } = slideText(xml);
+
+    let notes: string[] = [];
+    const rels = await zip.file(`ppt/slides/_rels/slide${page}.xml.rels`)?.async("string");
+    const notesName =
+      rels?.match(/notesSlides\/(notesSlide\d+\.xml)/)?.[1] ?? `notesSlide${page}.xml`;
+    const notesXml = await zip.file(`ppt/notesSlides/${notesName}`)?.async("string");
+    if (notesXml) {
+      // 备注页常混入幻灯片页码占位符（纯数字），过滤掉
+      notes = paragraphTexts(notesXml).filter((t) => !/^\d+$/.test(t));
+    }
+
+    if (!title && !body.length && !notes.length) continue;
+    const lines = [`【第 ${page} 页${title ? `·${title.slice(0, 60)}` : ""}】`];
+    if (body.length) lines.push(body.join("\n"));
+    if (notes.length) lines.push(`【备注】${notes.join("\n")}`);
+    slides.push(lines.join("\n"));
   }
   return slides.join("\n\n");
 }

@@ -20,10 +20,17 @@ const FILE_MIME: Record<string, string> = {
   ".md": "text/markdown; charset=utf-8",
   ".png": "image/png",
   ".svg": "image/svg+xml; charset=utf-8",
+  // 学习笔记等成品网页：CSP 禁脚本（见 note-html.ts），可放心同源内联打开
+  ".html": "text/html; charset=utf-8",
 };
 
 /** 这些类型浏览器能直接看：聊天里点开是预览而不是塞进下载夹（图片长按/右键即存） */
-const INLINE_MIME = new Set(["image/png", "image/svg+xml; charset=utf-8", "application/pdf"]);
+const INLINE_MIME = new Set([
+  "image/png",
+  "image/svg+xml; charset=utf-8",
+  "application/pdf",
+  "text/html; charset=utf-8",
+]);
 
 /** 工具产物路径是否确实落在 generated 目录内（与 QQ 桥 sendFile 同一道护栏） */
 export function insideGenerated(filePath: string): boolean {

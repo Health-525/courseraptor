@@ -1,7 +1,7 @@
 /**
  * 文档写作工具：generate_document / convert_document
  *
- * 只管 Word/Excel/PDF。PPT 生成工具（ppt.ts）源码保留、暂未注册进 coreTools。
+ * 只管 Word/Excel/PDF/网页笔记。PPT 生成工具（ppt.ts）源码保留、暂未注册进 coreTools。
  */
 
 import { tool } from "ai";
@@ -11,23 +11,32 @@ import { generateAndSave } from "../document/save";
 import type { DocumentSpec } from "../document/types";
 
 export const documentTools = {
-  /** 生成文档（Word/Excel/PDF 成品文件；PPT 用 ppt_save 输出 slide deck JSON） */
+  /** 生成文档（Word/Excel/PDF/网页笔记成品文件；PPT 用 ppt_save 输出 slide deck JSON） */
   generate_document: tool({
     description:
-      "AI 辅助写作：按结构化内容直接产出成品文件，支持 Word(docx)/Excel(xlsx)/PDF 三种格式，中文原生可写。学生要「一份报告 / 表格 / 简历模板」等交付物时用。落盘到本机 data/generated 并返回完整路径。docx/pdf 用 blocks（标题/正文/列表/表格/分页），xlsx 用 sheets。当前不提供 PPT 课件生成。",
+      "AI 辅助写作：按结构化内容直接产出成品文件，支持 Word(docx)/Excel(xlsx)/PDF/网页笔记(html) 四种格式，中文原生可写。学生要「一份报告 / 表格 / 简历模板」等交付物时用；**整理学习笔记/复习提纲用 html**——单文件网页，自带目录、重点/易错/考点提示框（callout），course 填课程名、sources 填来源课件清单。落盘到本机 data/generated 并返回完整路径。docx/pdf/html 用 blocks（标题/正文/列表/表格/提示框/分页），xlsx 用 sheets。当前不提供 PPT 课件生成。",
     inputSchema: z.object({
-      format: z.enum(["docx", "xlsx", "pdf"]).describe("目标文件格式"),
-      title: z.string().optional().describe("文档主标题（Word/PDF 顶部）"),
+      format: z.enum(["docx", "xlsx", "pdf", "html"]).describe("目标文件格式"),
+      title: z.string().optional().describe("文档主标题（Word/PDF/网页笔记顶部）"),
       author: z.string().optional().describe("作者/署名（可选）"),
+      course: z.string().optional().describe("学习笔记(html)用：课程名，展示在笔记头部眉题"),
+      sources: z
+        .array(z.string())
+        .optional()
+        .describe("学习笔记(html)用：来源课件文件名清单（如讲义、PPT 文件名），页脚溯源"),
       filename: z.string().optional().describe("成品文件名，可不带扩展名，同名自动加(2)"),
       blocks: z
         .array(
           z.object({
-            type: z.enum(["heading", "paragraph", "list", "table", "pagebreak"]),
-            text: z.string().optional().describe("heading/paragraph 的文本"),
+            type: z.enum(["heading", "paragraph", "list", "table", "callout", "pagebreak"]),
+            text: z.string().optional().describe("heading/paragraph/callout 的文本"),
             level: z.number().int().min(1).max(3).optional().describe("标题级别 1-3"),
             items: z.array(z.string()).optional().describe("list 的条目"),
             ordered: z.boolean().optional().describe("list 是否有序（true 用 1.2.3 前缀）"),
+            tone: z
+              .enum(["key", "warn", "exam"])
+              .optional()
+              .describe("callout 语气：key=重点 / warn=易错 / exam=考点（默认 key）"),
             caption: z.string().optional().describe("表格标题（可选）"),
             table: z
               .object({
@@ -38,7 +47,7 @@ export const documentTools = {
           }),
         )
         .optional()
-        .describe("Word/PDF 的正文块序列（按顺序排版）"),
+        .describe("Word/PDF/网页笔记的正文块序列（按顺序排版）"),
       sheets: z
         .array(
           z.object({
@@ -55,6 +64,8 @@ export const documentTools = {
         format: input.format,
         ...(input.title ? { title: input.title } : {}),
         ...(input.author ? { author: input.author } : {}),
+        ...(input.course ? { course: input.course } : {}),
+        ...(input.sources?.length ? { sources: input.sources } : {}),
         ...(input.blocks ? { blocks: input.blocks as DocumentSpec["blocks"] } : {}),
         ...(input.sheets ? { sheets: input.sheets as DocumentSpec["sheets"] } : {}),
       };

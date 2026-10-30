@@ -7,7 +7,7 @@
  * 格式与中文渲染细节都收敛在这里。
  */
 
-export type DocFormat = "docx" | "xlsx" | "pptx" | "pdf";
+export type DocFormat = "docx" | "xlsx" | "pptx" | "pdf" | "html";
 
 /** 表格：表头 + 若干行（字符串即可，数字在写入表格类格式时按需转换） */
 export interface TableSpec {
@@ -15,12 +15,22 @@ export interface TableSpec {
   rows: (string | number)[][];
 }
 
-/** 正文块：用于 docx / pdf 这种线性文档 */
+/** callout 提示框的语气（html 笔记的彩色边条；docx/pdf 退化为带前缀的着色段落） */
+export type CalloutTone = "key" | "warn" | "exam";
+
+export const CALLOUT_LABEL: Record<CalloutTone, string> = {
+  key: "重点",
+  warn: "易错",
+  exam: "考点",
+};
+
+/** 正文块：用于 docx / pdf / html 这种线性文档 */
 export type DocBlock =
   | { type: "heading"; text: string; level?: 1 | 2 | 3 }
   | { type: "paragraph"; text: string }
   | { type: "list"; items: string[]; ordered?: boolean }
   | { type: "table"; table: TableSpec; caption?: string }
+  | { type: "callout"; text: string; tone?: CalloutTone }
   | { type: "pagebreak" };
 
 /** 幻灯片：用于 pptx */
@@ -41,10 +51,14 @@ export interface SheetSpec {
 
 export interface DocumentSpec {
   format: DocFormat;
-  /** 文档主标题（docx/pdf 顶部大标题、pptx 封面页、xlsx 仅在无 sheet 名时兜底） */
+  /** 文档主标题（docx/pdf/html 顶部大标题、pptx 封面页、xlsx 仅在无 sheet 名时兜底） */
   title?: string;
   author?: string;
-  /** docx / pdf 用 */
+  /** 学习笔记（html）用：课程名，展示在笔记头部的眉题 */
+  course?: string;
+  /** 学习笔记（html）用：来源课件文件清单，页脚展示溯源 */
+  sources?: string[];
+  /** docx / pdf / html 用 */
   blocks?: DocBlock[];
   /** pptx 用 */
   slides?: SlideSpec[];
@@ -52,7 +66,7 @@ export interface DocumentSpec {
   sheets?: SheetSpec[];
 }
 
-export const DOC_FORMATS: DocFormat[] = ["docx", "xlsx", "pptx", "pdf"];
+export const DOC_FORMATS: DocFormat[] = ["docx", "xlsx", "pptx", "pdf", "html"];
 
 export function isDocFormat(x: string): x is DocFormat {
   return (DOC_FORMATS as string[]).includes(x);
@@ -63,4 +77,5 @@ export const FORMAT_EXT: Record<DocFormat, string> = {
   xlsx: ".xlsx",
   pptx: ".pptx",
   pdf: ".pdf",
+  html: ".html",
 };

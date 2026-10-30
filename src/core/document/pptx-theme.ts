@@ -21,7 +21,7 @@ import { createRequire } from "node:module";
 import { loadLogoDataUri } from "../brand";
 import type { DeckBackground, DeckElement, SlideDeck } from "./ppt-dsl";
 import { latexToMathML } from "./ppt-latex";
-import type { DocumentSpec, SlideSpec, TableSpec } from "./types";
+import { CALLOUT_LABEL, type DocumentSpec, type SlideSpec, type TableSpec } from "./types";
 
 const require = createRequire(import.meta.url);
 const requireAny = require as unknown as (id: string) => unknown;
@@ -73,6 +73,8 @@ export function slidesFromBlocks(spec: DocumentSpec): SlideSpec[] {
       else if (b.type === "list")
         cur.bullets.push(...b.items.map((it, i) => (b.ordered ? `${i + 1}. ${it}` : it)));
       else if (b.type === "table") cur.table = b.table;
+      else if (b.type === "callout")
+        cur.bullets.push(`【${CALLOUT_LABEL[b.tone ?? "key"]}】${b.text}`);
     }
   }
   if (cur) slides.push(cur);

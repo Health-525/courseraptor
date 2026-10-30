@@ -1,11 +1,12 @@
 /**
  * 文档渲染层：DocumentSpec → 各格式字节
  *
- * 四种格式对中文的处理路径不同，这里统一收口：
+ * 各格式对中文的处理路径不同，这里统一收口：
  * - docx / pptx：Office 只是「引用」字体名，字符以 UTF-8 存进 XML，阅读器用本机
  *   字体渲染，无需嵌字体，天生不怕中文。显式指定中文字体名以保观感一致。
  * - xlsx：SheetJS 写 UTF-8 字符串，同样安全。
  * - pdf：pdfkit 内建字体无中文字形，必须注册一份系统 TTF（见 font.ts）并子集化嵌入。
+ * - html：单文件网页笔记（见 note-html.ts），UTF-8 直写，字体走系统栈。
  *
  * 依赖一律用 createRequire 载入并转 any：pdfkit 无官方 @types，避免 tsc 缺声明。
  */
@@ -13,14 +14,29 @@
 import { createRequire } from "node:module";
 import type * as Docx from "docx";
 import { resolveCjkFont, resolveCjkFontFamily } from "./font";
+import { renderNoteHtml } from "./note-html";
 import { renderPptxThemed } from "./pptx-theme";
-import type { DocBlock, DocumentSpec, SheetSpec, TableSpec } from "./types";
+import {
+  CALLOUT_LABEL,
+  type CalloutTone,
+  type DocBlock,
+  type DocumentSpec,
+  type SheetSpec,
+  type TableSpec,
+} from "./types";
 
 const require = createRequire(import.meta.url);
 const requireAny = require as unknown as (id: string) => unknown;
 
 /** 统一中文字体名（docx/pptx 里作为引用写入，阅读器回退到本机同名字体） */
 const CJK_FONT = "Microsoft YaHei";
+
+/** callout 三种语气在 docx/pdf 里的着色（与 note-html 的 CSS 同源） */
+const TONE_COLOR: Record<CalloutTone, string> = {
+  key: "AD392C",
+  warn: "B07A1E",
+  exam: "2E6E4E",
+};
 
 function firstNonEmpty(...xs: (string | undefined | null)[]): string {
   for (const x of xs) if (x?.trim()) return x.trim();
@@ -149,6 +165,26 @@ function pushDocxBlock(
       );
       children.push(new Paragraph({ children: [new TextRun({ text: "", size: 12 })] }));
       break;
+    case "callout": {
+      // Word 没有现成的提示框，退化为「着色标签前缀 + 正文」段落
+      const tone = b.tone ?? "key";
+      children.push(
+        new Paragraph({
+          spacing: { before: 80, after: 120 },
+          children: [
+            new TextRun({
+              text: `【${CALLOUT_LABEL[tone]}】`,
+              bold: true,
+              color: TONE_COLOR[tone],
+              size: 22,
+              font: CJK_FONT,
+            }),
+            new TextRun({ text: b.text, size: 22, font: CJK_FONT }),
+          ],
+        }),
+      );
+      break;
+    }
     case "pagebreak":
       children.push(new Paragraph({ children: [new PageBreak()] }));
       break;
@@ -327,6 +363,16 @@ export async function renderPdf(spec: DocumentSpec): Promise<Buffer> {
       ensureRoom(doc, bottom, 40);
       drawPdfTable(doc, b.table, left, right, bottom, !!font);
       doc.moveDown(0.6);
+    } else if (b.type === "callout") {
+      // PDF 同样没有提示框：着色「【重点】正文」一段
+      const tone = b.tone ?? "key";
+      ensureRoom(doc, bottom, 40);
+      setFont();
+      doc
+        .fillColor(TONE_COLOR[tone])
+        .fontSize(12)
+        .text(`【${CALLOUT_LABEL[tone]}】${b.text}`, { align: "justify" });
+      doc.moveDown(0.5);
     } else if (b.type === "pagebreak") {
       doc.addPage();
     }
@@ -399,6 +445,8 @@ export async function renderDocument(
       return { buffer: await renderPptxThemed(spec), baseName };
     case "pdf":
       return { buffer: await renderPdf(spec), baseName };
+    case "html":
+      return { buffer: Buffer.from(renderNoteHtml(spec), "utf8"), baseName };
     default:
       throw new Error(`不支持的格式: ${(spec as { format?: string }).format}`);
   }
