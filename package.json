@@ -1,6 +1,6 @@
 {
   "name": "courseraptor",
-  "version": "0.6.5",
+  "version": "0.6.6",
   "description": "面向大学生的本地优先智能学习工作台：以 AI 为核心，统一连接课表、待办、课程资料与知识沉淀，让每一天的学习安排都清晰可控。",
   "scripts": {
     "dev": "tsx local/cli/index.ts",
