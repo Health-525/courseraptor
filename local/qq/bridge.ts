@@ -37,7 +37,7 @@ import { ensureCredentials } from "../../src/core/onboarding";
 import { migratedDataPath } from "../../src/core/paths";
 import { maybeAutoTitle } from "../../src/core/session-titles";
 import { localOnlyCommandMessage } from "../cli/tui/slash-menu";
-import { mdToPlain, splitMessage } from "./format";
+import { composeInboundQuestion, mdToPlain, splitMessage } from "./format";
 import { type QqArchiveInput, qqArchiveSlot } from "./session-archive";
 
 type BridgeLogger = Pick<Console, "log" | "info" | "warn" | "error" | "debug">;
@@ -307,27 +307,32 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
       return;
     }
 
-    const text = msg.content.trim();
-    if (!text) return;
+    // 组装给模型的问题：正文 + 附件标记（文件/图片消息正文常为空，
+    // 只看 content 会把纯附件消息静默丢掉——用户发文件就石沉大海）。
+    // 无正文也无可用附件（question 为空）才跳过。
+    const question = composeInboundQuestion(msg.content, msg.attachments);
+    if (!question) return;
 
-    const localOnlyMessage = localOnlyCommandMessage(text);
+    const localOnlyMessage = localOnlyCommandMessage(msg.content.trim());
     if (localOnlyMessage) {
       await bot.sendText(msg.replyTarget, localOnlyMessage);
       return;
     }
 
     const history = touchHistory(senderId);
-    const userMsg: ModelMessage = { role: "user", content: text };
+    const userMsg: ModelMessage = { role: "user", content: question };
 
     // 网页侧栏的历史记录：私聊每人一档、群聊每群一档（粒度见 session-archive.ts）。
     // 一轮只记一次——成功记整轮问答，失败只留「他在 QQ 里问过这句」。
     // archiveQQRound 已改异步（落盘后还要让模型定标题），这里不等待：
-    // 同步落盘先行，命名在后台尽力而为，绝不拖住 QQ 回复
+    // 同步落盘先行，命名在后台尽力而为，绝不拖住 QQ 回复。
+    // 附件消息把组装后的 question 落档（原始 content 是空的，看不出问了什么）。
+    const archiveMsg: QqArchiveInput = { ...msg, content: question };
     let archived = false;
     const archive = (answer: string | null): void => {
       if (archived) return;
       archived = true;
-      void archiveQQRound(msg, answer, log);
+      void archiveQQRound(archiveMsg, answer, log);
     };
 
     const stopNotices = startWaitingNotices((t) => bot.sendText(msg.replyTarget, t));

@@ -75,3 +75,77 @@ export function splitMessage(text: string, max = 1500): string[] {
   if (current.trim()) segments.push(current.trim());
   return segments;
 }
+
+// ── 入站附件 → 文本 ─────────────────────────────────────────────
+// QQ 官方机器人推送的文件/图片/语音消息正文（content）通常为空，附件信息
+// 全在 attachments 数组里。以前桥只看 content，纯附件消息被当空消息静默
+// 丢弃——用户发文件机器毫无反应。这里把附件转成模型可读的文本标记。
+
+/** 入站附件的结构子集（与 SDK InboundMessage.attachments 元素结构兼容，不硬依赖 SDK 类型） */
+export interface QqAttachmentLike {
+  content_type: string;
+  url?: string;
+  filename?: string;
+  size?: number;
+  /** 语音消息：QQ 服务端转出的 WAV 链接与识别文本 */
+  voice_wav_url?: string;
+  asr_refer_text?: string;
+}
+
+/** 附件标记后追加给模型的行为提示：链接时效 + 能力边界（web_fetch 读文本类，二进制读不了） */
+const ATTACHMENT_HINT =
+  "（以上附件来自 QQ 消息，链接有时效：需要内容时可用 web_fetch 读文本类文件，读不了的格式如实说明已收到即可）";
+
+function humanSize(bytes: number | undefined): string {
+  if (bytes === undefined || !Number.isFinite(bytes) || bytes <= 0) return "";
+  const units = ["B", "KB", "MB", "GB"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${unit === 0 || value >= 100 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+}
+
+/** 把附件数组渲染成 `[文件 名字 · 大小：链接]` 式文本标记；无附件或全不可识别返回空串 */
+export function describeAttachments(attachments: readonly QqAttachmentLike[] | undefined): string {
+  if (!attachments || attachments.length === 0) return "";
+  const lines: string[] = [];
+  for (const a of attachments) {
+    const type = (a.content_type ?? "").trim();
+    const name = (a.filename ?? "").trim();
+    const url = (a.url ?? "").trim();
+    const size = humanSize(a.size);
+    if (type === "voice") {
+      const asr = (a.asr_refer_text ?? "").trim();
+      lines.push(`[语音${asr ? `：${asr}` : url ? `（语音文件）${url}` : ""}]`);
+    } else if (type.startsWith("image/")) {
+      lines.push(`[图片${name ? ` ${name}` : ""}${url ? `：${url}` : ""}]`);
+    } else if (type === "file" || type.startsWith("video/")) {
+      lines.push(
+        `[文件${name ? ` ${name}` : ""}${size ? ` · ${size}` : ""}${url ? `：${url}` : ""}]`,
+      );
+    } else if (url) {
+      lines.push(`[附件${name ? ` ${name}` : ""}${size ? ` · ${size}` : ""}：${url}]`);
+    }
+  }
+  return lines.join("\n");
+}
+
+/**
+ * 组装发给模型的用户问题：正文 + 附件标记 + 行为提示。
+ * 纯文件消息（正文为空）也能得到非空问题——这正是「发文件没反应」的回归钉。
+ * 返回空串表示这条消息既无正文也无可用附件，调用方照旧跳过。
+ */
+export function composeInboundQuestion(
+  content: string,
+  attachments?: readonly QqAttachmentLike[],
+): string {
+  const text = content.trim();
+  const described = describeAttachments(attachments);
+  if (described === "") return text;
+  const block = `${described}\n${ATTACHMENT_HINT}`;
+  if (text === "") return block;
+  return `${text}\n${block}`;
+}
