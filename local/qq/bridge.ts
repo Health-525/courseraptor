@@ -28,6 +28,7 @@ import {
 import type { ModelMessage } from "ai";
 import { createRaptorAgent } from "../../src/core/agent";
 import { quarantineCorruptFile, writeFileAtomic } from "../../src/core/atomic-write";
+import { attachmentIdForSource, findByUrl, putAttachment } from "../../src/core/attachment-store";
 import { appendRound } from "../../src/core/chat-sessions";
 import { config } from "../../src/core/config";
 import { drainGeneratedRound, runInDocumentRound } from "../../src/core/document/save";
@@ -36,8 +37,9 @@ import { registerQQPushSender } from "../../src/core/notify";
 import { ensureCredentials } from "../../src/core/onboarding";
 import { migratedDataPath } from "../../src/core/paths";
 import { maybeAutoTitle } from "../../src/core/session-titles";
+import { isTableFilename } from "../../src/core/spreadsheet";
 import { localOnlyCommandMessage } from "../cli/tui/slash-menu";
-import { composeInboundQuestion, mdToPlain, splitMessage } from "./format";
+import { composeInboundQuestion, mdToPlain, type QqAttachmentLike, splitMessage } from "./format";
 import { type QqArchiveInput, qqArchiveSlot } from "./session-archive";
 
 type BridgeLogger = Pick<Console, "log" | "info" | "warn" | "error" | "debug">;
@@ -67,6 +69,73 @@ async function deliverGeneratedFiles(
         .catch(() => {});
     }
   }
+}
+
+// ── QQ 附件落地：抢在链接失效前下载入附件缓存 ──────────────────
+
+/** 与附件主链路同款大小护栏：超此值不落地（退回链接标记，读不了为常态） */
+const QQ_ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024;
+
+/**
+ * 把入站 QQ 附件在收到当下下载进附件缓存（attachment-store）——QQ 的附件
+ * 链接很快失效，等 agent 跑到工具调用那步再取就 404 了。同一 URL 重复
+ * 发送直接命中缓存。只落地文件/图片/视频（语音自带识别文本）；单个失败
+ * 只记日志、原样返回该项，组装时退回链接标记，绝不拦截回复。
+ */
+async function persistQqAttachments(
+  attachments: readonly { content_type: string; url?: string; filename?: string }[] | undefined,
+  log: BridgeLogger,
+): Promise<QqAttachmentLike[]> {
+  const out: QqAttachmentLike[] = [];
+  if (!attachments) return out;
+  for (const a of attachments) {
+    const type = (a.content_type ?? "").trim();
+    const url = (a.url ?? "").trim();
+    const downloadable =
+      url !== "" && (type === "file" || type.startsWith("image/") || type.startsWith("video/"));
+    if (!downloadable) {
+      out.push(a);
+      continue;
+    }
+    try {
+      const cached = findByUrl(url);
+      if (cached) {
+        out.push({ ...a, localPath: cached.storedPath, cacheId: cached.id });
+        continue;
+      }
+      const res = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const declared = Number(res.headers.get("content-length") ?? 0);
+      if (declared > QQ_ATTACHMENT_MAX_BYTES) throw new Error(`超过 50MB 上限`);
+      const buf = Buffer.from(await res.arrayBuffer());
+      if (buf.byteLength > QQ_ATTACHMENT_MAX_BYTES) throw new Error(`超过 50MB 上限`);
+      const filename = (a.filename ?? "").trim() || "qq附件";
+      const meta = await putAttachment({
+        id: attachmentIdForSource("url", url),
+        filename,
+        kind: isTableFilename(filename) ? "table" : "other",
+        format:
+          filename
+            .toLowerCase()
+            .match(/\.[a-z0-9]{1,8}$/)?.[0]
+            ?.slice(1) ?? "",
+        source: "url",
+        url,
+        buf,
+      });
+      out.push({ ...a, localPath: meta.storedPath, cacheId: meta.id });
+      log.log(`[qq] 附件已落地 ${filename}（${meta.storedPath}）`);
+    } catch (e) {
+      log.warn(
+        `[qq] 附件下载失败（${(a.filename ?? "").trim() || type}）：${(e as Error)?.message ?? e}`,
+      );
+      out.push(a);
+    }
+  }
+  return out;
 }
 
 // ── 授权：白名单 + 暗号激活 ────────────────────────────────────
@@ -309,8 +378,12 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
 
     // 组装给模型的问题：正文 + 附件标记（文件/图片消息正文常为空，
     // 只看 content 会把纯附件消息静默丢掉——用户发文件就石沉大海）。
+    // QQ 的附件链接很快失效（agent 晚一步去取就 404），所以收到当下先抢着
+    // 下载入附件缓存（attachment-store），把本机路径/缓存 id 交给模型用
+    // query_table / read_local_file 读；下载失败退回给链接，行为不变。
     // 无正文也无可用附件（question 为空）才跳过。
-    const question = composeInboundQuestion(msg.content, msg.attachments);
+    const attachments = await persistQqAttachments(msg.attachments, log);
+    const question = composeInboundQuestion(msg.content, attachments);
     if (!question) return;
 
     const localOnlyMessage = localOnlyCommandMessage(msg.content.trim());

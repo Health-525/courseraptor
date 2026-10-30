@@ -90,11 +90,18 @@ export interface QqAttachmentLike {
   /** 语音消息：QQ 服务端转出的 WAV 链接与识别文本 */
   voice_wav_url?: string;
   asr_refer_text?: string;
+  /** 桥已把该附件下载入附件缓存（attachment-store）时回填：本机存储路径与缓存 id */
+  localPath?: string;
+  cacheId?: string;
 }
 
-/** 附件标记后追加给模型的行为提示：链接时效 + 能力边界（web_fetch 读文本类，二进制读不了） */
-const ATTACHMENT_HINT =
+/** 未落地（下载失败/未尝试）附件的提示：链接时效 + 能力边界 */
+const ATTACHMENT_HINT_REMOTE =
   "（以上附件来自 QQ 消息，链接有时效：需要内容时可用 web_fetch 读文本类文件，读不了的格式如实说明已收到即可）";
+
+/** 已落地附件的提示：直接用本地工具读，别再碰会失效的 QQ 链接 */
+const ATTACHMENT_HINT_LOCAL =
+  "（以上附件已自动下载到本机：表格用 query_table 按缓存 id 查内容（支持按姓名/学号等关键词筛行），文档用 read_local_file 按路径读取；QQ 原链接有时效，不必再访问）";
 
 function humanSize(bytes: number | undefined): string {
   if (bytes === undefined || !Number.isFinite(bytes) || bytes <= 0) return "";
@@ -108,6 +115,14 @@ function humanSize(bytes: number | undefined): string {
   return `${unit === 0 || value >= 100 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
 }
 
+/** 落地标记：`已下载：<路径>（缓存 id=<id>）`；QQ 原链接会失效，落地后不再展示 */
+function storedMark(a: QqAttachmentLike): string {
+  const p = (a.localPath ?? "").trim();
+  if (p === "") return "";
+  const id = (a.cacheId ?? "").trim();
+  return `，已下载：${p}${id ? `（缓存 id=${id}）` : ""}`;
+}
+
 /** 把附件数组渲染成 `[文件 名字 · 大小：链接]` 式文本标记；无附件或全不可识别返回空串 */
 export function describeAttachments(attachments: readonly QqAttachmentLike[] | undefined): string {
   if (!attachments || attachments.length === 0) return "";
@@ -117,14 +132,15 @@ export function describeAttachments(attachments: readonly QqAttachmentLike[] | u
     const name = (a.filename ?? "").trim();
     const url = (a.url ?? "").trim();
     const size = humanSize(a.size);
+    const stored = storedMark(a);
     if (type === "voice") {
       const asr = (a.asr_refer_text ?? "").trim();
       lines.push(`[语音${asr ? `：${asr}` : url ? `（语音文件）${url}` : ""}]`);
     } else if (type.startsWith("image/")) {
-      lines.push(`[图片${name ? ` ${name}` : ""}${url ? `：${url}` : ""}]`);
+      lines.push(`[图片${name ? ` ${name}` : ""}${stored || (url ? `：${url}` : "")}]`);
     } else if (type === "file" || type.startsWith("video/")) {
       lines.push(
-        `[文件${name ? ` ${name}` : ""}${size ? ` · ${size}` : ""}${url ? `：${url}` : ""}]`,
+        `[文件${name ? ` ${name}` : ""}${size ? ` · ${size}` : ""}${stored || (url ? `：${url}` : "")}]`,
       );
     } else if (url) {
       lines.push(`[附件${name ? ` ${name}` : ""}${size ? ` · ${size}` : ""}：${url}]`);
@@ -136,6 +152,7 @@ export function describeAttachments(attachments: readonly QqAttachmentLike[] | u
 /**
  * 组装发给模型的用户问题：正文 + 附件标记 + 行为提示。
  * 纯文件消息（正文为空）也能得到非空问题——这正是「发文件没反应」的回归钉。
+ * 有任一附件已落地本机时提示改指本地工具（query_table / read_local_file）。
  * 返回空串表示这条消息既无正文也无可用附件，调用方照旧跳过。
  */
 export function composeInboundQuestion(
@@ -145,7 +162,9 @@ export function composeInboundQuestion(
   const text = content.trim();
   const described = describeAttachments(attachments);
   if (described === "") return text;
-  const block = `${described}\n${ATTACHMENT_HINT}`;
+  const landed = (attachments ?? []).some((a) => (a.localPath ?? "").trim() !== "");
+  const hint = landed ? ATTACHMENT_HINT_LOCAL : ATTACHMENT_HINT_REMOTE;
+  const block = `${described}\n${hint}`;
   if (text === "") return block;
   return `${text}\n${block}`;
 }
