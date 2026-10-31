@@ -79,3 +79,34 @@ test("大小人性化：字节/KB/MB/GB 边界", () => {
   assert.match(pick(3_200_000), /3\.1 MB/);
   assert.ok(!pick(0).includes("·"), "size=0 不显示大小段");
 });
+
+test("已落地附件：展示本机路径与缓存 id，不再展示会失效的 QQ 链接", () => {
+  const stored = {
+    ...file,
+    localPath: "D:\\data\\attachments\\files\\218fae170170.xlsx",
+    cacheId: "218fae170170",
+  };
+  const described = describeAttachments([stored]);
+  assert.ok(described.includes("已下载：D:\\data\\attachments\\files\\218fae170170.xlsx"));
+  assert.ok(described.includes("缓存 id=218fae170170"));
+  assert.ok(!described.includes("https://qq.example"), "落地后不再展示 QQ 链接");
+});
+
+test("落地附件的提示改指本地工具（query_table / read_local_file）", () => {
+  const stored = { ...file, localPath: "D:\\data\\attachments\\files\\a1.xlsx", cacheId: "a1" };
+  const question = composeInboundQuestion("帮我看看这个表格", [stored]);
+  assert.match(question, /query_table/);
+  assert.match(question, /read_local_file/);
+  assert.ok(!question.includes("web_fetch"), "落地场景不再引导走 web_fetch");
+  // 混合场景（一个落地一个失败退回链接）：本地提示优先，链接原样保留
+  const mixed = composeInboundQuestion("", [stored, image]);
+  assert.match(mixed, /query_table/);
+  assert.ok(mixed.includes("https://qq.example/img/x.png"), "未落地附件仍给链接");
+});
+
+test("图片落地标记", () => {
+  const stored = { ...image, localPath: "D:\\data\\attachments\\files\\i1.png", cacheId: "i1" };
+  const described = describeAttachments([stored]);
+  assert.ok(described.includes("[图片 截图.png，已下载："), "落地图片带已下载标记");
+  assert.ok(!described.includes("https://"), "不再展示链接");
+});
