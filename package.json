@@ -61,17 +61,17 @@
   },
   "type": "module",
   "dependencies": {
-    "@ai-sdk/deepseek": "^3.0.63",
-    "@ai-sdk/openai-compatible": "^3.0.67",
-    "@ai-sdk/tui": "^1.0.137",
+    "@ai-sdk/deepseek": "^3.0.75",
+    "@ai-sdk/openai-compatible": "^3.0.80",
+    "@ai-sdk/tui": "^1.0.156",
     "@resvg/resvg-js": "^2.6.2",
-    "@tencent-connect/qqbot-nodejs": "^1.0.4",
+    "@tencent-connect/qqbot-nodejs": "^1.0.5",
     "ai": "^7.0.83",
-    "docx": "^9.9.0",
+    "docx": "^9.15.0",
     "fontkit": "^2.0.4",
     "jszip": "^3.10.2",
     "mammoth": "^1.13.0",
-    "marked": "^18.1.0",
+    "marked": "^18.1.2",
     "mathml2omml": "^0.5.0",
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.20.2",
@@ -82,16 +82,16 @@
     "temml": "^0.14.0",
     "tsx": "^4.23.15",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "overrides": {
     "image-size": "^2.0.4"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.15",
-    "@types/node": "^26.6.4",
-    "jscpd": "^5.4.1",
-    "lefthook": "^2.2.1",
+    "@biomejs/biome": "^2.6.3",
+    "@types/node": "^26.6.5",
+    "jscpd": "^5.4.2",
+    "lefthook": "^2.2.2",
     "typescript": "^7.0.2"
   }
 }
