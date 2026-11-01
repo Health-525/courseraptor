@@ -29,10 +29,11 @@ const EXPECTED_IDS = [
   "course-notes",
   "export-schedule",
   "ai-news",
+  "development-progress",
 ];
 
-test("技能库：allowlist 9 篇，id 唯一、原文平级在 skills/<id>/", () => {
-  assert.equal(SKILL_LIBRARY.length, 9);
+test("技能库：allowlist 10 篇，id 唯一、原文平级在 skills/<id>/", () => {
+  assert.equal(SKILL_LIBRARY.length, 10);
   assert.equal(SKILL_SOURCES.length, SKILL_LIBRARY.length);
   const ids = SKILL_LIBRARY.map((s) => s.id);
   assert.deepEqual([...ids].sort(), [...EXPECTED_IDS].sort());
@@ -118,6 +119,7 @@ test("菜单与提示词路由：场景对照进 description，提示词指向 r
   assert.match(menu, /→feynman-learning/);
   assert.match(menu, /→export-schedule/);
   assert.match(menu, /→zone-of-proximal-development/);
+  assert.match(menu, /→development-progress/);
 
   const desc = String((coreTools.read_skill as { description?: string }).description ?? "");
   for (const s of SKILL_LIBRARY) {
@@ -126,6 +128,7 @@ test("菜单与提示词路由：场景对照进 description，提示词指向 r
 
   const s = basePrompt();
   assert.match(s, /read_skill/, "学习辅导应指向 read_skill");
+  assert.match(s, /development-progress/, "开发进度应指向工作记录技能");
   assert.match(s, /export_schedule_image/, "应指向课表图工具");
   assert.doesNotMatch(s, /ppt_preview|ppt_save/, "提示词不应再推销 PPT 工具");
   assert.doesNotMatch(s, /read_learning_reference|学习教练/, "旧学习教练话术应清除");

@@ -66,6 +66,11 @@ export const SKILL_SOURCES: SkillSource[] = [
     when: "AI 新闻/模型动态/开源雷达/行业日报/突发简报/近期趋势",
     dropSections: [],
   },
+  {
+    id: "development-progress",
+    when: "记录/查询开发进度、项目阻塞、工作日志或开发周报",
+    dropSections: [],
+  },
 ];
 
 /** OpenMAIC 专有工具名 → 中文动作描述（顺序敏感：长名在前） */
