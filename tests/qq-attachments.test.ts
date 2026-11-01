@@ -110,3 +110,58 @@ test("图片落地标记", () => {
   assert.ok(described.includes("[图片 截图.png，已下载："), "落地图片带已下载标记");
   assert.ok(!described.includes("https://"), "不再展示链接");
 });
+
+// ── 引用消息（quoteRef 解析结果）→ 模型问题组装 ─────────────────
+
+test("回复引用提问：被引用正文带进问题", () => {
+  const question = composeInboundQuestion("这个呢？", undefined, { text: "明天几点上课" });
+  assert.ok(question.startsWith("这个呢？\n"));
+  assert.match(question, /（引用消息：明天几点上课）/);
+});
+
+test("引用消息带附件：附件标记并入引用块", () => {
+  const question = composeInboundQuestion("帮我看看这个", undefined, {
+    text: "",
+    attachments: [file],
+  });
+  assert.match(
+    question,
+    /（引用消息附件：\[文件 课件\.pptx · 3\.1 MB：https:\/\/qq\.example\/dl\/abc\]）/,
+  );
+});
+
+test("引用消息正文与附件都有：两行齐全", () => {
+  const question = composeInboundQuestion(
+    "",
+    [{ ...image, localPath: "D:\\d\\i1.png", cacheId: "i1" }],
+    {
+      text: "刚发的文件",
+      attachments: [{ ...file, localPath: "D:\\d\\a1.xlsx", cacheId: "a1" }],
+    },
+  );
+  assert.match(question, /（引用消息：刚发的文件\n/);
+  assert.match(question, /已下载：D:\\d\\a1\.xlsx/);
+  assert.match(question, /query_table/, "落地附件仍指本地工具");
+});
+
+test("引用语音消息：识别文本优先展示", () => {
+  const question = composeInboundQuestion("再确认下", undefined, {
+    attachments: [
+      { content_type: "voice", url: "https://qq.example/v.silk", asr_refer_text: "周五有考试" },
+    ],
+  });
+  assert.match(question, /（引用消息附件：\[语音：周五有考试\]/);
+});
+
+test("空引用（解析不到内容）不影响原有组装，行为与没引用一致", () => {
+  assert.equal(composeInboundQuestion("这周有什么课", undefined, { text: "" }), "这周有什么课");
+  assert.equal(composeInboundQuestion("", undefined, { text: "", attachments: [] }), "");
+  assert.equal(composeInboundQuestion("", undefined, null), "", "quote 传 null 同样按无引用处理");
+});
+
+test("引用 + 本消息附件并存：引用块在前、附件块在后", () => {
+  const question = composeInboundQuestion("对比下", [image], { text: "上次那张图" });
+  const quoteAt = question.indexOf("（引用消息：");
+  const attachAt = question.indexOf("[图片");
+  assert.ok(quoteAt > -1 && attachAt > quoteAt, "引用块在附件标记之前");
+});

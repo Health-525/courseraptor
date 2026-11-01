@@ -149,22 +149,62 @@ export function describeAttachments(attachments: readonly QqAttachmentLike[] | u
   return lines.join("\n");
 }
 
+/** 被引用消息的结构子集（与 SDK quoteRef 中间件解析出的 ResolvedQuote 兼容） */
+export interface QqQuoteLike {
+  /** 被引用消息的合并文本（正文优先，缺省回退平台推送的原始内容） */
+  text?: string;
+  /** 被引用消息携带的附件（映射成 QqAttachmentLike 后同样走落地链路） */
+  attachments?: readonly QqAttachmentLike[];
+}
+
+/** 引用块：`（引用消息：…）`；正文与附件都没有时返回空串（视为没引用） */
+function renderQuote(quote: QqQuoteLike | null | undefined): string {
+  if (!quote) return "";
+  const text = (quote.text ?? "").trim();
+  const described = describeAttachments(quote.attachments);
+  if (text !== "" && described !== "") return `（引用消息：${text}\n${described}）`;
+  if (text !== "") return `（引用消息：${text}）`;
+  if (described !== "") return `（引用消息附件：${described}）`;
+  return "";
+}
+
 /**
- * 组装发给模型的用户问题：正文 + 附件标记 + 行为提示。
+ * 组装发给模型的用户问题：正文 + 引用块 + 附件标记 + 行为提示。
  * 纯文件消息（正文为空）也能得到非空问题——这正是「发文件没反应」的回归钉。
+ * 用户回复/引用某条消息提问时，被引用内容一并带上（quoteRef 中间件解析）。
  * 有任一附件已落地本机时提示改指本地工具（query_table / read_local_file）。
  * 返回空串表示这条消息既无正文也无可用附件，调用方照旧跳过。
  */
 export function composeInboundQuestion(
   content: string,
   attachments?: readonly QqAttachmentLike[],
+  quote?: QqQuoteLike | null,
 ): string {
   const text = content.trim();
   const described = describeAttachments(attachments);
-  if (described === "") return text;
+  const quoteLine = renderQuote(quote);
+  if (described === "" && quoteLine === "") return text;
   const landed = (attachments ?? []).some((a) => (a.localPath ?? "").trim() !== "");
   const hint = landed ? ATTACHMENT_HINT_LOCAL : ATTACHMENT_HINT_REMOTE;
-  const block = `${described}\n${hint}`;
-  if (text === "") return block;
-  return `${text}\n${block}`;
+  const blocks = [quoteLine, `${described}\n${hint}`].filter(Boolean);
+  if (text === "") return blocks.join("\n");
+  return [text, ...blocks].join("\n");
+}
+
+// ── 生成物回传：按媒体类型选通道 ───────────────────────────────
+
+/** 图片扩展名：走媒体图片消息（QQ 聊天里直接预览，不用下载文件） */
+const IMAGE_EXTS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"]);
+/** 视频扩展名：走媒体视频消息 */
+const VIDEO_EXTS = new Set([".mp4", ".mov", ".m4v", ".webm"]);
+
+/**
+ * 生成物回传通道判定：图片/视频走对应媒体消息（聊天内直接预览），
+ * 其余（docx/xlsx/pptx/pdf/html…）走文件消息。按扩展名判，稳过 MIME 猜测。
+ */
+export function mediaKindOf(filename: string): "image" | "video" | "file" {
+  const ext = filename.toLowerCase().match(/\.[a-z0-9]{1,8}$/)?.[0] ?? "";
+  if (IMAGE_EXTS.has(ext)) return "image";
+  if (VIDEO_EXTS.has(ext)) return "video";
+  return "file";
 }

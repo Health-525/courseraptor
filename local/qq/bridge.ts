@@ -7,10 +7,15 @@
  * - 独立模式：`npm run qq` 只跑桥（日志走控制台）
  *
  * - 场景：单聊（C2C）直接对话；群聊需 @机器人 触发（mentionGate）
+ * - 回复：私聊走官方 stream_messages 逐字回放（工具期显示「正在查…」
+ *   状态行；QQBOT_STREAM=0 可关），群聊/流式失败退回心跳 + 分段纯文本；
+ *   typingIndicator 全程显示「输入中」
  * - 授权：白名单制。官方平台只给 openid（非 QQ 号），首次使用发送
  *   暗号（QQBOT_PASSCODE）激活，openid 落盘 qq-allowlist.json
  * - 会话：每发送者独立历史（内存滑动窗口 20 条）；每轮问答另外写进
  *   网页那套会话档案（data/chat-sessions.json），侧栏能回看 QQ 里的对话
+ * - 网关会话（sessionId/lastSeq）经 sessionPersistence 落盘，重启后
+ *   RESUME 恢复，缩短断档
  */
 
 import "../../src/adapters";
@@ -21,11 +26,17 @@ import {
   concurrencyGuard,
   contentSanitizer,
   errorHandler,
+  FileKVStore,
+  kvSessionPersistence,
   mentionGate,
   messageFilter,
   QQBot,
+  quoteRef,
+  rateLimiter,
+  typingIndicator,
 } from "@tencent-connect/qqbot-nodejs";
 import type { ModelMessage } from "ai";
+import { translateStream } from "../../src/channels/web/web-stream-translate";
 import { createRaptorAgent } from "../../src/core/agent";
 import { quarantineCorruptFile, writeFileAtomic } from "../../src/core/atomic-write";
 import { attachmentIdForSource, findByUrl, putAttachment } from "../../src/core/attachment-store";
@@ -35,20 +46,30 @@ import { drainGeneratedRound, runInDocumentRound } from "../../src/core/document
 import { isRaptorError, isSessionExpiredError } from "../../src/core/errors";
 import { registerQQPushSender } from "../../src/core/notify";
 import { ensureCredentials } from "../../src/core/onboarding";
-import { migratedDataPath } from "../../src/core/paths";
+import { dataDir, migratedDataPath } from "../../src/core/paths";
 import { maybeAutoTitle } from "../../src/core/session-titles";
 import { isTableFilename } from "../../src/core/spreadsheet";
 import { localOnlyCommandMessage } from "../cli/tui/slash-menu";
-import { composeInboundQuestion, mdToPlain, type QqAttachmentLike, splitMessage } from "./format";
+import {
+  composeInboundQuestion,
+  mdToPlain,
+  mediaKindOf,
+  type QqAttachmentLike,
+  type QqQuoteLike,
+  splitMessage,
+} from "./format";
 import { type QqArchiveInput, qqArchiveSlot } from "./session-archive";
+import { createStreamFeed, QqStreamReply } from "./stream-reply";
 
 type BridgeLogger = Pick<Console, "log" | "info" | "warn" | "error" | "debug">;
 
 /**
  * 回传本轮生成的文档成品到 QQ。
- * bot.sendFile 走「上传媒体 + 文件消息(msg_type)」，官方机器人需具备文件消息
- * 权限，未开通会抛错——此时降级成一条文字，把文件名与本机路径告知用户，
- * 绝不静默吞掉。target 复用消息自带的 replyTarget，私聊/群聊都适用。
+ * 图片/视频产物优先走对应媒体消息（QQ 聊天里直接预览，体验远好于文件消息），
+ * 其余走「上传媒体 + 文件消息(msg_type)」。官方机器人的媒体/文件消息均需
+ * 平台权限，未开通会抛错——逐级降级：媒体消息 → 文件消息 → 一条文字，
+ * 把文件名与本机路径告知用户，绝不静默吞掉。target 复用消息自带的
+ * replyTarget，私聊/群聊都适用。
  */
 type SendFileFn = QQBot["sendFile"];
 async function deliverGeneratedFiles(
@@ -59,6 +80,21 @@ async function deliverGeneratedFiles(
 ): Promise<void> {
   const files = drainGeneratedRound(roundId);
   for (const f of files) {
+    const kind = mediaKindOf(f.filename);
+    try {
+      if (kind === "image") {
+        await bot.sendImage(target, { localPath: f.filePath });
+        log.log(`[qq] 已回传图片 ${f.filename}`);
+        continue;
+      }
+      if (kind === "video") {
+        await bot.sendVideo(target, { localPath: f.filePath });
+        log.log(`[qq] 已回传视频 ${f.filename}`);
+        continue;
+      }
+    } catch (e) {
+      log.warn(`[qq] 媒体消息发送失败 ${f.filename}，降级文件消息：${(e as Error)?.message ?? e}`);
+    }
     try {
       await bot.sendFile(target, { localPath: f.filePath }, { fileName: f.filename });
       log.log(`[qq] 已回传文件 ${f.filename}`);
@@ -136,6 +172,44 @@ async function persistQqAttachments(
     }
   }
   return out;
+}
+
+// ── 引用消息：quoteRef 中间件解析结果的读取 ──────────────────
+
+/** 中间件写进 ctx.state.quote 的结构子集（与 SDK ResolvedQuote 兼容，宽松读） */
+interface ResolvedQuoteShape {
+  text?: unknown;
+  attachments?: Array<{
+    contentType?: unknown;
+    url?: unknown;
+    filename?: unknown;
+    asrText?: unknown;
+  }>;
+}
+
+/**
+ * 读取用户回复/引用的那条消息（quoteRef 中间件解析，挂在 ctx.state.quote）。
+ * 结构不认识、内容为空都返回 null——引用只是锦上添花的上下文，绝不因它
+ * 拦住正常问答。
+ */
+function readQqQuote(ctx: { state?: { quote?: unknown } }): QqQuoteLike | null {
+  const q = ctx.state?.quote as ResolvedQuoteShape | undefined;
+  if (!q || typeof q !== "object") return null;
+  const text = typeof q.text === "string" ? q.text.trim() : "";
+  const attachments: QqAttachmentLike[] = [];
+  for (const a of Array.isArray(q.attachments) ? q.attachments : []) {
+    const contentType = typeof a?.contentType === "string" ? a.contentType : "";
+    const url = typeof a?.url === "string" ? a.url : "";
+    if (contentType === "" && url === "") continue;
+    attachments.push({
+      content_type: contentType,
+      url,
+      filename: typeof a?.filename === "string" ? a.filename : undefined,
+      asr_refer_text: typeof a?.asrText === "string" ? a.asrText : undefined,
+    });
+  }
+  if (text === "" && attachments.length === 0) return null;
+  return { text, attachments };
 }
 
 // ── 授权：白名单 + 暗号激活 ────────────────────────────────────
@@ -324,15 +398,46 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
   // qq 渠道：注入 QQ 排版规则，让模型原生输出纯文本列表
   const agent = await createRaptorAgent("qq");
 
+  // sessionPersistence：网关会话（sessionId/lastSeq）落盘，重启后优先 RESUME
+  // 恢复而不是重新 IDENTIFY——缩短重启断档，也少一次 intents 重算。QQ 网关
+  // 会话本身约 5 分钟过期，KV 条目带同款 TTL，过期自动失效。
   const bot = new QQBot({
     appId: config.qqBotAppId,
     appSecret: config.qqBotAppSecret,
     logger: log,
+    sessionPersistence: kvSessionPersistence({
+      store: new FileKVStore({ dir: dataDir(), fileName: "qq-gateway-session-kv.json" }),
+      accountId: config.qqBotAppId,
+    }),
   });
 
   bot.use(errorHandler());
   bot.use(messageFilter({ skipSelfEcho: true, dedup: { windowMs: 5000 } }));
+  // 按发送者限流：脚本刷消息会烧光全机器人的被动回复额度。10 条/分钟对
+  // 正常对话毫无感知；限流提示同一人每分钟至多一条——提示本身也占额度，
+  // 刷屏者不值得多条
+  const rateNoticeAt = new Map<string, number>();
+  bot.use(
+    rateLimiter({
+      perSender: { max: 10, windowMs: 60_000 },
+      onLimit: (ctx, tier) => {
+        log.warn(`[qq] 限流拦截（sender=${ctx.message.senderId}，tier=${tier}）`);
+        const id = ctx.message.senderId;
+        const now = Date.now();
+        if ((rateNoticeAt.get(id) ?? 0) > now - 60_000) return;
+        rateNoticeAt.set(id, now);
+        void ctx.bot.sendText(ctx.replyTarget, "⏱ 消息太密了，歇一分钟再发～").catch(() => {});
+      },
+    }),
+  );
   bot.use(contentSanitizer({ stripBotMention: true }));
+  // 输入中提示（仅 C2C）：处理全程带 keepalive 续发，长任务不再是无反馈的
+  // 黑箱等待；只给已授权用户发，陌生人暗号试探不占用调用
+  bot.use(typingIndicator({ predicate: (ctx) => allowedOpenids.has(ctx.message.senderId) }));
+  // 引用消息索引与解析：用户回复某条消息提问时，被引用内容（含附件/语音
+  // 识别文本）解析进 ctx.state.quote；放在 mentionGate 之前，群里没 @ 机器人
+  // 的消息也进索引，之后的回复引用才查得到
+  bot.use(quoteRef());
   bot.use(mentionGate({ requireMentionInGroup: true }));
   bot.use(concurrencyGuard());
   // 白名单不用 accessPolicy 中间件：它会拦截未授权消息，导致
@@ -353,7 +458,7 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
     rejectedNotified.add(senderId);
   };
 
-  bot.on("message", async (_ctx, msg) => {
+  bot.on("message", async (ctx, msg) => {
     const senderId = msg.senderId;
 
     // 未授权：暗号激活或拒绝
@@ -376,14 +481,21 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
       return;
     }
 
-    // 组装给模型的问题：正文 + 附件标记（文件/图片消息正文常为空，
-    // 只看 content 会把纯附件消息静默丢掉——用户发文件就石沉大海）。
+    // 组装给模型的问题：正文 + 引用消息 + 附件标记（文件/图片消息正文常为空，
+    // 只看 content 会把纯附件消息静默丢弃——用户发文件就石沉大海）。
     // QQ 的附件链接很快失效（agent 晚一步去取就 404），所以收到当下先抢着
     // 下载入附件缓存（attachment-store），把本机路径/缓存 id 交给模型用
     // query_table / read_local_file 读；下载失败退回给链接，行为不变。
-    // 无正文也无可用附件（question 为空）才跳过。
+    // 引用消息（用户回复某条消息提问）的附件走同一落地链路。
+    // 无正文也无可用附件/引用（question 为空）才跳过。
+    const quote = readQqQuote(ctx);
+    const quotedAttachments = await persistQqAttachments(quote?.attachments, log);
     const attachments = await persistQqAttachments(msg.attachments, log);
-    const question = composeInboundQuestion(msg.content, attachments);
+    const question = composeInboundQuestion(
+      msg.content,
+      attachments,
+      quote ? { text: quote.text, attachments: quotedAttachments } : null,
+    );
     if (!question) return;
 
     const localOnlyMessage = localOnlyCommandMessage(msg.content.trim());
@@ -408,28 +520,56 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
       void archiveQQRound(archiveMsg, answer, log);
     };
 
-    const stopNotices = startWaitingNotices((t) => bot.sendText(msg.replyTarget, t));
+    // —— 回复通路 ——
+    // 私聊走官方 stream_messages 逐字回放（初帧立即顶替旧模式的 4 秒应答），
+    // 群聊不支持流式、流式打开失败、流式中途断掉，都退回「心跳 + 分段纯文本」。
+    // typingIndicator 中间件全程兜着「输入中」，两条通路用户都不会干等。
+    let noticesStopper: (() => void) | null = null;
+    const ensureNotices = (): void => {
+      noticesStopper ??= startWaitingNotices((t) => bot.sendText(msg.replyTarget, t));
+    };
+    const stopNotices = (): void => {
+      noticesStopper?.();
+    };
+    const streamReply =
+      msg.replyTarget.scope === "c2c" && config.qqStream
+        ? await QqStreamReply.open(bot, msg.replyTarget, log, ensureNotices)
+        : null;
+    if (!streamReply) ensureNotices();
+
     try {
       // 给这一轮对话打一个 roundId：文档生成工具落盘时会盖上此章，
       // 结束后按章回捞，只把「本轮生成的成品」回传（跨用户并行也不串台）。
       const roundId = `${senderId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
-      const result = await runInDocumentRound(roundId, () =>
-        agent.generate({
+      // agent 走流式（与网页同一套事件循环）：正文逐字推给流式帧，工具执行期
+      // 显示「正在查课表…」状态行；群聊没有流式帧也复用同一循环累积全文。
+      // 失败与看门狗超时都归入 failure，走统一的错误通路。
+      const feed = createStreamFeed(streamReply);
+      const translation = await runInDocumentRound(roundId, () =>
+        translateStream(agent, {
           messages: [...history, userMsg],
+          signal: new AbortController().signal,
+          send: feed.send,
         }),
       );
+      const rawText = feed.rawText() || translation.text;
+      if (translation.failure) throw new Error(translation.failure);
       stopNotices();
-      const reply = mdToPlain(result.text || "（无输出）");
+      const reply = mdToPlain(rawText || "（无输出）");
       // 先留档再发送：分段发送中途被限流，这一轮也已经进得了历史
-      archive(result.text || null);
-      for (const seg of splitMessage(reply)) {
-        await bot.sendText(msg.replyTarget, seg);
+      archive(rawText || null);
+      // 流式通路：终帧即最终回复（DONE 定格），失败才退回分段发送
+      const streamed = streamReply ? await streamReply.finish(reply) : false;
+      if (!streamed) {
+        for (const seg of splitMessage(reply)) {
+          await bot.sendText(msg.replyTarget, seg);
+        }
       }
-      // 回传本轮生成的文档成品（官方机器人文件消息需权限，失败降级为文字告知路径）
+      // 回传本轮生成的文档成品（图片/视频优先媒体消息，失败逐级降级）
       await deliverGeneratedFiles(bot, msg.replyTarget, roundId, log);
       const assistantMsg: ModelMessage = {
         role: "assistant",
-        content: result.text,
+        content: rawText,
       };
       rememberHistory(senderId, [...history, userMsg, assistantMsg].slice(-MAX_HISTORY_TURNS));
     } catch (e) {
@@ -437,7 +577,11 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
       // 答砸了也把「他在 QQ 里问过这句」留下：只有提问，跟网页侧同一口径
       archive(null);
       log.error(`[qq] 处理失败（openid=${senderId}）：${(e as Error)?.message ?? e}`);
-      await bot.sendText(msg.replyTarget, `❌ ${humanizeError(e)}`);
+      const errorText = `❌ ${humanizeError(e)}`;
+      const streamed = streamReply ? await streamReply.finish(errorText) : false;
+      if (!streamed) {
+        await bot.sendText(msg.replyTarget, errorText).catch(() => {});
+      }
     }
   });
 
