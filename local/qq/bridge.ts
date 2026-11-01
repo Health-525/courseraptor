@@ -7,9 +7,10 @@
  * - 独立模式：`npm run qq` 只跑桥（日志走控制台）
  *
  * - 场景：单聊（C2C）直接对话；群聊需 @机器人 触发（mentionGate）
- * - 回复：私聊走官方 stream_messages 逐字回放（工具期显示「正在查…」
- *   状态行；QQBOT_STREAM=0 可关），群聊/流式失败退回心跳 + 分段纯文本；
- *   typingIndicator 全程显示「输入中」
+ * - 回复：私聊走官方 stream_messages 逐字回放（帧序严格追加：应答头 →
+ *   首个工具的状态行 → 正文逐字生长，终帧 DONE 定格——平台对已下发内容
+ *   锁前缀，回改即拒；QQBOT_STREAM=0 可关），群聊/流式失败退回心跳 +
+ *   分段纯文本；typingIndicator 全程显示「输入中」
  * - 授权：白名单制。官方平台只给 openid（非 QQ 号），首次使用发送
  *   暗号（QQBOT_PASSCODE）激活，openid 落盘 qq-allowlist.json
  * - 会话：每发送者独立历史（内存滑动窗口 20 条）；每轮问答另外写进
@@ -541,9 +542,9 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
       // 给这一轮对话打一个 roundId：文档生成工具落盘时会盖上此章，
       // 结束后按章回捞，只把「本轮生成的成品」回传（跨用户并行也不串台）。
       const roundId = `${senderId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
-      // agent 走流式（与网页同一套事件循环）：正文逐字推给流式帧，工具执行期
-      // 显示「正在查课表…」状态行；群聊没有流式帧也复用同一循环累积全文。
-      // 失败与看门狗超时都归入 failure，走统一的错误通路。
+      // agent 走流式（与网页同一套事件循环）：正文逐字追加给流式帧，首个
+      // 工具在头部写一行状态行（此后冻结）；群聊没有流式帧也复用同一循环
+      // 累积全文。失败与看门狗超时都归入 failure，走统一的错误通路。
       const feed = createStreamFeed(streamReply);
       const translation = await runInDocumentRound(roundId, () =>
         translateStream(agent, {
@@ -555,11 +556,16 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
       const rawText = feed.rawText() || translation.text;
       if (translation.failure) throw new Error(translation.failure);
       stopNotices();
-      const reply = mdToPlain(rawText || "（无输出）");
+      // 空输出/漏帧兜底走同一条漏斗：缺的正文补进 feed，流式帧与普通分段
+      // 拿同一份文本，绝不让 DONE 帧只定稿一句应答头
+      if (feed.rawText() === "") feed.send({ t: "text", v: rawText || "（无输出）" });
+      const fullText = feed.rawText();
+      const reply = mdToPlain(fullText);
       // 先留档再发送：分段发送中途被限流，这一轮也已经进得了历史
-      archive(rawText || null);
-      // 流式通路：终帧即最终回复（DONE 定格），失败才退回分段发送
-      const streamed = streamReply ? await streamReply.finish(reply) : false;
+      archive(fullText);
+      // 流式通路：终帧即最终回复（DONE 以流中原文定格，不注入 mdToPlain
+      // 文本——与流中前缀不一致会被平台拒），失败才退回分段发送
+      const streamed = streamReply ? await streamReply.finish() : false;
       if (!streamed) {
         for (const seg of splitMessage(reply)) {
           await bot.sendText(msg.replyTarget, seg);
@@ -569,7 +575,7 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
       await deliverGeneratedFiles(bot, msg.replyTarget, roundId, log);
       const assistantMsg: ModelMessage = {
         role: "assistant",
-        content: rawText,
+        content: fullText,
       };
       rememberHistory(senderId, [...history, userMsg, assistantMsg].slice(-MAX_HISTORY_TURNS));
     } catch (e) {
@@ -578,7 +584,8 @@ async function launchQQBridge(opts: { logger?: BridgeLogger }): Promise<void> {
       archive(null);
       log.error(`[qq] 处理失败（openid=${senderId}）：${(e as Error)?.message ?? e}`);
       const errorText = `❌ ${humanizeError(e)}`;
-      const streamed = streamReply ? await streamReply.finish(errorText) : false;
+      // 失败提示以追加方式进流（回改已下发前文必被平台拒），流已死才退回普通消息
+      const streamed = streamReply ? await streamReply.fail(errorText) : false;
       if (!streamed) {
         await bot.sendText(msg.replyTarget, errorText).catch(() => {});
       }

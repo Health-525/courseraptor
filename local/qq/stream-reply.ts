@@ -1,18 +1,24 @@
 /**
  * QQ 私聊流式回复（官方 stream_messages 能力）
  *
- * QQ 开放平台对 C2C 开放 stream_messages：同一条消息原地逐帧改写，正是
- * LLM 逐字输出的展示形态。本模块收拢「agent 流事件 → QQ 流式帧」的粘合：
- * 工具执行期在帧首显示「⏳ 正在查课表…」状态行，正文产出后逐字增长，
- * 结束发终帧（DONE）。任何一帧失败都标记 broken 并回调桥，自动退回
- * 「心跳提示 + 分段纯文本」的旧通路——用户侧永远有回复。
+ * 平台契约（2026-11-01 实测定案）：服务端把「已下发内容」视为不可变前缀
+ * （replace 模式要求每帧全量正文以它开头，只许在末尾追加），违反即
+ * 40007/err_code 40113003「已经提交的消息内容不可修改」，且服务端约在
+ * 帧发出 1 秒后就把内容下发锁定。因此本模块的帧序列严格单调追加：
+ *   帧1（收到当下）：🦖 收到，正在查…
+ *   帧2（首个工具、正文未动）：追加 ⏳ 状态行（此后冻结，工具切换不换文案）
+ *   帧3+（正文产出）：头部不动，正文逐字追加
+ *   终帧（DONE）：以最后已推送内容定稿，绝不注入新文本（mdToPlain 后的
+ *   文本与流中原文前缀不一致，注进去同样会被拒）
+ * 任何一帧失败都标记 broken 并回调桥，自动退回「心跳提示 + 分段纯文本」
+ * 的旧通路——用户侧永远有回复。
  */
 
 import type { QQBot, ReplyTarget, StreamSession } from "@tencent-connect/qqbot-nodejs";
 
 type BridgeLogger = Pick<Console, "log" | "info" | "warn" | "error" | "debug">;
 
-/** 初帧文案：私聊收到消息当下即可见（顶替旧模式 4 秒后才来的「收到，正在查…」） */
+/** 首帧文案：追加式流式消息的固定头部，发出后即不可撤回/改写 */
 export const STREAM_ACK_TEXT = "🦖 收到，正在查…";
 
 /**
@@ -67,12 +73,6 @@ export function toolStatusLabel(name: string | undefined): string {
   return TOOL_STATUS_LABELS[name] ?? `正在处理（${name}）`;
 }
 
-/** 组装流式帧：工具执行期在正文前加状态行；无正文时只显示状态行 */
-export function renderStreamFrame(text: string, status: string | null): string {
-  if (status === null) return text;
-  return text === "" ? `⏳ ${status}…` : `⏳ ${status}…\n\n${text}`;
-}
-
 /** 流式帧的推送目标（QqStreamReply 本体或测试桩） */
 export interface QqStreamPushTarget {
   push(text: string): void;
@@ -85,6 +85,7 @@ export interface QqStreamPushTarget {
  */
 export class QqStreamReply {
   private broken = false;
+  private lastText = STREAM_ACK_TEXT;
   private constructor(
     private readonly session: StreamSession,
     private readonly log: BridgeLogger,
@@ -112,15 +113,37 @@ export class QqStreamReply {
     return !this.broken;
   }
 
-  /** 追加一帧（传全量文本，SDK 内部节流，调用方尽管随手 push） */
+  /**
+   * 追加一帧（传全量文本，SDK 内部节流，调用方尽管随手 push）。
+   * 前缀守卫：回改已推送内容的帧必被平台 40007 拒绝——与其发出去把气泡
+   * 定格在旧内容上，不如当场断流退回普通消息。
+   */
   push(text: string): void {
     if (this.broken) return;
+    if (!text.startsWith(this.lastText)) {
+      this.break(new Error("流式帧回改了已下发前缀（append-only 契约被打破）"));
+      return;
+    }
+    this.lastText = text;
     void this.session.update(text).catch((e) => this.break(e));
   }
 
-  /** 终帧 + DONE；返回 false 表示流式已死，调用方改走 sendText 分段 */
-  async finish(text: string): Promise<boolean> {
+  /** 终帧（DONE）：以最后已推送内容定稿；返回 false 表示流式已死，调用方改走 sendText 分段 */
+  async finish(): Promise<boolean> {
     if (this.broken) return false;
+    try {
+      await this.session.complete();
+      return true;
+    } catch (e) {
+      this.break(e);
+      return false;
+    }
+  }
+
+  /** 失败收尾：在已推送内容之后追加提示再定稿（追加式，不回改前文） */
+  async fail(notice: string): Promise<boolean> {
+    if (this.broken) return false;
+    const text = `${this.lastText}\n\n${notice}`;
     try {
       await this.session.update(text);
       await this.session.complete();
@@ -142,7 +165,8 @@ export class QqStreamReply {
 
 /**
  * 把网页渠道那套 SSE 形态的流事件喂给 QQ 流式帧（与 translateStream 的
- * send 回调直接对接）：text 增量累积成正文，tool start/end 切换状态行。
+ * send 回调直接对接）：text 增量累积成正文追加在头部之后；首个工具在
+ * 头部追加一行状态行（此后冻结——换状态行就是回改已下发前缀）。
  * reply 传 null 时只累积不发（群聊复用同一事件循环，收尾走分段发送）。
  */
 export function createStreamFeed(reply: QqStreamPushTarget | null): {
@@ -150,9 +174,15 @@ export function createStreamFeed(reply: QqStreamPushTarget | null): {
   rawText: () => string;
 } {
   let raw = "";
-  let status: string | null = null;
+  /** 已写进流的状态行；null = 还没写过（首个工具、正文未动时才写） */
+  let frozenStatus: string | null = null;
+  const frame = () => {
+    const header =
+      frozenStatus === null ? STREAM_ACK_TEXT : `${STREAM_ACK_TEXT}\n⏳ ${frozenStatus}…`;
+    return raw === "" ? header : `${header}\n\n${raw}`;
+  };
   const push = () => {
-    reply?.push(renderStreamFrame(raw, status));
+    reply?.push(frame());
   };
   return {
     send(obj) {
@@ -162,13 +192,9 @@ export function createStreamFeed(reply: QqStreamPushTarget | null): {
         return;
       }
       if (obj.t === "tool") {
-        if (obj.phase === "start") {
-          status = toolStatusLabel(typeof obj.name === "string" ? obj.name : undefined);
-        } else if (obj.phase === "end" || obj.phase === "error") {
-          status = null;
-        } else {
-          return;
-        }
+        if (obj.phase !== "start") return; // end/error 不动帧：状态行一旦写入即冻结
+        if (frozenStatus !== null || raw !== "") return; // 已写过或正文已开始：换文案=回改
+        frozenStatus = toolStatusLabel(typeof obj.name === "string" ? obj.name : undefined);
         push();
       }
     },
