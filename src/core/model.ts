@@ -1,9 +1,9 @@
 /**
  * 领域模型：core 定义的规范数据形状
  *
- * 适配器（adapters/njtech）负责把学校系统抓到的原始数据映射成这里的
- * 形状；core 与 channels 只消费本文件，不接触任何学校私有结构。
- * 历史上这些类型与 NJTECH 抓取逻辑同住 src/jwgl/types.ts，
+ * 适配器（src/adapters）负责把数据源抓到的原始数据映射成这里的
+ * 形状；core 与 channels 只消费本文件，不接触任何来源私有结构。
+ * 历史上这些类型与教务抓取逻辑同住 src/jwgl/types.ts，
  * 多校适配（roadmap P3）时抽到 core 作为跨学校的公共契约。
  */
 

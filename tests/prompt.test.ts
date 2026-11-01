@@ -8,34 +8,19 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { HAS_NJTECH } from "./_util/njtech-probe";
 
 // 必须在导入被测模块前设好数据目录（term-dates/holidays 首次 load 即缓存；
 // 每个测试文件是独立进程，不会污染其他用例）
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-prompt-"));
 process.env.RAPTOR_DATA_DIR = dataDir;
-// 本文件钉的是南工大校历/教学周语义：默认学校已改为 custom（不接入任何学校），显式选校。
-// njtech 是本地可选插件、不进公开仓库；缺失时退回默认 custom 让装配点通过，
-// 依赖 njtech 校历的用例由 t=test.skip 跳过（与学校无关的通用准则用例照常跑）。
-if (HAS_NJTECH) {
-  process.env.RAPTOR_SCHOOL = "njtech";
-} else {
-  delete process.env.RAPTOR_SCHOOL;
-}
 
 await import("../src/adapters");
 const { writeFileAtomicSync } = await import("../src/core/atomic-write");
+const { recordManualTermStart } = await import("../src/core/manual-terms");
 
-writeFileAtomicSync(
-  path.join(dataDir, "term-dates.json"),
-  JSON.stringify({
-    "2026-1": {
-      week1Monday: "2026-08-31",
-      source: "recorded",
-      evidence: "南工教〔2026〕91号",
-    },
-  }),
-);
+// 教学周种子：2026 秋学期 8-31（周一）开学（recorded 真值）
+recordManualTermStart(2026, 3, "2026-08-31");
+
 writeFileAtomicSync(
   path.join(dataDir, "term-holidays.json"),
   JSON.stringify({
@@ -48,13 +33,10 @@ writeFileAtomicSync(
 
 const { calendarSection } = await import("../src/core/prompt");
 
-/** njtech 校历专属用例：插件缺失（公开仓库 / CI）时跳过 */
-const t = HAS_NJTECH ? test : test.skip;
-
-t("校历段：开学日期与放假/调休从运行时真值渲染进提示词", () => {
+test("校历段：开学日期与放假/调休从运行时真值渲染进提示词", () => {
   const s = calendarSection();
-  assert.match(s, /2026-1 学期：第 1 周 2026-08-31（周一）/);
-  assert.match(s, /南工教〔2026〕91号/, "recorded 来源要带证据（通知文号）");
+  assert.match(s, /2026-2027-1 学期：第 1 周 2026-08-31（周一）/);
+  assert.match(s, /导入课表时记录的开学日期/, "recorded 来源要带依据");
   assert.match(s, /2026-10-01 放假（国庆节）/);
   assert.match(s, /2026-09-27 调休补课（按周4课表）/);
   assert.match(s, /以工具返回为准/, "永远声明运行时真值优先级");

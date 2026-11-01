@@ -55,7 +55,7 @@ export const customSchool: SchoolAdapter = {
     getCookie: noJwgl,
   },
   schedule: {
-    // 手动课表的「抓取」就是读缓存：欢迎面板与今日页与 njtech 同一条路
+    // 手动课表的「抓取」就是读缓存：欢迎面板与今日页共用同一条路
     fetchSmart: async (): Promise<FetchResult<ScheduleResult>> => {
       const cached = loadScheduleCache();
       return cached

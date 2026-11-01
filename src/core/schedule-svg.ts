@@ -1,7 +1,7 @@
 /**
  * 课表 SVG 渲染 — 纯数据到图形，不碰网络、不落盘
  *
- * 两个入口共用：AI 工具 export_schedule_image（adapters/njtech/tools/calendar.ts）
+ * 两个入口共用：AI 工具 export_schedule_image（adapters 的日历工具）
  * 与网页直链 /api/schedule/image（channels/web/chat-web.ts）。两种形态：
  * - 整学期汇总：课程按 (星期, 节次) 定位，课格标注周次，同时段不同周次的
  *   课（冲突）横向并排分栏

@@ -15,25 +15,15 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { HAS_NJTECH } from "./_util/njtech-probe";
 
 // 必须在导入被测模块之前指向临时数据目录（term-holidays 真值源落在这里）
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-ics-"));
-// 本文件钉的是南工大校历/教学周语义：默认学校已改为 custom（不接入任何学校），显式选校。
-// njtech 是本地可选插件、不进公开仓库；缺失时不能设 njtech（否则装配点抛错整文件崩），
-// 改用默认 custom 让装配通过，下面所有 test 由 t=test.skip 统一跳过。
-if (HAS_NJTECH) {
-  process.env.RAPTOR_SCHOOL = "njtech";
-} else {
-  delete process.env.RAPTOR_SCHOOL;
-}
 
 await import("../src/adapters");
 const { buildTermICS } = await import("../src/core/calendar/export");
 const { recordSpecialDays } = await import("../src/core/calendar/holidays");
 
-/** njtech 插件缺失（公开仓库 / CI）时整文件跳过，本地装了 njtech 才真正跑 */
-const t = HAS_NJTECH ? test : test.skip;
+// 节次→时间段映射取当前学校（默认 custom 的兜底作息表：08:00 起、45 分钟一节）
 
 const NOW = new Date("2026-09-01T00:00:00Z");
 
@@ -47,7 +37,7 @@ function fixture() {
       {
         title: "最优化方法",
         weekday: 3, // 周三
-        periods: [1, 2], // 08:10-09:50
+        periods: [1, 2], // 08:00-09:40
         weeks: "1-2",
         location: "仁智楼518",
         teacher: "张三",
@@ -55,7 +45,7 @@ function fixture() {
       {
         title: "周六课,含逗号",
         weekday: 6, // 周六
-        periods: [3, 4], // 10:20-12:00
+        periods: [3, 4], // 10:00-11:40
         weeks: "1-2", // 第 1 周周六（09-05）是调休补课日：不照常上；第 2 周正常
         location: "",
         teacher: "",
@@ -82,7 +72,7 @@ function fixture() {
 }
 
 /** 第 1 周周三=09-02（放假日）、周六=09-05（调休补课）；第 2 周周三=09-09 正常 */
-t("假期吞课、全天事件补齐、调休按被换周几补课", () => {
+test("假期吞课、全天事件补齐、调休按被换周几补课", () => {
   recordSpecialDays([
     { date: "2026-09-02", type: "holiday", name: "测试节" },
     { date: "2026-09-04", type: "holiday", name: "没课日的中秋" }, // 当天无课，靠全量补齐
@@ -97,22 +87,22 @@ t("假期吞课、全天事件补齐、调休按被换周几补课", () => {
   assert.equal(r.noTimeSkipped, 1); // 无节次课定时不了，如实跳过
 
   // 正常周次展开：第 2 周周三 = 2026-09-09 08:10、第 2 周周六 = 09-12 10:20
-  assert.ok(r.ics.includes("DTSTART;TZID=Asia/Shanghai:20260909T081000"));
-  assert.ok(r.ics.includes("DTSTART;TZID=Asia/Shanghai:20260912T102000"));
+  assert.ok(r.ics.includes("DTSTART;TZID=Asia/Shanghai:20260909T080000"));
+  assert.ok(r.ics.includes("DTSTART;TZID=Asia/Shanghai:20260912T100000"));
   // 放假日：全天事件而不是定时事件
   assert.ok(r.ics.includes("DTSTART;VALUE=DATE:20260902"));
   assert.ok(r.ics.includes("DTSTART;VALUE=DATE:20260904"));
   assert.ok(r.ics.includes("SUMMARY:放假：测试节"));
   // 当天的课确实被吞掉
-  assert.ok(!r.ics.includes("20260902T081000"));
+  assert.ok(!r.ics.includes("20260902T080000"));
   // 调休补课：09-05（周六）出现周三的第 1-2 节课
-  assert.ok(r.ics.includes("DTSTART;TZID=Asia/Shanghai:20260905T081000"));
+  assert.ok(r.ics.includes("DTSTART;TZID=Asia/Shanghai:20260905T080000"));
   assert.ok(r.ics.includes("调休补课（按周三课表）"));
   // 自然落在 09-05 的周六课不照常上（该天执行周三课表）
-  assert.ok(!r.ics.includes("20260905T1020"));
+  assert.ok(!r.ics.includes("20260905T1000"));
 });
 
-t("考试事件带时刻、考场座位与提前 30 分钟提醒", () => {
+test("考试事件带时刻、考场座位与提前 30 分钟提醒", () => {
   const r = buildTermICS(fixture());
   assert.ok(r.ics.includes("DTSTART;TZID=Asia/Shanghai:20260910T140000"));
   assert.ok(r.ics.includes("DTEND;TZID=Asia/Shanghai:20260910T160000"));
@@ -122,7 +112,7 @@ t("考试事件带时刻、考场座位与提前 30 分钟提醒", () => {
   assert.equal(r.examEvents, 1);
 });
 
-t("无时刻的考试是全天事件：不挂 30 分钟提醒（否则前一夜 23:30 响铃）", () => {
+test("无时刻的考试是全天事件：不挂 30 分钟提醒（否则前一夜 23:30 响铃）", () => {
   const fx = fixture();
   fx.exams = [
     { date: "2026-12-28", subject: "思想政治理论", time: "", location: "", seatNumber: "" },
@@ -132,7 +122,7 @@ t("无时刻的考试是全天事件：不挂 30 分钟提醒（否则前一夜 
   assert.ok(!r.ics.includes("TRIGGER"), "全天考试事件不得携带提醒");
 });
 
-t("RFC 5545 基本面：CRLF、转义、日历名、UID 稳定", () => {
+test("RFC 5545 基本面：CRLF、转义、日历名、UID 稳定", () => {
   const a = buildTermICS(fixture());
   const b = buildTermICS(fixture());
   assert.equal(a.ics, b.ics, "同输入同 now 必须逐字节一致（UID/DTSTAMP 稳定）");
@@ -154,7 +144,7 @@ t("RFC 5545 基本面：CRLF、转义、日历名、UID 稳定", () => {
   }
 });
 
-t("长中文标题正确折叠后仍能还原完整 SUMMARY", () => {
+test("长中文标题正确折叠后仍能还原完整 SUMMARY", () => {
   const fx = fixture();
   const longTitle = "习近平新时代中国特色社会主义思想概论（含形势与政策实践环节）";
   fx.courses = [

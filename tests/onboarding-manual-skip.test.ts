@@ -11,7 +11,6 @@ import { test } from "node:test";
 // 隔离：凭证与数据都指到临时目录，绝不碰真机 credentials.enc / data/
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-onboard-manual-"));
 process.env.RAPTOR_CREDENTIALS_FILE = path.join(process.env.RAPTOR_DATA_DIR, "credentials.enc");
-delete process.env.RAPTOR_SCHOOL;
 
 await import("../src/adapters"); // 无凭证起步 → 默认 custom（不接入任何学校）
 const { ensureCredentials } = await import("../src/core/onboarding");

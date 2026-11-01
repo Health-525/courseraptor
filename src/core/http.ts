@@ -106,7 +106,7 @@ function parseCookieString(cookie: string): Map<string, string> {
 
 /**
  * 创建带 Cookie 管理的 HTTP 客户端
- * @param baseURL - 教务系统基础 URL (e.g. "https://jwgl.njtech.edu.cn")
+ * @param baseURL - 教务系统基础 URL (e.g. "https://jwgl.example.edu.cn")
  * @param initialCookie - 登录后的 cookie 字符串（登录流程传空串，由 Set-Cookie 填充）
  */
 export function createClient(baseURL: string, initialCookie = ""): HttpClient {

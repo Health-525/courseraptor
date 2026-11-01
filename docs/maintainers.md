@@ -29,7 +29,7 @@ npm run demo
 | `src/core/agent.ts` | agent 组装：core 通用工具 + 数据接入层贡献的课表工具合并；提示词骨架在 `src/core/prompt.ts`，学期段运行时渲染自 `data/term-dates.json`，不在代码里硬编码 |
 | `src/core/tools/` | 通用工具聚合（文件/文档/记忆/待办/知识库/番茄钟/设置/天气/时间） |
 | `src/adapters/custom/` | 内置手动课表实现：学期规则（`academics.ts`）、课表查询工具（`tools/schedule.ts`，只读本地导入缓存）、提示词段（`prompt.ts`） |
-| `src/adapters/index.ts` | 装配点：RAPTOR_SCHOOL > 设置页保存的 schoolId > custom（手动课表） |
+| `src/adapters/index.ts` | 装配点：登记内置 custom，按设置页保存的 schoolId 选定默认学校（不可用时回落 custom） |
 | `src/core/memory/` | 两层记忆（短期 session.json / 长期 memory.json） |
 | `src/core/paths.ts` | 项目根、`dataDir()`、`isInsideDir()` 路径护栏、`migratedDataPath()` 状态文件归位——**全项目唯一实现，不要在别处重写** |
 | `src/core/json-cache.ts` | 免登录 JSON 缓存骨架（schedule/exam-cache 的公共约定） |
