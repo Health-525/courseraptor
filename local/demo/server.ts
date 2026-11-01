@@ -314,15 +314,15 @@ export function createDemoServer(options?: { liveAgent?: DemoStreamAgent | null 
           model: FALLBACK_MODEL_ID,
           models: FALLBACK_MODELS.map((m) => ({ ...m })),
           quickQuestions: DEFAULT_QUESTIONS,
-          /* 学校块与正式版同形状（chat-web.ts statusPayload）：没有它演示页
-             设置里「选择学校」是空的，看不出复选框选学校 → 下方出表单的联动 */
+          /* 学校块与正式版同形状（chat-web.ts statusPayload，手动课表模式）：
+             没有它演示页设置里「选择学校」是空的，看不出复选框选学校 →
+             下方出表单的联动 */
           school: {
-            current: "njtech",
-            manual: false,
+            current: "custom",
+            manual: true,
             scheduleCached: true,
             custom: { name: "", city: "" },
             options: [
-              { id: "njtech", name: "南京工业大学", shortName: "NJTECH", manual: false },
               { id: "custom", name: "其他学校（手动课表）", shortName: "自定义", manual: true },
             ],
           },

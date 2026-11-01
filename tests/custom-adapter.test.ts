@@ -7,11 +7,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { HAS_NJTECH } from "./_util/njtech-probe";
 
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-custom-"));
 process.env.RAPTOR_CREDENTIALS_FILE = path.join(process.env.RAPTOR_DATA_DIR, "credentials.enc");
-delete process.env.RAPTOR_SCHOOL;
 
 await import("../src/adapters");
 const { school, selectSchool } = await import("../src/core/school");
@@ -20,18 +18,10 @@ const { loadExamCache } = await import("../src/core/exam-cache");
 const { loadGradesCache } = await import("../src/core/grades-cache");
 const { recordManualTermStart, manualTermStarts } = await import("../src/core/manual-terms");
 
-/** 跨校（custom ↔ njtech）隔离用例专用：njtech 插件缺失（公开仓库 / CI）时跳过 */
-const testNjtech = HAS_NJTECH ? test : test.skip;
-
-/** 切到自定义学校再执行，结束后切回（不影响同进程后续断言） */
+/** 确保在自定义学校（custom）下执行 */
 async function withCustom<T>(fn: () => Promise<T> | T): Promise<T> {
   assert.ok(selectSchool("custom"));
-  try {
-    return await fn();
-  } finally {
-    // 装了 njtech 就切回它当基线；没装（CI）则停在 custom，后续用例各自再选 custom
-    if (HAS_NJTECH) selectSchool("njtech");
-  }
+  return await fn();
 }
 
 test("terms：学期标签 / 周次展开 / 记录开学日期后周次有据", async () => {
@@ -135,45 +125,14 @@ test("能力边界：无教务登录、无通知面；fetchSmart 即读缓存", 
   });
 });
 
-testNjtech("课表缓存分校：真实学校不读 custom 导入的课表（反向放行见下一条）", () => {
-  selectSchool("custom");
-  saveScheduleCache({
-    year: 2026,
-    semester: 3,
-    label: "2026-2027学年第一学期",
-    courses: [
-      {
-        title: "某某大学课程",
-        weekday: 1,
-        periods: [1, 2],
-        weeks: "1-16",
-        location: "",
-        teacher: "",
-      },
-    ],
-  });
-  // custom 自己读得到
-  assert.ok(loadScheduleCache()?.schedule.courses[0]?.title === "某某大学课程");
-  // 切回 njtech：不得把别校导入的课表当「最后已知课表」回退
-  selectSchool("njtech");
-  assert.equal(loadScheduleCache(), null, "跨学校缓存必须失效");
-  selectSchool("custom");
-  assert.ok(loadScheduleCache(), "切回后缓存仍在（文件没删）");
-  // 旧格式（无 schoolId）兼容：视为当前学校写入
-  selectSchool("njtech");
-  const legacy = loadScheduleCache();
-  assert.equal(legacy, null, "njtech 下 custom 标记的缓存仍不可见");
-});
-
 test("无适配（custom）放行别校标记的缓存：手动课表只认数据、不问出处", () => {
-  // 直接落一份「此前在真实学校（如 njtech）下写入」的缓存，绕开 saveScheduleCache 的分校盖章；
-  // 不依赖 njtech 插件（CI 无插件时同样覆盖此路径）
+  // 直接落一份「此前在其他学校下写入」的缓存，绕开 saveScheduleCache 的分校盖章
   const file = path.join(process.env.RAPTOR_DATA_DIR!, "schedule-cache.json");
   fs.writeFileSync(
     file,
     JSON.stringify({
       savedAt: Date.now(),
-      schoolId: "njtech",
+      schoolId: "legacy-school",
       schedule: {
         year: 2026,
         semester: 3,
@@ -199,12 +158,12 @@ test("无适配（custom）放行别校标记的缓存：手动课表只认数�
 });
 
 test("无适配（custom）放行别校标记的成绩/考试缓存：面板与今日页同口径", () => {
-  // 成绩缓存：此前在真实学校（如 njtech）下落盘，切到 custom 后成绩面板必须仍读得到
+  // 成绩缓存：此前在其他学校下落盘，切到 custom 后成绩面板必须仍读得到
   fs.writeFileSync(
     path.join(process.env.RAPTOR_DATA_DIR!, "grades-cache.json"),
     JSON.stringify({
       savedAt: Date.now(),
-      schoolId: "njtech",
+      schoolId: "legacy-school",
       gpa: "3.52",
       requiredCredits: 8,
       courseCount: 2,
@@ -226,7 +185,7 @@ test("无适配（custom）放行别校标记的成绩/考试缓存：面板与�
     path.join(process.env.RAPTOR_DATA_DIR!, "exam-cache.json"),
     JSON.stringify({
       savedAt: Date.now(),
-      schoolId: "njtech",
+      schoolId: "legacy-school",
       exams: { year: 2026, semester: 3, exams: [] },
     }),
     "utf8",

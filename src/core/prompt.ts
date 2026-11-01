@@ -3,8 +3,8 @@
  *
  * 这里只放与学校无关的部分：身份、通用工具（文件/文档/时间/天气/记忆/
  * 待办/专注/知识库）、事实纪律、行为准则与校历真值段。教务工具清单与学校背景
- * 知识由学校适配器贡献（school().promptSections，NJTECH 实现在
- * src/adapters/njtech/prompt.ts）。
+ * 知识由学校适配器贡献（school().promptSections，内置实现在
+ * src/adapters/custom/prompt.ts）。
  *
  * 校历不再是写死在提示词里的第二份数据源：calendarSection() 运行时从
  * data/term-dates.json（get_schedule 落盘的真值）渲染，两者永不漂移。

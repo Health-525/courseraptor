@@ -584,7 +584,7 @@ test("待办可创建、完成并导出日历，本地数据接口回脱敏概�
       title: "提交选课材料",
       dueAt: "2026-09-10T09:00:00+08:00",
       source: "教务通知",
-      sourceUrl: "https://jwc.njtech.edu.cn/example",
+      sourceUrl: "https://jwc.example.edu.cn/example",
     }),
   });
   assert.equal(create.status, 201);

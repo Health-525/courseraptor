@@ -10,11 +10,9 @@ import { createRequire } from "node:module";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { HAS_NJTECH } from "./_util/njtech-probe";
 
 process.env.RAPTOR_DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "raptor-import-"));
 process.env.RAPTOR_CREDENTIALS_FILE = path.join(process.env.RAPTOR_DATA_DIR, "credentials.enc");
-delete process.env.RAPTOR_SCHOOL;
 
 await import("../src/adapters");
 const { startChatWeb } = await import("../src/channels/web/chat-web");
@@ -22,9 +20,6 @@ const { setScheduleParser } = await import("../src/core/schedule-import");
 const { loadScheduleCache } = await import("../src/core/schedule-cache");
 const { loadCredentialsStore } = await import("../src/core/credentials");
 const { manualTermStarts } = await import("../src/core/manual-terms");
-
-/** 依赖 njtech（真实学校账号切换）的用例：插件缺失（公开仓库 / CI）时跳过 */
-const testNjtech = HAS_NJTECH ? test : test.skip;
 
 /** 页面签发的 CSRF token（写请求必须带） */
 let pageToken: string | null = null;
@@ -68,75 +63,14 @@ test("GET /api/settings：school 块带清单与手动课表标记，默认 cust
   assert.equal(r.school.current, "custom");
   assert.equal(r.school.manual, true);
   const optIds = r.school.options.map((o: { id: string }) => o.id);
-  // njtech 是本地可选插件、不进公开仓库：装了才在 custom 之前多一项真实学校
-  assert.deepEqual(optIds, HAS_NJTECH ? ["njtech", "custom"] : ["custom"]);
+  assert.deepEqual(optIds, ["custom"]);
   // custom（手动课表）恒为清单末位
   assert.equal(r.school.options[r.school.options.length - 1].manual, true);
   // 默认 custom 没接教务通知：通知卡不亮（与本机 .env 是否带账号无关）
   assert.equal(r.school.newsReady, false);
 });
 
-testNjtech("切学校教务账号跟着切：旧校存回名下、新校空则清空待填、切回自动恢复", async () => {
-  // ⓪ 默认 custom 起步：先显式切到 njtech 才有教务账号可言。
-  //     本机 .env 可能带账号，切校结果文案两种都合法，只钉「已切换」
-  const toNjtech = await wfetch(`${await base()}/api/settings`, {
-    method: "POST",
-    body: JSON.stringify({ schoolId: "njtech" }),
-  });
-  assert.equal(toNjtech.status, 200);
-  const td = await toNjtech.json();
-  assert.equal(td.status.school.current, "njtech");
-  assert.match(td.results.find((x: { field: string }) => x.field === "school").message, /已切换/);
-
-  // ① njtech 下保存教务账号 → 入 njtech 槽位
-  const save = await wfetch(`${await base()}/api/settings`, {
-    method: "POST",
-    body: JSON.stringify({ jwglUsername: "202311112222", jwglPassword: "fake-pass-1" }),
-  });
-  assert.equal(save.status, 200);
-  assert.equal(loadCredentialsStore()?.jwglAccounts?.njtech?.username, "202311112222");
-
-  // ② 切到自定义学校：没有该校账号 → 当前账号清空，提示填写；南工大账号留在槽里不删
-  const r = await wfetch(`${await base()}/api/settings`, {
-    method: "POST",
-    body: JSON.stringify({ schoolId: "custom" }),
-  });
-  assert.equal(r.status, 200);
-  const d = await r.json();
-  const line = d.results.find((x: { field: string }) => x.field === "school");
-  assert.match(line.message, /已切换为「其他学校/);
-  assert.match(line.message, /还没有保存教务账号/);
-  assert.equal(d.status.school.current, "custom");
-  assert.equal(d.status.jwgl.configured, false);
-  assert.equal(d.status.jwgl.username, "");
-  // custom 没接教务通知：不管账号配没配，通知卡一律不亮
-  assert.equal(d.status.school.newsReady, false);
-  const store1 = loadCredentialsStore();
-  assert.equal(store1?.username, "");
-  assert.equal(store1?.jwglAccounts?.njtech?.username, "202311112222", "旧校账号必须还在槽里");
-
-  // ③ 切回 njtech：自动恢复南工大账号，不用重填
-  const back = await wfetch(`${await base()}/api/settings`, {
-    method: "POST",
-    body: JSON.stringify({ schoolId: "njtech" }),
-  });
-  const bd = await back.json();
-  assert.match(
-    bd.results.find((x: { field: string }) => x.field === "school").message,
-    /已载入本校保存的教务账号（学号 2023\*\*\*\*）/,
-  );
-  assert.equal(bd.status.jwgl.configured, true);
-  assert.equal(bd.status.jwgl.username, "202311112222");
-  // 账号已存 + njtech 接入了通知 → 教务通知卡亮
-  assert.equal(bd.status.school.newsReady, true);
-
-  // ④ 能力说明按学校 capabilities 生成：njtech 接了通知就写通知，custom 无说明
-  const opts = bd.status.school.options as Array<{ id: string; note?: string }>;
-  assert.match(opts.find((o) => o.id === "njtech")?.note ?? "", /通知/);
-  assert.equal(opts.find((o) => o.id === "custom")?.note, undefined);
-});
-
-testNjtech("POST /api/settings 切换学校：运行期生效并落凭证", async () => {
+test("POST /api/settings：custom 下提交自定义校名/城市落凭证；重复提交同校与未知学校各有明确反馈", async () => {
   const r = await wfetch(`${await base()}/api/settings`, {
     method: "POST",
     body: JSON.stringify({ schoolId: "custom", customSchoolName: "某某大学", customCity: "杭州" }),
@@ -145,21 +79,25 @@ testNjtech("POST /api/settings 切换学校：运行期生效并落凭证", asyn
   const d = await r.json();
   assert.equal(d.status.school.current, "custom");
   assert.equal(d.status.school.manual, true);
-  // 自定义学校没有教务处官网可抓：通知卡同样不亮
+  // custom 没接教务通知：通知卡一律不亮
   assert.equal(d.status.school.newsReady, false);
-  // 本用例由 testNjtech 守卫：仅在装了 njtech 时运行，此时上一用例把当前学校
-  // 留在 njtech，切 custom 是真实切换 → 「已切换」。
-  assert.match(d.results.find((x: { field: string }) => x.field === "school").message, /已切换/);
+  // 已是当前学校：提示无需切换，不算失败
+  assert.match(d.results.find((x: { field: string }) => x.field === "school").message, /无需切换/);
   const creds = loadCredentialsStore();
-  assert.equal(creds?.schoolId, "custom");
   assert.equal(creds?.customSchoolName, "某某大学");
   assert.equal(creds?.customCity, "杭州");
-  // 再切一遍同一学校：提示无需切换，不算失败
+  // 再提交一遍同一学校：同样成功
   const again = await wfetch(`${await base()}/api/settings`, {
     method: "POST",
     body: JSON.stringify({ schoolId: "custom" }),
   });
   assert.equal(again.status, 200);
+  // 未知学校明确拒绝（不静默回退）
+  const unknown = await wfetch(`${await base()}/api/settings`, {
+    method: "POST",
+    body: JSON.stringify({ schoolId: "no-such-school" }),
+  });
+  assert.equal(unknown.status, 400);
 });
 
 test("自定义学校：/api/news 给未适配态", async () => {

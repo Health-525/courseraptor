@@ -3,8 +3,8 @@
  *
  * 依赖方向约定（重构自 roadmap P3「多校适配」）：
  * - core 与 channels 只允许 import 本文件的类型与 school()/registerSchool()，
- *   绝不 import src/adapters/njtech 下的任何模块
- * - 适配器（adapters/njtech）可以 import core 的任何东西
+ *   绝不 import src/adapters 下的任何模块
+ * - 适配器（adapters）可以 import core 的任何东西
  * - 装配点在 src/adapters/index.ts：入口文件顶部 `import "../adapters"`
  *   （或 ../../adapters）完成默认学校的注册，之后 school() 全局可用
  *
@@ -35,11 +35,11 @@ export type SchoolCapability =
   | "calendarExport"; // 日历导出
 
 export interface SchoolInfo {
-  /** 适配器标识（RAPTOR_SCHOOL 环境变量取值） */
+  /** 适配器标识（设置页保存的 schoolId 取值） */
   id: string;
   /** 学校全名，用于系统提示词自我介绍 */
   name: string;
-  /** 短名（如 NJTECH），用于标题栏等紧凑位置 */
+  /** 短名，用于标题栏等紧凑位置 */
   shortName: string;
   /** 学校所在城市：天气等工具的默认城市 */
   city: string;

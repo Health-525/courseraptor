@@ -24,9 +24,8 @@ export interface CachedSchedule {
    * saveScheduleCache 覆盖式写入、不保留 base——官方课表永远赢过本地手改。
    */
   base?: ScheduleResult;
-  /** 落盘时的学校 id：真实学校之间切换后（如 hebau 切回 njtech）在线失败时，
-   *  不得回退到别校导入的课表冒充「最后已知课表」。手动课表学校（custom）
-   *  例外：读时放行别校标记的缓存（见 loadScheduleCache） */
+  /** 落盘时的学校 id（历史多校时期的标记）：手动课表学校（custom）读时
+   *  放行任何学校标记的缓存（见 loadScheduleCache） */
   schoolId?: string;
 }
 
