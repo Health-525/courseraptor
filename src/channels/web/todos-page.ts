@@ -21,7 +21,8 @@ export function todosPage(options: { demo?: boolean; demoData?: TodayBrief } = {
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(max-width: 720px)" content="#AD392C">
 <meta name="theme-color" content="#F6F4ED">
 <link rel="icon" type="image/png" href="/logo.png">
 <title>待办 · CourseRaptor</title>
@@ -173,24 +174,22 @@ export function todosPage(options: { demo?: boolean; demoData?: TodayBrief } = {
                 border-radius: 4px; text-align: center;
                 color: var(--ink-3); font-size: 14px; }
 
-  /* ── 手机：清单优先，标题、时间与删除操作分区放置 ── */
+  /* ── 手机：朱砂报头（mobile-nav 共享）之下清单优先，标题、时间与删除操作分区放置 ── */
   @media (max-width: 720px) {
-    .pagehead { flex-wrap: nowrap; padding: 12px 16px; gap: 10px; }
-    .pagehead .seal { width: 34px; height: 34px; }
-    .pagehead .seal img { top: 4px; left: 4px; width: 26px; height: 26px; }
-    .ph-title h1 { font-size: 20px; }
-    .ph-title .ph-stamp, .ph-right { display: none; }
-    main { display: block; padding: 16px 14px 28px; }
-    .todos-rail { position: static; padding: 0 2px 12px; }
+    .ph-right { display: none; }
+    main { display: block; padding: 18px 14px 28px; }
+    .todos-rail { position: static; display: flex; align-items: flex-end;
+                  justify-content: space-between; gap: 12px;
+                  margin: 0 2px 14px; padding: 0 0 10px;
+                  border-bottom: 1px solid var(--ink); }
     .rail-kicker { display: none; }
-    .rail-title { font-size: 22px; }
-    .rail-meta { margin-top: 8px; padding-top: 8px; font-size: 12px; }
-    .card { border-radius: 12px; }
+    .rail-title { font-size: 24px; line-height: 1.2; }
+    .rail-meta { margin: 0; padding: 0; border-top: 0; text-align: right; font-size: 12px; }
     .card > h2 { padding: 12px 16px 10px; }
     .cbody { padding: 12px; }
     .todo-group { min-height: 32px; font-size: 12px; }
     .todo-item { grid-template-columns: auto minmax(0, 1fr) auto; gap: 5px 10px;
-                 align-items: start; padding: 11px 10px; border-radius: 8px; }
+                 align-items: start; padding: 11px 10px; border-radius: 10px; }
     .todo-chk { grid-column: 1; grid-row: 1 / span 2; width: 22px; height: 22px; margin-top: 2px; }
     .todo-chk::before { content: ""; position: absolute; inset: -11px; }
     .todo-chk:checked::after { left: 7px; top: 2px; }

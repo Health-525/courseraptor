@@ -47,7 +47,7 @@ export const scheduleImageTools = {
       if (!cached) {
         return {
           error:
-            "还没有课表缓存：请先在 设置 → 学校 → 导入课表，或先查询一次课表让缓存落盘。不要编造课表内容。",
+            "还没有课表缓存：请用户在对话里贴课表或上传课表文件，先调 import_schedule 导入（也可用 设置 → 导入课表）。不要编造课表内容。",
         };
       }
       const schedule = cached.schedule;

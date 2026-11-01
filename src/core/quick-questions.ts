@@ -15,6 +15,7 @@ export const QUICK_QUESTION_MAX_COUNT = 12;
 export const DEFAULT_QUESTIONS: string[] = [
   "今天有什么安排",
   "这周课表",
+  "帮我导入课表",
   "教务处最近有什么通知",
   "我的成绩和 GPA",
   "最近的考试安排",

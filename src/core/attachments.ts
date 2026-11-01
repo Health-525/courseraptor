@@ -656,6 +656,16 @@ export async function openLocalFile(
   return analyzeBuffer(buf, filename, source, opts, { mtimeMs: stat.mtimeMs });
 }
 
+/** 附件解析结果 → 课表导入用的纯文本：表格给数据行（表头+预览行），长文给全文；
+ *  不支持解析的格式给空（调用方据此提示改贴文字或换格式） */
+export function importTextOf(result: AttachmentResult): string {
+  if (result.mode === "text") return result.text;
+  if (result.mode === "table") return result.sheets.map((s) => s.preview.join("\n")).join("\n\n");
+  if (result.mode === "search") return result.matches.join("\n");
+  if (result.mode === "firecrawl") return result.markdown;
+  return "";
+}
+
 /** 从缓存按 id 重新出视图（query_table / 续读用，不重新下载） */
 export async function viewCachedAttachment(
   id: string,

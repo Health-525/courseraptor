@@ -21,7 +21,8 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(max-width: 720px)" content="#AD392C">
 <meta name="theme-color" content="#F6F4ED">
 <link rel="icon" type="image/png" href="/logo.png">
 <title>今日日程 · CourseRaptor</title>
@@ -158,41 +159,38 @@ export function todayPage(options: { demo?: boolean; demoData?: TodayBrief } = {
                color: var(--ink-3); overflow-wrap: anywhere; }
   .exam-list { display: grid; gap: 8px; }
 
-  /* ── 手机：页头一行，下一节课成为首屏主角 ── */
+  /* ── 手机：朱砂报头（mobile-nav 共享）承担页题与日期；正文是头版——
+     版次行（第几教学周）→ 今日头条 → 考试 ── */
   @keyframes mobileEnter { from { opacity: 0; transform: translateY(6px); }
                            to { opacity: 1; transform: none; } }
   @media (max-width: 720px) {
-    .pagehead { flex-wrap: nowrap; padding: 12px 16px; gap: 10px; }
-    .pagehead .seal { width: 34px; height: 34px; }
-    .pagehead .seal img { top: 4px; left: 4px; width: 26px; height: 26px; }
-    .ph-title h1 { font-size: 20px; }
-    .ph-title .ph-stamp, .ph-week, .ph-right .tbtn { display: none; }
-    .ph-right { width: auto; flex: none; margin-left: auto; }
-    .ph-clock { flex: none; }
-    .ph-date { font-size: 12px; }
-    main { display: block; padding: 16px 14px 28px; }
-    .schedule-rail { position: static; display: grid; grid-template-columns: auto minmax(0, 1fr);
-                     align-items: start; gap: 12px; padding: 0 2px 12px; }
+    .ph-week, .ph-right .tbtn { display: none; }
+    main { display: block; padding: 18px 14px 28px; }
+    /* 版次行：左楷体周次、右等宽更新时间，一条墨线收底 */
+    .schedule-rail { position: static; display: flex; align-items: flex-end;
+                     justify-content: space-between; gap: 12px;
+                     margin: 0 2px 14px; padding: 0 0 10px;
+                     border-bottom: 1px solid var(--ink); }
     .rail-kicker, .rail-nav { display: none; }
-    .rail-title { font-size: 22px; }
-    .rail-meta { margin: 0; padding: 0; border-top: 0; text-align: right; font-size: 12px; }
-    .rail-meta .tbtn { min-height: 34px; margin-top: 6px; }
+    .rail-title { font-size: 24px; line-height: 1.2; }
+    .rail-meta { margin: 0; padding: 0; border-top: 0; text-align: right;
+                 font-size: 11.5px; line-height: 1.6; }
+    .rail-meta .tbtn { min-height: 34px; margin-top: 6px; border-radius: 999px; }
     .col { gap: 16px; }
-    .lead { padding: 16px; border: 1px solid var(--rule-2); border-top: 2px solid var(--accent);
-            border-radius: 12px; animation: mobileEnter .28s ease-out; }
-    .lead-kicker { font-size: 12px; letter-spacing: .08em; }
-    .lead-title { font-size: 22px; }
+    .lead { padding: 18px 16px 16px; animation: mobileEnter .28s ease-out; }
+    .lead-kicker { font-size: 11px; letter-spacing: .16em; }
+    .lead-title { font-size: 26px; line-height: 1.25; }
     .lead-count { font-size: 21px; }
     .today-strip { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 3px;
                    scroll-snap-type: x proximity; }
-    .tchip { flex: none; scroll-snap-align: start; }
+    .tchip { flex: none; scroll-snap-align: start; border-radius: 10px; }
     .tchip.done { opacity: 1; background: var(--shade); }
     .tchip.done .tchip-name { color: var(--ink-3); text-decoration: line-through; }
-    .card { border-radius: 12px; animation: mobileEnter .28s .05s ease-out both; }
+    .card { animation: mobileEnter .28s .05s ease-out both; }
     .card > h2 { padding: 12px 16px 10px; }
     .cbody { padding: 12px; }
-    .exam-item { padding: 10px; }
-    .exam-dday { font-size: 12px; }
+    .exam-item { padding: 10px; border-radius: 10px; }
+    .exam-dday { font-size: 12px; border-radius: 6px; }
     .exam-meta { font-size: 12.5px; }
   }
 
@@ -283,7 +281,7 @@ function renderLead(b) {
   if (!b.schedule.available) {
     tag = "待建档"; tagNext = true;
     titleText = "还没有课表数据";
-    metaText = "在对话页问一次课表（如「这学期课表看一下」），我把它缓存到本机后，这个页面就有数据了。";
+    metaText = "在对话里把课表发给我——贴文字或上传 Excel / PDF / Word，说「帮我导入课表」，导入后这个页面就有数据了。";
   } else if (current.length) {
     const c = current[0];
     tag = "正在上课"; tagNext = false;
@@ -362,7 +360,7 @@ function renderSrc(b) {
   n.textContent = "";
   if (!b.schedule.available) {
     n.appendChild(el("div", null, "尚无本地课表缓存"));
-    n.appendChild(el("div", null, "请在对话页查询一次本周课表。"));
+    n.appendChild(el("div", null, "在对话里发课表即可导入。"));
   } else {
     const s = el("div", b.schedule.stale ? "stale" : null,
       "课表更新于 " + fmtStamp(b.schedule.cachedAt) + (b.schedule.stale ? "（较旧）" : ""));

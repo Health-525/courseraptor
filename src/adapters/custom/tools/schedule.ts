@@ -36,9 +36,10 @@ export const customScheduleTools = {
     execute: async ({ semester }) => {
       const cached = loadScheduleCache();
       if (!cached) {
-        // 「请先配置」口径：网页端据此自动推出设置面板
+        // 对话即入口：不再推设置面板（不含「请先配置」口径），由 agent 当场
+        // 引导用户把课表发进对话走 import_schedule；设置页导入仍作备选
         throw new Error(
-          "尚未导入课表：请先配置——功能大厅 → 设置 → 学校 → 导入课表，粘贴文字课表或上传文件，AI 解析后即可查询",
+          "尚未导入课表：请用户直接在对话里贴课表文字或上传课表文件（Excel/PDF/Word/TXT），收到后调 import_schedule 导入；也可用 功能大厅 → 设置 里的「导入课表」",
         );
       }
       const term: ScheduleResult = cached.schedule;
@@ -49,7 +50,7 @@ export const customScheduleTools = {
         }
         if (parsed.year !== term.year || parsed.semester !== term.semester) {
           return {
-            error: `本地只有「${term.label}」的导入课表；要换学期请到 设置 → 学校 → 导入课表 重新导入`,
+            error: `本地只有「${term.label}」的导入课表；要换学期请让用户把新学期课表发到对话里，调 import_schedule 重新导入`,
           };
         }
       }
@@ -67,7 +68,7 @@ export const customScheduleTools = {
         weekSource: week?.source,
         weekNote:
           week?.source === "estimated"
-            ? "⚠️ 开学日期是估算值，在 设置 → 学校 → 导入课表 里填开学日期即可校准"
+            ? "⚠️ 开学日期是估算值：重新导入课表时告知开学日期（第 1 周周一）即可校准，对话里或 设置 → 导入课表 都行"
             : week?.evidence,
         total: term.courses.length,
         courses: term.courses.map((c) => ({

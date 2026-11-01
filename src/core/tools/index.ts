@@ -19,6 +19,7 @@ import { promptTools } from "./prompts";
 import { reminderTools } from "./reminders";
 import { scheduleEditTools } from "./schedule-edit";
 import { scheduleImageTools } from "./schedule-image";
+import { scheduleImportTools } from "./schedule-import";
 import { settingsTools } from "./settings";
 import { skillTools } from "./skill-library";
 import { timeTools } from "./time";
@@ -39,6 +40,7 @@ export const coreTools = {
   ...skillTools,
   ...scheduleImageTools,
   ...scheduleEditTools,
+  ...scheduleImportTools,
   ...settingsTools,
   ...panelTools,
   ...weatherTools,

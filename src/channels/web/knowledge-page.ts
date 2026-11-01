@@ -42,7 +42,8 @@ export function knowledgePage(
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(max-width: 720px)" content="#AD392C">
 <meta name="theme-color" content="#F6F4ED">
 <link rel="icon" type="image/png" href="/logo.png">
 <title>知识库 · CourseRaptor</title>
@@ -293,25 +294,23 @@ export function knowledgePage(
                     to { opacity: 1; transform: none; } }
   .enter { animation: rise .38s cubic-bezier(.2, .7, .3, 1) both; }
 
+  /* 手机：朱砂报头（mobile-nav 共享）之下，搜索 → 标签横滚 → 卷首统计 → 川流 */
   @media (max-width: 720px) {
     :root { --heat-s: 10px; }
-    .pagehead { flex-wrap: nowrap; padding: 12px 16px; gap: 10px; }
-    .pagehead .seal { width: 34px; height: 34px; }
-    .pagehead .seal img { top: 4px; left: 4px; width: 26px; height: 26px; }
-    .ph-title h1 { font-size: 20px; }
-    .ph-title .ph-stamp, .ph-right { display: none; }
-    main { display: block; padding: 14px 14px 28px; }
+    .ph-right { display: none; }
+    main { display: block; padding: 18px 14px 28px; }
     .kn-rail { position: static; margin-bottom: 14px; padding: 0; border-bottom: 0; }
-    .kw-box { min-height: 44px; border-radius: 10px; background: var(--card); }
+    .kw-box { min-height: 46px; border-radius: 999px; padding-left: 18px;
+              background: var(--card); }
     .kw-hint, .rail-sec, .rail-meta { display: none; }
-    .cat-nav { flex-direction: row; flex-wrap: nowrap; gap: 6px; margin: 8px 0 0;
+    .cat-nav { flex-direction: row; flex-wrap: nowrap; gap: 6px; margin: 10px 0 0;
                overflow-x: auto; padding-bottom: 3px; }
     .cat-btn { flex: none; width: auto; min-height: 36px; border: 1px solid var(--rule);
-               background: var(--paper); padding: 5px 10px; border-radius: 8px; }
+               background: var(--paper); padding: 5px 12px; border-radius: 999px; }
     .cat-btn.active::before { display: none; }
     .cat-label { max-width: 9em; }
     .kn-hero { flex-direction: column; align-items: stretch; gap: 12px; margin-bottom: 14px;
-               padding: 14px; border-radius: 12px; }
+               padding: 14px; border-radius: 14px; }
     .hero-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
     .hs-cell { flex-direction: column; gap: 3px; padding: 0 12px; }
     .hs-cell .n { font-size: 25px; }

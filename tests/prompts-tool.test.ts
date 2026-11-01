@@ -16,7 +16,7 @@ process.env.RAPTOR_CREDENTIALS_FILE = path.join(tmpData, "credentials.enc");
 
 const { coreTools } = await import("../src/core/tools");
 const { loadCredentialsStore } = await import("../src/core/credentials");
-const { DEFAULT_QUESTIONS } = await import("../src/core/quick-questions");
+const { DEFAULT_QUESTIONS, QUICK_QUESTION_MAX_COUNT } = await import("../src/core/quick-questions");
 
 const manage = coreTools.manage_prompts as unknown as {
   execute: (input: Record<string, unknown>) => Promise<Record<string, unknown>>;
@@ -82,8 +82,9 @@ test("reset：恢复默认清单", async () => {
 
 test("add 超量（>12 条）拒绝并提示先删", async () => {
   await manage.execute({ action: "reset" });
-  // 默认 7 条 + 5 条 = 12 条（上限），再加 1 条必须被拒
-  const fill = Array.from({ length: 5 }, (_, i) => `自定义提示 ${i + 1}`);
+  // 默认清单 + 补齐到上限，再加 1 条必须被拒（条数由常量推出，默认清单增减不改本测试）
+  const room = QUICK_QUESTION_MAX_COUNT - DEFAULT_QUESTIONS.length;
+  const fill = Array.from({ length: room }, (_, i) => `自定义提示 ${i + 1}`);
   const filled = await manage.execute({ action: "add", items: fill });
   assert.equal(filled.ok, true);
   const overflow = await manage.execute({ action: "add", items: ["第 13 条"] });

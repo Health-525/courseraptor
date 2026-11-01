@@ -3,7 +3,11 @@
 
 import type http from "node:http";
 import type { ModelMessage } from "ai";
-import { type AttachmentResult, openLocalFile } from "../../core/attachments";
+import {
+  type AttachmentResult,
+  importTextOf as importTextOfCore,
+  openLocalFile,
+} from "../../core/attachments";
 import { appendRound, contextMessages, DEFAULT_ID, ledgerOf } from "../../core/chat-sessions";
 import { EMPTY_TURN_HINT } from "../../core/empty-turn";
 import { ledgerBlock, ledgerLine } from "../../core/session-ledger";
@@ -158,14 +162,9 @@ function attachmentDigest(result: AttachmentResult, name: string, storedPath: st
   return `${head}\n（内容已由云解析兜底，见 markdown）`;
 }
 
-/** 课表导入用的附件 → 纯文本：表格给数据行（表头+预览行），长文给全文；不支持解析的格式给空 */
-export function importTextOf(result: AttachmentResult): string {
-  if (result.mode === "text") return result.text;
-  if (result.mode === "table") return result.sheets.map((s) => s.preview.join("\n")).join("\n\n");
-  if (result.mode === "search") return result.matches.join("\n");
-  if (result.mode === "firecrawl") return result.markdown;
-  return "";
-}
+/** 课表导入用的附件 → 纯文本：实现已上移 core/attachments（对话导入工具
+ *  与网页导入端点共用），这里原地转出口保持既有导入路径不变。 */
+export const importTextOf = importTextOfCore;
 
 /** 发消息前把本轮上传预解析成小型文本块，直接注入模型上下文 */
 async function preparseUploads(uploads: WebUpload[]): Promise<string> {

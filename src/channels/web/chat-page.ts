@@ -12,6 +12,7 @@ export function chatPage(options: { demo?: boolean } = {}): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(max-width: 720px)" content="#AD392C">
 <meta name="theme-color" content="#F0EDE4">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -1583,37 +1584,58 @@ export function chatPage(options: { demo?: boolean } = {}): string {
        失焦即回来；仅触屏生效，桌面聚焦不打扰点提示词 */
     form:has(textarea:focus) .quickbar { display: none; }
   }
-  /* ── 手机工作台：压缩欢迎区，输入与核心导航落在拇指热区 ── */
+  /* ── 手机工作台：朱砂报头 + 纸面正文 + 浮起输入卡（底部 Dock 见 mobile-nav）──
+     顶栏在手机上就是红头文件的报头：朱砂通栏、纸色字标与图标、带底文件头
+     双线（粗纸线 + 3px 下细线）。首屏是左对齐的封面：小印章 → 日期眉批 →
+     楷体问候 → 题花短线 → 说明。红色只用在报头、印章与主按钮上。 */
   @keyframes mobileHeroIn { from { opacity: 0; transform: translateY(6px); }
                             to { opacity: 1; transform: none; } }
   @media (max-width: 720px) {
-    .topbar { min-height: 56px; background: var(--paper); border-bottom-color: transparent; }
-    #log { padding: 24px 18px 20px; }
-    .hero { justify-content: flex-start; padding: 38px 6px 32px; }
-    .hero .seal { width: 76px; height: 76px; margin-bottom: 18px;
+    .topbar { position: relative; z-index: 2; min-height: 0; gap: 4px;
+              padding: max(8px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right))
+                       8px max(6px, env(safe-area-inset-left));
+              background: var(--accent); border-bottom: 3px solid var(--card);
+              box-shadow: 0 6px 0 -3px rgba(252, 251, 247, .45); }
+    .topbar .tb-title { font-size: 19px; }
+    .topbar .wordmark .course { color: rgba(252, 251, 247, .8); }
+    .topbar .wordmark .raptor { color: var(--card); }
+    .topbar .iconbtn, .topbar .iconbtn:hover { color: var(--card); }
+    .topbar .iconbtn:active { background: rgba(252, 251, 247, .16); }
+    .topbar .iconbtn:focus-visible { outline-color: var(--card); outline-offset: -4px; }
+    #log { padding: 22px 18px 18px; }
+    /* 封面：左对齐，印章缩成落款章，楷体问候下一道朱砂题花 */
+    .hero { align-items: flex-start; justify-content: flex-start; text-align: left;
+            padding: 26px 4px 24px; }
+    .hero .seal { width: 60px; height: 60px; margin: 0 0 22px;
                   animation: mobileHeroIn .3s ease-out; }
-    .hero .seal img { top: 9px; left: 9px; width: 58px; height: 58px; }
-    .hero .hero-kicker { margin-bottom: 9px; letter-spacing: .12em;
+    .hero .seal img { top: 7px; left: 7px; width: 46px; height: 46px; }
+    .hero .hero-kicker { margin-bottom: 8px; letter-spacing: .16em;
                          animation: mobileHeroIn .3s .05s ease-out both; }
-    .hero h2 { font-size: 28px; letter-spacing: .5px;
+    .hero h2 { font-size: 32px; line-height: 1.25; letter-spacing: 1px;
                animation: mobileHeroIn .3s .1s ease-out both; }
-    .hero p { max-width: 330px; line-height: 1.75;
+    .hero h2::after { content: ""; display: block; width: 34px; height: 3px;
+                      margin: 14px 0 2px; background: var(--accent); }
+    .hero p { margin: 0; max-width: 21em; line-height: 1.8;
               animation: mobileHeroIn .3s .15s ease-out both; }
     .hero .mobile-block { display: block; }
     .hero .hint { display: block; margin-top: 8px; font-family: var(--sans);
                   font-size: 13px; line-height: 1.6; letter-spacing: 0; }
-    .turn { margin-bottom: 30px; }
-    .turn.user .msg { padding: 11px 14px; border-radius: 0 8px 8px 0; }
-    form { border-top: 0; padding: 8px max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left)); }
+    .turn { margin-bottom: 28px; }
+    .turn.user .msg { padding: 11px 14px; border-radius: 0 12px 12px 0; }
+    /* 输入区：不再是一条底栏，而是浮在纸面上的圆角输入卡 */
+    form { border-top: 0; background: transparent;
+           padding: 6px max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left)); }
     .quickbar { width: 100%; margin-bottom: 8px; }
     .qlabel { display: none; }
     .qchips { width: 100%; }
-    .chip { min-height: 36px; background: var(--paper); }
-    .cwrap { gap: 6px; padding: 6px; border-radius: 12px;
-             box-shadow: 0 5px 18px rgba(50, 42, 31, .07); }
-    .attach-btn { border-color: transparent; background: transparent; }
-    #b { padding: 8px 16px; border-radius: 9px; }
-    .jump { bottom: calc(var(--jump-bottom, 96px) + var(--vkb, 0px) + 66px); }
+    .chip { min-height: 36px; padding: 5px 14px; border-radius: 999px;
+            background: var(--card); }
+    .cwrap { gap: 6px; padding: 6px 6px 6px 8px; border-radius: 18px;
+             box-shadow: 0 8px 26px rgba(50, 42, 31, .1); }
+    .cwrap:focus-within { box-shadow: 0 10px 30px rgba(50, 42, 31, .15); }
+    .attach-btn { border-color: transparent; background: transparent; border-radius: 12px; }
+    #b { padding: 8px 16px; border-radius: 13px; }
+    .jump { bottom: calc(var(--jump-bottom, 96px) + var(--vkb, 0px) + 88px); }
     .hall-head { padding-left: max(16px, env(safe-area-inset-left));
                  padding-right: max(16px, env(safe-area-inset-right)); }
     .hall-rule { margin: 0 16px; }
@@ -1622,6 +1644,13 @@ export function chatPage(options: { demo?: boolean } = {}): string {
     .hall-ico { width: 34px; height: 34px; }
     .tool summary, .think summary { min-height: 44px; }
     .acts .tbtn, .frow a.tbtn { min-height: 42px; }
+  }
+  /* 触屏打字时收起底部 Dock：键盘已占半屏，导航让位给输入卡与消息区
+     （同 quickbar 的聚焦收起；失焦即回） */
+  @media (max-width: 720px) and (hover: none) {
+    .chat-shell:has(#i:focus) .mobile-tabbar { display: none; }
+    .chat-shell:has(#i:focus) main { padding-bottom: 0; }
+    .chat-shell:has(#i:focus) .jump { bottom: calc(var(--jump-bottom, 96px) + var(--vkb, 0px)); }
   }
 ${MOBILE_NAV_CSS}
 </style>

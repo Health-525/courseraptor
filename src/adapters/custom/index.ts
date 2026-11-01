@@ -17,7 +17,7 @@ import { customScheduleTools } from "./tools/schedule";
 /** 自定义学校没有教务登录：任何登录调用都指回设置页 */
 const noJwgl = async () => {
   throw new Error(
-    "自定义学校模式没有接入教务系统：课表用 设置 → 学校 → 导入课表；需要教务在线功能请换回已适配学校",
+    "自定义学校模式没有接入教务系统：课表在对话里直接导入（贴文字或上传课表文件），或用 设置 里的「导入课表」",
   );
 };
 
@@ -60,7 +60,7 @@ export const customSchool: SchoolAdapter = {
       const cached = loadScheduleCache();
       return cached
         ? { ok: true, data: cached.schedule }
-        : { ok: false, error: "尚未导入课表（设置 → 学校 → 导入课表）" };
+        : { ok: false, error: "尚未导入课表（在对话里发课表即可导入，或用 设置 → 导入课表）" };
     },
     fetchExamsSmart: async (): Promise<FetchResult<ExamResult>> => ({
       ok: false,

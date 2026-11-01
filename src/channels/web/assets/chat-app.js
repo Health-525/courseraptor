@@ -3001,14 +3001,20 @@ function buildSchedule(b) {
         hallEmpty(
           "🗓️",
           "还没有导入课表",
-          "其他学校模式：粘贴文字或上传文件，AI 解析后确认即可用。",
-          "去导入课表",
+          "直接在对话里贴课表文字或上传文件，说「帮我导入课表」；也可以用表单导入。",
+          "用表单导入",
           () => openHall("import"),
         ),
       );
       return wrap;
     }
-    wrap.appendChild(hallEmpty("🗓️", "还没有课表", "在对话框里说「课表」，查询后这里就会显示。"));
+    wrap.appendChild(
+      hallEmpty(
+        "🗓️",
+        "还没有课表",
+        "在对话里把课表发给我，说「帮我导入课表」，导入后这里就会显示。",
+      ),
+    );
     return wrap;
   }
   (b.week?.days || []).forEach((d) => {

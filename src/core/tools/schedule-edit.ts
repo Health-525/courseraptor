@@ -133,7 +133,7 @@ export const scheduleEditTools = {
       if (!cached) {
         return {
           error:
-            "还没有课表缓存：请先在 设置 → 学校 → 导入课表，或先调 get_schedule 查一次课表落盘。修改前先 list 看清现状，不要凭印象改。",
+            "还没有课表缓存：请用户在对话里贴课表或上传课表文件，先调 import_schedule 导入（也可用 设置 → 导入课表）。修改前先 list 看清现状，不要凭印象改。",
         };
       }
       // base：首次编辑时快照原始课表（revert 用）；本次未动 base 语义

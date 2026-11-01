@@ -106,6 +106,11 @@ function ledgerCategory(
       return action === "status" || action === "list" ? undefined : PREFIX.pomodoro;
     case "edit_schedule":
       return action === "list" ? undefined : PREFIX.schedule;
+    // 对话内课表导入：parse 只出草稿不登记，commit 落盘才是状态改动
+    case "import_schedule":
+      return undefined;
+    case "import_schedule_commit":
+      return PREFIX.schedule;
     case "edit_exams":
       return action === "list" ? undefined : PREFIX.exams;
     case "edit_grades":

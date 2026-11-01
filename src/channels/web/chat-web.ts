@@ -336,7 +336,7 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse) {
       const weekParam = Number(params.get("week"));
       const cached = loadScheduleCache();
       if (!cached) {
-        json(res, { error: "还没有课表缓存：在对话页查询一次课表后再导出" });
+        json(res, { error: "还没有课表：在对话里把课表发给我（贴文字或上传文件）导入后再导出" });
         return;
       }
       const schedule = cached.schedule;

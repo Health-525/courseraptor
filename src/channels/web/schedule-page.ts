@@ -22,7 +22,8 @@ export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } 
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" media="(max-width: 720px)" content="#AD392C">
 <meta name="theme-color" content="#F6F4ED">
 <link rel="icon" type="image/png" href="/logo.png">
 <title>课表 · CourseRaptor</title>
@@ -180,19 +181,15 @@ export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } 
      上课时间直接进课格（.tt-course-meta[data-time]），滚到周中时不用
      回头查节次列。 ── */
   @media (max-width: 720px) {
-    .pagehead { flex-wrap: nowrap; padding: 12px 16px; gap: 10px; }
-    .pagehead .seal { width: 34px; height: 34px; }
-    .pagehead .seal img { top: 4px; left: 4px; width: 26px; height: 26px; }
-    .ph-title h1 { font-size: 20px; }
-    .ph-title .ph-stamp, .ph-clock, .ph-right a[href="/today"], .ph-right a[href="/"] { display: none; }
-    .ph-right { width: auto; flex: none; gap: 6px; margin-left: auto; }
-    .ph-right .tbtn { min-height: 34px; padding: 4px 8px; font-size: 12px; white-space: nowrap; }
-    main { display: block; padding: 14px 14px 28px; }
+    /* 报头（mobile-nav 共享）里只留两枚出图胶囊；日期与跨页链接交给 Dock */
+    .ph-clock, .ph-right a[href="/today"], .ph-right a[href="/"] { display: none; }
+    .ph-right .tbtn { white-space: nowrap; }
+    main { display: block; padding: 18px 14px 28px; }
     .schedule-rail { position: static; padding: 0 2px 12px; }
     .rail-kicker { display: none; }
-    .rail-title { font-size: 22px; }
+    .rail-title { font-size: 24px; }
     .week-nav { margin-top: 10px; gap: 8px; }
-    .week-nav .tbtn, .week-sel { min-height: 40px; }
+    .week-nav .tbtn, .week-sel { min-height: 40px; border-radius: 10px; }
     .rail-meta { margin-top: 10px; padding-top: 8px; font-size: 12px; }
     .col { gap: 0; }
     .schedule-view-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 3px;
@@ -203,9 +200,9 @@ export function schedulePage(options: { demo?: boolean; demoData?: TodayBrief } 
                                    font-family: inherit; font-size: 14px; cursor: pointer; }
     .schedule-view-switch button[aria-pressed="true"] { background: var(--card); color: var(--accent-deep);
                                    font-weight: 600; box-shadow: 0 1px 4px rgba(50, 42, 31, .08); }
-    .mobile-day-card { display: block; border-radius: 12px; }
+    .mobile-day-card { display: block; }
     body.schedule-week .mobile-day-card { display: none; }
-    #weekCard { display: none; border-radius: 12px; }
+    #weekCard { display: none; border-radius: 14px; }
     body.schedule-week #weekCard { display: block; }
     .day-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 10px;
                 scroll-snap-type: x proximity; }
@@ -361,7 +358,7 @@ function renderWeek(b) {
   const prevScroll = prevWrap ? prevWrap.scrollLeft : 0;
   body.textContent = "";
   if (!b.schedule.available) {
-    body.appendChild(el("p", "daynote", "暂无课表数据。在对话页问一次课表（如「这学期课表看一下」），缓存到本机后这里就有数据了。"));
+    body.appendChild(el("p", "daynote", "暂无课表数据。在对话里把课表发给我（贴文字或上传 Excel / PDF / Word），说「帮我导入课表」，导入后这里就有数据了。"));
     note.textContent = "";
     return;
   }
@@ -479,7 +476,7 @@ function renderDay(b) {
   body.textContent = "";
   $("dayNote").textContent = b.term.weekLabel || "";
   if (!b.schedule.available) {
-    body.appendChild(el("p", "daynote", "暂无课表数据。在对话页问一次课表，缓存后这里就有数据了。"));
+    body.appendChild(el("p", "daynote", "暂无课表数据。在对话里发课表说「帮我导入课表」，导入后这里就有数据了。"));
     return;
   }
   if (!b.week) {
@@ -545,7 +542,7 @@ function renderSrc(b) {
   n.textContent = "";
   if (!b.schedule.available) {
     n.appendChild(el("div", null, "尚无本地课表缓存"));
-    n.appendChild(el("div", null, "请在对话页查询一次本周课表。"));
+    n.appendChild(el("div", null, "在对话里发课表即可导入。"));
   } else {
     const s = el("div", b.schedule.stale ? "stale" : null,
       "课表更新于 " + fmtStamp(b.schedule.cachedAt) + (b.schedule.stale ? "（较旧）" : ""));
