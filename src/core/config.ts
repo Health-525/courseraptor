@@ -51,6 +51,11 @@ export interface RaptorConfig {
    * 桥关闭主动推送，绝不把本机单用户数据广播给全部授权用户。
    */
   qqPushOpenids: string[];
+  /**
+   * QQ 私聊流式回复（官方 stream_messages）：逐字回放模型输出。默认开启；
+   * QQBOT_STREAM=0 关闭（退回心跳提示 + 整段回复的旧通路）。
+   */
+  qqStream: boolean;
   /** QQ 凭证来源（诊断用）；「完整可用」指 AppID 与 AppSecret 都在 */
   qqBotSource: QQBotSource;
   /** 教务请求全局限速（zod 校验后的 RAPTOR_MAX_RPS / RAPTOR_BURST） */
@@ -302,6 +307,7 @@ function loadConfig(): RaptorConfig {
     qqBotPasscode: resolvedQQ.passcode,
     qqBotSource: resolvedQQ.source,
     qqPushOpenids: parseQQPushOpenids(env("QQBOT_PUSH_OPENIDS")),
+    qqStream: env("QQBOT_STREAM") !== "0",
     rateLimit: parseRateLimit(),
   };
 
