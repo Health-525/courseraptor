@@ -34,8 +34,9 @@ jobs:
         working-directory: landing
       - run: npm run build
         working-directory: landing
-        env:
-          PAGES_BASE: /courseraptor/
+      # 域名绑定主要存于 Pages 设置；产物内再放一份 CNAME，防止配置被重置后丢失
+      - run: echo courseraptor.com > dist/CNAME
+        working-directory: landing
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
